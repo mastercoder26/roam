@@ -18,6 +18,10 @@
 		A1000000000000000000000B /* AddressSearchField.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000B /* AddressSearchField.swift */; };
 		A1000000000000000000000D /* AnimationConstants.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000010 /* AnimationConstants.swift */; };
 		A1000000000000000000000E /* DesignSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000011 /* DesignSystem.swift */; };
+		A10000000000000000000012 /* SwerveRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000012 /* SwerveRootView.swift */; };
+		A10000000000000000000013 /* DriveView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000013 /* DriveView.swift */; };
+		A10000000000000000000014 /* DriveSessionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000014 /* DriveSessionManager.swift */; };
+		A10000000000000000000015 /* DrivingScore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000015 /* DrivingScore.swift */; };
 		A1000000000000000000000C /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000C /* Assets.xcassets */; };
 /* End PBXBuildFile section */
 
@@ -37,6 +41,10 @@
 		A2000000000000000000000F /* Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Release.xcconfig; sourceTree = "<group>"; };
 		A20000000000000000000010 /* AnimationConstants.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnimationConstants.swift; sourceTree = "<group>"; };
 		A20000000000000000000011 /* DesignSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem.swift; sourceTree = "<group>"; };
+		A20000000000000000000012 /* SwerveRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwerveRootView.swift; sourceTree = "<group>"; };
+		A20000000000000000000013 /* DriveView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriveView.swift; sourceTree = "<group>"; };
+		A20000000000000000000014 /* DriveSessionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriveSessionManager.swift; sourceTree = "<group>"; };
+		A20000000000000000000015 /* DrivingScore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DrivingScore.swift; sourceTree = "<group>"; };
 		A30000000000000000000001 /* Swerve.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Swerve.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -86,8 +94,10 @@
 		A50000000000000000000004 /* Features */ = {
 			isa = PBXGroup;
 			children = (
+				A5000000000000000000000C /* Root */,
 				A50000000000000000000009 /* Home */,
 				A5000000000000000000000A /* Results */,
+				A5000000000000000000000D /* Drive */,
 			);
 			path = Features;
 			sourceTree = "<group>";
@@ -96,6 +106,7 @@
 			isa = PBXGroup;
 			children = (
 				A20000000000000000000004 /* RouteDifficultyModels.swift */,
+				A20000000000000000000015 /* DrivingScore.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -104,6 +115,7 @@
 			isa = PBXGroup;
 			children = (
 				A20000000000000000000005 /* APIClient.swift */,
+				A20000000000000000000014 /* DriveSessionManager.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -151,6 +163,22 @@
 				A20000000000000000000003 /* ResultsView.swift */,
 			);
 			path = Results;
+			sourceTree = "<group>";
+		};
+		A5000000000000000000000C /* Root */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000012 /* SwerveRootView.swift */,
+			);
+			path = Root;
+			sourceTree = "<group>";
+		};
+		A5000000000000000000000D /* Drive */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000013 /* DriveView.swift */,
+			);
+			path = Drive;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -233,6 +261,10 @@
 				A1000000000000000000000B /* AddressSearchField.swift in Sources */,
 				A1000000000000000000000D /* AnimationConstants.swift in Sources */,
 				A1000000000000000000000E /* DesignSystem.swift in Sources */,
+				A10000000000000000000012 /* SwerveRootView.swift in Sources */,
+				A10000000000000000000013 /* DriveView.swift in Sources */,
+				A10000000000000000000014 /* DriveSessionManager.swift in Sources */,
+				A10000000000000000000015 /* DrivingScore.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

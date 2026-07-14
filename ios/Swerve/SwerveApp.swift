@@ -4,7 +4,7 @@ import SwiftUI
 struct SwerveApp: App {
     var body: some Scene {
         WindowGroup {
-            HomeView()
+            SwerveRootView()
         }
     }
 }

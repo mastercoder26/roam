@@ -31,6 +31,10 @@
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Swerve uses your location during a manually started drive to measure distance, speed changes, and turning events.</string>
+	<key>NSMotionUsageDescription</key>
+	<string>Swerve uses motion sensors during a manually started drive to identify abrupt phone movement.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
