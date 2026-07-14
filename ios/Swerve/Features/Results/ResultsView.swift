@@ -15,10 +15,13 @@ struct ResultsView: View {
 
     private var alternates: [ScoredRoute] {
         var routes: [ScoredRoute] = []
+        var seenPolylines = Set<String>()
         let all = [result.primaryRoute] + result.alternateRoutes
 
         for route in all where route.polyline != selectedRoute.polyline {
-            routes.append(route)
+            if seenPolylines.insert(route.polyline).inserted {
+                routes.append(route)
+            }
         }
         return routes
     }

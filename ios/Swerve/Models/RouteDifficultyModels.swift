@@ -19,7 +19,9 @@ struct RouteDifficultyResponse: Decodable {
 }
 
 struct ScoredRoute: Decodable, Identifiable, Hashable {
-    var id: String { polyline.prefix(32).description }
+    // Google route polylines commonly share their opening segment. The complete
+    // encoded polyline is needed to keep SwiftUI identities distinct.
+    var id: String { polyline }
 
     let score: Double
     let uncalibratedScore: Double?
