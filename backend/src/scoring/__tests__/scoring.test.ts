@@ -5,6 +5,7 @@ import {
   scoreToLabel,
   aggregateSegmentScores,
 } from "../index.js";
+import { getCalibrator } from "../helpers.js";
 import { highwayRoute } from "./fixtures/highway-route.js";
 import { urbanRoute } from "./fixtures/urban-route.js";
 import {
@@ -67,11 +68,11 @@ describe("highway route scoring", () => {
 });
 
 describe("urban route scoring", () => {
-  it("scores urban grid as hard (6–10)", () => {
+  it("scores a dense urban grid as hard without defaulting to very hard", () => {
     const result = scoreRoute(urbanRoute);
     expect(result.score).toBeGreaterThanOrEqual(6);
-    expect(result.score).toBeLessThanOrEqual(10);
-    expect(result.label).toMatch(/Hard|Very Hard/);
+    expect(result.score).toBeLessThan(8);
+    expect(result.label).toBe("Hard");
     expect(result.reasons.some((r) => r.includes("turn"))).toBe(true);
   });
 
@@ -81,6 +82,15 @@ describe("urban route scoring", () => {
       urbanRoute.distanceMeters
     );
     expect(maneuversPer10Mi).toBeGreaterThanOrEqual(8);
+  });
+});
+
+describe("score calibration", () => {
+  it("compresses upper heuristic scores so very hard remains exceptional", () => {
+    const calibrator = getCalibrator();
+    expect(calibrator.transform(8.7)).toBeLessThan(8);
+    expect(calibrator.transform(10)).toBe(9);
+    expect(calibrator.modelVersion).toBe("hybrid-v6");
   });
 });
 

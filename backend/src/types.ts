@@ -135,4 +135,4 @@ export interface ScoringOptions {
   conditions?: RouteConditions;
 }
 
-export const MODEL_VERSION = "hybrid-v5";
+export const MODEL_VERSION = "hybrid-v6";

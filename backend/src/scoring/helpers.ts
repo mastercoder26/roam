@@ -57,16 +57,24 @@ export function applyUncertaintyBand(
 
 const CALIBRATION_KNOTS = [
   { x: 0, y: 0 },
-  { x: 1.5, y: 1.2 },
-  { x: 3, y: 2.8 },
-  { x: 4.5, y: 4.6 },
-  { x: 6, y: 6.2 },
-  { x: 7.5, y: 7.8 },
-  { x: 9, y: 9.2 },
-  { x: 10, y: 10 },
+  { x: 1.5, y: 1.1 },
+  { x: 3, y: 2.5 },
+  { x: 4.5, y: 3.8 },
+  { x: 6, y: 5.0 },
+  { x: 7.5, y: 6.3 },
+  { x: 9, y: 7.8 },
+  { x: 10, y: 9.0 },
 ] as const;
 
-function isotonicTransform(score: number): number {
+/**
+ * Maps the heuristic workload to the product's 0–10 difficulty scale.
+ *
+ * The previous curve treated the upper half of the heuristic score as nearly
+ * linear, which made ordinary dense-city trips and traffic delays read as
+ * "Very Hard". This conservative curve keeps the ordering intact while
+ * reserving 8–10 for routes with several severe, corroborated burdens.
+ */
+export function calibrateScore(score: number): number {
   const x = Math.max(0, Math.min(10, score));
   const knots = CALIBRATION_KNOTS;
   if (x <= knots[0].x) return knots[0].y;
@@ -86,5 +94,5 @@ export function getCalibrator(): {
   transform: (score: number) => number;
   modelVersion: string;
 } {
-  return { transform: isotonicTransform, modelVersion: "hybrid-v5" };
+  return { transform: calibrateScore, modelVersion: "hybrid-v6" };
 }
