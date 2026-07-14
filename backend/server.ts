@@ -43,5 +43,5 @@ app.post("/api/route/difficulty", (req, res) => {
 });
 
 app.listen(port, () => {
-  console.log(`Drive Difficulty API listening on http://localhost:${port}`);
+  console.log(`Swerve API listening on http://localhost:${port}`);
 });

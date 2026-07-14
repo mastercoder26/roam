@@ -1,0 +1,26 @@
+import SwiftUI
+
+/// Motion tokens aligned with Apple fluid-interface defaults:
+/// critically damped springs for UI, snappy press feedback, no bounce on routine transitions.
+enum AppAnimation {
+    /// Default UI spring — no overshoot (damping 1.0, response 0.35)
+    static let spring = Animation.spring(response: 0.35, dampingFraction: 1.0)
+
+    /// Deliberate reveal (score arc, breakdown bars)
+    static let reveal = Animation.spring(response: 0.5, dampingFraction: 1.0)
+
+    /// Hero section entrance on results screen
+    static let hero = Animation.spring(response: 0.45, dampingFraction: 1.0)
+
+    /// Button press, suggestion dismiss — must feel instant
+    static let press = Animation.spring(response: 0.2, dampingFraction: 1.0)
+
+    /// High-frequency UI (search suggestions, error fade)
+    static let quick = Animation.easeOut(duration: 0.18)
+
+    /// Route / map camera — on-screen movement
+    static let map = Animation.easeInOut(duration: 0.38)
+
+    /// Stagger between hero elements only (score → map)
+    static let heroStagger: Double = 0.08
+}

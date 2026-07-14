@@ -223,7 +223,7 @@ export async function fetchOsmRouteData(route: ParsedRoute): Promise<OsmRouteDat
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
         // overpass-api.de rejects requests without an identifying UA (406)
-        "User-Agent": "drive-difficulty/1.0 (route scoring)",
+        "User-Agent": "swerve/1.0 (route scoring)",
       },
       body: `data=${encodeURIComponent(buildQuery(samples, turnPoints))}`,
       signal: controller.signal,
