@@ -3,8 +3,9 @@ import { resolve } from "node:path";
 import express from "express";
 import { handleDifficulty } from "./src/handlers/difficulty.js";
 
-config({ path: resolve(import.meta.dirname, "../.env.local") });
-config({ path: resolve(import.meta.dirname, "../.env") });
+// `server.ts` lives in `backend/`, alongside the local environment files.
+config({ path: resolve(import.meta.dirname, ".env.local") });
+config({ path: resolve(import.meta.dirname, ".env") });
 
 function getAllowedOrigins(): string[] {
   const raw = process.env.ALLOWED_ORIGINS ?? "*";
