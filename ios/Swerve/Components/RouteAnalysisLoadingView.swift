@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct RouteAnalysisLoadingView: View {
-    @State private var orbiting = false
+    @State private var orbitPhase = 0.0
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
@@ -29,14 +29,21 @@ struct RouteAnalysisLoadingView: View {
         .accessibilityLabel("Analyzing route difficulty")
         .onAppear {
             guard !reduceMotion else { return }
-            withAnimation(.linear(duration: 2.8).repeatForever(autoreverses: false)) {
-                orbiting = true
+            orbitPhase = 0
+            withAnimation(.linear(duration: 3.2).repeatForever(autoreverses: false)) {
+                orbitPhase = 1
             }
         }
     }
 
     private var globe: some View {
         ZStack {
+            Circle()
+                .stroke(
+                    Color.white.opacity(0.18),
+                    style: StrokeStyle(lineWidth: 1, dash: [3, 5])
+                )
+                .frame(width: 228, height: 228)
             Circle()
                 .fill(Color.orange)
                 .frame(width: 194, height: 194)
@@ -55,16 +62,27 @@ struct RouteAnalysisLoadingView: View {
                 .rotationEffect(.degrees(-18))
                 .offset(x: -30, y: 18)
 
-            Image(systemName: "car.side.fill")
-                .font(.title2.weight(.bold))
-                .foregroundStyle(.black)
-                .padding(11)
-                .background(.white, in: Circle())
-                .shadow(color: .black.opacity(0.22), radius: 7, y: 4)
-                .offset(y: -112)
-                .rotationEffect(.degrees(orbiting ? 360 : 0), anchor: .init(x: 0.5, y: 4.1))
+            orbitingCar
         }
-        .frame(width: 230, height: 230)
+        .frame(width: 250, height: 250)
+    }
+
+    private var orbitingCar: some View {
+        let angle = orbitPhase * 2 * .pi - (.pi / 2)
+        let orbitRadius: CGFloat = 114
+        let center: CGFloat = 125
+
+        return Image(systemName: "car.side.fill")
+            .font(.title2.weight(.bold))
+            .foregroundStyle(.black)
+            .padding(11)
+            .background(.white, in: Circle())
+            .shadow(color: .black.opacity(0.22), radius: 7, y: 4)
+            .rotationEffect(.radians(orbitPhase * 2 * .pi))
+            .position(
+                x: center + CGFloat(cos(angle)) * orbitRadius,
+                y: center + CGFloat(sin(angle)) * orbitRadius
+            )
     }
 }
 
