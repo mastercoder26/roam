@@ -139,10 +139,10 @@ private struct DotCarIllustration: View {
 
     private var dotCar: some View {
         ZStack {
-            ForEach(CarDots.shell) { dot in
+            ForEach(CarDots.all) { dot in
                 FloatingDot(
                     size: dot.size,
-                    color: dot.isAccent ? .orange : .white,
+                    color: dot.color,
                     phase: dot.phase,
                     isVisible: dotsAreFormed,
                     isBobbing: dotsAreFormed && !isDrivingAway && !reduceMotion
@@ -213,6 +213,10 @@ private struct DotWheel: View {
 
     var body: some View {
         ZStack {
+            Circle()
+                .stroke(.white.opacity(0.18), lineWidth: 2)
+                .frame(width: 34, height: 34)
+
             ForEach(0..<8, id: \.self) { index in
                 let angle = Double(index) * .pi / 4
                 FloatingDot(
@@ -227,6 +231,14 @@ private struct DotWheel: View {
                     y: CGFloat(sin(angle) * 16)
                 )
             }
+
+            FloatingDot(
+                size: 7,
+                color: .white,
+                phase: phase + 9,
+                isVisible: isVisible,
+                isBobbing: isBobbing
+            )
         }
         .frame(width: 42, height: 42)
         .rotationEffect(.degrees(isSpinning ? -720 : 0))
@@ -246,9 +258,35 @@ private struct CarDot: Identifiable {
     let size: CGFloat
     let phase: Double
     let isAccent: Bool
+    let detail: CarDetail = .body
+
+    var color: Color {
+        switch detail {
+        case .body:
+            return isAccent ? .orange : .white
+        case .glass:
+            return Color(red: 0.39, green: 0.76, blue: 1)
+        case .trim:
+            return .white.opacity(0.64)
+        case .headlamp:
+            return Color(red: 1, green: 0.84, blue: 0.28)
+        case .tailLamp:
+            return Color(red: 1, green: 0.28, blue: 0.22)
+        }
+    }
+}
+
+private enum CarDetail {
+    case body
+    case glass
+    case trim
+    case headlamp
+    case tailLamp
 }
 
 private enum CarDots {
+    static var all: [CarDot] { shell + windows + details }
+
     static let shell: [CarDot] = [
         .init(id: 0, x: 44, y: 116, size: 8, phase: 0, isAccent: true),
         .init(id: 1, x: 58, y: 106, size: 7, phase: 1, isAccent: false),
@@ -273,6 +311,36 @@ private enum CarDots {
         .init(id: 20, x: 130, y: 134, size: 8, phase: 20, isAccent: true),
         .init(id: 21, x: 70, y: 132, size: 7, phase: 21, isAccent: false),
         .init(id: 22, x: 49, y: 127, size: 8, phase: 22, isAccent: false)
+    ]
+
+    // A cool blue cluster makes the cabin read as separate glass rather than
+    // simply a raised part of the body.
+    static let windows: [CarDot] = [
+        .init(id: 23, x: 123, y: 85, size: 6, phase: 23, isAccent: false, detail: .glass),
+        .init(id: 24, x: 131, y: 76, size: 6, phase: 24, isAccent: false, detail: .glass),
+        .init(id: 25, x: 142, y: 69, size: 7, phase: 25, isAccent: false, detail: .glass),
+        .init(id: 26, x: 156, y: 66, size: 7, phase: 26, isAccent: false, detail: .glass),
+        .init(id: 27, x: 172, y: 66, size: 7, phase: 27, isAccent: false, detail: .glass),
+        .init(id: 28, x: 187, y: 70, size: 6, phase: 28, isAccent: false, detail: .glass),
+        .init(id: 29, x: 198, y: 78, size: 7, phase: 29, isAccent: false, detail: .glass),
+        .init(id: 30, x: 205, y: 86, size: 6, phase: 30, isAccent: false, detail: .glass)
+    ]
+
+    static let details: [CarDot] = [
+        // Windshield / rear-window pillars and the door seam.
+        .init(id: 31, x: 113, y: 88, size: 4, phase: 31, isAccent: false, detail: .trim),
+        .init(id: 32, x: 202, y: 91, size: 4, phase: 32, isAccent: false, detail: .trim),
+        .init(id: 33, x: 163, y: 86, size: 3, phase: 33, isAccent: false, detail: .trim),
+        .init(id: 34, x: 163, y: 99, size: 3, phase: 34, isAccent: false, detail: .trim),
+        .init(id: 35, x: 163, y: 112, size: 3, phase: 35, isAccent: false, detail: .trim),
+        // Door handle, bumpers, headlights, and taillight.
+        .init(id: 36, x: 177, y: 103, size: 4, phase: 36, isAccent: false, detail: .trim),
+        .init(id: 37, x: 41, y: 121, size: 5, phase: 37, isAccent: false, detail: .trim),
+        .init(id: 38, x: 281, y: 121, size: 5, phase: 38, isAccent: false, detail: .trim),
+        .init(id: 39, x: 43, y: 108, size: 6, phase: 39, isAccent: false, detail: .headlamp),
+        .init(id: 40, x: 278, y: 108, size: 6, phase: 40, isAccent: false, detail: .tailLamp),
+        .init(id: 41, x: 138, y: 120, size: 3, phase: 41, isAccent: false, detail: .trim),
+        .init(id: 42, x: 185, y: 120, size: 3, phase: 42, isAccent: false, detail: .trim)
     ]
 }
 
