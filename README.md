@@ -11,6 +11,22 @@ has two focused modes:
 This is a prototype, not a safety system or an emergency service. A drive score
 is coaching feedback, not a guarantee that a person or route is safe.
 
+## How scoring uses data
+
+Route difficulty combines Google Routes geometry, maneuvers, traffic-aware ETA,
+and best-effort live enrichment from Open-Meteo and OpenStreetMap/Overpass.
+Posted speed limits are assigned only to the matching sampled portion of a
+route; when that coverage is unavailable, Swerve falls back to per-step route
+timing instead of applying a route-wide average. The app lists the live sources
+that contributed to each result and shows an uncertainty band.
+
+Manual driving scores are local to the device. Swerve rejects poor GPS fixes,
+derives braking and acceleration from changes in accepted GPS speed, uses
+course change for sharp-corner signals, and transforms gravity-free Core Motion
+readings into a vertical reference frame to corroborate motion. Scores are
+normalized to distance; short or sparse drives are labelled **Preliminary**
+instead of being presented as precise assessments.
+
 ## Run the iOS app
 
 Open [Swerve.xcodeproj](ios/Swerve.xcodeproj) in Xcode, choose an iPhone
@@ -39,6 +55,19 @@ with `Ctrl+C` in its terminal, or use another port:
 
 ```bash
 PORT=3001 npm run dev
+```
+
+Run the backend scoring tests with:
+
+```bash
+npm test
+```
+
+Run the deterministic manual-drive checks with:
+
+```bash
+swiftc ios/Swerve/Models/DrivingScore.swift ios/Swerve/Models/DriveScoringEngine.swift ios/tests/DriveScoringEngineChecks.swift -o /tmp/swerve-drive-checks
+/tmp/swerve-drive-checks
 ```
 
 ## Open source and attribution

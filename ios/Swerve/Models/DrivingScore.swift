@@ -56,10 +56,14 @@ struct DrivingScore {
     var grade: String {
         if dataQuality.confidence == .low { return "Preliminary" }
         switch score {
-        case 90...: "Excellent"
-        case 78...: "Steady"
-        case 65...: "Needs attention"
-        default: "Practice needed"
+        case 90...:
+            return "Excellent"
+        case 78...:
+            return "Steady"
+        case 65...:
+            return "Needs attention"
+        default:
+            return "Practice needed"
         }
     }
 

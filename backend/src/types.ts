@@ -34,6 +34,10 @@ export interface SpeedLimitPoint {
   placeId: string;
   speedLimit?: number;
   speedLimitUnit?: "KPH" | "MPH";
+  /** Position in the sampled route polyline, when supplied by Roads API. */
+  sampleIndex?: number;
+  /** Number of source samples used to query Roads API. */
+  sampleCount?: number;
 }
 
 export interface ScoringBreakdown {

@@ -266,8 +266,24 @@ struct ResultsView: View {
                         : "\(conditions.turns.unprotectedLeftTurns) unprotected left turns (no signal)"
                 )
             }
+
+            if !conditions.sources.isEmpty {
+                Divider()
+                Label("Inputs used: \(conditions.sources.map { sourceLabel($0) }.joined(separator: ", "))", systemImage: "checkmark.seal")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
         .premiumCard()
+    }
+
+    private func sourceLabel(_ source: String) -> String {
+        switch source {
+        case "open-meteo": "Open-Meteo weather"
+        case "osm-overpass": "OpenStreetMap road data"
+        case "google-route-warnings": "Google route advisories"
+        default: source
+        }
     }
 
     private func conditionRow(systemImage: String, color: Color, text: String) -> some View {
