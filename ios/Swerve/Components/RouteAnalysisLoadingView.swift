@@ -258,7 +258,25 @@ private struct CarDot: Identifiable {
     let size: CGFloat
     let phase: Double
     let isAccent: Bool
-    let detail: CarDetail = .body
+    let detail: CarDetail
+
+    init(
+        id: Int,
+        x: CGFloat,
+        y: CGFloat,
+        size: CGFloat,
+        phase: Double,
+        isAccent: Bool,
+        detail: CarDetail = .body
+    ) {
+        self.id = id
+        self.x = x
+        self.y = y
+        self.size = size
+        self.phase = phase
+        self.isAccent = isAccent
+        self.detail = detail
+    }
 
     var color: Color {
         switch detail {
