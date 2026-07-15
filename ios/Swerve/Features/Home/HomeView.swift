@@ -180,7 +180,7 @@ private struct RouteConnector: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            Circle().fill(AppDesign.accent).frame(width: 12, height: 12).overlay(Circle().stroke(.white, lineWidth: 3))
+            Circle().fill(AppDesign.accent).frame(width: 8, height: 8).overlay(Circle().stroke(.white, lineWidth: 2))
             VStack(spacing: 5) {
                 ForEach(0..<4, id: \.self) { index in
                     Circle()
