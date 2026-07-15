@@ -9,6 +9,8 @@ struct HomeView: View {
     @State private var pendingResult: RouteAnalysisResult?
     @State private var errorMessage: String?
     @State private var navigationPath = NavigationPath()
+    @State private var originMarkerY: CGFloat = 18
+    @State private var destinationMarkerY: CGFloat = 0
     @StateObject private var locationCoordinator = RoutePlanningLocationCoordinator()
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -75,15 +77,32 @@ struct HomeView: View {
     }
 
     private var routeFields: some View {
-        HStack(alignment: .top, spacing: 10) {
-            RouteConnector(showDestination: canEnterDestination).frame(width: 24)
-            VStack(alignment: .leading, spacing: 12) {
-                originField
-                if canEnterDestination {
-                    AddressSearchField(title: "Destination", placeholder: "Where are you going?", systemImage: "flag.fill", iconColor: .red, showsIcon: false, text: $destination)
-                        .transition(reduceMotion ? .opacity : .opacity.combined(with: .move(edge: .top)))
-                }
+        VStack(alignment: .leading, spacing: 12) {
+            originField
+            if canEnterDestination {
+                AddressSearchField(title: "Destination", placeholder: "Where are you going?", systemImage: "flag.fill", iconColor: .red, showsIcon: false, text: $destination)
+                    .background {
+                        GeometryReader { proxy in
+                            Color.clear.preference(
+                                key: DestinationMarkerOffsetKey.self,
+                                value: proxy.frame(in: .named("route-fields")).minY + 18
+                            )
+                        }
+                    }
+                    .transition(reduceMotion ? .opacity : .opacity.combined(with: .move(edge: .top)))
             }
+        }
+        .padding(.leading, 34)
+        .background(alignment: .topLeading) {
+            RouteConnector(originY: originMarkerY, destinationY: destinationMarkerY, showDestination: canEnterDestination)
+                .frame(width: 24)
+                .allowsHitTesting(false)
+        }
+        .coordinateSpace(name: "route-fields")
+        .onPreferenceChange(OriginMarkerOffsetKey.self) { originMarkerY = $0 }
+        .onPreferenceChange(DestinationMarkerOffsetKey.self) { destinationMarkerY = $0 }
+        .onChange(of: canEnterDestination) { _, canEnter in
+            if !canEnter { destinationMarkerY = 0 }
         }
         .animation(reduceMotion ? .easeOut(duration: 0.2) : AppAnimation.spring, value: canEnterDestination)
     }
@@ -105,6 +124,14 @@ struct HomeView: View {
                     showsIcon: false,
                     text: $origin
                 )
+                .background {
+                    GeometryReader { proxy in
+                        Color.clear.preference(
+                            key: OriginMarkerOffsetKey.self,
+                            value: proxy.frame(in: .named("route-fields")).minY + 18
+                        )
+                    }
+                }
 
                 Button { locationCoordinator.useCurrentLocation() } label: {
                     Group {
@@ -176,28 +203,46 @@ struct HomeView: View {
 }
 
 private struct RouteConnector: View {
+    let originY: CGFloat
+    let destinationY: CGFloat
     let showDestination: Bool
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
+    private var targetY: CGFloat {
+        max(destinationY, originY + 30)
+    }
+
     var body: some View {
-        VStack(spacing: 0) {
-            Circle().fill(AppDesign.accent).frame(width: 12, height: 12).overlay(Circle().stroke(.white, lineWidth: 3))
-            VStack(spacing: 5) {
+        GeometryReader { _ in
+            ZStack {
+                Circle()
+                    .fill(AppDesign.accent)
+                    .frame(width: 12, height: 12)
+                    .overlay(Circle().stroke(.white, lineWidth: 3))
+                    .position(x: 12, y: originY)
+
                 ForEach(0..<4, id: \.self) { index in
                     Circle()
                         .fill(Color.secondary.opacity(0.55))
                         .frame(width: 3, height: 3)
+                        .position(x: 12, y: dotY(for: index))
                         .opacity(showDestination ? 1 : 0)
                         .animation(dotAnimation(for: index), value: showDestination)
                 }
+
+                Image(systemName: "flag.fill")
+                    .font(.caption)
+                    .foregroundStyle(.red)
+                    .position(x: 12, y: targetY)
+                    .opacity(showDestination ? 1 : 0)
+                    .animation(flagAnimation, value: showDestination)
             }
-            .padding(.vertical, 6)
-            Image(systemName: "flag.fill")
-                .font(.caption)
-                .foregroundStyle(.red)
-                .opacity(showDestination ? 1 : 0)
-                .animation(flagAnimation, value: showDestination)
-        }.padding(.top, 11).accessibilityHidden(true)
+        }
+        .accessibilityHidden(true)
+    }
+
+    private func dotY(for index: Int) -> CGFloat {
+        originY + (targetY - originY) * CGFloat(index + 1) / 5
     }
 
     private func dotAnimation(for index: Int) -> Animation? {
@@ -208,6 +253,22 @@ private struct RouteConnector: View {
     private var flagAnimation: Animation? {
         guard !reduceMotion else { return .easeOut(duration: 0.15) }
         return AppAnimation.spring.delay(0.36)
+    }
+}
+
+private struct DestinationMarkerOffsetKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
+    }
+}
+
+private struct OriginMarkerOffsetKey: PreferenceKey {
+    static var defaultValue: CGFloat = 18
+
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
     }
 }
 
