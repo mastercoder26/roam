@@ -9,6 +9,9 @@ final class DriveSessionManager: NSObject, ObservableObject {
     @Published private(set) var elapsed: TimeInterval = 0
     @Published private(set) var currentSpeedMetersPerSecond: CLLocationSpeed = 0
     @Published private(set) var motionSamples = 0
+    @Published private(set) var acceptedLocationSamples = 0
+    @Published private(set) var rejectedLocationSamples = 0
+    @Published private(set) var currentHorizontalAccelerationG = 0.0
     @Published private(set) var statusMessage = "Ready when you are"
     @Published private(set) var lastScore: DrivingScore?
 
@@ -17,11 +20,11 @@ final class DriveSessionManager: NSObject, ObservableObject {
     private var timer: Timer?
     private var startDate: Date?
     private var previousLocation: CLLocation?
-    private var lastCourse: CLLocationDirection?
     private var distanceMeters: CLLocationDistance = 0
     private var topSpeed: CLLocationSpeed = 0
     private var events: [DrivingEvent] = []
     private var lastEventAt: [DrivingEventKind: Date] = [:]
+    private var recentMotionSamples: [DriveMotionSample] = []
 
     override init() {
         super.init()
@@ -63,13 +66,22 @@ final class DriveSessionManager: NSObject, ObservableObject {
         locationManager.stopUpdatingLocation()
         currentSpeedMetersPerSecond = 0
 
+        let result = DriveScoringEngine.score(
+            duration: duration,
+            distanceMeters: distanceMeters,
+            events: events,
+            acceptedLocationSamples: acceptedLocationSamples,
+            rejectedLocationSamples: rejectedLocationSamples,
+            motionSamples: motionSamples
+        )
         lastScore = DrivingScore(
-            score: makeScore(duration: duration),
+            score: result.score,
             duration: duration,
             distanceMeters: distanceMeters,
             topSpeedMetersPerSecond: topSpeed,
             events: events,
-            motionSamples: motionSamples
+            motionSamples: motionSamples,
+            dataQuality: result.quality
         )
         statusMessage = motionSamples == 0
             ? "No motion samples received — try a physical iPhone."
@@ -80,12 +92,15 @@ final class DriveSessionManager: NSObject, ObservableObject {
         elapsed = 0
         currentSpeedMetersPerSecond = 0
         motionSamples = 0
+        acceptedLocationSamples = 0
+        rejectedLocationSamples = 0
+        currentHorizontalAccelerationG = 0
         previousLocation = nil
-        lastCourse = nil
         distanceMeters = 0
         topSpeed = 0
         events = []
         lastEventAt = [:]
+        recentMotionSamples = []
     }
 
     private func startElapsedTimer() {
@@ -103,7 +118,7 @@ final class DriveSessionManager: NSObject, ObservableObject {
         }
 
         motionManager.deviceMotionUpdateInterval = 1.0 / 20.0
-        motionManager.startDeviceMotionUpdates(to: .main) { [weak self] motion, _ in
+        motionManager.startDeviceMotionUpdates(using: .xArbitraryZVertical, to: .main) { [weak self] motion, _ in
             guard let self, let motion, self.isRecording else { return }
             self.record(motion: motion)
         }
@@ -112,75 +127,77 @@ final class DriveSessionManager: NSObject, ObservableObject {
     private func record(motion: CMDeviceMotion) {
         motionSamples += 1
 
-        // `userAcceleration` removes gravity. A large horizontal spike normally
-        // means the phone moved abruptly; it is kept separate from GPS-derived
-        // braking/acceleration so we do not overstate confidence.
+        // `userAcceleration` removes gravity. Transform it into a vertical-Z
+        // reference frame before measuring horizontal force so phone orientation
+        // does not change the reading.
         let acceleration = motion.userAcceleration
-        let horizontalG = hypot(acceleration.x, acceleration.y)
-        if horizontalG >= 0.48 {
-            addEvent(.phoneMovement, cooldown: 3)
+        let matrix = motion.attitude.rotationMatrix
+        let worldX = matrix.m11 * acceleration.x + matrix.m12 * acceleration.y + matrix.m13 * acceleration.z
+        let worldY = matrix.m21 * acceleration.x + matrix.m22 * acceleration.y + matrix.m23 * acceleration.z
+        let horizontalG = hypot(worldX, worldY)
+        currentHorizontalAccelerationG = horizontalG
+
+        recentMotionSamples.append(
+            DriveMotionSample(timestamp: Date(), horizontalAccelerationG: horizontalG)
+        )
+        recentMotionSamples.removeAll { Date().timeIntervalSince($0.timestamp) > 2 }
+
+        if DriveScoringEngine.shouldFlagPhoneMovement(horizontalG) {
+            addEvent(.phoneMovement, source: .deviceMotion, cooldown: 3)
         }
     }
 
     private func record(location: CLLocation) {
-        guard location.horizontalAccuracy >= 0 else { return }
+        let sample = DriveLocationSample(
+            timestamp: location.timestamp,
+            speedMetersPerSecond: location.speed,
+            courseDegrees: location.course >= 0 ? location.course : nil,
+            horizontalAccuracyMeters: location.horizontalAccuracy
+        )
+
+        guard DriveScoringEngine.accepts(sample) else {
+            rejectedLocationSamples += 1
+            return
+        }
+
+        acceptedLocationSamples += 1
         let speed = max(location.speed, 0)
         currentSpeedMetersPerSecond = speed
         topSpeed = max(topSpeed, speed)
 
         if let previousLocation {
             let time = location.timestamp.timeIntervalSince(previousLocation.timestamp)
-            if time > 0.35, time < 10 {
+            if time >= DriveScoringEngine.minimumSampleGap, time <= DriveScoringEngine.maximumSampleGap {
                 distanceMeters += location.distance(from: previousLocation)
-                let acceleration = (speed - max(previousLocation.speed, 0)) / time
-                if acceleration <= -3.2 {
-                    addEvent(.hardBrake, cooldown: 4)
-                } else if acceleration >= 2.8 {
-                    addEvent(.rapidAcceleration, cooldown: 4)
-                }
-
-                if speed >= 5, location.course >= 0, let lastCourse {
-                    let courseChange = abs(normalizedAngle(location.course - lastCourse))
-                    if courseChange / time >= 28 {
-                        addEvent(.sharpCorner, cooldown: 5)
-                    }
+                let previousSample = DriveLocationSample(
+                    timestamp: previousLocation.timestamp,
+                    speedMetersPerSecond: previousLocation.speed,
+                    courseDegrees: previousLocation.course >= 0 ? previousLocation.course : nil,
+                    horizontalAccuracyMeters: previousLocation.horizontalAccuracy
+                )
+                let nearbyMotion = recentMotionSamples
+                    .filter { abs($0.timestamp.timeIntervalSince(location.timestamp)) <= 1 }
+                    .map(\.horizontalAccelerationG)
+                    .max()
+                for event in DriveScoringEngine.detectEvents(
+                    previous: previousSample,
+                    current: sample,
+                    nearbyMotionG: nearbyMotion
+                ) {
+                    let cooldown: TimeInterval = event.kind == .sharpCorner ? 5 : 4
+                    addEvent(event.kind, source: event.source, cooldown: cooldown)
                 }
             }
         }
 
         previousLocation = location
-        if location.course >= 0 { lastCourse = location.course }
     }
 
-    private func normalizedAngle(_ degrees: CLLocationDirection) -> CLLocationDirection {
-        let wrapped = degrees.truncatingRemainder(dividingBy: 360)
-        return wrapped > 180 ? wrapped - 360 : (wrapped < -180 ? wrapped + 360 : wrapped)
-    }
-
-    private func addEvent(_ kind: DrivingEventKind, cooldown: TimeInterval) {
+    private func addEvent(_ kind: DrivingEventKind, source: DrivingEventSource, cooldown: TimeInterval) {
         let now = Date()
         if let lastEvent = lastEventAt[kind], now.timeIntervalSince(lastEvent) < cooldown { return }
         lastEventAt[kind] = now
-        events.append(DrivingEvent(kind: kind, timestamp: now))
-    }
-
-    private func makeScore(duration: TimeInterval) -> Int {
-        let penalties = events.reduce(into: 0) { total, event in
-            switch event.kind {
-            case .hardBrake:
-                total += 8
-            case .rapidAcceleration:
-                total += 6
-            case .sharpCorner:
-                total += 6
-            case .phoneMovement:
-                total += 3
-            }
-        }
-        // A very short recording is deliberately conservative: it has too little
-        // context to claim a high-confidence driving assessment.
-        let shortDrivePenalty = duration < 60 ? 8 : 0
-        return max(20, min(100, 100 - penalties - shortDrivePenalty))
+        events.append(DrivingEvent(kind: kind, timestamp: now, source: source))
     }
 }
 

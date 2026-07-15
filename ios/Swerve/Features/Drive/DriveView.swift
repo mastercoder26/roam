@@ -57,14 +57,12 @@ struct DriveView: View {
 
     private var recordingCard: some View {
         VStack(spacing: 18) {
-            HStack {
-                Label(session.isRecording ? "DRIVE IN PROGRESS" : "MANUAL DRIVE", systemImage: session.isRecording ? "record.circle.fill" : "steeringwheel")
-                    .font(.caption.weight(.bold))
-                    .foregroundStyle(session.isRecording ? .red : .secondary)
-                Spacer()
-                Text(timeString(session.elapsed))
-                    .font(.title3.monospacedDigit().weight(.semibold))
-            }
+            Label(session.isRecording ? "DRIVE IN PROGRESS" : "MANUAL DRIVE", systemImage: session.isRecording ? "record.circle.fill" : "steeringwheel")
+                .font(.caption.weight(.bold))
+                .foregroundStyle(session.isRecording ? .red : .secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+            FlipClock(elapsed: session.elapsed, isActive: session.isRecording)
 
             Button {
                 if session.isRecording { session.endDrive() } else { session.startDrive() }
@@ -105,7 +103,7 @@ struct DriveView: View {
     private var liveMetrics: some View {
         HStack(spacing: 12) {
             DriveMetric(title: "Speed", value: "\(Int((session.currentSpeedMetersPerSecond * 2.23694).rounded()))", unit: "mph", symbol: "speedometer")
-            DriveMetric(title: "Motion", value: "\(session.motionSamples)", unit: "samples", symbol: "waveform.path.ecg")
+            DriveMetric(title: "Motion", value: String(format: "%.2f", session.currentHorizontalAccelerationG), unit: "g", symbol: "waveform.path.ecg")
         }
     }
 
@@ -113,7 +111,7 @@ struct DriveView: View {
         VStack(alignment: .leading, spacing: 12) {
             SectionHeader(title: "What gets measured", subtitle: "A first-pass, on-device drive score — not a safety guarantee.")
             Label("GPS speed changes flag hard braking and rapid acceleration.", systemImage: "location.fill")
-            Label("Phone motion highlights abrupt movement without assuming the phone is mounted perfectly.", systemImage: "waveform.path.ecg")
+            Label("Motion is transformed against gravity and used as corroboration, not as a standalone verdict.", systemImage: "waveform.path.ecg")
             Label("A physical iPhone is required for meaningful sensor data.", systemImage: "iphone")
         }
         .font(.footnote)
@@ -121,9 +119,6 @@ struct DriveView: View {
         .premiumCard()
     }
 
-    private func timeString(_ time: TimeInterval) -> String {
-        String(format: "%02d:%02d", Int(time) / 60, Int(time) % 60)
-    }
 }
 
 private struct DriveMetric: View {
@@ -151,7 +146,7 @@ private struct DriveScoreCard: View {
             HStack(alignment: .firstTextBaseline) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Last drive").font(.headline)
-                    Text(score.grade).font(.footnote.weight(.semibold)).foregroundStyle(score.score >= 78 ? .green : .orange)
+                    Text(score.grade).font(.footnote.weight(.semibold)).foregroundStyle(score.dataQuality.confidence == .low ? .orange : (score.score >= 78 ? .green : .orange))
                 }
                 Spacer()
                 Text("\(score.score)")
@@ -175,6 +170,9 @@ private struct DriveScoreCard: View {
                     HStack {
                         Image(systemName: event.symbol).frame(width: 22).foregroundStyle(.orange)
                         Text(event.title)
+                        Text(eventSource(for: event))
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
                         Spacer()
                         Text("\(score.count(for: event))").monospacedDigit().foregroundStyle(.secondary)
                     }
@@ -183,8 +181,67 @@ private struct DriveScoreCard: View {
             }
 
             Text(score.summary).font(.footnote).foregroundStyle(.secondary)
+            Label(score.dataQuality.summary, systemImage: "checkmark.shield")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
         }
         .premiumCard()
+    }
+
+    private func eventSource(for kind: DrivingEventKind) -> String {
+        // Counts are grouped by event kind; source provenance is surfaced in the
+        // score summary rather than pretending every occurrence had one source.
+        kind == .phoneMovement ? "motion" : "GPS / motion"
+    }
+}
+
+private struct FlipClock: View {
+    let elapsed: TimeInterval
+    let isActive: Bool
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    private var digits: [String] {
+        let minutes = Int(elapsed) / 60
+        let seconds = Int(elapsed) % 60
+        return Array(String(format: "%02d%02d", minutes, seconds)).map(String.init)
+    }
+
+    var body: some View {
+        HStack(spacing: 5) {
+            ForEach(Array(digits.enumerated()), id: \.offset) { index, digit in
+                if index == 2 {
+                    Text(":")
+                        .font(.system(size: 30, weight: .bold, design: .rounded))
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 1)
+                }
+                FlipClockDigit(digit: digit, animate: isActive && !reduceMotion)
+            }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Drive time \(Int(elapsed) / 60) minutes, \(Int(elapsed) % 60) seconds")
+    }
+}
+
+private struct FlipClockDigit: View {
+    let digit: String
+    let animate: Bool
+
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(Color.black)
+            Text(digit)
+                .font(.system(size: 48, weight: .semibold, design: .rounded))
+                .monospacedDigit()
+                .foregroundStyle(Color.white.opacity(0.92))
+                .contentTransition(.numericText())
+            Rectangle()
+                .fill(Color.white.opacity(0.18))
+                .frame(height: 1)
+        }
+        .frame(width: 56, height: 76)
+        .animation(animate ? .spring(response: 0.28, dampingFraction: 0.82) : nil, value: digit)
     }
 }
 

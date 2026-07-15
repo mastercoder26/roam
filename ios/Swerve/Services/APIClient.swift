@@ -28,10 +28,16 @@ enum APIError: LocalizedError {
 
 struct APIClient {
     let baseURL: URL
+    private let fallbackBaseURL: URL?
     private let session: URLSession
 
-    init(baseURL: URL? = nil, session: URLSession = .shared) {
+    init(
+        baseURL: URL? = nil,
+        fallbackBaseURL: URL? = AppConfiguration.fallbackAPIBaseURL,
+        session: URLSession = .shared
+    ) {
         self.baseURL = baseURL ?? AppConfiguration.apiBaseURL
+        self.fallbackBaseURL = fallbackBaseURL
         self.session = session
     }
 
@@ -42,13 +48,6 @@ struct APIClient {
         includeAlternates: Bool = true,
         continuousDriveMinutes: Double? = nil
     ) async throws -> RouteDifficultyResponse {
-        let endpoint = baseURL.appendingPathComponent("api/route/difficulty")
-
-        var request = URLRequest(url: endpoint)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.timeoutInterval = 60
-
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime]
 
@@ -60,7 +59,28 @@ struct APIClient {
             continuousDriveMinutes: continuousDriveMinutes
         )
 
-        request.httpBody = try JSONEncoder().encode(body)
+        let requestBody = try JSONEncoder().encode(body)
+
+        do {
+            return try await sendRouteRequest(to: baseURL, body: requestBody)
+        } catch APIError.networkError(let networkError) {
+            // A physical phone cannot reach the Mac through `localhost`, so try
+            // the current development machine's LAN address after that fails.
+            guard let fallbackBaseURL, fallbackBaseURL != baseURL else {
+                throw APIError.networkError(networkError)
+            }
+            return try await sendRouteRequest(to: fallbackBaseURL, body: requestBody)
+        }
+    }
+
+    private func sendRouteRequest(to baseURL: URL, body: Data) async throws -> RouteDifficultyResponse {
+        let endpoint = baseURL.appendingPathComponent("api/route/difficulty")
+
+        var request = URLRequest(url: endpoint)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.timeoutInterval = 60
+        request.httpBody = body
 
         let data: Data
         let response: URLResponse
@@ -101,6 +121,12 @@ struct APIClient {
 }
 
 enum AppConfiguration {
+#if DEBUG
+    static let fallbackAPIBaseURL = URL(string: "http://192.168.1.117:3000")
+#else
+    static let fallbackAPIBaseURL: URL? = nil
+#endif
+
     static var apiBaseURL: URL {
         if let urlString = Bundle.main.object(forInfoDictionaryKey: "API_BASE_URL") as? String,
            !urlString.isEmpty,

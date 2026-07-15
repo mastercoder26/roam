@@ -32,6 +32,7 @@ struct DrivingEvent: Identifiable {
     let id = UUID()
     let kind: DrivingEventKind
     let timestamp: Date
+    let source: DrivingEventSource
 }
 
 struct DrivingScore {
@@ -41,6 +42,7 @@ struct DrivingScore {
     let topSpeedMetersPerSecond: CLLocationSpeed
     let events: [DrivingEvent]
     let motionSamples: Int
+    let dataQuality: DriveDataQuality
 
     var distanceMiles: Double { distanceMeters / 1_609.344 }
     var topSpeedMPH: Int { Int((topSpeedMetersPerSecond * 2.23694).rounded()) }
@@ -52,6 +54,7 @@ struct DrivingScore {
     }
 
     var grade: String {
+        if dataQuality.confidence == .low { return "Preliminary" }
         switch score {
         case 90...: "Excellent"
         case 78...: "Steady"
@@ -61,8 +64,8 @@ struct DrivingScore {
     }
 
     var summary: String {
-        guard duration >= 60 else {
-            return "Keep recording for a few minutes to make this score more useful."
+        guard dataQuality.confidence != .low else {
+            return dataQuality.summary
         }
         guard !events.isEmpty else {
             return "Smooth trip. Keep leaving room to brake and taking turns calmly."

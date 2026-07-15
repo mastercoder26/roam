@@ -18,33 +18,41 @@ struct HomeView: View {
 
     var body: some View {
         NavigationStack(path: $navigationPath) {
-            ScrollView {
-                VStack(alignment: .leading, spacing: AppDesign.sectionSpacing) {
-                    headerSection
+            ZStack {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: AppDesign.sectionSpacing) {
+                        headerSection
 
-                    routeCard
+                        routeCard
 
-                    departureCard
+                        departureCard
 
-                    if let errorMessage {
-                        errorBanner(errorMessage)
-                            .transition(.opacity.combined(with: .move(edge: .top)))
+                        if let errorMessage {
+                            errorBanner(errorMessage)
+                                .transition(.opacity.combined(with: .move(edge: .top)))
+                        }
+
+                        PrimaryActionButton(
+                            title: "Analyze Difficulty",
+                            isLoading: isLoading,
+                            isEnabled: canAnalyze
+                        ) {
+                            Task { await analyzeRoute() }
+                        }
+                        .padding(.top, 4)
                     }
-
-                    PrimaryActionButton(
-                        title: "Analyze Difficulty",
-                        isLoading: isLoading,
-                        isEnabled: canAnalyze
-                    ) {
-                        Task { await analyzeRoute() }
-                    }
-                    .padding(.top, 4)
+                    .padding(.horizontal, AppDesign.contentPadding)
+                    .padding(.vertical, 12)
                 }
-                .padding(.horizontal, AppDesign.contentPadding)
-                .padding(.vertical, 12)
+                .background(Color(.systemGroupedBackground))
+                .animation(AppAnimation.quick, value: errorMessage)
+
+                if isLoading {
+                    RouteAnalysisLoadingView()
+                        .transition(.opacity)
+                        .zIndex(1)
+                }
             }
-            .background(Color(.systemGroupedBackground))
-            .animation(AppAnimation.quick, value: errorMessage)
             .navigationTitle("Swerve")
             .navigationBarTitleDisplayMode(.large)
             .navigationDestination(for: RouteAnalysisResult.self) { result in
