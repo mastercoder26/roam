@@ -5,6 +5,8 @@ struct HomeView: View {
     @State private var destination = ""
     @State private var departureTime = Date().addingTimeInterval(15 * 60)
     @State private var isLoading = false
+    @State private var isCompletingLoading = false
+    @State private var pendingResult: RouteAnalysisResult?
     @State private var errorMessage: String?
     @State private var navigationPath = NavigationPath()
 
@@ -48,7 +50,9 @@ struct HomeView: View {
                 .animation(AppAnimation.quick, value: errorMessage)
 
                 if isLoading {
-                    RouteAnalysisLoadingView()
+                    RouteAnalysisLoadingView(isFinishing: isCompletingLoading) {
+                        completeLoading()
+                    }
                         .transition(.opacity)
                         .zIndex(1)
                 }
@@ -141,7 +145,6 @@ struct HomeView: View {
             errorMessage = nil
         }
         isLoading = true
-        defer { isLoading = false }
 
         do {
             let response = try await apiClient.analyzeRoute(
@@ -158,14 +161,24 @@ struct HomeView: View {
                 alternateRoutes: response.alternateRoutes
             )
 
+            pendingResult = result
             UINotificationFeedbackGenerator().notificationOccurred(.success)
-            navigationPath.append(result)
+            isCompletingLoading = true
         } catch {
             UINotificationFeedbackGenerator().notificationOccurred(.error)
             withAnimation(AppAnimation.quick) {
                 errorMessage = error.localizedDescription
             }
+            isLoading = false
         }
+    }
+
+    private func completeLoading() {
+        guard let pendingResult else { return }
+        isCompletingLoading = false
+        isLoading = false
+        self.pendingResult = nil
+        navigationPath.append(pendingResult)
     }
 }
 
