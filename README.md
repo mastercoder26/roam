@@ -79,6 +79,13 @@ swiftc ios/Swerve/Models/DrivingScore.swift ios/Swerve/Models/DriveScoringEngine
 /tmp/swerve-drive-checks
 ```
 
+Run the route-entry state checks with:
+
+```bash
+swiftc ios/Swerve/Models/RoutePlanningLocationCoordinator.swift ios/tests/RoutePlanningLocationChecks.swift -o /tmp/swerve-route-location-checks
+/tmp/swerve-route-location-checks
+```
+
 ## Open source and attribution
 
 Swerve is available under the [MIT License](LICENSE).

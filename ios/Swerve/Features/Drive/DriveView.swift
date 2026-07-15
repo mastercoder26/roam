@@ -17,6 +17,10 @@ struct DriveView: View {
                     } else {
                         howItWorksCard
                     }
+
+                    if !session.recordedDrives.isEmpty, !session.isRecording {
+                        driveHistory
+                    }
                 }
                 .padding(.horizontal, AppDesign.contentPadding)
                 .padding(.vertical, 12)
@@ -119,6 +123,127 @@ struct DriveView: View {
         .premiumCard()
     }
 
+    private var driveHistory: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            SectionHeader(title: "Past drives", subtitle: "Routes and coaching events stay on this device.")
+            ForEach(session.recordedDrives) { drive in
+                NavigationLink {
+                    DriveDetailView(drive: drive)
+                } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: "map.fill")
+                            .foregroundStyle(Color.accentColor)
+                            .frame(width: 30, height: 30)
+                            .background(Color.accentColor.opacity(0.12))
+                            .clipShape(Circle())
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(drive.startedAt.formatted(date: .abbreviated, time: .shortened))
+                                .font(.subheadline.weight(.semibold))
+                            Text("\(String(format: "%.1f", drive.score.distanceMiles)) mi · \(drive.score.events.count) coaching events")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        Text("\(drive.score.score)")
+                            .font(.headline.monospacedDigit())
+                            .foregroundStyle(drive.score.score >= 78 ? .green : .orange)
+                        Image(systemName: "chevron.right").font(.caption.weight(.bold)).foregroundStyle(.tertiary)
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                if drive.id != session.recordedDrives.last?.id { Divider() }
+            }
+        }
+        .premiumCard()
+    }
+
+}
+
+private struct DriveDetailView: View {
+    let drive: RecordedDrive
+    @State private var selectedEvent: DrivingEvent?
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: AppDesign.sectionSpacing) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Drive details").font(AppDesign.Typography.heroTitle)
+                    Text(drive.startedAt.formatted(date: .complete, time: .shortened)).font(.subheadline).foregroundStyle(.secondary)
+                }
+
+                if drive.route.count >= 2 {
+                    RecordedDriveMapView(route: drive.route, events: drive.score.events) { event in
+                        selectedEvent = event
+                    }
+                    .frame(height: 300)
+                    .clipShape(RoundedRectangle(cornerRadius: AppDesign.cornerRadius, style: .continuous))
+                } else {
+                    ContentUnavailableView("Route unavailable", systemImage: "location.slash", description: Text("This drive did not receive enough accurate GPS fixes to draw a route."))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 36)
+                        .premiumCard()
+                }
+
+                DriveScoreCard(score: drive.score)
+                incidentSection
+            }
+            .padding(.horizontal, AppDesign.contentPadding)
+            .padding(.vertical, 12)
+        }
+        .background(Color(.systemGroupedBackground))
+        .navigationTitle("Past drive")
+        .navigationBarTitleDisplayMode(.inline)
+        .sheet(item: $selectedEvent) { event in
+            DriveEventDetail(event: event)
+                .presentationDetents([.height(250)])
+                .presentationDragIndicator(.visible)
+        }
+    }
+
+    private var incidentSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            SectionHeader(title: "Coaching events", subtitle: "Tap a map icon or event for details.")
+            if drive.score.events.isEmpty {
+                Label("No abrupt maneuvers were detected.", systemImage: "checkmark.circle.fill")
+                    .foregroundStyle(.secondary)
+            } else {
+                ForEach(drive.score.events) { event in
+                    Button { selectedEvent = event } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: event.kind.symbol).foregroundStyle(.orange).frame(width: 24)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(event.kind.title).font(.subheadline.weight(.semibold))
+                                Text(event.timestamp.formatted(date: .omitted, time: .standard)).font(.caption).foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            Image(systemName: "chevron.right").font(.caption.weight(.bold)).foregroundStyle(.tertiary)
+                        }
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+        .premiumCard()
+    }
+}
+
+private struct DriveEventDetail: View {
+    let event: DrivingEvent
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Image(systemName: event.kind.symbol).font(.title).foregroundStyle(.orange)
+            Text(event.kind.title).font(.title2.weight(.bold))
+            Text(event.timestamp.formatted(date: .abbreviated, time: .standard)).foregroundStyle(.secondary)
+            Text("Detected from \(event.source.rawValue). This is a coaching signal, not a determination of unsafe driving.")
+                .font(.footnote).foregroundStyle(.secondary)
+            Spacer()
+        }
+        .padding(24)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
 }
 
 private struct DriveMetric: View {
@@ -129,7 +254,7 @@ private struct DriveMetric: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Image(systemName: symbol).foregroundStyle(Color.accentColor)
+            IconTile(symbol: symbol)
             Text(value).font(.title2.monospacedDigit().weight(.semibold))
             Text("\(title) · \(unit)").font(.caption).foregroundStyle(.secondary)
         }

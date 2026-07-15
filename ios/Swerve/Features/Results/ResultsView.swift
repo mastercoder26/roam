@@ -113,7 +113,7 @@ struct ResultsView: View {
 
     private var tripDetailsSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            SectionHeader(title: "Trip")
+            SectionHeader(title: "Trip at a glance", subtitle: "The essentials before you choose a route.")
 
             HStack(spacing: 16) {
                 detailTile(
@@ -433,13 +433,11 @@ struct ResultsView: View {
         valueColor: Color = .primary
     ) -> some View {
         VStack(alignment: .leading, spacing: 4) {
-            Label(title, systemImage: systemImage)
-                .font(AppDesign.Typography.metricLabel)
-                .foregroundStyle(.secondary)
-            Text(value)
-                .font(AppDesign.Typography.metricValue)
-                .foregroundStyle(valueColor)
-                .monospacedDigit()
+            Image(systemName: systemImage)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(AppDesign.accent)
+            Text(value).font(AppDesign.Typography.metricValue).foregroundStyle(valueColor).monospacedDigit()
+            Text(title).font(AppDesign.Typography.metricLabel).foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }

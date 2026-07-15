@@ -3,14 +3,23 @@ import SwiftUI
 // MARK: - Design tokens
 
 enum AppDesign {
+    static let accent = Color(red: 0.02, green: 0.42, blue: 0.92)
+    static let safety = Color.orange
+    static let positive = Color.green
+    static let space4: CGFloat = 4
+    static let space8: CGFloat = 8
+    static let space12: CGFloat = 12
+    static let space16: CGFloat = 16
+    static let space24: CGFloat = 24
     static let cornerRadius: CGFloat = 16
     static let cornerRadiusSmall: CGFloat = 12
+    static let cornerRadiusLarge: CGFloat = 24
     static let cardPadding: CGFloat = 16
     static let sectionSpacing: CGFloat = 20
     static let contentPadding: CGFloat = 16
 
     enum Typography {
-        static let heroTitle = Font.system(.largeTitle, design: .default, weight: .semibold)
+        static let heroTitle = Font.system(.largeTitle, design: .rounded, weight: .bold)
         static let sectionTitle = Font.headline
         static let metricValue = Font.subheadline.weight(.semibold)
         static let metricLabel = Font.caption
@@ -35,6 +44,10 @@ struct PremiumCardModifier: ViewModifier {
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(Color(.secondarySystemGroupedBackground))
             .clipShape(RoundedRectangle(cornerRadius: AppDesign.cornerRadius, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: AppDesign.cornerRadius, style: .continuous)
+                    .stroke(Color.primary.opacity(0.05), lineWidth: 1)
+            }
     }
 }
 
@@ -101,12 +114,40 @@ struct PrimaryActionButton: View {
             .foregroundStyle(.white)
             .background(
                 RoundedRectangle(cornerRadius: AppDesign.cornerRadius, style: .continuous)
-                    .fill(isEnabled ? Color.accentColor : Color(.systemGray3))
+                    .fill(isEnabled ? AppDesign.accent : Color(.systemGray3))
             )
         }
         .buttonStyle(PressableScaleStyle())
         .disabled(!isEnabled)
         .animation(AppAnimation.quick, value: isLoading)
+    }
+}
+
+struct IconTile: View {
+    let symbol: String
+    var color: Color = AppDesign.accent
+
+    var body: some View {
+        Image(systemName: symbol)
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(color)
+            .frame(width: 34, height: 34)
+            .background(color.opacity(0.12), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+    }
+}
+
+struct StatRow: View {
+    let title: String
+    let value: String
+    let symbol: String
+
+    var body: some View {
+        HStack(spacing: AppDesign.space12) {
+            IconTile(symbol: symbol)
+            Text(title).font(.subheadline).foregroundStyle(.secondary)
+            Spacer()
+            Text(value).font(.subheadline.weight(.semibold)).monospacedDigit()
+        }
     }
 }
 

@@ -1,7 +1,7 @@
 import CoreLocation
 import Foundation
 
-enum DrivingEventKind: String, CaseIterable, Identifiable {
+enum DrivingEventKind: String, CaseIterable, Identifiable, Codable {
     case hardBrake
     case rapidAcceleration
     case sharpCorner
@@ -28,14 +28,46 @@ enum DrivingEventKind: String, CaseIterable, Identifiable {
     }
 }
 
-struct DrivingEvent: Identifiable {
-    let id = UUID()
+struct DriveCoordinate: Codable, Hashable {
+    let latitude: CLLocationDegrees
+    let longitude: CLLocationDegrees
+
+    init(_ coordinate: CLLocationCoordinate2D) {
+        latitude = coordinate.latitude
+        longitude = coordinate.longitude
+    }
+
+    var clLocationCoordinate: CLLocationCoordinate2D {
+        CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
+    }
+}
+
+struct DriveRoutePoint: Codable, Identifiable, Hashable {
+    let timestamp: Date
+    let coordinate: DriveCoordinate
+    let speedMetersPerSecond: Double
+
+    var id: Date { timestamp }
+}
+
+struct DrivingEvent: Identifiable, Codable, Hashable {
+    let id: UUID
     let kind: DrivingEventKind
     let timestamp: Date
     let source: DrivingEventSource
+    /// Present for GPS/fused events and for motion events after a GPS fix.
+    let coordinate: DriveCoordinate?
+
+    init(id: UUID = UUID(), kind: DrivingEventKind, timestamp: Date, source: DrivingEventSource, coordinate: DriveCoordinate? = nil) {
+        self.id = id
+        self.kind = kind
+        self.timestamp = timestamp
+        self.source = source
+        self.coordinate = coordinate
+    }
 }
 
-struct DrivingScore {
+struct DrivingScore: Codable {
     let score: Int
     let duration: TimeInterval
     let distanceMeters: CLLocationDistance
@@ -82,5 +114,19 @@ struct DrivingScore {
 
     func count(for kind: DrivingEventKind) -> Int {
         events.filter { $0.kind == kind }.count
+    }
+}
+
+struct RecordedDrive: Identifiable, Codable {
+    let id: UUID
+    let startedAt: Date
+    let score: DrivingScore
+    let route: [DriveRoutePoint]
+
+    init(id: UUID = UUID(), startedAt: Date, score: DrivingScore, route: [DriveRoutePoint]) {
+        self.id = id
+        self.startedAt = startedAt
+        self.score = score
+        self.route = route
     }
 }

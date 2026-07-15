@@ -53,14 +53,14 @@ struct SwerveRootView: View {
                                 .transition(.opacity.combined(with: .move(edge: .leading)))
                         }
                     }
-                    .foregroundStyle(selectedTab == tab ? Color.primary : Color.secondary)
+                    .foregroundStyle(selectedTab == tab ? AppDesign.accent : Color.secondary)
                     .padding(.horizontal, selectedTab == tab ? 16 : 14)
                     .padding(.vertical, 12)
                     .background {
                         if selectedTab == tab {
                             Capsule(style: .continuous)
-                                .fill(.thinMaterial)
-                                .overlay(Capsule(style: .continuous).stroke(.white.opacity(0.38), lineWidth: 0.8))
+                                .fill(AppDesign.accent.opacity(0.12))
+                                .overlay(Capsule(style: .continuous).stroke(AppDesign.accent.opacity(0.12), lineWidth: 0.8))
                                 .matchedGeometryEffect(id: "liquid-selection", in: tabAnimation)
                         }
                     }

@@ -14,6 +14,7 @@ final class DriveSessionManager: NSObject, ObservableObject {
     @Published private(set) var currentHorizontalAccelerationG = 0.0
     @Published private(set) var statusMessage = "Ready when you are"
     @Published private(set) var lastScore: DrivingScore?
+    @Published private(set) var recordedDrives: [RecordedDrive] = []
 
     private let locationManager = CLLocationManager()
     private let motionManager = CMMotionManager()
@@ -25,6 +26,9 @@ final class DriveSessionManager: NSObject, ObservableObject {
     private var events: [DrivingEvent] = []
     private var lastEventAt: [DrivingEventKind: Date] = [:]
     private var recentMotionSamples: [DriveMotionSample] = []
+    private var routePoints: [DriveRoutePoint] = []
+    private var latestCoordinate: DriveCoordinate?
+    private let historyKey = "recorded-drives-v1"
 
     override init() {
         super.init()
@@ -33,6 +37,7 @@ final class DriveSessionManager: NSObject, ObservableObject {
         locationManager.desiredAccuracy = kCLLocationAccuracyBestForNavigation
         locationManager.distanceFilter = 5
         locationManager.pausesLocationUpdatesAutomatically = false
+        loadRecordedDrives()
     }
 
     func startDrive() {
@@ -83,7 +88,7 @@ final class DriveSessionManager: NSObject, ObservableObject {
             rejectedLocationSamples: rejectedLocationSamples,
             motionSamples: motionSamples
         )
-        lastScore = DrivingScore(
+        let score = DrivingScore(
             score: result.score,
             duration: duration,
             distanceMeters: distanceMeters,
@@ -92,6 +97,12 @@ final class DriveSessionManager: NSObject, ObservableObject {
             motionSamples: motionSamples,
             dataQuality: result.quality
         )
+        lastScore = score
+        let drive = RecordedDrive(startedAt: startDate ?? Date(), score: score, route: routePoints)
+        recordedDrives.insert(drive, at: 0)
+        // Keep storage bounded while retaining a useful recent history.
+        recordedDrives = Array(recordedDrives.prefix(50))
+        saveRecordedDrives()
         statusMessage = motionSamples == 0
             ? "No motion samples received — try a physical iPhone."
             : "Drive saved on this device"
@@ -110,6 +121,8 @@ final class DriveSessionManager: NSObject, ObservableObject {
         events = []
         lastEventAt = [:]
         recentMotionSamples = []
+        routePoints = []
+        latestCoordinate = nil
     }
 
     private func startElapsedTimer() {
@@ -154,7 +167,7 @@ final class DriveSessionManager: NSObject, ObservableObject {
         recentMotionSamples.removeAll { Date().timeIntervalSince($0.timestamp) > 2 }
 
         if DriveScoringEngine.shouldFlagPhoneMovement(horizontalG) {
-            addEvent(.phoneMovement, source: .deviceMotion, cooldown: 3)
+            addEvent(.phoneMovement, timestamp: Date(), coordinate: latestCoordinate, source: .deviceMotion, cooldown: 3)
         }
     }
 
@@ -176,6 +189,7 @@ final class DriveSessionManager: NSObject, ObservableObject {
         let speed = max(location.speed, 0)
         currentSpeedMetersPerSecond = speed
         topSpeed = max(topSpeed, speed)
+        let routePoint = DriveRoutePoint(timestamp: location.timestamp, coordinate: DriveCoordinate(location.coordinate), speedMetersPerSecond: speed)
 
         if let previousLocation {
             let time = location.timestamp.timeIntervalSince(previousLocation.timestamp)
@@ -194,10 +208,10 @@ final class DriveSessionManager: NSObject, ObservableObject {
                     distanceMeters: distance
                 ) else {
                     rejectedLocationSamples += 1
-                    self.previousLocation = location
                     return
                 }
                 distanceMeters += distance
+                appendRoutePoint(routePoint)
                 let nearbyMotion = recentMotionSamples
                     .filter { abs($0.timestamp.timeIntervalSince(location.timestamp)) <= 1 }
                     .map(\.horizontalAccelerationG)
@@ -208,19 +222,47 @@ final class DriveSessionManager: NSObject, ObservableObject {
                     nearbyMotionG: nearbyMotion
                 ) {
                     let cooldown: TimeInterval = event.kind == .sharpCorner ? 5 : 4
-                    addEvent(event.kind, source: event.source, cooldown: cooldown)
+                    addEvent(event.kind, timestamp: location.timestamp, coordinate: routePoint.coordinate, source: event.source, cooldown: cooldown)
                 }
+            } else if time > DriveScoringEngine.maximumSampleGap {
+                // Resume the route after a long background gap without drawing
+                // a synthetic straight line or deriving a false acceleration.
+                appendRoutePoint(routePoint)
             }
+        } else {
+            appendRoutePoint(routePoint)
         }
 
         previousLocation = location
+        latestCoordinate = routePoint.coordinate
     }
 
-    private func addEvent(_ kind: DrivingEventKind, source: DrivingEventSource, cooldown: TimeInterval) {
-        let now = Date()
-        if let lastEvent = lastEventAt[kind], now.timeIntervalSince(lastEvent) < cooldown { return }
-        lastEventAt[kind] = now
-        events.append(DrivingEvent(kind: kind, timestamp: now, source: source))
+    private func appendRoutePoint(_ point: DriveRoutePoint) {
+        // One point per ~5 m from CLLocation plus a time-based escape hatch is
+        // enough to draw a faithful route without unbounded storage.
+        if let last = routePoints.last,
+           point.timestamp.timeIntervalSince(last.timestamp) < 1,
+           CLLocation(latitude: last.coordinate.latitude, longitude: last.coordinate.longitude)
+                .distance(from: CLLocation(latitude: point.coordinate.latitude, longitude: point.coordinate.longitude)) < 5 {
+            return
+        }
+        routePoints.append(point)
+    }
+
+    private func addEvent(_ kind: DrivingEventKind, timestamp: Date, coordinate: DriveCoordinate?, source: DrivingEventSource, cooldown: TimeInterval) {
+        if let lastEvent = lastEventAt[kind], timestamp.timeIntervalSince(lastEvent) < cooldown { return }
+        lastEventAt[kind] = timestamp
+        events.append(DrivingEvent(kind: kind, timestamp: timestamp, source: source, coordinate: coordinate))
+    }
+
+    private func loadRecordedDrives() {
+        guard let data = UserDefaults.standard.data(forKey: historyKey) else { return }
+        recordedDrives = (try? JSONDecoder().decode([RecordedDrive].self, from: data)) ?? []
+    }
+
+    private func saveRecordedDrives() {
+        guard let data = try? JSONEncoder().encode(recordedDrives) else { return }
+        UserDefaults.standard.set(data, forKey: historyKey)
     }
 }
 

@@ -14,7 +14,7 @@ struct DriveMotionSample {
     let horizontalAccelerationG: Double
 }
 
-enum DrivingEventSource: String {
+enum DrivingEventSource: String, Codable {
     case gpsSpeed = "GPS speed"
     case fused = "GPS + motion"
     case deviceMotion = "Device motion"
@@ -25,7 +25,7 @@ struct DetectedDrivingEvent {
     let source: DrivingEventSource
 }
 
-enum DriveScoreConfidence: String {
+enum DriveScoreConfidence: String, Codable {
     case low
     case medium
     case high
@@ -39,7 +39,7 @@ enum DriveScoreConfidence: String {
     }
 }
 
-struct DriveDataQuality {
+struct DriveDataQuality: Codable {
     let acceptedLocationSamples: Int
     let rejectedLocationSamples: Int
     let motionSamples: Int

@@ -160,3 +160,93 @@ enum PolylineDecoder {
     .frame(height: 220)
     .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
 }
+
+/// A locally recorded route with incident annotations. The annotations use
+/// actual accepted GPS fixes, rather than inferred positions along the line.
+struct RecordedDriveMapView: UIViewRepresentable {
+    let route: [DriveRoutePoint]
+    let events: [DrivingEvent]
+    var onSelectEvent: (DrivingEvent) -> Void
+
+    func makeUIView(context: Context) -> MKMapView {
+        let map = MKMapView()
+        map.delegate = context.coordinator
+        map.isRotateEnabled = false
+        map.showsCompass = false
+        map.pointOfInterestFilter = .excludingAll
+        return map
+    }
+
+    func updateUIView(_ map: MKMapView, context: Context) {
+        context.coordinator.onSelectEvent = onSelectEvent
+        context.coordinator.update(map: map, route: route, events: events)
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator(onSelectEvent: onSelectEvent) }
+
+    final class Coordinator: NSObject, MKMapViewDelegate {
+        var onSelectEvent: (DrivingEvent) -> Void
+        private var renderedKey = ""
+
+        init(onSelectEvent: @escaping (DrivingEvent) -> Void) {
+            self.onSelectEvent = onSelectEvent
+        }
+
+        func update(map: MKMapView, route: [DriveRoutePoint], events: [DrivingEvent]) {
+            let key = route.map(\.timestamp).description + events.map(\.id).description
+            guard key != renderedKey else { return }
+            renderedKey = key
+            map.removeOverlays(map.overlays)
+            map.removeAnnotations(map.annotations)
+
+            let coordinates = route.map { $0.coordinate.clLocationCoordinate }
+            guard !coordinates.isEmpty else { return }
+            map.addOverlay(MKPolyline(coordinates: coordinates, count: coordinates.count))
+            for event in events {
+                guard let coordinate = event.coordinate?.clLocationCoordinate else { continue }
+                let annotation = DriveEventAnnotation(event: event)
+                annotation.coordinate = coordinate
+                map.addAnnotation(annotation)
+            }
+            let rect = MKPolyline(coordinates: coordinates, count: coordinates.count).boundingMapRect
+            map.setVisibleMapRect(rect, edgePadding: UIEdgeInsets(top: 36, left: 28, bottom: 36, right: 28), animated: false)
+        }
+
+        func mapView(_ mapView: MKMapView, rendererFor overlay: MKOverlay) -> MKOverlayRenderer {
+            guard let polyline = overlay as? MKPolyline else { return MKOverlayRenderer(overlay: overlay) }
+            let renderer = MKPolylineRenderer(polyline: polyline)
+            renderer.strokeColor = .systemBlue
+            renderer.lineWidth = 5
+            renderer.lineCap = .round
+            renderer.lineJoin = .round
+            return renderer
+        }
+
+        func mapView(_ mapView: MKMapView, viewFor annotation: MKAnnotation) -> MKAnnotationView? {
+            guard let annotation = annotation as? DriveEventAnnotation else { return nil }
+            let view = mapView.dequeueReusableAnnotationView(withIdentifier: "drive-event") as? MKMarkerAnnotationView
+                ?? MKMarkerAnnotationView(annotation: annotation, reuseIdentifier: "drive-event")
+            view.annotation = annotation
+            view.canShowCallout = true
+            view.markerTintColor = .systemOrange
+            view.glyphImage = UIImage(systemName: annotation.event.kind.symbol)
+            return view
+        }
+
+        func mapView(_ mapView: MKMapView, didSelect view: MKAnnotationView) {
+            guard let annotation = view.annotation as? DriveEventAnnotation else { return }
+            onSelectEvent(annotation.event)
+        }
+    }
+}
+
+private final class DriveEventAnnotation: MKPointAnnotation {
+    let event: DrivingEvent
+
+    init(event: DrivingEvent) {
+        self.event = event
+        super.init()
+        title = event.kind.title
+        subtitle = "Tap for details"
+    }
+}
