@@ -55,7 +55,7 @@ private enum RouteAnalysisGlobeScene {
         addGrid(to: earth)
 
         let orbitNode = SCNNode()
-        orbitNode.eulerAngles.x = -CGFloat.pi / 10
+        orbitNode.eulerAngles.x = -Float.pi / 10
         orbitNode.addChildNode(makeCar())
         scene.rootNode.addChildNode(orbitNode)
 
@@ -69,7 +69,7 @@ private enum RouteAnalysisGlobeScene {
         keyLight.light = SCNLight()
         keyLight.light?.type = .directional
         keyLight.light?.intensity = 1_100
-        keyLight.eulerAngles = SCNVector3(-CGFloat.pi / 3, -CGFloat.pi / 4, 0)
+        keyLight.eulerAngles = SCNVector3(-Float.pi / 3, -Float.pi / 4, 0)
         scene.rootNode.addChildNode(keyLight)
 
         let fillLight = SCNNode()
@@ -91,7 +91,7 @@ private enum RouteAnalysisGlobeScene {
     }
 
     private static func addGrid(to earth: SCNNode) {
-        for rotation in [CGFloat(0), CGFloat.pi / 2] {
+        for rotation in [Float(0), Float.pi / 2] {
             let ring = SCNNode(geometry: SCNTorus(ringRadius: 1.185, pipeRadius: 0.006))
             ring.geometry?.firstMaterial?.diffuse.contents = UIColor.white.withAlphaComponent(0.22)
             ring.eulerAngles.x = rotation
@@ -102,7 +102,7 @@ private enum RouteAnalysisGlobeScene {
     private static func makeCar() -> SCNNode {
         let car = SCNNode()
         car.position = SCNVector3(0, 0, 1.52)
-        car.eulerAngles.y = -CGFloat.pi / 2
+        car.eulerAngles.y = -Float.pi / 2
 
         let body = SCNBox(width: 0.46, height: 0.16, length: 0.24, chamferRadius: 0.06)
         body.firstMaterial?.diffuse.contents = UIColor.systemOrange
@@ -119,7 +119,7 @@ private enum RouteAnalysisGlobeScene {
             for z in [-0.14, 0.14] as [Float] {
                 let wheel = SCNNode(geometry: SCNCylinder(radius: 0.065, height: 0.045))
                 wheel.geometry?.firstMaterial?.diffuse.contents = UIColor.black
-                wheel.eulerAngles.x = CGFloat.pi / 2
+                wheel.eulerAngles.x = Float.pi / 2
                 wheel.position = SCNVector3(x, -0.1, z)
                 car.addChildNode(wheel)
             }
