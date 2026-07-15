@@ -121,18 +121,24 @@ struct APIClient {
 }
 
 enum AppConfiguration {
-#if DEBUG
-    static let fallbackAPIBaseURL = URL(string: "http://192.168.1.117:3000")
-#else
-    static let fallbackAPIBaseURL: URL? = nil
-#endif
+    static var fallbackAPIBaseURL: URL? {
+        configuredURL(forInfoDictionaryKey: "API_FALLBACK_BASE_URL")
+    }
 
     static var apiBaseURL: URL {
-        if let urlString = Bundle.main.object(forInfoDictionaryKey: "API_BASE_URL") as? String,
-           !urlString.isEmpty,
-           let url = URL(string: urlString) {
-            return url
+        configuredURL(forInfoDictionaryKey: "API_BASE_URL")
+            ?? URL(string: "http://localhost:3000")!
+    }
+
+    private static func configuredURL(forInfoDictionaryKey key: String) -> URL? {
+        guard let urlString = Bundle.main.object(forInfoDictionaryKey: key) as? String else {
+            return nil
         }
-        return URL(string: "http://localhost:3000")!
+        let trimmed = urlString.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty,
+              !trimmed.contains("$") else {
+            return nil
+        }
+        return URL(string: trimmed)
     }
 }

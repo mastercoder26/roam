@@ -1,2 +1,3 @@
 // Release configuration — point at your deployed API host
 API_BASE_URL = http:/$()/localhost:3000
+API_FALLBACK_BASE_URL =

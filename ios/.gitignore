@@ -1,3 +1,4 @@
 .derivedData/
 *.xcuserstate
 xcuserdata/
+Swerve/Config/Debug.local.xcconfig

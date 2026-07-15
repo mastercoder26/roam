@@ -38,6 +38,11 @@ On first manual drive, iOS asks for location and motion permissions. Swerve
 uses them only while the user has explicitly started a drive. The current
 prototype keeps the resulting score in memory on the device.
 
+For a physical iPhone, copy `ios/Swerve/Config/Debug.local.example.xcconfig`
+to `Debug.local.xcconfig` and replace `YOUR_MAC_LAN_IP` with your Mac’s current
+Wi-Fi IP. The local file is ignored by Git; do not put a private network address
+in the shared project configuration.
+
 For a manual drive that continues while the phone is locked, iOS may also ask
 for **Always Allow** location access after the drive begins. It enables location
 updates only for the active session and turns them off when the user ends it.
