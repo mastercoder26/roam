@@ -4,6 +4,7 @@ struct DriveLocationSample {
     let timestamp: Date
     let speedMetersPerSecond: Double
     let courseDegrees: Double?
+    let courseAccuracyDegrees: Double?
     let horizontalAccuracyMeters: Double
 }
 
@@ -58,6 +59,7 @@ struct DriveDataQuality {
 
 enum DriveScoringEngine {
     static let maximumLocationAccuracyMeters = 35.0
+    static let maximumCourseAccuracyDegrees = 25.0
     static let minimumSampleGap = 0.5
     static let maximumSampleGap = 5.0
     static let hardBrakeThreshold = -3.2
@@ -69,6 +71,22 @@ enum DriveScoringEngine {
         sample.horizontalAccuracyMeters > 0 &&
             sample.horizontalAccuracyMeters <= maximumLocationAccuracyMeters &&
             sample.speedMetersPerSecond >= 0
+    }
+
+    static func isPlausibleTransition(
+        previous: DriveLocationSample,
+        current: DriveLocationSample,
+        distanceMeters: Double
+    ) -> Bool {
+        guard accepts(previous), accepts(current), distanceMeters >= 0 else { return false }
+        let elapsed = current.timestamp.timeIntervalSince(previous.timestamp)
+        guard elapsed >= minimumSampleGap, elapsed <= maximumSampleGap else { return false }
+
+        // GPS can occasionally jump hundreds of meters despite a nominally good
+        // horizontal accuracy. Allow a generous 2.4× speed envelope plus a
+        // margin, while rejecting impossible distance leaps.
+        let maximumExpectedDistance = max(previous.speedMetersPerSecond, current.speedMetersPerSecond) * elapsed * 2.4 + 80
+        return distanceMeters <= maximumExpectedDistance
     }
 
     static func detectEvents(
@@ -97,7 +115,11 @@ enum DriveScoringEngine {
 
         if current.speedMetersPerSecond >= 6,
            let previousCourse = previous.courseDegrees,
-           let currentCourse = current.courseDegrees {
+           let currentCourse = current.courseDegrees,
+           let previousCourseAccuracy = previous.courseAccuracyDegrees,
+           let currentCourseAccuracy = current.courseAccuracyDegrees,
+           previousCourseAccuracy <= maximumCourseAccuracyDegrees,
+           currentCourseAccuracy <= maximumCourseAccuracyDegrees {
             let courseRate = abs(normalizedAngle(currentCourse - previousCourse)) / elapsed
             if courseRate >= sharpCornerDegreesPerSecond {
                 events.append(DetectedDrivingEvent(kind: .sharpCorner, source: source))

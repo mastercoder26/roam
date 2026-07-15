@@ -21,6 +21,22 @@ struct DriveScoringEngineChecks {
         )
         expect(cornerEvents.contains { $0.kind == .sharpCorner }, "rapid course changes at driving speed should flag a sharp corner")
 
+        let unreliableCourseEvents = DriveScoringEngine.detectEvents(
+            previous: sample(0, speed: 12, course: 5, courseAccuracy: 80),
+            current: sample(2, speed: 12, course: 80, courseAccuracy: 80),
+            nearbyMotionG: nil
+        )
+        expect(!unreliableCourseEvents.contains { $0.kind == .sharpCorner }, "poor compass accuracy must not create sharp-corner events")
+
+        expect(
+            !DriveScoringEngine.isPlausibleTransition(
+                previous: sample(0, speed: 10),
+                current: sample(2, speed: 10),
+                distanceMeters: 2_000
+            ),
+            "impossible GPS distance jumps must be rejected"
+        )
+
         let events = [
             DrivingEvent(kind: .hardBrake, timestamp: Date(), source: .gpsSpeed),
             DrivingEvent(kind: .rapidAcceleration, timestamp: Date(), source: .gpsSpeed),
@@ -59,12 +75,14 @@ struct DriveScoringEngineChecks {
         _ seconds: TimeInterval,
         speed: Double,
         course: Double? = 0,
+        courseAccuracy: Double? = 10,
         accuracy: Double = 8
     ) -> DriveLocationSample {
         DriveLocationSample(
             timestamp: Date(timeIntervalSinceReferenceDate: seconds),
             speedMetersPerSecond: speed,
             courseDegrees: course,
+            courseAccuracyDegrees: courseAccuracy,
             horizontalAccuracyMeters: accuracy
         )
     }

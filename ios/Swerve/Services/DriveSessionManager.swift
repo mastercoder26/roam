@@ -32,6 +32,7 @@ final class DriveSessionManager: NSObject, ObservableObject {
         locationManager.activityType = .automotiveNavigation
         locationManager.desiredAccuracy = kCLLocationAccuracyBestForNavigation
         locationManager.distanceFilter = 5
+        locationManager.pausesLocationUpdatesAutomatically = false
     }
 
     func startDrive() {
@@ -47,8 +48,15 @@ final class DriveSessionManager: NSObject, ObservableObject {
         switch locationManager.authorizationStatus {
         case .notDetermined:
             locationManager.requestWhenInUseAuthorization()
-        case .authorizedAlways, .authorizedWhenInUse:
+        case .authorizedAlways:
+            locationManager.allowsBackgroundLocationUpdates = true
             locationManager.startUpdatingLocation()
+        case .authorizedWhenInUse:
+            locationManager.startUpdatingLocation()
+            // A manual drive should keep recording after the user locks the
+            // phone. iOS presents the additional permission only after the
+            // user has already started a drive.
+            locationManager.requestAlwaysAuthorization()
         case .denied, .restricted:
             statusMessage = "Location access is off — motion will still be recorded"
         @unknown default:
@@ -64,6 +72,7 @@ final class DriveSessionManager: NSObject, ObservableObject {
         timer = nil
         motionManager.stopDeviceMotionUpdates()
         locationManager.stopUpdatingLocation()
+        locationManager.allowsBackgroundLocationUpdates = false
         currentSpeedMetersPerSecond = 0
 
         let result = DriveScoringEngine.score(
@@ -106,8 +115,10 @@ final class DriveSessionManager: NSObject, ObservableObject {
     private func startElapsedTimer() {
         timer?.invalidate()
         timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
-            guard let self, let startDate = self.startDate else { return }
-            self.elapsed = Date().timeIntervalSince(startDate)
+            Task { @MainActor [weak self] in
+                guard let self, let startDate = self.startDate else { return }
+                self.elapsed = Date().timeIntervalSince(startDate)
+            }
         }
     }
 
@@ -152,6 +163,7 @@ final class DriveSessionManager: NSObject, ObservableObject {
             timestamp: location.timestamp,
             speedMetersPerSecond: location.speed,
             courseDegrees: location.course >= 0 ? location.course : nil,
+            courseAccuracyDegrees: location.courseAccuracy >= 0 ? location.courseAccuracy : nil,
             horizontalAccuracyMeters: location.horizontalAccuracy
         )
 
@@ -168,13 +180,24 @@ final class DriveSessionManager: NSObject, ObservableObject {
         if let previousLocation {
             let time = location.timestamp.timeIntervalSince(previousLocation.timestamp)
             if time >= DriveScoringEngine.minimumSampleGap, time <= DriveScoringEngine.maximumSampleGap {
-                distanceMeters += location.distance(from: previousLocation)
                 let previousSample = DriveLocationSample(
                     timestamp: previousLocation.timestamp,
                     speedMetersPerSecond: previousLocation.speed,
                     courseDegrees: previousLocation.course >= 0 ? previousLocation.course : nil,
+                    courseAccuracyDegrees: previousLocation.courseAccuracy >= 0 ? previousLocation.courseAccuracy : nil,
                     horizontalAccuracyMeters: previousLocation.horizontalAccuracy
                 )
+                let distance = location.distance(from: previousLocation)
+                guard DriveScoringEngine.isPlausibleTransition(
+                    previous: previousSample,
+                    current: sample,
+                    distanceMeters: distance
+                ) else {
+                    rejectedLocationSamples += 1
+                    self.previousLocation = location
+                    return
+                }
+                distanceMeters += distance
                 let nearbyMotion = recentMotionSamples
                     .filter { abs($0.timestamp.timeIntervalSince(location.timestamp)) <= 1 }
                     .map(\.horizontalAccelerationG)
@@ -206,7 +229,11 @@ extension DriveSessionManager: CLLocationManagerDelegate {
         Task { @MainActor [weak self] in
             guard let self, self.isRecording else { return }
             switch manager.authorizationStatus {
-            case .authorizedAlways, .authorizedWhenInUse:
+            case .authorizedAlways:
+                manager.allowsBackgroundLocationUpdates = true
+                manager.startUpdatingLocation()
+                self.statusMessage = "Recording this drive"
+            case .authorizedWhenInUse:
                 manager.startUpdatingLocation()
                 self.statusMessage = "Recording this drive"
             case .denied, .restricted:
@@ -221,6 +248,13 @@ extension DriveSessionManager: CLLocationManagerDelegate {
         guard let location = locations.last else { return }
         Task { @MainActor [weak self] in
             self?.record(location: location)
+        }
+    }
+
+    nonisolated func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
+        Task { @MainActor [weak self] in
+            guard self?.isRecording == true else { return }
+            self?.statusMessage = "Location update failed — motion recording continues"
         }
     }
 }

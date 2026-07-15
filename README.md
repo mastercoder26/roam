@@ -38,6 +38,10 @@ On first manual drive, iOS asks for location and motion permissions. Swerve
 uses them only while the user has explicitly started a drive. The current
 prototype keeps the resulting score in memory on the device.
 
+For a manual drive that continues while the phone is locked, iOS may also ask
+for **Always Allow** location access after the drive begins. It enables location
+updates only for the active session and turns them off when the user ends it.
+
 ## Run the backend
 
 The iOS app uses the API in `backend/`. From the repository root:
