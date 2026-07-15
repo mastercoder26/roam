@@ -68,18 +68,8 @@ struct HomeView: View {
 
     private var routeCard: some View {
         VStack(alignment: .leading, spacing: 16) {
-            SectionHeader(title: "Your route", subtitle: "Set your starting point to begin.")
-            if case .awaitingOrigin = locationCoordinator.state {
-                Button { locationCoordinator.useCurrentLocation() } label: {
-                    Label("Use Current Location", systemImage: "location.fill")
-                        .font(.headline).frame(maxWidth: .infinity).padding(.vertical, 14)
-                }
-                .buttonStyle(.borderedProminent).tint(AppDesign.accent).buttonStyle(PressableScaleStyle())
-                Button("Enter a starting address instead") { switchToManualOrigin() }
-                    .font(.footnote.weight(.semibold)).frame(maxWidth: .infinity).buttonStyle(.plain).foregroundStyle(AppDesign.accent)
-            } else {
-                routeFields
-            }
+            SectionHeader(title: "Your route", subtitle: "Add a starting location to continue.")
+            routeFields
         }
         .premiumCard()
     }
@@ -90,7 +80,7 @@ struct HomeView: View {
             VStack(alignment: .leading, spacing: 12) {
                 originField
                 if canEnterDestination {
-                    AddressSearchField(title: "Destination", placeholder: "Where are you going?", systemImage: "flag.fill", iconColor: .red, text: $destination)
+                    AddressSearchField(title: "Destination", placeholder: "Where are you going?", systemImage: "flag.fill", iconColor: .red, showsIcon: false, text: $destination)
                         .transition(reduceMotion ? .opacity : .opacity.combined(with: .move(edge: .top)))
                 }
             }
@@ -98,32 +88,40 @@ struct HomeView: View {
         .animation(reduceMotion ? .easeOut(duration: 0.2) : AppAnimation.spring, value: canEnterDestination)
     }
 
-    @ViewBuilder private var originField: some View {
-        switch locationCoordinator.state {
-        case .locating:
-            HStack(spacing: 12) {
-                ProgressView().tint(AppDesign.accent)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Finding your location").font(.subheadline.weight(.semibold))
-                    Text("This only takes a moment.").font(.caption).foregroundStyle(.secondary)
-                }
-            }.frame(minHeight: 44, alignment: .leading)
-        case .resolved(let address):
-            HStack(spacing: 10) {
-                IconTile(symbol: "location.fill")
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("CURRENT LOCATION").font(.caption2.weight(.bold)).foregroundStyle(AppDesign.accent)
-                    Text(address).font(.subheadline).lineLimit(2)
-                }
-                Spacer(minLength: 0)
-                Button("Change") { switchToManualOrigin() }.font(.caption.weight(.semibold)).foregroundStyle(AppDesign.accent)
+    private var originField: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if case .manualEntry(let message) = locationCoordinator.state, let message {
+                Label(message, systemImage: "info.circle.fill")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
             }
-        case .manualEntry(let message):
-            VStack(alignment: .leading, spacing: 8) {
-                if let message { Label(message, systemImage: "info.circle.fill").font(.footnote).foregroundStyle(.secondary) }
-                AddressSearchField(title: "Starting address", placeholder: "Enter starting address", systemImage: "location.fill", iconColor: AppDesign.accent, text: $origin)
+
+            HStack(alignment: .top, spacing: 8) {
+                AddressSearchField(
+                    title: "Starting location",
+                    placeholder: "Enter starting address",
+                    systemImage: "circle.fill",
+                    iconColor: AppDesign.accent,
+                    showsIcon: false,
+                    text: $origin
+                )
+
+                Button { locationCoordinator.useCurrentLocation() } label: {
+                    Group {
+                        if case .locating = locationCoordinator.state {
+                            ProgressView().tint(AppDesign.accent)
+                        } else {
+                            Image(systemName: "location.fill")
+                        }
+                    }
+                    .font(.body.weight(.semibold))
+                    .frame(width: 38, height: 38)
+                }
+                .buttonStyle(.bordered)
+                .tint(AppDesign.accent)
+                .accessibilityLabel("Use current location")
+                .accessibilityHint("Fills the starting location with your current address")
             }
-        case .awaitingOrigin: EmptyView()
         }
     }
 
@@ -170,12 +168,6 @@ struct HomeView: View {
         }
     }
 
-    private func switchToManualOrigin() {
-        origin = ""
-        destination = ""
-        locationCoordinator.useManualEntry()
-    }
-
     private func completeLoading() {
         guard let pendingResult else { return }
         isCompletingLoading = false; isLoading = false; self.pendingResult = nil; navigationPath.append(pendingResult)
@@ -184,12 +176,37 @@ struct HomeView: View {
 
 private struct RouteConnector: View {
     let showDestination: Bool
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     var body: some View {
         VStack(spacing: 0) {
             Circle().fill(AppDesign.accent).frame(width: 12, height: 12).overlay(Circle().stroke(.white, lineWidth: 3))
-            VStack(spacing: 5) { ForEach(0..<4, id: \.self) { _ in Circle().fill(Color.secondary.opacity(showDestination ? 0.55 : 0.18)).frame(width: 3, height: 3) } }.padding(.vertical, 6)
-            Image(systemName: "flag.fill").font(.caption).foregroundStyle(showDestination ? Color.red : Color.secondary.opacity(0.25))
+            VStack(spacing: 5) {
+                ForEach(0..<4, id: \.self) { index in
+                    Circle()
+                        .fill(Color.secondary.opacity(0.55))
+                        .frame(width: 3, height: 3)
+                        .opacity(showDestination ? 1 : 0)
+                        .animation(dotAnimation(for: index), value: showDestination)
+                }
+            }
+            .padding(.vertical, 6)
+            Image(systemName: "flag.fill")
+                .font(.caption)
+                .foregroundStyle(.red)
+                .opacity(showDestination ? 1 : 0)
+                .animation(flagAnimation, value: showDestination)
         }.padding(.top, 11).accessibilityHidden(true)
+    }
+
+    private func dotAnimation(for index: Int) -> Animation? {
+        guard !reduceMotion else { return .easeOut(duration: 0.15) }
+        return AppAnimation.spring.delay(Double(index) * 0.08)
+    }
+
+    private var flagAnimation: Animation? {
+        guard !reduceMotion else { return .easeOut(duration: 0.15) }
+        return AppAnimation.spring.delay(0.36)
     }
 }
 

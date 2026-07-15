@@ -6,6 +6,7 @@ struct AddressSearchField: View {
     let placeholder: String
     let systemImage: String
     var iconColor: Color = .secondary
+    var showsIcon = true
     @Binding var text: String
 
     @StateObject private var completer = AddressSearchCompleter()
@@ -19,10 +20,12 @@ struct AddressSearchField: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 12) {
-                Image(systemName: systemImage)
-                    .font(.caption)
-                    .foregroundStyle(iconColor)
-                    .frame(width: 20)
+                if showsIcon {
+                    Image(systemName: systemImage)
+                        .font(.caption)
+                        .foregroundStyle(iconColor)
+                        .frame(width: 20)
+                }
 
                 TextField(placeholder, text: $text)
                     .focused($isFocused)
@@ -36,7 +39,7 @@ struct AddressSearchField: View {
 
             if showSuggestions {
                 Divider()
-                    .padding(.leading, 32)
+                    .padding(.leading, showsIcon ? 32 : 0)
                     .transition(.opacity)
 
                 ForEach(Array(completer.suggestions.prefix(4).enumerated()), id: \.offset) { _, suggestion in
@@ -57,7 +60,7 @@ struct AddressSearchField: View {
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.vertical, 8)
-                        .padding(.leading, 32)
+                        .padding(.leading, showsIcon ? 32 : 0)
                     }
                     .buttonStyle(.plain)
                 }
