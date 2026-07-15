@@ -8,6 +8,7 @@ struct AddressSearchField: View {
     var iconColor: Color = .secondary
     var showsIcon = true
     @Binding var text: String
+    var onSuggestionsVisibilityChanged: ((Bool) -> Void)?
 
     @StateObject private var completer = AddressSearchCompleter()
     @FocusState private var isFocused: Bool
@@ -68,6 +69,12 @@ struct AddressSearchField: View {
             }
         }
         .animation(suggestionAnimation, value: showSuggestions)
+        .onChange(of: showSuggestions) { _, isVisible in
+            onSuggestionsVisibilityChanged?(isVisible)
+        }
+        .onDisappear {
+            onSuggestionsVisibilityChanged?(false)
+        }
         .accessibilityElement(children: .contain)
         .accessibilityLabel(title)
     }
