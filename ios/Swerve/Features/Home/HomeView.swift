@@ -115,9 +115,10 @@ struct HomeView: View {
                         }
                     }
                     .font(.body.weight(.semibold))
-                    .frame(width: 38, height: 38)
+                    .frame(width: 28, height: 28)
                 }
                 .buttonStyle(.bordered)
+                .controlSize(.small)
                 .tint(AppDesign.accent)
                 .accessibilityLabel("Use current location")
                 .accessibilityHint("Fills the starting location with your current address")
@@ -180,7 +181,7 @@ private struct RouteConnector: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            Circle().fill(AppDesign.accent).frame(width: 8, height: 8).overlay(Circle().stroke(.white, lineWidth: 2))
+            Circle().fill(AppDesign.accent).frame(width: 12, height: 12).overlay(Circle().stroke(.white, lineWidth: 3))
             VStack(spacing: 5) {
                 ForEach(0..<4, id: \.self) { index in
                     Circle()
