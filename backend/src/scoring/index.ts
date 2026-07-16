@@ -78,6 +78,7 @@ export function scoreRoute(
     departureTime: options.departureTime,
     departureLocalMinutes: options.departureLocalMinutes,
     conditions: options.conditions,
+    stepSpeedsMph: options.stepSpeedsMph,
   });
 
   const trafficDelaySeconds = Math.max(

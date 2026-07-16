@@ -95,6 +95,30 @@ export type RouteDemandId = (typeof ROUTE_DEMAND_IDS)[number];
 export type RouteDemandLevel = "low" | "moderate" | "high";
 
 /**
+ * A contiguous, ordered portion of the route expressed as a fraction of the
+ * validated full-route overview-polyline's geometric length. `startFraction`
+ * is inclusive and `endFraction` is exclusive, except that the final range
+ * may end at 1. These values intentionally use the same overview geometry
+ * that mobile clients decode for local GPS overlap.
+ *
+ * Ranges are intentionally omitted when the overview geometry or its ordered
+ * step mapping cannot be validated. Aggregate enrichment (for example a
+ * route-wide weather summary) must not pretend to know the exact section
+ * where a condition occurs.
+ */
+export interface RouteDemandCoverageRange {
+  startFraction: number;
+  endFraction: number;
+}
+
+/**
+ * Stable, factual scalar values that give a client enough evidence to compare
+ * a planned route with on-device driving history. Keys are demand-specific;
+ * values never contain inferred driver behavior.
+ */
+export type RouteDemandMetrics = Record<string, number>;
+
+/**
  * A factual, normalized description of one thing this route asks of a driver.
  * `available` is false when the route provider could not verify that category.
  */
@@ -105,6 +129,14 @@ export interface RouteDemand {
   level: RouteDemandLevel;
   evidence: string;
   available: boolean;
+  /** Optional factual quantities such as `estimatedMilesAt45`. */
+  metrics?: RouteDemandMetrics;
+  /**
+   * Optional structural coverage on the validated overview polyline. Omitted
+   * when geometry cannot be verified or a source only provides an aggregate
+   * route-level condition rather than a location.
+   */
+  coverageRanges?: RouteDemandCoverageRange[];
 }
 
 export interface ScoredRoute {

@@ -9,6 +9,7 @@ struct ResultsView: View {
     @State private var selectedRoute: ScoredRoute
     @State private var readinessAssessment: DriverReadinessAssessment
     @State private var heroAppeared = false
+    @State private var showsAllReadinessEvidence = false
 
     init(result: RouteAnalysisResult) {
         self.result = result
@@ -57,13 +58,31 @@ struct ResultsView: View {
             .sorted { $0.intensity > $1.intensity }
     }
 
+    private var orderedReadinessInsights: [DriverReadinessInsight] {
+        readiness.insights.sorted { lhs, rhs in
+            let leftPriority = readinessPriority(lhs.state)
+            let rightPriority = readinessPriority(rhs.state)
+            if leftPriority != rightPriority { return leftPriority < rightPriority }
+            return lhs.title < rhs.title
+        }
+    }
+
     private var featuredReadinessInsights: [DriverReadinessInsight] {
-        let actionable = readiness.insights.filter { $0.state != .informational }
-        let candidates = actionable.isEmpty ? readiness.insights : actionable
-        return candidates
-            .sorted { readinessPriority($0.state) < readinessPriority($1.state) }
-            .prefix(4)
-            .map { $0 }
+        let actionItems = orderedReadinessInsights.filter {
+            $0.state == .practiceNeeded || $0.state == .unmeasured
+        }
+        guard !showsAllReadinessEvidence else { return orderedReadinessInsights }
+
+        // Never hide a meaningful gap. Only supporting matches are collapsed.
+        let remainingSlots = max(0, 4 - actionItems.count)
+        let supporting = orderedReadinessInsights.filter {
+            $0.state != .practiceNeeded && $0.state != .unmeasured
+        }
+        return actionItems + supporting.prefix(remainingSlots)
+    }
+
+    private var hiddenReadinessInsightCount: Int {
+        max(0, orderedReadinessInsights.count - featuredReadinessInsights.count)
     }
 
     var body: some View {
@@ -174,6 +193,8 @@ struct ResultsView: View {
                 }
             }
 
+            ReadinessHistorySummary(profile: readiness.profile)
+
             if !featuredReadinessInsights.isEmpty {
                 Divider()
                 VStack(spacing: 10) {
@@ -181,6 +202,32 @@ struct ResultsView: View {
                         ReadinessInsightRow(insight: insight)
                     }
                 }
+            }
+
+            if hiddenReadinessInsightCount > 0 || showsAllReadinessEvidence {
+                Button {
+                    withAnimation(AppAnimation.quick) {
+                        showsAllReadinessEvidence.toggle()
+                    }
+                } label: {
+                    Label(
+                        showsAllReadinessEvidence
+                            ? "Show fewer comparisons"
+                            : "See all \(orderedReadinessInsights.count) comparisons",
+                        systemImage: showsAllReadinessEvidence
+                            ? "chevron.up"
+                            : "chevron.down"
+                    )
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(AppDesign.accent)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .buttonStyle(.plain)
+                .accessibilityHint(
+                    showsAllReadinessEvidence
+                        ? "Collapses the recorded evidence used in this route comparison."
+                        : "Expands the recorded evidence used in this route comparison."
+                )
             }
 
             if !(selectedRoute.routeDemands ?? []).isEmpty {
@@ -267,7 +314,7 @@ struct ResultsView: View {
     private var readinessSymbol: String {
         switch readiness.verdict {
         case .looksLikeMatch:
-            return "checkmark.shield.fill"
+            return "chart.bar.fill"
         case .practiceWithAdult:
             return "figure.and.child.holdinghands"
         case .insufficientHistory:
@@ -295,6 +342,7 @@ struct ResultsView: View {
             route: selectedRoute,
             recordedDrives: driveSession.recordedDrives
         )
+        showsAllReadinessEvidence = false
     }
 
     private var mapSection: some View {
@@ -642,6 +690,78 @@ struct ResultsView: View {
     }
 }
 
+private struct ReadinessHistorySummary: View {
+    let profile: DriverReadinessProfile
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            Label("Evidence from your saved drives", systemImage: "lock.shield.fill")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+
+            Text(
+                "\(profile.qualifyingDriveCount) qualifying \(profile.qualifyingDriveCount == 1 ? "drive" : "drives") · \(String(format: "%.1f", profile.reliableTraceMiles)) mi of validated GPS trace · \(profile.qualifyingDriveDayCount) \(profile.qualifyingDriveDayCount == 1 ? "day" : "days")"
+            )
+            .font(.footnote.weight(.medium))
+            .monospacedDigit()
+
+            VStack(alignment: .leading, spacing: 4) {
+                readinessFact(
+                    "8 PM–6 AM driving",
+                    value: "\(String(format: "%.1f", profile.nightExposure.miles)) mi across \(profile.nightExposure.sessionCount) \(profile.nightExposure.sessionCount == 1 ? "drive" : "drives")",
+                    symbol: "moon.stars.fill"
+                )
+                readinessFact(
+                    "45+ mph baseline",
+                    value: "\(String(format: "%.1f", profile.fastRoad45Exposure.miles)) mi across \(profile.fastRoad45Exposure.sessionCount) \(profile.fastRoad45Exposure.sessionCount == 1 ? "drive" : "drives")",
+                    symbol: "speedometer"
+                )
+                readinessFact(
+                    "Longest validated GPS trace",
+                    value: durationText(profile.longestDriveDuration),
+                    symbol: "clock.fill"
+                )
+            }
+
+            Text("GPS, motion, and route overlap are analyzed on this iPhone only.")
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+        }
+        .padding(12)
+        .background(Color(.tertiarySystemFill), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .accessibilityElement(children: .combine)
+    }
+
+    @ViewBuilder
+    private func readinessFact(_ title: String, value: String, symbol: String) -> some View {
+        VStack(alignment: .leading, spacing: 1) {
+            HStack(spacing: 7) {
+                Image(systemName: symbol)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(AppDesign.accent)
+                    .frame(width: 15)
+                Text(title)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Text(value)
+                .font(.caption.weight(.medium))
+                .foregroundStyle(.primary)
+                .monospacedDigit()
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.leading, 22)
+        }
+    }
+
+    private func durationText(_ duration: TimeInterval) -> String {
+        let minutes = max(0, Int((duration / 60).rounded()))
+        return minutes >= 60
+            ? "\(minutes / 60)h \(minutes % 60)m"
+            : "\(minutes) min"
+    }
+}
+
 private struct ReadinessInsightRow: View {
     let insight: DriverReadinessInsight
 
@@ -681,14 +801,48 @@ private struct ReadinessInsightRow: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(insight.title)
                     .font(.subheadline.weight(.semibold))
+                    .fixedSize(horizontal: false, vertical: true)
+                Text(stateTitle)
+                    .font(.caption2.weight(.bold))
+                    .foregroundStyle(color)
+                    .textCase(.uppercase)
                 Text(insight.detail)
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
+                if let evidence = insight.evidence {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Saved: \(evidence.recordedValue)")
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(.primary)
+                        if let target = evidence.comparisonTarget {
+                            Text("Compared with: \(target)")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        if let collectionNote = evidence.collectionNote {
+                            Label(collectionNote, systemImage: "info.circle")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .padding(.top, 2)
+                        }
+                    }
+                    .padding(.top, 3)
+                }
             }
             Spacer(minLength: 0)
         }
         .accessibilityElement(children: .combine)
+    }
+
+    private var stateTitle: String {
+        switch insight.state {
+        case .matched: "Recorded"
+        case .practiceNeeded: "Practice"
+        case .unmeasured: "Not measured"
+        case .informational: "Info"
+        }
     }
 }
 

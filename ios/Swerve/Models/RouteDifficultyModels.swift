@@ -104,6 +104,27 @@ enum RouteDemandLevel: String, Codable, Hashable {
     }
 }
 
+/// A normalized distance range along the planned route's overview-polyline
+/// geometry. The backend emits it only when its step mapping can be verified
+/// against that same geometry. These values are held only with the in-memory
+/// plan while a practice drive is recorded; saved history stores coverage
+/// percentages, never route geometry.
+struct RouteDemandCoverageRange: Codable, Hashable {
+    let startFraction: Double
+    let endFraction: Double
+
+    init(startFraction: Double, endFraction: Double) {
+        self.startFraction = min(max(startFraction, 0), 1)
+        self.endFraction = min(max(endFraction, 0), 1)
+    }
+
+    var normalized: RouteDemandCoverageRange {
+        startFraction <= endFraction
+            ? self
+            : RouteDemandCoverageRange(startFraction: endFraction, endFraction: startFraction)
+    }
+}
+
 /// A verified route characteristic returned by the backend. `evidence` is a
 /// concise factual sentence, such as "42% of the route is on major roads.".
 struct RouteDemand: Codable, Hashable, Identifiable {
@@ -113,6 +134,13 @@ struct RouteDemand: Codable, Hashable, Identifiable {
     let level: RouteDemandLevel
     let evidence: String
     let available: Bool
+    /// Factual numeric requirements (for example, estimated 60+ mph miles).
+    /// Missing values simply keep older backend responses compatible.
+    let metrics: [String: Double]?
+    /// Factual route portions that contribute to the demand when the routing
+    /// provider can identify them. This is optional for older responses and
+    /// unavailable route characteristics.
+    let coverageRanges: [RouteDemandCoverageRange]?
 
     init(
         id: String,
@@ -120,7 +148,9 @@ struct RouteDemand: Codable, Hashable, Identifiable {
         intensity: Double,
         level: RouteDemandLevel,
         evidence: String,
-        available: Bool
+        available: Bool,
+        metrics: [String: Double]? = nil,
+        coverageRanges: [RouteDemandCoverageRange]? = nil
     ) {
         self.id = id
         self.title = title ?? RouteDemandKind(rawValue: id)?.defaultTitle ?? id
@@ -128,6 +158,8 @@ struct RouteDemand: Codable, Hashable, Identifiable {
         self.level = level
         self.evidence = evidence
         self.available = available
+        self.metrics = metrics
+        self.coverageRanges = coverageRanges?.map(\.normalized)
     }
 
     var kind: RouteDemandKind? {

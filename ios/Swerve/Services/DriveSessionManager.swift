@@ -32,6 +32,7 @@ final class DriveSessionManager: NSObject, ObservableObject {
     private var recentMotionSamples: [DriveMotionSample] = []
     private var routePoints: [DriveRoutePoint] = []
     private var latestCoordinate: DriveCoordinate?
+    private var recordingTimeZoneIdentifier: String?
     private var activePracticeRoute: PlannedRouteContext?
     // The encoded route is deliberately memory-only. Saved drives receive the
     // privacy-safe context plus a local overlap result, never an address,
@@ -61,6 +62,7 @@ final class DriveSessionManager: NSObject, ObservableObject {
         queuedPracticeRoute = nil
         queuedPracticeRoutePolyline = nil
         resetCurrentDrive()
+        recordingTimeZoneIdentifier = TimeZone.autoupdatingCurrent.identifier
         isRecording = true
         startDate = Date()
         statusMessage = "Recording this drive"
@@ -115,25 +117,50 @@ final class DriveSessionManager: NSObject, ObservableObject {
             dataQuality: result.quality
         )
         lastScore = score
-        let persistedPracticeRoute = activePracticeRoute.map { context in
-            let routeMatched = activePracticeRoutePolyline.map {
-                DriverReadinessEngine.matchesPlannedPracticeRoute(
+        let practiceCoverage = activePracticeRoute.flatMap { context in
+            activePracticeRoutePolyline.map {
+                DriverReadinessEngine.practiceRouteCoverage(
                     plannedPolyline: $0,
-                    recordedRoute: routePoints
+                    recordedRoute: routePoints,
+                    demands: context.routeDemands
                 )
-            } ?? false
+            }
+        }
+        let routeMatched = practiceCoverage.map {
+            $0.overallCoverage >= 0.60 &&
+                $0.longestContinuousCoverage >= 0.45 &&
+                $0.originCoverage >= 0.60 &&
+                $0.destinationCoverage >= 0.60
+        } ?? false
+        let persistedPracticeRoute = activePracticeRoute.map { context in
             return PlannedRouteContext(
                 id: context.id,
                 createdAt: context.createdAt,
                 routeDemands: context.routeDemands,
-                recordedRouteMatched: routeMatched
+                recordedRouteMatched: routeMatched,
+                // Demand-specific evidence is retained only if the whole
+                // manually recorded drive substantially followed the plan.
+                verifiedDemandExposures: routeMatched
+                    ? practiceCoverage?.demandExposures
+                    : nil
             )
         }
         let practiceRouteWasVerified = persistedPracticeRoute?.recordedRouteMatched
-        let drive = RecordedDrive(
-            startedAt: startDate ?? Date(),
+        let driveStartedAt = startDate ?? Date()
+        let unsummarizedDrive = RecordedDrive(
+            startedAt: driveStartedAt,
             score: score,
             route: routePoints,
+            recordingTimeZoneIdentifier: recordingTimeZoneIdentifier,
+            plannedRouteContext: persistedPracticeRoute
+        )
+        let drive = RecordedDrive(
+            id: unsummarizedDrive.id,
+            startedAt: driveStartedAt,
+            score: score,
+            route: routePoints,
+            recordingTimeZoneIdentifier: recordingTimeZoneIdentifier,
+            experienceSummary: DriveExperienceEngine.summarize(drive: unsummarizedDrive),
             plannedRouteContext: persistedPracticeRoute
         )
         recordedDrives.insert(drive, at: 0)
@@ -151,6 +178,7 @@ final class DriveSessionManager: NSObject, ObservableObject {
         }
         activePracticeRoute = nil
         activePracticeRoutePolyline = nil
+        recordingTimeZoneIdentifier = nil
     }
 
     /// Queues a locally generated route context for the next manually started
@@ -185,6 +213,7 @@ final class DriveSessionManager: NSObject, ObservableObject {
         recentMotionSamples = []
         routePoints = []
         latestCoordinate = nil
+        recordingTimeZoneIdentifier = nil
     }
 
     private func startElapsedTimer() {
