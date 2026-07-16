@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct DriveView: View {
-    @StateObject private var session = DriveSessionManager()
+    @EnvironmentObject private var session: DriveSessionManager
     @State private var showingHelp = false
 
     var body: some View {
@@ -9,6 +9,10 @@ struct DriveView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: AppDesign.sectionSpacing) {
                     header
+                    if session.queuedPracticeRoute != nil, !session.isRecording {
+                        practiceRouteReadyCard
+                            .transition(.opacity.combined(with: .move(edge: .top)))
+                    }
                     recordingCard
                     liveMetrics
 
@@ -57,6 +61,46 @@ struct DriveView: View {
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
         }
+    }
+
+    private var practiceRouteReadyCard: some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: "point.topleft.down.to.point.bottomright.curvepath.fill")
+                .font(.title3.weight(.semibold))
+                .foregroundStyle(AppDesign.accent)
+                .frame(width: 34, height: 34)
+                .background(AppDesign.accent.opacity(0.12), in: Circle())
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Practice route ready")
+                    .font(.subheadline.weight(.semibold))
+                Text("Start manually when you’re ready. Swerve only counts this as route practice when saved GPS overlaps the route.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Button {
+                session.clearPlannedPracticeRoute()
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 32, height: 32)
+                    .background(Color(.tertiarySystemFill), in: Circle())
+            }
+            .buttonStyle(PressableScaleStyle())
+            .accessibilityLabel("Cancel practice route")
+            .accessibilityHint("Removes this planned route from the next drive")
+        }
+        .padding(14)
+        .background(AppDesign.accent.opacity(0.08), in: RoundedRectangle(cornerRadius: AppDesign.cornerRadius, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: AppDesign.cornerRadius, style: .continuous)
+                .stroke(AppDesign.accent.opacity(0.16), lineWidth: 1)
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Practice route ready")
     }
 
     private var recordingCard: some View {
@@ -397,4 +441,5 @@ private struct DriveHelpSheet: View {
 
 #Preview {
     DriveView()
+        .environmentObject(DriveSessionManager())
 }

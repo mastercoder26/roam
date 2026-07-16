@@ -12,6 +12,7 @@ struct SwerveRootView: View {
     }
 
     @State private var selectedTab: Tab = .routes
+    @StateObject private var driveSession = DriveSessionManager()
     @Namespace private var tabAnimation
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -23,6 +24,7 @@ struct SwerveRootView: View {
                 case .drive: DriveView()
                 }
             }
+            .environmentObject(driveSession)
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 Color.clear.frame(height: 76).allowsHitTesting(false)
             }
@@ -33,6 +35,14 @@ struct SwerveRootView: View {
                 .padding(.bottom, 10)
         }
         .animation(reduceMotion ? .easeOut(duration: 0.18) : AppAnimation.spring, value: selectedTab)
+        .onChange(of: driveSession.practiceRoutePresentationRequest) { _, request in
+            // The manager emits this only when a Results-screen action queues a
+            // route for practice. Keeping the request separate from the route
+            // itself avoids coupling tab presentation to transient view state.
+            guard request != nil, selectedTab != .drive else { return }
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            selectedTab = .drive
+        }
     }
 
     private var liquidTabBar: some View {

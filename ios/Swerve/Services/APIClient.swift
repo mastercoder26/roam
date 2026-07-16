@@ -50,11 +50,14 @@ struct APIClient {
     ) async throws -> RouteDifficultyResponse {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime]
+        let localTime = Calendar.autoupdatingCurrent.dateComponents([.hour, .minute], from: departureTime)
+        let departureLocalMinutes = (localTime.hour ?? 0) * 60 + (localTime.minute ?? 0)
 
         let body = RouteDifficultyRequest(
             origin: origin.trimmingCharacters(in: .whitespacesAndNewlines),
             destination: destination.trimmingCharacters(in: .whitespacesAndNewlines),
             departureTime: formatter.string(from: departureTime),
+            departureLocalMinutes: departureLocalMinutes,
             includeAlternates: includeAlternates,
             continuousDriveMinutes: continuousDriveMinutes
         )

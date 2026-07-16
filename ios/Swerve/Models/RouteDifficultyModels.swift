@@ -7,6 +7,8 @@ struct RouteDifficultyRequest: Encodable {
     let origin: String
     let destination: String
     let departureTime: String
+    /// The driver's selected local clock time, independent from server timezone.
+    let departureLocalMinutes: Int
     let includeAlternates: Bool
     let continuousDriveMinutes: Double?
 }
@@ -40,6 +42,9 @@ struct ScoredRoute: Decodable, Identifiable, Hashable {
     let polyline: String
     let bounds: RouteBounds
     let scoreDelta: Double?
+    /// A semantic, evidence-backed description of what this route asks of a
+    /// driver. It is optional while older backend deployments are still in use.
+    let routeDemands: [RouteDemand]?
 
     func hash(into hasher: inout Hasher) {
         hasher.combine(polyline)
@@ -47,6 +52,86 @@ struct ScoredRoute: Decodable, Identifiable, Hashable {
 
     static func == (lhs: ScoredRoute, rhs: ScoredRoute) -> Bool {
         lhs.polyline == rhs.polyline
+    }
+}
+
+// MARK: - Route Readiness
+
+/// Stable identifiers emitted by the route-analysis service. Keep these
+/// identifiers separate from display copy: a planned practice drive stores only
+/// the identifier and its factual route evidence, never an address or polyline.
+enum RouteDemandKind: String, Codable, CaseIterable, Hashable {
+    case afterDark
+    case fastRoads
+    case merges
+    case complexIntersections
+    case weatherVisibility
+    case sustainedDrive
+    case traffic
+    case roadConditions
+
+    var defaultTitle: String {
+        switch self {
+        case .afterDark: "After-dark driving"
+        case .fastRoads: "Fast roads"
+        case .merges: "Merges"
+        case .complexIntersections: "Complex intersections"
+        case .weatherVisibility: "Weather and visibility"
+        case .sustainedDrive: "Sustained drive"
+        case .traffic: "Traffic"
+        case .roadConditions: "Road conditions"
+        }
+    }
+}
+
+enum RouteDemandLevel: String, Codable, Hashable {
+    case low
+    case moderate
+    case high
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        let raw = try container.decode(String.self)
+        switch raw.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+        case "low", "minimal": self = .low
+        case "moderate", "medium", "elevated": self = .moderate
+        case "high", "severe": self = .high
+        default:
+            // The numeric intensity remains available to the UI and readiness
+            // engine even if a newer server introduces a display level.
+            self = .moderate
+        }
+    }
+}
+
+/// A verified route characteristic returned by the backend. `evidence` is a
+/// concise factual sentence, such as "42% of the route is on major roads.".
+struct RouteDemand: Codable, Hashable, Identifiable {
+    let id: String
+    let title: String
+    let intensity: Double
+    let level: RouteDemandLevel
+    let evidence: String
+    let available: Bool
+
+    init(
+        id: String,
+        title: String? = nil,
+        intensity: Double,
+        level: RouteDemandLevel,
+        evidence: String,
+        available: Bool
+    ) {
+        self.id = id
+        self.title = title ?? RouteDemandKind(rawValue: id)?.defaultTitle ?? id
+        self.intensity = min(max(intensity, 0), 1)
+        self.level = level
+        self.evidence = evidence
+        self.available = available
+    }
+
+    var kind: RouteDemandKind? {
+        RouteDemandKind(rawValue: id)
     }
 }
 

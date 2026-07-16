@@ -117,16 +117,50 @@ struct DrivingScore: Codable {
     }
 }
 
+/// Route characteristics intentionally saved with a manually started practice
+/// drive. It contains no origin, destination, raw polyline, or map coordinates;
+/// the recorded GPS trace remains local to the device as part of the drive.
+struct PlannedRouteContext: Identifiable, Codable, Hashable {
+    let id: UUID
+    let createdAt: Date
+    let routeDemands: [RouteDemand]
+    /// Set only after the locally recorded GPS trace overlaps the in-memory
+    /// planned route. It stores a verdict, never route geometry or addresses.
+    let recordedRouteMatched: Bool?
+
+    init(
+        id: UUID = UUID(),
+        createdAt: Date = Date(),
+        routeDemands: [RouteDemand],
+        recordedRouteMatched: Bool? = nil
+    ) {
+        self.id = id
+        self.createdAt = createdAt
+        self.routeDemands = routeDemands
+        self.recordedRouteMatched = recordedRouteMatched
+    }
+}
+
 struct RecordedDrive: Identifiable, Codable {
     let id: UUID
     let startedAt: Date
     let score: DrivingScore
     let route: [DriveRoutePoint]
+    /// Absent on historical drives and on ordinary manual drives. Its optional
+    /// type makes old `recorded-drives-v1` data decode without a migration.
+    let plannedRouteContext: PlannedRouteContext?
 
-    init(id: UUID = UUID(), startedAt: Date, score: DrivingScore, route: [DriveRoutePoint]) {
+    init(
+        id: UUID = UUID(),
+        startedAt: Date,
+        score: DrivingScore,
+        route: [DriveRoutePoint],
+        plannedRouteContext: PlannedRouteContext? = nil
+    ) {
         self.id = id
         self.startedAt = startedAt
         self.score = score
         self.route = route
+        self.plannedRouteContext = plannedRouteContext
     }
 }

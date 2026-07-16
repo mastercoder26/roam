@@ -105,7 +105,8 @@ struct AlternateRouteCard: View {
                 southwest: Coordinate(latitude: 30.0, longitude: -97.0),
                 northeast: Coordinate(latitude: 30.5, longitude: -97.5)
             ),
-            scoreDelta: 0.9
+            scoreDelta: 0.9,
+            routeDemands: nil
         ),
         isSelected: false,
         onSelect: {}

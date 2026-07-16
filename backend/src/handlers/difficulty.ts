@@ -5,7 +5,7 @@ import { enrichRoute, neutralConditions } from "../enrichment/index.js";
 import { scoreRoutes } from "../scoring/index.js";
 import type { DifficultyRequest } from "../types.js";
 
-function validateRequest(body: unknown): DifficultyRequest {
+export function validateDifficultyRequest(body: unknown): DifficultyRequest {
   if (!body || typeof body !== "object") {
     throw new Error("Request body must be a JSON object");
   }
@@ -14,6 +14,7 @@ function validateRequest(body: unknown): DifficultyRequest {
     origin,
     destination,
     departureTime,
+    departureLocalMinutes,
     includeAlternates,
     continuousDriveMinutes,
   } = body as DifficultyRequest;
@@ -24,12 +25,26 @@ function validateRequest(body: unknown): DifficultyRequest {
   if (!destination || typeof destination !== "string") {
     throw new Error("destination is required and must be a string");
   }
+  if (
+    departureLocalMinutes !== undefined &&
+    (!Number.isInteger(departureLocalMinutes) ||
+      departureLocalMinutes < 0 ||
+      departureLocalMinutes >= 24 * 60)
+  ) {
+    throw new Error(
+      "departureLocalMinutes must be an integer between 0 and 1439"
+    );
+  }
 
   return {
     origin: origin.trim(),
     destination: destination.trim(),
     departureTime:
       typeof departureTime === "string" ? departureTime : undefined,
+    departureLocalMinutes:
+      typeof departureLocalMinutes === "number"
+        ? departureLocalMinutes
+        : undefined,
     includeAlternates: includeAlternates ?? false,
     continuousDriveMinutes:
       typeof continuousDriveMinutes === "number"
@@ -49,7 +64,7 @@ export async function handleDifficulty(
   }
 
   try {
-    const request = validateRequest(req.body);
+    const request = validateDifficultyRequest(req.body);
     const routes = await computeRoutes({
       origin: request.origin,
       destination: request.destination,
@@ -74,6 +89,7 @@ export async function handleDifficulty(
     const scoreOptions = routes.map((_route, i) => ({
       stepSpeedsMph: optionsList[i],
       departureTime: request.departureTime,
+      departureLocalMinutes: request.departureLocalMinutes,
       continuousDriveMinutes: request.continuousDriveMinutes,
       conditions: conditionsList[i],
     }));
@@ -87,7 +103,8 @@ export async function handleDifficulty(
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "An unexpected error occurred";
-    const status = message.includes("required") ? 400 : 500;
+    const status =
+      message.includes("required") || message.includes("must be") ? 400 : 500;
     res.status(status).json({ error: message });
   }
 }

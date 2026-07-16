@@ -79,6 +79,34 @@ export interface ScoreUncertainty {
   spread: number;
 }
 
+/** The stable identifiers used by clients to compare route demands with local experience. */
+export const ROUTE_DEMAND_IDS = [
+  "afterDark",
+  "fastRoads",
+  "merges",
+  "complexIntersections",
+  "weatherVisibility",
+  "sustainedDrive",
+  "traffic",
+  "roadConditions",
+] as const;
+
+export type RouteDemandId = (typeof ROUTE_DEMAND_IDS)[number];
+export type RouteDemandLevel = "low" | "moderate" | "high";
+
+/**
+ * A factual, normalized description of one thing this route asks of a driver.
+ * `available` is false when the route provider could not verify that category.
+ */
+export interface RouteDemand {
+  id: RouteDemandId;
+  title: string;
+  intensity: number;
+  level: RouteDemandLevel;
+  evidence: string;
+  available: boolean;
+}
+
 export interface ScoredRoute {
   score: number;
   uncalibratedScore?: number;
@@ -88,6 +116,8 @@ export interface ScoredRoute {
   contributions: FactorContribution[];
   uncertainty: ScoreUncertainty;
   hotspots: SegmentHotspot[];
+  /** Stable, factual route-demand signals for the local readiness assessment. */
+  routeDemands: RouteDemand[];
   /** Live conditions (weather, road metadata, construction) used for scoring. */
   conditions?: RouteConditions;
   modelVersion?: string;
@@ -112,6 +142,8 @@ export interface DifficultyRequest {
   origin: string;
   destination: string;
   departureTime?: string;
+  /** Local clock minutes at departure (0 = midnight, 1439 = 11:59 PM). */
+  departureLocalMinutes?: number;
   includeAlternates?: boolean;
   continuousDriveMinutes?: number;
 }
@@ -129,12 +161,15 @@ export interface ScoringContext {
 
 export interface DriverContext {
   departureTime?: Date;
+  departureLocalMinutes?: number;
   continuousDriveMinutes: number;
 }
 
 export interface ScoringOptions {
   stepSpeedsMph?: Map<number, number>;
   departureTime?: string;
+  /** Client-local clock minutes, kept separate from the absolute departure timestamp. */
+  departureLocalMinutes?: number;
   continuousDriveMinutes?: number;
   conditions?: RouteConditions;
 }

@@ -82,12 +82,78 @@ export interface BuildFeaturesInput {
   segments: RouteSegment[];
   stepSpeedsMph?: Map<number, number>;
   departureTime?: string;
+  /** Local clock minutes supplied by the client (0 = midnight). */
+  departureLocalMinutes?: number;
   conditions?: RouteConditions;
 }
 
-function isNightHour(date: Date): boolean {
-  const h = date.getUTCHours();
-  return h >= 20 || h < 6;
+export function isValidDepartureLocalMinutes(
+  value: unknown
+): value is number {
+  return (
+    typeof value === "number" &&
+    Number.isInteger(value) &&
+    value >= 0 &&
+    value < 24 * 60
+  );
+}
+
+/**
+ * Resolve a client-local clock for route timing. New clients always supply
+ * `departureLocalMinutes`; the timestamp path is retained only so older
+ * clients keep a deterministic, host-timezone-independent fallback.
+ */
+export function resolveDepartureLocalMinutes(
+  departureLocalMinutes?: number,
+  departureTime?: string
+): number | undefined {
+  if (isValidDepartureLocalMinutes(departureLocalMinutes)) {
+    return departureLocalMinutes;
+  }
+
+  if (!departureTime) return undefined;
+  const legacyDeparture = new Date(departureTime);
+  if (Number.isNaN(legacyDeparture.getTime())) return undefined;
+
+  return (
+    legacyDeparture.getUTCHours() * 60 + legacyDeparture.getUTCMinutes()
+  );
+}
+
+function isNightLocalMinute(localMinutes: number): boolean {
+  const hour = Math.floor(localMinutes / 60);
+  return hour >= 20 || hour < 6;
+}
+
+/** Exact overlap with the repeating 8 PM–6 AM local-time window. */
+function nighttimeSecondsInInterval(
+  startLocalMinutes: number,
+  durationSeconds: number
+): number {
+  let remainingSeconds = Math.max(0, durationSeconds);
+  let cursorMinutes = startLocalMinutes % (24 * 60);
+  let nighttimeSeconds = 0;
+
+  while (remainingSeconds > 0.001) {
+    const nighttime = isNightLocalMinute(cursorMinutes);
+    const hour = Math.floor(cursorMinutes / 60);
+    const boundaryMinutes = nighttime
+      ? hour < 6
+        ? 6 * 60
+        : 24 * 60
+      : 20 * 60;
+    const secondsUntilBoundary = Math.max(
+      0.001,
+      (boundaryMinutes - cursorMinutes) * 60
+    );
+    const spanSeconds = Math.min(remainingSeconds, secondsUntilBoundary);
+
+    if (nighttime) nighttimeSeconds += spanSeconds;
+    remainingSeconds -= spanSeconds;
+    cursorMinutes = (cursorMinutes + spanSeconds / 60) % (24 * 60);
+  }
+
+  return nighttimeSeconds;
 }
 
 function computeSpeedStats(
@@ -148,18 +214,24 @@ function longestHighwayRunMiles(
 
 function computeNighttimeShare(
   segments: RouteSegment[],
+  departureLocalMinutes?: number,
   departureTime?: string
 ): number {
-  if (!departureTime || segments.length === 0) return 0;
-  const start = new Date(departureTime);
-  if (Number.isNaN(start.getTime())) return 0;
+  if (segments.length === 0) return 0;
+  const startLocalMinutes = resolveDepartureLocalMinutes(
+    departureLocalMinutes,
+    departureTime
+  );
+  if (startLocalMinutes === undefined) return 0;
 
   let nightSeconds = 0;
   let totalSeconds = 0;
   for (const seg of segments) {
     totalSeconds += seg.durationSeconds;
-    const mid = new Date(start.getTime() + (seg.cumulativeSecondsFromStart + seg.durationSeconds / 2) * 1000);
-    if (isNightHour(mid)) nightSeconds += seg.durationSeconds;
+    nightSeconds += nighttimeSecondsInInterval(
+      startLocalMinutes + seg.cumulativeSecondsFromStart / 60,
+      seg.durationSeconds
+    );
   }
   return totalSeconds > 0 ? nightSeconds / totalSeconds : 0;
 }
@@ -265,7 +337,14 @@ function deriveConditionFeatures(
 }
 
 export function buildFeatures(input: BuildFeaturesInput): RouteFeatures {
-  const { route, segments, stepSpeedsMph, departureTime, conditions } = input;
+  const {
+    route,
+    segments,
+    stepSpeedsMph,
+    departureTime,
+    departureLocalMinutes,
+    conditions,
+  } = input;
   const speedStats = computeSpeedStats(route, stepSpeedsMph);
   const { highwayShare } = computeHighwayShare(route.steps, stepSpeedsMph);
   const maneuvers = computeManeuverComplexity(route.steps, route.distanceMeters);
@@ -323,7 +402,11 @@ export function buildFeatures(input: BuildFeaturesInput): RouteFeatures {
     mergeBurdenSubscore: merge.subscore,
     trafficRatio,
     trafficVariance: trafficVariance * (1 + delayRatio),
-    nighttimeShare: computeNighttimeShare(segments, departureTime),
+    nighttimeShare: computeNighttimeShare(
+      segments,
+      departureLocalMinutes,
+      departureTime
+    ),
     urbanShare,
     highwayShare,
     longestHighwaySegmentMiles,
@@ -352,6 +435,7 @@ export function buildFeaturesFromRoute(
   options: {
     stepSpeedsMph?: Map<number, number>;
     departureTime?: string;
+    departureLocalMinutes?: number;
     conditions?: RouteConditions;
   } = {}
 ): { segments: RouteSegment[]; features: RouteFeatures } {
@@ -361,6 +445,7 @@ export function buildFeaturesFromRoute(
     segments,
     stepSpeedsMph: options.stepSpeedsMph,
     departureTime: options.departureTime,
+    departureLocalMinutes: options.departureLocalMinutes,
     conditions: options.conditions,
   });
   return { segments, features };

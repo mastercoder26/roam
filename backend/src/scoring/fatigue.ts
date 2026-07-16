@@ -39,10 +39,23 @@ export function durationPoints(hours: number): number {
   return 2.8 * smoothstep(hours / 4.5) + 1.2 * smoothstep((hours - 4) / 6);
 }
 
-/** UTC hour-of-day so scoring is host-timezone independent. */
-function circadianPenalty(departureTime?: Date): number {
-  if (!departureTime) return 0;
-  const hour = departureTime.getUTCHours();
+/**
+ * Prefer the driver's local clock supplied by the client. The Date fallback is
+ * only for older clients and intentionally uses UTC so server locale never
+ * changes the result.
+ */
+function circadianPenalty(
+  departureTime?: Date,
+  departureLocalMinutes?: number
+): number {
+  const hour =
+    typeof departureLocalMinutes === "number" &&
+    Number.isInteger(departureLocalMinutes) &&
+    departureLocalMinutes >= 0 &&
+    departureLocalMinutes < 24 * 60
+      ? Math.floor(departureLocalMinutes / 60)
+      : departureTime?.getUTCHours();
+  if (hour === undefined || !Number.isFinite(hour)) return 0;
   if (hour >= 0 && hour < 6) return 1.0;
   if (hour >= 22) return 0.85;
   if (hour >= 15 && hour < 18) return 0.35;
@@ -60,7 +73,10 @@ export function computeFatigue(
   ctx: DriverContext
 ): FatigueResult {
   const durationMinutes = features.durationHours * 60;
-  const circadian = circadianPenalty(ctx.departureTime);
+  const circadian = circadianPenalty(
+    ctx.departureTime,
+    ctx.departureLocalMinutes
+  );
   const continuous = continuousDrivePenalty(ctx.continuousDriveMinutes);
 
   // Duration is mostly handled by durationPoints; keep a light log term here.

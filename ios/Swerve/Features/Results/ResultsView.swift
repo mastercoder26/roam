@@ -5,12 +5,23 @@ struct ResultsView: View {
     let result: RouteAnalysisResult
 
     @Environment(\.openURL) private var openURL
+    @EnvironmentObject private var driveSession: DriveSessionManager
     @State private var selectedRoute: ScoredRoute
+    @State private var readinessAssessment: DriverReadinessAssessment
     @State private var heroAppeared = false
 
     init(result: RouteAnalysisResult) {
         self.result = result
         _selectedRoute = State(initialValue: result.primaryRoute)
+        // This initial placeholder is immediately refreshed from the shared
+        // local history on appearance. Caching prevents the GPS-overlap work
+        // from running repeatedly while SwiftUI lays out this screen.
+        _readinessAssessment = State(
+            initialValue: DriverReadinessEngine.assess(
+                route: result.primaryRoute,
+                recordedDrives: []
+            )
+        )
     }
 
     private var alternates: [ScoredRoute] {
@@ -30,16 +41,45 @@ struct ResultsView: View {
         selectedRoute.label.color
     }
 
+    private var readiness: DriverReadinessAssessment {
+        readinessAssessment
+    }
+
+    private var driveHistoryIDs: [UUID] {
+        driveSession.recordedDrives.map(\.id)
+    }
+
+    private var visibleRouteDemands: [RouteDemand] {
+        (selectedRoute.routeDemands ?? [])
+            .filter { demand in
+                demand.available && demand.level != .low
+            }
+            .sorted { $0.intensity > $1.intensity }
+    }
+
+    private var featuredReadinessInsights: [DriverReadinessInsight] {
+        let actionable = readiness.insights.filter { $0.state != .informational }
+        let candidates = actionable.isEmpty ? readiness.insights : actionable
+        return candidates
+            .sorted { readinessPriority($0.state) < readinessPriority($1.state) }
+            .prefix(4)
+            .map { $0 }
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: AppDesign.sectionSpacing) {
                 scoreSection
                     .heroAppear(visible: heroAppeared)
 
-                mapSection
+                readinessSection
                     .heroAppear(visible: heroAppeared, delay: AppAnimation.heroStagger)
 
+                mapSection
+                    .heroAppear(visible: heroAppeared, delay: AppAnimation.heroStagger * 2)
+
                 tripDetailsSection
+                routeDemandsSection
                 if let conditions = selectedRoute.conditions, !conditions.sources.isEmpty {
                     conditionsSection(conditions)
                 }
@@ -47,11 +87,15 @@ struct ResultsView: View {
                 if let hotspots = selectedRoute.hotspots, !hotspots.isEmpty {
                     hotspotsSection(hotspots)
                 }
-                breakdownSection
-                if let contributions = selectedRoute.contributions, !contributions.isEmpty {
-                    contributionsSection(contributions)
+                if selectedRoute.routeDemands == nil {
+                    // Keep older backend deployments useful instead of hiding
+                    // the prior score explanation while they catch up.
+                    breakdownSection
+                    if let contributions = selectedRoute.contributions, !contributions.isEmpty {
+                        contributionsSection(contributions)
+                    }
+                    reasonsSection
                 }
-                reasonsSection
 
                 if !alternates.isEmpty {
                     alternatesSection
@@ -65,6 +109,13 @@ struct ResultsView: View {
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
             heroAppeared = true
+            refreshReadiness()
+        }
+        .onChange(of: selectedRoute.polyline) { _, _ in
+            refreshReadiness()
+        }
+        .onChange(of: driveHistoryIDs) { _, _ in
+            refreshReadiness()
         }
     }
 
@@ -96,6 +147,154 @@ struct ResultsView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 8)
+    }
+
+    private var readinessSection: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            SectionHeader(
+                title: "Can I drive this?",
+                subtitle: "Compared with drives recorded privately on this phone."
+            )
+
+            HStack(alignment: .top, spacing: 12) {
+                Image(systemName: readinessSymbol)
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(readinessColor)
+                    .frame(width: 42, height: 42)
+                    .background(readinessColor.opacity(0.12), in: RoundedRectangle(cornerRadius: 13, style: .continuous))
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(readiness.headline)
+                        .font(.headline)
+                        .foregroundStyle(.primary)
+                    Text(readiness.summary)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+
+            if !featuredReadinessInsights.isEmpty {
+                Divider()
+                VStack(spacing: 10) {
+                    ForEach(featuredReadinessInsights) { insight in
+                        ReadinessInsightRow(insight: insight)
+                    }
+                }
+            }
+
+            if !(selectedRoute.routeDemands ?? []).isEmpty {
+                Divider()
+                Button {
+                    queuePracticeRoute()
+                } label: {
+                    Label("Practice this route", systemImage: "steeringwheel")
+                        .font(.subheadline.weight(.semibold))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .foregroundStyle(.white)
+                        .background(AppDesign.accent, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                }
+                .buttonStyle(PressableScaleStyle())
+                .disabled(driveSession.isRecording)
+                .opacity(driveSession.isRecording ? 0.55 : 1)
+                .accessibilityHint("Prepares this route for your next manually started drive. It does not begin recording.")
+            }
+
+            Label(
+                "This is coaching, not a safety guarantee.",
+                systemImage: "checkmark.shield"
+            )
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        }
+        .premiumCard()
+        .animation(AppAnimation.spring, value: selectedRoute.polyline)
+    }
+
+    @ViewBuilder
+    private var routeDemandsSection: some View {
+        if selectedRoute.routeDemands != nil {
+            VStack(alignment: .leading, spacing: 14) {
+                SectionHeader(
+                    title: "What this route asks of you",
+                    subtitle: "The road conditions that stand out for this drive."
+                )
+
+                if visibleRouteDemands.isEmpty {
+                    Label(
+                        "No route demand stands out above its usual range.",
+                        systemImage: "checkmark.circle.fill"
+                    )
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                } else {
+                    VStack(spacing: 0) {
+                        ForEach(visibleRouteDemands) { demand in
+                            RouteDemandRow(demand: demand)
+                            if demand.id != visibleRouteDemands.last?.id {
+                                Divider().padding(.leading, 48)
+                            }
+                        }
+                    }
+                }
+
+                if selectedRoute.routeDemands?.contains(where: { !$0.available }) == true {
+                    Label(
+                        "Unavailable live road or weather data is left out rather than estimated.",
+                        systemImage: "checkmark.shield.fill"
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+            }
+            .premiumCard()
+            .animation(AppAnimation.spring, value: selectedRoute.polyline)
+        }
+    }
+
+    private var readinessColor: Color {
+        switch readiness.verdict {
+        case .looksLikeMatch:
+            return AppDesign.positive
+        case .practiceWithAdult:
+            return AppDesign.safety
+        case .insufficientHistory:
+            return AppDesign.accent
+        }
+    }
+
+    private var readinessSymbol: String {
+        switch readiness.verdict {
+        case .looksLikeMatch:
+            return "checkmark.shield.fill"
+        case .practiceWithAdult:
+            return "figure.and.child.holdinghands"
+        case .insufficientHistory:
+            return "road.lanes"
+        }
+    }
+
+    private func queuePracticeRoute() {
+        guard !driveSession.isRecording else { return }
+        driveSession.queuePlannedPracticeRoute(selectedRoute)
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+    }
+
+    private func readinessPriority(_ state: DriverReadinessInsightState) -> Int {
+        switch state {
+        case .practiceNeeded: return 0
+        case .unmeasured: return 1
+        case .matched: return 2
+        case .informational: return 3
+        }
+    }
+
+    private func refreshReadiness() {
+        readinessAssessment = DriverReadinessEngine.assess(
+            route: selectedRoute,
+            recordedDrives: driveSession.recordedDrives
+        )
     }
 
     private var mapSection: some View {
@@ -443,6 +642,145 @@ struct ResultsView: View {
     }
 }
 
+private struct ReadinessInsightRow: View {
+    let insight: DriverReadinessInsight
+
+    private var color: Color {
+        switch insight.state {
+        case .matched:
+            return AppDesign.positive
+        case .practiceNeeded:
+            return AppDesign.safety
+        case .unmeasured:
+            return AppDesign.accent
+        case .informational:
+            return .secondary
+        }
+    }
+
+    private var symbol: String {
+        switch insight.state {
+        case .matched:
+            return "checkmark.circle.fill"
+        case .practiceNeeded:
+            return "figure.and.child.holdinghands"
+        case .unmeasured:
+            return "questionmark.circle.fill"
+        case .informational:
+            return "info.circle.fill"
+        }
+    }
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: symbol)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(color)
+                .frame(width: 22, height: 22)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(insight.title)
+                    .font(.subheadline.weight(.semibold))
+                Text(insight.detail)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+        }
+        .accessibilityElement(children: .combine)
+    }
+}
+
+private struct RouteDemandRow: View {
+    let demand: RouteDemand
+
+    private var color: Color {
+        switch demand.level {
+        case .low:
+            return AppDesign.positive
+        case .moderate:
+            return AppDesign.safety
+        case .high:
+            return .red
+        }
+    }
+
+    private var symbol: String {
+        switch demand.kind {
+        case .afterDark:
+            return "moon.stars.fill"
+        case .fastRoads:
+            return "speedometer"
+        case .merges:
+            return "arrow.triangle.merge"
+        case .complexIntersections:
+            return "arrow.triangle.turn.up.right.diamond.fill"
+        case .weatherVisibility:
+            return "cloud.sun.rain.fill"
+        case .sustainedDrive:
+            return "clock.fill"
+        case .traffic:
+            return "car.2.fill"
+        case .roadConditions:
+            return "road.lanes"
+        case nil:
+            return "point.3.connected.trianglepath.dotted"
+        }
+    }
+
+    private var levelLabel: String {
+        switch demand.level {
+        case .low: return "Low"
+        case .moderate: return "Elevated"
+        case .high: return "High"
+        }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .top, spacing: 12) {
+                Image(systemName: symbol)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(color)
+                    .frame(width: 36, height: 36)
+                    .background(color.opacity(0.12), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+
+                VStack(alignment: .leading, spacing: 3) {
+                    HStack(spacing: 8) {
+                        Text(demand.title)
+                            .font(.subheadline.weight(.semibold))
+                        Text(levelLabel)
+                            .font(.caption2.weight(.bold))
+                            .foregroundStyle(color)
+                            .padding(.horizontal, 7)
+                            .padding(.vertical, 3)
+                            .background(color.opacity(0.12), in: Capsule())
+                    }
+                    Text(demand.evidence)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 0)
+            }
+
+            GeometryReader { proxy in
+                ZStack(alignment: .leading) {
+                    Capsule().fill(Color(.systemGray5))
+                    Capsule()
+                        .fill(color)
+                        .frame(width: proxy.size.width * demand.intensity)
+                }
+            }
+            .frame(height: 5)
+            .accessibilityHidden(true)
+        }
+        .padding(.vertical, 10)
+        .accessibilityElement(children: .combine)
+    }
+}
+
 struct BreakdownBarRow: View {
     let title: String
     let value: Double
@@ -704,10 +1042,34 @@ enum RouteNavigationService {
                         southwest: Coordinate(latitude: 30.2, longitude: -97.8),
                         northeast: Coordinate(latitude: 32.8, longitude: -96.8)
                     ),
-                    scoreDelta: nil
+                    scoreDelta: nil,
+                    routeDemands: [
+                        RouteDemand(
+                            id: "afterDark",
+                            intensity: 0.85,
+                            level: .high,
+                            evidence: "Most of the drive falls in the 8 PM–6 AM window.",
+                            available: true
+                        ),
+                        RouteDemand(
+                            id: "fastRoads",
+                            intensity: 0.68,
+                            level: .high,
+                            evidence: "72% of the route is estimated at 45+ mph.",
+                            available: true
+                        ),
+                        RouteDemand(
+                            id: "merges",
+                            intensity: 0.56,
+                            level: .moderate,
+                            evidence: "2 ramps or merge transitions appear in the route instructions.",
+                            available: true
+                        )
+                    ]
                 ),
                 alternateRoutes: []
             )
         )
     }
+    .environmentObject(DriveSessionManager())
 }

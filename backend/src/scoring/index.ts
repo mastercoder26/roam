@@ -8,6 +8,7 @@ import type {
 import { MODEL_VERSION } from "../types.js";
 import { scoreSegmentLocal, aggregateSegmentScores } from "./segments.js";
 import { buildFeaturesFromRoute } from "./features.js";
+import { buildRouteDemands } from "./demands.js";
 import { computeBaseScore } from "./baseScore.js";
 import { computeFatigue, computeRawScore } from "./fatigue.js";
 import {
@@ -33,6 +34,7 @@ export function scoreRoute(
   const { segments, features } = buildFeaturesFromRoute(route, {
     stepSpeedsMph: options.stepSpeedsMph,
     departureTime: options.departureTime,
+    departureLocalMinutes: options.departureLocalMinutes,
     conditions: options.conditions,
   });
 
@@ -45,6 +47,7 @@ export function scoreRoute(
     departureTime: options.departureTime
       ? new Date(options.departureTime)
       : undefined,
+    departureLocalMinutes: options.departureLocalMinutes,
     continuousDriveMinutes,
   });
   const rawScore = computeRawScore(D_route, base.D_base, fatigue, features);
@@ -71,6 +74,11 @@ export function scoreRoute(
   const uncertainty = applyUncertaintyBand(score, baseUncertainty);
 
   const reasons = generateReasons(ctx, features, base, fatigue);
+  const routeDemands = buildRouteDemands(route, features, {
+    departureTime: options.departureTime,
+    departureLocalMinutes: options.departureLocalMinutes,
+    conditions: options.conditions,
+  });
 
   const trafficDelaySeconds = Math.max(
     0,
@@ -86,6 +94,7 @@ export function scoreRoute(
     contributions,
     uncertainty,
     hotspots,
+    routeDemands,
     conditions: options.conditions,
     modelVersion: MODEL_VERSION,
     distanceMeters: route.distanceMeters,

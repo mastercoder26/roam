@@ -15,6 +15,10 @@ final class DriveSessionManager: NSObject, ObservableObject {
     @Published private(set) var statusMessage = "Ready when you are"
     @Published private(set) var lastScore: DrivingScore?
     @Published private(set) var recordedDrives: [RecordedDrive] = []
+    @Published private(set) var queuedPracticeRoute: PlannedRouteContext?
+    /// A distinct presentation event for the root view. The queued context
+    /// remains available until the driver explicitly starts or cancels it.
+    @Published private(set) var practiceRoutePresentationRequest: UUID?
 
     private let locationManager = CLLocationManager()
     private let motionManager = CMMotionManager()
@@ -28,6 +32,12 @@ final class DriveSessionManager: NSObject, ObservableObject {
     private var recentMotionSamples: [DriveMotionSample] = []
     private var routePoints: [DriveRoutePoint] = []
     private var latestCoordinate: DriveCoordinate?
+    private var activePracticeRoute: PlannedRouteContext?
+    // The encoded route is deliberately memory-only. Saved drives receive the
+    // privacy-safe context plus a local overlap result, never an address,
+    // polyline, or other planned-route geometry.
+    private var queuedPracticeRoutePolyline: String?
+    private var activePracticeRoutePolyline: String?
     private let historyKey = "recorded-drives-v1"
 
     override init() {
@@ -43,6 +53,13 @@ final class DriveSessionManager: NSObject, ObservableObject {
     func startDrive() {
         guard !isRecording else { return }
 
+        // Copy the context into the recording before removing it from the
+        // pre-drive queue. Starting remains entirely manual; this only tags
+        // the resulting local record after the driver chooses to begin.
+        activePracticeRoute = queuedPracticeRoute
+        activePracticeRoutePolyline = queuedPracticeRoutePolyline
+        queuedPracticeRoute = nil
+        queuedPracticeRoutePolyline = nil
         resetCurrentDrive()
         isRecording = true
         startDate = Date()
@@ -98,14 +115,59 @@ final class DriveSessionManager: NSObject, ObservableObject {
             dataQuality: result.quality
         )
         lastScore = score
-        let drive = RecordedDrive(startedAt: startDate ?? Date(), score: score, route: routePoints)
+        let persistedPracticeRoute = activePracticeRoute.map { context in
+            let routeMatched = activePracticeRoutePolyline.map {
+                DriverReadinessEngine.matchesPlannedPracticeRoute(
+                    plannedPolyline: $0,
+                    recordedRoute: routePoints
+                )
+            } ?? false
+            return PlannedRouteContext(
+                id: context.id,
+                createdAt: context.createdAt,
+                routeDemands: context.routeDemands,
+                recordedRouteMatched: routeMatched
+            )
+        }
+        let practiceRouteWasVerified = persistedPracticeRoute?.recordedRouteMatched
+        let drive = RecordedDrive(
+            startedAt: startDate ?? Date(),
+            score: score,
+            route: routePoints,
+            plannedRouteContext: persistedPracticeRoute
+        )
         recordedDrives.insert(drive, at: 0)
         // Keep storage bounded while retaining a useful recent history.
         recordedDrives = Array(recordedDrives.prefix(50))
         saveRecordedDrives()
-        statusMessage = motionSamples == 0
-            ? "No motion samples received — try a physical iPhone."
-            : "Drive saved on this device"
+        if motionSamples == 0 {
+            statusMessage = "No motion samples received — try a physical iPhone."
+        } else if practiceRouteWasVerified == true {
+            statusMessage = "Drive saved — planned-route overlap verified on this device"
+        } else if practiceRouteWasVerified == false {
+            statusMessage = "Drive saved — planned-route overlap could not be verified from GPS"
+        } else {
+            statusMessage = "Drive saved on this device"
+        }
+        activePracticeRoute = nil
+        activePracticeRoutePolyline = nil
+    }
+
+    /// Queues a locally generated route context for the next manually started
+    /// drive. The route geometry stays in memory solely to verify GPS overlap
+    /// when the drive ends; this deliberately never calls `startDrive()`.
+    func queuePlannedPracticeRoute(_ route: ScoredRoute) {
+        guard !isRecording else { return }
+        queuedPracticeRoute = PlannedRouteContext(routeDemands: route.routeDemands ?? [])
+        queuedPracticeRoutePolyline = route.polyline
+        practiceRoutePresentationRequest = UUID()
+    }
+
+    /// Cancels a pre-drive route tag without affecting any saved drive.
+    func clearPlannedPracticeRoute() {
+        guard !isRecording else { return }
+        queuedPracticeRoute = nil
+        queuedPracticeRoutePolyline = nil
     }
 
     private func resetCurrentDrive() {
