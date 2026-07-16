@@ -205,8 +205,12 @@ private struct RouteConnector: View {
             }
             .frame(height: 32)
             Image(systemName: "flag.fill")
-                .font(.caption)
+                .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(.red)
+                // The glyph is visually top-heavy, so center its drawing—not
+                // merely its text line—against the destination input.
+                .frame(width: 12, height: 12)
+                .offset(y: 3)
                 .opacity(showDestinationIndicator ? 1 : 0)
                 .animation(flagAnimation, value: showDestinationIndicator)
         }
