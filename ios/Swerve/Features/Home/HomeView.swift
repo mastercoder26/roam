@@ -192,7 +192,9 @@ private struct RouteConnector: View {
     var body: some View {
         VStack(spacing: 0) {
             Circle().fill(AppDesign.accent).frame(width: 12, height: 12).overlay(Circle().stroke(.white, lineWidth: 3))
-            VStack(spacing: 8) {
+            // This fixed segment matches the origin row + 12pt inter-row gap,
+            // keeping the flag centered on the destination text field.
+            VStack(spacing: 4) {
                 ForEach(0..<4, id: \.self) { index in
                     Circle()
                         .fill(Color.secondary.opacity(0.55))
@@ -201,7 +203,7 @@ private struct RouteConnector: View {
                         .animation(dotAnimation(for: index), value: showDestinationIndicator)
                 }
             }
-            .padding(.vertical, 9)
+            .frame(height: 32)
             Image(systemName: "flag.fill")
                 .font(.caption)
                 .foregroundStyle(.red)
