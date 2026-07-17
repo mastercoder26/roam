@@ -180,6 +180,36 @@ export interface DifficultyRequest {
   continuousDriveMinutes?: number;
 }
 
+/** One requested departure window for a server-side route comparison. */
+export interface DepartureComparisonCandidate {
+  /** Stable client-generated identifier, returned unchanged with this result. */
+  id: string;
+  /** ISO-8601 timestamp representing this candidate departure window. */
+  departureTime: string;
+  /** Client-local clock minutes for this candidate (0 = midnight). */
+  departureLocalMinutes: number;
+}
+
+export interface DepartureComparisonRequest {
+  origin: string;
+  destination: string;
+  candidates: DepartureComparisonCandidate[];
+}
+
+/**
+ * Comparison candidates are deliberately independent. A provider or enrichment
+ * failure for one window must not discard useful route data for the others.
+ */
+export interface DepartureComparisonCandidateResult
+  extends DepartureComparisonCandidate {
+  route?: ScoredRoute;
+  error?: { message: string };
+}
+
+export interface DepartureComparisonResponse {
+  candidates: DepartureComparisonCandidateResult[];
+}
+
 export interface ScoringContext {
   highwayShare: number;
   maneuversPer10Mi: number;

@@ -29,7 +29,7 @@ struct RouteAnalysisLoadingView: View {
                     Text(statusTitle)
                         .font(.title2.weight(.semibold))
                         .foregroundStyle(.white)
-                    Text("Tracing the route, then matching its road signals to your drive.")
+                    Text("Tracing the route, then checking the road signals that shape its difficulty.")
                         .font(.subheadline)
                         .foregroundStyle(.white.opacity(0.64))
                         .multilineTextAlignment(.center)
@@ -63,12 +63,14 @@ struct RouteAnalysisLoadingView: View {
             return
         }
 
-        withAnimation(.linear(duration: 0.72)) {
+        withAnimation(.linear(duration: 0.64)) {
             routeProgress = 1
         }
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.58) {
-            withAnimation(.spring(response: 0.52, dampingFraction: 0.86)) {
+        // Let the route finish drawing before the data points assemble into a
+        // car. The story reads in a single direction: trace, understand, go.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.68) {
+            withAnimation(AppAnimation.content) {
                 dotsAreFormed = true
             }
             if departureRequested {
@@ -93,10 +95,10 @@ struct RouteAnalysisLoadingView: View {
             return
         }
 
-        withAnimation(.easeIn(duration: 0.72)) {
+        withAnimation(.easeOut(duration: 0.30)) {
             isDrivingAway = true
         }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.76, execute: onDepartureComplete)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.34, execute: onDepartureComplete)
     }
 }
 
@@ -111,10 +113,15 @@ private struct DotCarIllustration: View {
     var body: some View {
         ZStack {
             routeLine
-            dotCar
-                .offset(x: isDrivingAway ? -390 : 0)
-                .opacity(isDrivingAway ? 0.85 : 1)
-                .animation(.easeIn(duration: 0.72), value: isDrivingAway)
+            // A single display-synced timeline drives the whole illustration.
+            // Individual timelines per dot create unnecessary work during a
+            // network wait and make this otherwise small loading scene costly.
+            TimelineView(.animation(minimumInterval: 1 / 30)) { context in
+                dotCar(time: context.date.timeIntervalSinceReferenceDate)
+                    .offset(x: isDrivingAway ? -390 : 0)
+                    .opacity(isDrivingAway ? 0.85 : 1)
+                    .animation(.easeOut(duration: 0.30), value: isDrivingAway)
+            }
         }
         .frame(width: canvasSize.width, height: canvasSize.height)
         .clipped()
@@ -137,13 +144,14 @@ private struct DotCarIllustration: View {
         .shadow(color: .orange.opacity(0.35), radius: 12)
     }
 
-    private var dotCar: some View {
+    private func dotCar(time: TimeInterval) -> some View {
         ZStack {
             ForEach(CarDots.all) { dot in
                 FloatingDot(
                     size: dot.size,
                     color: dot.color,
                     phase: dot.phase,
+                    time: time,
                     isVisible: dotsAreFormed,
                     isBobbing: dotsAreFormed && !isDrivingAway && !reduceMotion
                 )
@@ -152,7 +160,7 @@ private struct DotCarIllustration: View {
                     y: dotsAreFormed ? dot.y : 145
                 )
                 .animation(
-                    .spring(response: 0.48, dampingFraction: 0.82)
+                    AppAnimation.content
                         .delay(dot.phase * 0.028),
                     value: dotsAreFormed
                 )
@@ -161,6 +169,7 @@ private struct DotCarIllustration: View {
             DotWheel(
                 center: CGPoint(x: 92, y: 126),
                 phase: 0,
+                time: time,
                 isVisible: dotsAreFormed,
                 isBobbing: dotsAreFormed && !isDrivingAway && !reduceMotion,
                 isSpinning: isDrivingAway
@@ -168,6 +177,7 @@ private struct DotCarIllustration: View {
             DotWheel(
                 center: CGPoint(x: 231, y: 126),
                 phase: 8,
+                time: time,
                 isVisible: dotsAreFormed,
                 isBobbing: dotsAreFormed && !isDrivingAway && !reduceMotion,
                 isSpinning: isDrivingAway
@@ -181,32 +191,31 @@ private struct FloatingDot: View {
     let size: CGFloat
     let color: Color
     let phase: Double
+    let time: TimeInterval
     let isVisible: Bool
     let isBobbing: Bool
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1 / 30)) { context in
-            let time = context.date.timeIntervalSinceReferenceDate
-            let bob = isBobbing ? sin(time * 2.2 + phase) * 2.2 : 0
+        let bob = isBobbing ? sin(time * 2.2 + phase) * 2.2 : 0
 
-            Circle()
-                .fill(color)
-                .frame(width: size, height: size)
-                .offset(y: bob)
-                .opacity(isVisible ? 1 : 0)
-                .scaleEffect(isVisible ? 1 : 0.72)
-                .animation(
-                    .spring(response: 0.42, dampingFraction: 0.82)
-                        .delay(phase * 0.024),
-                    value: isVisible
-                )
-        }
+        Circle()
+            .fill(color)
+            .frame(width: size, height: size)
+            .offset(y: bob)
+            .opacity(isVisible ? 1 : 0)
+            .scaleEffect(isVisible ? 1 : 0.72)
+            .animation(
+                AppAnimation.selection
+                    .delay(phase * 0.024),
+                value: isVisible
+            )
     }
 }
 
 private struct DotWheel: View {
     let center: CGPoint
     let phase: Double
+    let time: TimeInterval
     let isVisible: Bool
     let isBobbing: Bool
     let isSpinning: Bool
@@ -223,6 +232,7 @@ private struct DotWheel: View {
                     size: index.isMultiple(of: 2) ? 8 : 6,
                     color: index.isMultiple(of: 2) ? .orange : .white.opacity(0.88),
                     phase: phase + Double(index),
+                    time: time,
                     isVisible: isVisible,
                     isBobbing: isBobbing
                 )
@@ -236,16 +246,17 @@ private struct DotWheel: View {
                 size: 7,
                 color: .white,
                 phase: phase + 9,
+                time: time,
                 isVisible: isVisible,
                 isBobbing: isBobbing
             )
         }
         .frame(width: 42, height: 42)
         .rotationEffect(.degrees(isSpinning ? -720 : 0))
-        .animation(.easeIn(duration: 0.72), value: isSpinning)
+        .animation(.easeOut(duration: 0.30), value: isSpinning)
         .position(x: isVisible ? center.x : center.x * 0.92 + 12, y: isVisible ? center.y : 145)
         .animation(
-            .spring(response: 0.48, dampingFraction: 0.82).delay(phase * 0.028),
+            AppAnimation.content.delay(phase * 0.028),
             value: isVisible
         )
     }

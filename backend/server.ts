@@ -1,7 +1,10 @@
 import { config } from "dotenv";
 import { resolve } from "node:path";
 import express from "express";
-import { handleDifficulty } from "./src/handlers/difficulty.js";
+import {
+  handleDepartureComparison,
+  handleDifficulty,
+} from "./src/handlers/difficulty.js";
 
 // `server.ts` lives in `backend/`, alongside the local environment files.
 config({ path: resolve(import.meta.dirname, ".env.local") });
@@ -41,6 +44,10 @@ app.use((req, res, next) => {
 
 app.post("/api/route/difficulty", (req, res) => {
   void handleDifficulty(req, res);
+});
+
+app.post("/api/route/departure-comparison", (req, res) => {
+  void handleDepartureComparison(req, res);
 });
 
 const server = app.listen(port, () => {

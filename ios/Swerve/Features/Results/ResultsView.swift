@@ -2,17 +2,27 @@ import SwiftUI
 import UIKit
 
 struct ResultsView: View {
-    let result: RouteAnalysisResult
+    @State private var result: RouteAnalysisResult
 
     @Environment(\.openURL) private var openURL
     @EnvironmentObject private var driveSession: DriveSessionManager
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var selectedRoute: ScoredRoute
     @State private var readinessAssessment: DriverReadinessAssessment
+    @State private var routeChoiceRanking: RouteChoiceRanking?
+    @State private var routeChoiceCacheKey: RouteChoiceRankingCacheKey?
+    @State private var practicePlan: PracticePlan?
+    @State private var departureComparison: DepartureComparisonResponse?
+    @State private var departureComparisonError: String?
+    @State private var isComparingDepartures = false
+    @State private var isReanalyzingDeparture = false
     @State private var heroAppeared = false
     @State private var showsAllReadinessEvidence = false
 
+    private let apiClient = APIClient()
+
     init(result: RouteAnalysisResult) {
-        self.result = result
+        _result = State(initialValue: result)
         _selectedRoute = State(initialValue: result.primaryRoute)
         // This initial placeholder is immediately refreshed from the shared
         // local history on appearance. Caching prevents the GPS-overlap work
@@ -25,17 +35,8 @@ struct ResultsView: View {
         )
     }
 
-    private var alternates: [ScoredRoute] {
-        var routes: [ScoredRoute] = []
-        var seenPolylines = Set<String>()
-        let all = [result.primaryRoute] + result.alternateRoutes
-
-        for route in all where route.polyline != selectedRoute.polyline {
-            if seenPolylines.insert(route.polyline).inserted {
-                routes.append(route)
-            }
-        }
-        return routes
+    private var routeChoices: [RankedRouteChoice] {
+        routeChoiceRanking?.choices ?? []
     }
 
     private var labelColor: Color {
@@ -48,6 +49,11 @@ struct ResultsView: View {
 
     private var driveHistoryIDs: [UUID] {
         driveSession.recordedDrives.map(\.id)
+    }
+
+    private var calmestDepartureID: String? {
+        guard let departureComparison else { return nil }
+        return DepartureComparisonRanking.calmestCandidateID(in: departureComparison.candidates)
     }
 
     private var visibleRouteDemands: [RouteDemand] {
@@ -94,8 +100,14 @@ struct ResultsView: View {
                 readinessSection
                     .heroAppear(visible: heroAppeared, delay: AppAnimation.heroStagger)
 
-                mapSection
+                departureComparisonSection
                     .heroAppear(visible: heroAppeared, delay: AppAnimation.heroStagger * 2)
+
+                routeChoicesSection
+                    .heroAppear(visible: heroAppeared, delay: AppAnimation.heroStagger * 2)
+
+                mapSection
+                    .heroAppear(visible: heroAppeared, delay: AppAnimation.heroStagger * 3)
 
                 tripDetailsSection
                 routeDemandsSection
@@ -116,9 +128,6 @@ struct ResultsView: View {
                     reasonsSection
                 }
 
-                if !alternates.isEmpty {
-                    alternatesSection
-                }
             }
             .padding(.horizontal, AppDesign.contentPadding)
             .padding(.vertical, 12)
@@ -128,13 +137,14 @@ struct ResultsView: View {
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
             heroAppeared = true
-            refreshReadiness()
+            refreshRouteChoices()
+            startDepartureComparison()
         }
         .onChange(of: selectedRoute.polyline) { _, _ in
             refreshReadiness()
         }
         .onChange(of: driveHistoryIDs) { _, _ in
-            refreshReadiness()
+            refreshRouteChoices()
         }
     }
 
@@ -149,7 +159,7 @@ struct ResultsView: View {
                 .padding(.vertical, 6)
                 .background(labelColor.opacity(0.12))
                 .clipShape(Capsule())
-                .animation(AppAnimation.spring, value: selectedRoute.label)
+                .animation(reduceMotion ? .easeOut(duration: 0.16) : AppAnimation.selection, value: selectedRoute.label)
 
             if selectedRoute.uncertainty != nil {
                 Text(selectedRoute.formattedScoreWithUncertainty)
@@ -230,6 +240,11 @@ struct ResultsView: View {
                 )
             }
 
+            if let practicePlan, !practicePlan.goals.isEmpty {
+                Divider()
+                PracticePlanPreview(plan: practicePlan)
+            }
+
             if !(selectedRoute.routeDemands ?? []).isEmpty {
                 Divider()
                 Button {
@@ -256,7 +271,7 @@ struct ResultsView: View {
             .foregroundStyle(.secondary)
         }
         .premiumCard()
-        .animation(AppAnimation.spring, value: selectedRoute.polyline)
+        .animation(reduceMotion ? .easeOut(duration: 0.16) : AppAnimation.content, value: selectedRoute.polyline)
     }
 
     @ViewBuilder
@@ -296,7 +311,7 @@ struct ResultsView: View {
                 }
             }
             .premiumCard()
-            .animation(AppAnimation.spring, value: selectedRoute.polyline)
+            .animation(reduceMotion ? .easeOut(duration: 0.16) : AppAnimation.content, value: selectedRoute.polyline)
         }
     }
 
@@ -324,7 +339,7 @@ struct ResultsView: View {
 
     private func queuePracticeRoute() {
         guard !driveSession.isRecording else { return }
-        driveSession.queuePlannedPracticeRoute(selectedRoute)
+        driveSession.queuePlannedPracticeRoute(selectedRoute, practicePlan: practicePlan)
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
     }
 
@@ -338,11 +353,128 @@ struct ResultsView: View {
     }
 
     private func refreshReadiness() {
-        readinessAssessment = DriverReadinessEngine.assess(
+        let assessment = DriverReadinessEngine.assess(
             route: selectedRoute,
             recordedDrives: driveSession.recordedDrives
         )
+        readinessAssessment = assessment
+        practicePlan = PracticePlanEngine.makePlan(assessment: assessment, route: selectedRoute)
         showsAllReadinessEvidence = false
+    }
+
+    private func refreshRouteChoices(force: Bool = false) {
+        let key = RouteChoiceRankingEngine.cacheKey(
+            primaryRoute: result.primaryRoute,
+            alternateRoutes: result.alternateRoutes,
+            recordedDrives: driveSession.recordedDrives
+        )
+        guard force || key != routeChoiceCacheKey else {
+            refreshReadiness()
+            return
+        }
+
+        let ranking = RouteChoiceRankingEngine.rank(
+            primaryRoute: result.primaryRoute,
+            alternateRoutes: result.alternateRoutes,
+            recordedDrives: driveSession.recordedDrives
+        )
+        let selectedID = ranking.selectedRouteID(preserving: selectedRoute.id)
+        routeChoiceCacheKey = key
+        routeChoiceRanking = ranking
+        if let selectedChoice = ranking.choice(for: selectedID) {
+            selectedRoute = selectedChoice.route
+            readinessAssessment = selectedChoice.assessment
+            practicePlan = PracticePlanEngine.makePlan(
+                assessment: selectedChoice.assessment,
+                route: selectedChoice.route
+            )
+        } else {
+            refreshReadiness()
+        }
+        showsAllReadinessEvidence = false
+    }
+
+    private func selectRouteChoice(_ choice: RankedRouteChoice) {
+        guard selectedRoute.id != choice.route.id else { return }
+        withAnimation(reduceMotion ? .easeOut(duration: 0.16) : AppAnimation.selection) {
+            selectedRoute = choice.route
+            readinessAssessment = choice.assessment
+            practicePlan = PracticePlanEngine.makePlan(assessment: choice.assessment, route: choice.route)
+            showsAllReadinessEvidence = false
+        }
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+    }
+
+    private func startDepartureComparison() {
+        let current = result
+        isComparingDepartures = true
+        departureComparisonError = nil
+        departureComparison = nil
+
+        Task {
+            do {
+                let response = try await apiClient.compareDepartureTimes(
+                    origin: current.origin,
+                    destination: current.destination,
+                    selectedDeparture: current.departureTime
+                )
+                guard result.origin == current.origin,
+                      result.destination == current.destination,
+                      result.departureTime == current.departureTime else {
+                    return
+                }
+                departureComparison = response
+            } catch {
+                guard result.origin == current.origin,
+                      result.destination == current.destination,
+                      result.departureTime == current.departureTime else {
+                    return
+                }
+                departureComparisonError = error.localizedDescription
+            }
+            guard result.origin == current.origin,
+                  result.destination == current.destination,
+                  result.departureTime == current.departureTime else {
+                return
+            }
+            isComparingDepartures = false
+        }
+    }
+
+    private func reanalyze(at candidate: DepartureComparisonCandidateResult) {
+        guard let departure = candidate.departureDate,
+              !isReanalyzingDeparture else { return }
+        let current = result
+        isReanalyzingDeparture = true
+
+        Task {
+            do {
+                let response = try await apiClient.analyzeRoute(
+                    origin: current.origin,
+                    destination: current.destination,
+                    departureTime: departure,
+                    includeAlternates: true
+                )
+                let updated = RouteAnalysisResult(
+                    origin: current.origin,
+                    destination: current.destination,
+                    departureTime: departure,
+                    primaryRoute: response.primaryRoute,
+                    alternateRoutes: response.alternateRoutes
+                )
+                withAnimation(reduceMotion ? .easeOut(duration: 0.16) : AppAnimation.content) {
+                    result = updated
+                    selectedRoute = response.primaryRoute
+                    routeChoiceRanking = nil
+                    routeChoiceCacheKey = nil
+                }
+                refreshRouteChoices(force: true)
+                startDepartureComparison()
+            } catch {
+                departureComparisonError = "Could not refresh this departure time. \(error.localizedDescription)"
+            }
+            isReanalyzingDeparture = false
+        }
     }
 
     private var mapSection: some View {
@@ -354,8 +486,7 @@ struct ResultsView: View {
         .frame(height: 220)
         .clipShape(RoundedRectangle(cornerRadius: AppDesign.cornerRadius, style: .continuous))
         .shadow(color: .black.opacity(0.06), radius: 12, y: 6)
-        .animation(AppAnimation.spring, value: selectedRoute.polyline)
-        .id(selectedRoute.polyline)
+        .animation(reduceMotion ? .easeOut(duration: 0.16) : AppAnimation.selection, value: selectedRoute.polyline)
     }
 
     private var tripDetailsSection: some View {
@@ -507,7 +638,7 @@ struct ResultsView: View {
             if conditions.turns.available && conditions.turns.unprotectedLeftTurns > 0 {
                 conditionRow(
                     systemImage: "arrow.turn.up.left",
-                    color: .red,
+                    color: AppDesign.safety,
                     text: conditions.turns.unprotectedLeftTurns == 1
                         ? "1 unprotected left turn (no signal)"
                         : "\(conditions.turns.unprotectedLeftTurns) unprotected left turns (no signal)"
@@ -546,7 +677,7 @@ struct ResultsView: View {
     }
 
     private func severityChip(label: String, severity: Double) -> some View {
-        let color: Color = severity < 0.15 ? .green : severity < 0.4 ? .yellow : severity < 0.7 ? .orange : .red
+        let color: Color = severity < 0.15 ? .green : severity < 0.4 ? .yellow : AppDesign.safety
         return Text(label)
             .font(.caption2.weight(.bold))
             .padding(.horizontal, 8)
@@ -654,22 +785,88 @@ struct ResultsView: View {
         .premiumCard()
     }
 
-    private var alternatesSection: some View {
+    @ViewBuilder
+    private var departureComparisonSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            SectionHeader(title: "Alternate Routes")
+            SectionHeader(
+                title: "Calmest departure",
+                subtitle: "A local comparison of nearby departure times. Your recorded driving history stays on this iPhone."
+            )
 
-            ForEach(alternates) { route in
-                AlternateRouteCard(
-                    route: route,
-                    isSelected: route.polyline == selectedRoute.polyline
-                ) {
-                    withAnimation(AppAnimation.spring) {
-                        selectedRoute = route
-                    }
-                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            if isComparingDepartures {
+                HStack(spacing: 10) {
+                    ProgressView().tint(AppDesign.accent)
+                    Text("Comparing nearby departure times")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
                 }
+                .padding(.vertical, 8)
+            } else if let departureComparison {
+                ForEach(departureComparison.candidates) { candidate in
+                    DepartureComparisonRow(
+                        candidate: candidate,
+                        isCalmestAvailable: calmestDepartureID == candidate.id,
+                        isCurrentDeparture: isCurrentDeparture(candidate),
+                        isUpdating: isReanalyzingDeparture
+                    ) {
+                        reanalyze(at: candidate)
+                    }
+                }
+                Label(
+                    calmestDepartureID == nil
+                        ? "Calmest available needs comparable traffic, after-dark, and weather data for every time."
+                        : "Each time uses the best available route at that departure time.",
+                    systemImage: "checkmark.shield"
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            } else if let departureComparisonError {
+                Label("Departure comparison is unavailable right now. \(departureComparisonError)", systemImage: "info.circle")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
+        .premiumCard()
+    }
+
+    private var routeChoicesSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            SectionHeader(
+                title: "Route choices",
+                subtitle: routeChoiceRanking?.comparisonLimitedByHistory == true
+                    ? "Recorded history is still building, so choices are ordered by route difficulty."
+                    : "Ranked by route demands and evidence recorded on this phone."
+            )
+
+            if let ranking = routeChoiceRanking {
+                ForEach(ranking.choices) { choice in
+                    AlternateRouteCard(
+                        route: choice.route,
+                        isSelected: choice.route.id == selectedRoute.id,
+                        readinessHeadline: choice.assessment.headline,
+                        badges: choice.badges,
+                        comparisonLimitedByHistory: ranking.comparisonLimitedByHistory
+                    ) {
+                        selectRouteChoice(choice)
+                    }
+                }
+            } else {
+                HStack(spacing: 10) {
+                    ProgressView().tint(AppDesign.accent)
+                    Text("Preparing route choices")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.vertical, 8)
+            }
+        }
+        .premiumCard()
+    }
+
+    private func isCurrentDeparture(_ candidate: DepartureComparisonCandidateResult) -> Bool {
+        guard let date = candidate.departureDate else { return false }
+        return abs(date.timeIntervalSince(result.departureTime)) < 1
     }
 
     @ViewBuilder
@@ -687,6 +884,124 @@ struct ResultsView: View {
             Text(title).font(AppDesign.Typography.metricLabel).foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+private struct PracticePlanPreview: View {
+    let plan: PracticePlan
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                Image(systemName: "target")
+                    .foregroundStyle(AppDesign.safety)
+                Text("Guided practice plan")
+                    .font(.subheadline.weight(.semibold))
+            }
+            Text(plan.summary)
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+
+            ForEach(plan.goals) { goal in
+                HStack(alignment: .top, spacing: 9) {
+                    Image(systemName: goal.requiresAdultSupervision ? "figure.and.child.holdinghands" : "checkmark.circle")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(goal.requiresAdultSupervision ? AppDesign.safety : AppDesign.accent)
+                        .frame(width: 18)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(goal.title).font(.footnote.weight(.semibold))
+                        Text(goal.coachingText)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+            }
+        }
+        .padding(12)
+        .background(AppDesign.safety.opacity(0.08), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(AppDesign.safety.opacity(0.16), lineWidth: 1)
+        }
+        .accessibilityElement(children: .combine)
+    }
+}
+
+private struct DepartureComparisonRow: View {
+    let candidate: DepartureComparisonCandidateResult
+    let isCalmestAvailable: Bool
+    let isCurrentDeparture: Bool
+    let isUpdating: Bool
+    let action: () -> Void
+
+    private var departureLabel: String {
+        guard let date = candidate.departureDate else { return "Time unavailable" }
+        return date.formatted(date: .omitted, time: .shortened)
+    }
+
+    var body: some View {
+        Group {
+            if let route = candidate.route {
+                Button(action: action) {
+                    HStack(alignment: .top, spacing: 12) {
+                        Image(systemName: isCalmestAvailable ? "leaf.fill" : "clock")
+                            .foregroundStyle(isCalmestAvailable ? AppDesign.positive : AppDesign.accent)
+                            .frame(width: 28, height: 28)
+                            .background((isCalmestAvailable ? AppDesign.positive : AppDesign.accent).opacity(0.12), in: Circle())
+
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(departureLabel).font(.subheadline.weight(.semibold))
+                            Text("Difficulty \(route.formattedScoreWithUncertainty) · \(route.formattedDuration) · \(route.formattedDistance)")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            if isCalmestAvailable {
+                                Text("Calmest available")
+                                    .font(.caption2.weight(.bold))
+                                    .foregroundStyle(AppDesign.positive)
+                            } else if isCurrentDeparture {
+                                Text("Current departure")
+                                    .font(.caption2.weight(.bold))
+                                    .foregroundStyle(AppDesign.accent)
+                            } else if !DepartureComparisonRanking.hasComparableConditions(candidate) {
+                                Text("Some comparison conditions are unavailable")
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+
+                        Spacer(minLength: 0)
+                        if isUpdating && !isCurrentDeparture {
+                            ProgressView().controlSize(.small)
+                        } else {
+                            Image(systemName: isCurrentDeparture ? "checkmark.circle.fill" : "chevron.right")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(isCurrentDeparture ? AppDesign.accent : .tertiary)
+                        }
+                    }
+                    .padding(10)
+                    .background(isCurrentDeparture ? AppDesign.accent.opacity(0.08) : Color(.tertiarySystemFill), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                }
+                .buttonStyle(PressableScaleStyle())
+                .disabled(isCurrentDeparture || isUpdating)
+                .accessibilityHint(isCurrentDeparture ? "This is the time used for the current route result." : "Refreshes the full route analysis for this departure time.")
+            } else {
+                HStack(alignment: .top, spacing: 12) {
+                    Image(systemName: "clock.badge.exclamationmark")
+                        .foregroundStyle(.secondary)
+                        .frame(width: 28, height: 28)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(departureLabel).font(.subheadline.weight(.semibold))
+                        Text(candidate.error?.message ?? "This departure time was unavailable.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                .padding(10)
+                .background(Color(.tertiarySystemFill), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            }
+        }
     }
 }
 
@@ -856,7 +1171,7 @@ private struct RouteDemandRow: View {
         case .moderate:
             return AppDesign.safety
         case .high:
-            return .red
+            return AppDesign.safety
         }
     }
 
@@ -972,7 +1287,7 @@ struct BreakdownBarRow: View {
             }
         }
         .onChange(of: value) { _, newValue in
-            withAnimation(AppAnimation.spring) {
+            withAnimation(reduceMotion ? .easeOut(duration: 0.16) : AppAnimation.content) {
                 displayedValue = newValue
             }
         }
@@ -982,7 +1297,7 @@ struct BreakdownBarRow: View {
         switch displayedValue {
         case 0..<0.35: return .green
         case 0.35..<0.65: return .orange
-        default: return .red
+        default: return AppDesign.safety
         }
     }
 }
@@ -1138,6 +1453,7 @@ enum RouteNavigationService {
             result: RouteAnalysisResult(
                 origin: "Miami, FL",
                 destination: "Orlando, FL",
+                departureTime: Date().addingTimeInterval(15 * 60),
                 primaryRoute: ScoredRoute(
                     score: 4.2,
                     uncalibratedScore: 4.0,

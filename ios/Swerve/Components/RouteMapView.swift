@@ -5,6 +5,7 @@ struct RouteMapView: UIViewRepresentable {
     let polyline: String
     let bounds: RouteBounds
     var routeColor: UIColor = .systemBlue
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     func makeUIView(context: Context) -> MKMapView {
         let mapView = MKMapView()
@@ -17,6 +18,7 @@ struct RouteMapView: UIViewRepresentable {
 
     func updateUIView(_ mapView: MKMapView, context: Context) {
         context.coordinator.routeColor = routeColor
+        context.coordinator.reduceMotion = reduceMotion
         context.coordinator.update(mapView: mapView, polyline: polyline, bounds: bounds)
     }
 
@@ -25,16 +27,24 @@ struct RouteMapView: UIViewRepresentable {
     }
 
     final class Coordinator: NSObject, MKMapViewDelegate {
-        private var renderedPolyline: String?
+        private var renderedKey: String?
         var routeColor: UIColor = .systemBlue
+        var reduceMotion = false
 
         func update(mapView: MKMapView, polyline: String, bounds: RouteBounds) {
-            guard renderedPolyline != polyline else { return }
-            renderedPolyline = polyline
+            let renderKey = makeRenderKey(polyline: polyline, bounds: bounds)
+            guard renderedKey != renderKey else { return }
+            renderedKey = renderKey
 
             CATransaction.begin()
-            CATransaction.setAnimationDuration(0.38)
-            CATransaction.setAnimationTimingFunction(CAMediaTimingFunction(controlPoints: 0.77, 0, 0.175, 1))
+            if reduceMotion {
+                CATransaction.setDisableActions(true)
+            } else {
+                CATransaction.setAnimationDuration(AppAnimation.mapDuration)
+                CATransaction.setAnimationTimingFunction(
+                    CAMediaTimingFunction(controlPoints: 0.77, 0, 0.175, 1)
+                )
+            }
 
             mapView.removeOverlays(mapView.overlays)
 
@@ -48,7 +58,7 @@ struct RouteMapView: UIViewRepresentable {
             mapView.setVisibleMapRect(
                 region,
                 edgePadding: UIEdgeInsets(top: 32, left: 24, bottom: 32, right: 24),
-                animated: true
+                animated: !reduceMotion
             )
             CATransaction.commit()
         }
@@ -93,6 +103,28 @@ struct RouteMapView: UIViewRepresentable {
             }
 
             return rect.isNull ? MKMapRect.world : rect
+        }
+
+        private func makeRenderKey(polyline: String, bounds: RouteBounds) -> String {
+            let resolvedColor = routeColor.resolvedColor(with: .current)
+            var red: CGFloat = 0
+            var green: CGFloat = 0
+            var blue: CGFloat = 0
+            var alpha: CGFloat = 0
+            let colorKey: String
+            if resolvedColor.getRed(&red, green: &green, blue: &blue, alpha: &alpha) {
+                colorKey = "\(red),\(green),\(blue),\(alpha)"
+            } else {
+                colorKey = resolvedColor.description
+            }
+            return [
+                polyline,
+                String(bounds.southwest.latitude),
+                String(bounds.southwest.longitude),
+                String(bounds.northeast.latitude),
+                String(bounds.northeast.longitude),
+                colorKey,
+            ].joined(separator: "|")
         }
     }
 }
@@ -161,12 +193,14 @@ enum PolylineDecoder {
     .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
 }
 
-/// A locally recorded route with incident annotations. The annotations use
-/// actual accepted GPS fixes, rather than inferred positions along the line.
+/// A locally recorded route with replay annotations. A moment is shown only
+/// when its timestamp falls inside a verified continuous GPS segment.
 struct RecordedDriveMapView: UIViewRepresentable {
     let route: [DriveRoutePoint]
-    let events: [DrivingEvent]
-    var onSelectEvent: (DrivingEvent) -> Void
+    let moments: [DriveReplayMoment]
+    var selectedEventID: UUID?
+    var onSelectMoment: (DriveReplayMoment) -> Void
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     func makeUIView(context: Context) -> MKMapView {
         let map = MKMapView()
@@ -178,38 +212,119 @@ struct RecordedDriveMapView: UIViewRepresentable {
     }
 
     func updateUIView(_ map: MKMapView, context: Context) {
-        context.coordinator.onSelectEvent = onSelectEvent
-        context.coordinator.update(map: map, route: route, events: events)
+        context.coordinator.onSelectMoment = onSelectMoment
+        context.coordinator.reduceMotion = reduceMotion
+        context.coordinator.update(
+            map: map,
+            route: route,
+            moments: moments,
+            selectedEventID: selectedEventID
+        )
     }
 
-    func makeCoordinator() -> Coordinator { Coordinator(onSelectEvent: onSelectEvent) }
+    func makeCoordinator() -> Coordinator { Coordinator(onSelectMoment: onSelectMoment) }
 
     final class Coordinator: NSObject, MKMapViewDelegate {
-        var onSelectEvent: (DrivingEvent) -> Void
+        var onSelectMoment: (DriveReplayMoment) -> Void
         private var renderedKey = ""
+        private var selectedEventID: UUID?
+        private var annotationsByID: [UUID: DriveReplayAnnotation] = [:]
+        var reduceMotion = false
 
-        init(onSelectEvent: @escaping (DrivingEvent) -> Void) {
-            self.onSelectEvent = onSelectEvent
+        init(onSelectMoment: @escaping (DriveReplayMoment) -> Void) {
+            self.onSelectMoment = onSelectMoment
         }
 
-        func update(map: MKMapView, route: [DriveRoutePoint], events: [DrivingEvent]) {
-            let key = route.map(\.timestamp).description + events.map(\.id).description
-            guard key != renderedKey else { return }
-            renderedKey = key
-            map.removeOverlays(map.overlays)
-            map.removeAnnotations(map.annotations)
+        func update(
+            map: MKMapView,
+            route: [DriveRoutePoint],
+            moments: [DriveReplayMoment],
+            selectedEventID: UUID?
+        ) {
+            let key = route.map(\.timestamp).description + moments.map(\.id).description
+            if key != renderedKey {
+                renderedKey = key
+                map.removeOverlays(map.overlays)
+                map.removeAnnotations(map.annotations)
+                annotationsByID = [:]
 
-            let coordinates = route.map { $0.coordinate.clLocationCoordinate }
-            guard !coordinates.isEmpty else { return }
-            map.addOverlay(MKPolyline(coordinates: coordinates, count: coordinates.count))
-            for event in events {
-                guard let coordinate = event.coordinate?.clLocationCoordinate else { continue }
-                let annotation = DriveEventAnnotation(event: event)
-                annotation.coordinate = coordinate
-                map.addAnnotation(annotation)
+                let polylines = continuousPolylines(from: route)
+                guard !polylines.isEmpty else { return }
+                polylines.forEach { map.addOverlay($0) }
+                for moment in moments {
+                    guard let coordinate = moment.coordinate?.clLocationCoordinate else { continue }
+                    let annotation = DriveReplayAnnotation(moment: moment)
+                    annotation.coordinate = coordinate
+                    annotationsByID[moment.id] = annotation
+                    map.addAnnotation(annotation)
+                }
+                let rect = polylines.reduce(MKMapRect.null) { partial, polyline in
+                    partial.isNull ? polyline.boundingMapRect : partial.union(polyline.boundingMapRect)
+                }
+                map.setVisibleMapRect(
+                    rect,
+                    edgePadding: UIEdgeInsets(top: 36, left: 28, bottom: 36, right: 28),
+                    animated: false
+                )
             }
-            let rect = MKPolyline(coordinates: coordinates, count: coordinates.count).boundingMapRect
-            map.setVisibleMapRect(rect, edgePadding: UIEdgeInsets(top: 36, left: 28, bottom: 36, right: 28), animated: false)
+
+            guard selectedEventID != self.selectedEventID else { return }
+            self.selectedEventID = selectedEventID
+            updateSelection(in: map)
+        }
+
+        /// Never draw a synthetic line across a gap in accepted GPS data. The
+        /// same trace segmentation also powers replay interpolation.
+        private func continuousPolylines(from route: [DriveRoutePoint]) -> [MKPolyline] {
+            let segments = DriveExperienceEngine.validTraceSegments(for: route)
+            guard !segments.isEmpty else { return [] }
+
+            var groups: [[CLLocationCoordinate2D]] = []
+            var lastEndIndex: Int?
+            for segment in segments {
+                if lastEndIndex == segment.startIndex, !groups.isEmpty {
+                    groups[groups.count - 1].append(segment.end.coordinate.clLocationCoordinate)
+                } else {
+                    groups.append([
+                        segment.start.coordinate.clLocationCoordinate,
+                        segment.end.coordinate.clLocationCoordinate,
+                    ])
+                }
+                lastEndIndex = segment.endIndex
+            }
+
+            return groups.compactMap { coordinates in
+                guard coordinates.count >= 2 else { return nil }
+                return MKPolyline(coordinates: coordinates, count: coordinates.count)
+            }
+        }
+
+        private func updateSelection(in map: MKMapView) {
+            for annotation in map.annotations {
+                guard let annotation = annotation as? DriveReplayAnnotation,
+                      let marker = map.view(for: annotation) as? MKMarkerAnnotationView else { continue }
+                marker.markerTintColor = annotation.moment.id == selectedEventID
+                    ? .systemBlue
+                    : .systemOrange
+                marker.displayPriority = annotation.moment.id == selectedEventID
+                    ? .required
+                    : .defaultHigh
+            }
+
+            guard let selectedEventID,
+                  let annotation = annotationsByID[selectedEventID] else { return }
+            map.selectAnnotation(annotation, animated: !reduceMotion)
+            CATransaction.begin()
+            if reduceMotion {
+                CATransaction.setDisableActions(true)
+            } else {
+                CATransaction.setAnimationDuration(AppAnimation.mapDuration)
+                CATransaction.setAnimationTimingFunction(
+                    CAMediaTimingFunction(controlPoints: 0.42, 0, 0.58, 1)
+                )
+            }
+            map.setCenter(annotation.coordinate, animated: !reduceMotion)
+            CATransaction.commit()
         }
 
         func mapView(_ mapView: MKMapView, rendererFor overlay: MKOverlay) -> MKOverlayRenderer {
@@ -223,30 +338,31 @@ struct RecordedDriveMapView: UIViewRepresentable {
         }
 
         func mapView(_ mapView: MKMapView, viewFor annotation: MKAnnotation) -> MKAnnotationView? {
-            guard let annotation = annotation as? DriveEventAnnotation else { return nil }
+            guard let annotation = annotation as? DriveReplayAnnotation else { return nil }
             let view = mapView.dequeueReusableAnnotationView(withIdentifier: "drive-event") as? MKMarkerAnnotationView
                 ?? MKMarkerAnnotationView(annotation: annotation, reuseIdentifier: "drive-event")
             view.annotation = annotation
             view.canShowCallout = true
-            view.markerTintColor = .systemOrange
-            view.glyphImage = UIImage(systemName: annotation.event.kind.symbol)
+            view.markerTintColor = annotation.moment.id == selectedEventID ? .systemBlue : .systemOrange
+            view.displayPriority = annotation.moment.id == selectedEventID ? .required : .defaultHigh
+            view.glyphImage = UIImage(systemName: annotation.moment.kind.symbol)
             return view
         }
 
         func mapView(_ mapView: MKMapView, didSelect view: MKAnnotationView) {
-            guard let annotation = view.annotation as? DriveEventAnnotation else { return }
-            onSelectEvent(annotation.event)
+            guard let annotation = view.annotation as? DriveReplayAnnotation else { return }
+            onSelectMoment(annotation.moment)
         }
     }
 }
 
-private final class DriveEventAnnotation: MKPointAnnotation {
-    let event: DrivingEvent
+private final class DriveReplayAnnotation: MKPointAnnotation {
+    let moment: DriveReplayMoment
 
-    init(event: DrivingEvent) {
-        self.event = event
+    init(moment: DriveReplayMoment) {
+        self.moment = moment
         super.init()
-        title = event.kind.title
-        subtitle = "Tap for details"
+        title = moment.kind.title
+        subtitle = "Tap to review this moment"
     }
 }

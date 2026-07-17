@@ -3,10 +3,24 @@ import SwiftUI
 struct AlternateRouteCard: View {
     let route: ScoredRoute
     let isSelected: Bool
+    var readinessHeadline: String? = nil
+    var badges: [RouteChoiceBadge] = []
+    var comparisonLimitedByHistory = false
     let onSelect: () -> Void
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var accentColor: Color {
         route.label.color
+    }
+
+    private var readinessColor: Color {
+        if readinessHeadline == DriverReadinessVerdict.looksLikeMatch.title {
+            return AppDesign.positive
+        }
+        if readinessHeadline == DriverReadinessVerdict.practiceWithAdult.title {
+            return AppDesign.safety
+        }
+        return AppDesign.accent
     }
 
     var body: some View {
@@ -28,7 +42,15 @@ struct AlternateRouteCard: View {
                         Text(topReason)
                             .font(.subheadline)
                             .foregroundStyle(.primary)
-                            .lineLimit(1)
+                            .lineLimit(2)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+
+                    if let readinessHeadline {
+                        Text(readinessHeadline)
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(comparisonLimitedByHistory ? .secondary : readinessColor)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
 
                     HStack(spacing: 12) {
@@ -37,7 +59,21 @@ struct AlternateRouteCard: View {
                     }
                     .font(.caption)
                     .foregroundStyle(.secondary)
+
+                    if !badges.isEmpty {
+                        FlowLayout(spacing: 6) {
+                            ForEach(badges, id: \.rawValue) { badge in
+                                Text(badge.title)
+                                    .font(.caption2.weight(.semibold))
+                                    .foregroundStyle(badge == .bestFit ? AppDesign.positive : AppDesign.accent)
+                                    .padding(.horizontal, 7)
+                                    .padding(.vertical, 4)
+                                    .background((badge == .bestFit ? AppDesign.positive : AppDesign.accent).opacity(0.11), in: Capsule())
+                            }
+                        }
+                    }
                 }
+                .layoutPriority(1)
 
                 Spacer(minLength: 0)
 
@@ -69,8 +105,8 @@ struct AlternateRouteCard: View {
             )
         }
         .buttonStyle(PressableScaleStyle())
-        .animation(AppAnimation.spring, value: isSelected)
-        .accessibilityLabel("Alternate route, score \(route.formattedScoreWithUncertainty), \(route.label.rawValue)")
+        .animation(reduceMotion ? .easeOut(duration: 0.16) : AppAnimation.selection, value: isSelected)
+        .accessibilityLabel("Route, score \(route.formattedScoreWithUncertainty), \(route.label.rawValue)\(readinessHeadline.map { ", \($0)" } ?? "")")
     }
 
     private func deltaText(_ delta: Double) -> String {
@@ -109,6 +145,7 @@ struct AlternateRouteCard: View {
             routeDemands: nil
         ),
         isSelected: false,
+        readinessHeadline: "Practice this with an adult",
         onSelect: {}
     )
     .padding()

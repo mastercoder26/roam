@@ -1,12 +1,18 @@
 # Swerve
 
 Swerve helps families plan for a drive and practise safer driving. The iOS app
-has two focused modes:
+has three focused modes:
 
-- **Routes** scores a planned route’s driving difficulty and explains why.
+- **Routes** scores a planned route’s driving difficulty, compares returned
+  choices with private recorded experience, offers guided practice plans, and
+  compares nearby departure times when the underlying conditions are
+  available.
 - **Drive** is a manually started, on-device driving session that combines GPS
   speed changes and phone motion to flag hard braking, rapid acceleration,
   sharp corners, and abrupt phone movement.
+- **Progress** shows measured local evidence such as validated miles,
+  after-dark miles, 45+ mph miles, continuous-trace coverage, and an
+  eight-week chart.
 
 This is a prototype, not a safety system or an emergency service. A drive score
 is coaching feedback, not a guarantee that a person or route is safe.
@@ -29,6 +35,18 @@ is moving; a single bump or parked-phone movement is ignored. Scores are
 normalized to distance; short or sparse drives are labelled **Preliminary**
 instead of being presented as precise assessments.
 
+When a route is queued or active for practice, its address and planned polyline
+stay in memory only. The saved planned-route context retains only stable demand
+IDs, numeric coverage, goal status, and local timestamps. The local drive
+record separately retains its GPS trace and coaching events for private replay.
+A post-drive debrief distinguishes verified practice, partial coverage, missing
+GPS coverage, and a drive that remains preliminary.
+
+The first minute of a manual drive can show a non-blocking sensor-placement
+advisory only after fresh GPS shows the car moving and the existing
+high-confidence motion detector sees two separate episodes. It never identifies
+handheld use and stores only the final advisory status, not raw motion samples.
+
 ## Run the iOS app
 
 Open [Swerve.xcodeproj](ios/Swerve.xcodeproj) in Xcode, choose an iPhone
@@ -37,8 +55,10 @@ iPhone for meaningful accelerometer and location readings; the Simulator is
 useful for UI only.
 
 On first manual drive, iOS asks for location and motion permissions. Swerve
-uses them only while the user has explicitly started a drive. The current
-prototype keeps the resulting score in memory on the device.
+uses them only while the user has explicitly started a drive. Recorded drives,
+route overlap, replay moments, readiness comparisons, and progress totals are
+stored locally on the device. No account, cloud sync, or driving-history upload
+is part of this prototype.
 
 For a physical iPhone, copy `ios/Swerve/Config/Debug.local.example.xcconfig`
 to `Debug.local.xcconfig` and replace `YOUR_MAC_LAN_IP` with your Mac’s current
@@ -77,7 +97,7 @@ npm test
 Run the deterministic manual-drive checks with:
 
 ```bash
-swiftc ios/Swerve/Models/RouteDifficultyModels.swift ios/Swerve/Models/DrivingScore.swift ios/Swerve/Models/DriveScoringEngine.swift ios/Swerve/Models/DriveExperienceEngine.swift ios/tests/DriveScoringEngineChecks.swift -o /tmp/swerve-drive-checks
+swiftc ios/Swerve/Models/RouteDifficultyModels.swift ios/Swerve/Models/PhonePlacementAnalyzer.swift ios/Swerve/Models/DriveScoringEngine.swift ios/Swerve/Models/DrivingScore.swift ios/Swerve/Models/DriveExperienceEngine.swift ios/Swerve/Models/DriverReadinessEngine.swift ios/Swerve/Models/PracticePlanEngine.swift ios/tests/DriveScoringEngineChecks.swift -o /tmp/swerve-drive-checks
 /tmp/swerve-drive-checks
 ```
 
@@ -87,6 +107,10 @@ Run the route-entry state checks with:
 swiftc ios/Swerve/Models/RoutePlanningLocationCoordinator.swift ios/tests/RoutePlanningLocationChecks.swift -o /tmp/swerve-route-location-checks
 /tmp/swerve-route-location-checks
 ```
+
+The route-readiness, practice, replay, placement, progress, and departure-time
+checks are standalone Swift command-line checks in `ios/tests/`. They cover the
+private local engines separately from the iOS app target.
 
 ## Open source and attribution
 

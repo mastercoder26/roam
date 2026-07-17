@@ -131,6 +131,23 @@ struct DriveDataQuality: Codable {
     let rejectedLocationSamples: Int
     let motionSamples: Int
     let confidence: DriveScoreConfidence
+    /// Final advisory-only result from the first minute of a manual drive.
+    /// No raw motion samples or episode timings are retained in saved history.
+    let placementQuality: PhonePlacementAssessment?
+
+    init(
+        acceptedLocationSamples: Int,
+        rejectedLocationSamples: Int,
+        motionSamples: Int,
+        confidence: DriveScoreConfidence,
+        placementQuality: PhonePlacementAssessment? = nil
+    ) {
+        self.acceptedLocationSamples = acceptedLocationSamples
+        self.rejectedLocationSamples = rejectedLocationSamples
+        self.motionSamples = motionSamples
+        self.confidence = confidence
+        self.placementQuality = placementQuality
+    }
 
     var summary: String {
         switch confidence {

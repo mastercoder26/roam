@@ -149,7 +149,7 @@ struct HomeView: View {
             FactorExplanationRow(symbol: "arrow.triangle.turn.up.right.diamond.fill", title: "Turns & decisions", detail: "Maneuver density, turn clusters, and unprotected lefts.")
             FactorExplanationRow(symbol: "car.2.fill", title: "Traffic & trip load", detail: "Live congestion, drive duration, and sustained attention.")
             FactorExplanationRow(symbol: "cloud.sun.rain.fill", title: "Conditions & roads", detail: "Weather, visibility, construction, and road geometry when available.")
-            Label("Missing live or road data is left out — Swerve never guesses.", systemImage: "checkmark.shield.fill").font(.footnote).foregroundStyle(.secondary)
+            Label("Missing live or road data is left out. Swerve never guesses.", systemImage: "checkmark.shield.fill").font(.footnote).foregroundStyle(.secondary)
         }.premiumCard()
     }
 
@@ -163,22 +163,39 @@ struct HomeView: View {
 
     private func analyzeRoute() async {
         withAnimation(AppAnimation.quick) { errorMessage = nil }
-        isLoading = true
+        withAnimation(reduceMotion ? .easeOut(duration: 0.12) : AppAnimation.quick) {
+            isLoading = true
+        }
         do {
             let response = try await apiClient.analyzeRoute(origin: origin, destination: destination, departureTime: departureTime, includeAlternates: true)
-            pendingResult = RouteAnalysisResult(origin: origin, destination: destination, primaryRoute: response.primaryRoute, alternateRoutes: response.alternateRoutes)
+            pendingResult = RouteAnalysisResult(
+                origin: origin,
+                destination: destination,
+                departureTime: departureTime,
+                primaryRoute: response.primaryRoute,
+                alternateRoutes: response.alternateRoutes
+            )
             UINotificationFeedbackGenerator().notificationOccurred(.success)
-            isCompletingLoading = true
+            withAnimation(reduceMotion ? .easeOut(duration: 0.12) : AppAnimation.quick) {
+                isCompletingLoading = true
+            }
         } catch {
             UINotificationFeedbackGenerator().notificationOccurred(.error)
-            withAnimation(AppAnimation.quick) { errorMessage = error.localizedDescription }
-            isLoading = false
+            withAnimation(AppAnimation.quick) {
+                errorMessage = error.localizedDescription
+                isLoading = false
+            }
         }
     }
 
     private func completeLoading() {
         guard let pendingResult else { return }
-        isCompletingLoading = false; isLoading = false; self.pendingResult = nil; navigationPath.append(pendingResult)
+        withAnimation(reduceMotion ? .easeOut(duration: 0.12) : AppAnimation.quick) {
+            isCompletingLoading = false
+            isLoading = false
+            self.pendingResult = nil
+        }
+        navigationPath.append(pendingResult)
     }
 }
 
@@ -242,6 +259,7 @@ private struct FactorExplanationRow: View {
 struct RouteAnalysisResult: Hashable {
     let origin: String
     let destination: String
+    let departureTime: Date
     let primaryRoute: ScoredRoute
     let alternateRoutes: [ScoredRoute]
 }

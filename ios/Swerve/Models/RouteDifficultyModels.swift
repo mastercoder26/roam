@@ -13,11 +13,151 @@ struct RouteDifficultyRequest: Encodable {
     let continuousDriveMinutes: Double?
 }
 
+/// A time-window comparison intentionally contains only route inputs. The
+/// phone's saved driving history stays on-device and is never part of this
+/// request.
+struct DepartureComparisonRequest: Encodable {
+    let origin: String
+    let destination: String
+    let candidates: [DepartureComparisonCandidate]
+}
+
+struct DepartureComparisonCandidate: Codable, Identifiable, Hashable {
+    let id: String
+    let departureTime: String
+    let departureLocalMinutes: Int
+}
+
 // MARK: - Response
 
 struct RouteDifficultyResponse: Decodable {
     let primaryRoute: ScoredRoute
     let alternateRoutes: [ScoredRoute]
+}
+
+struct DepartureComparisonResponse: Decodable {
+    let candidates: [DepartureComparisonCandidateResult]
+}
+
+struct DepartureComparisonCandidateResult: Decodable, Identifiable, Hashable {
+    let id: String
+    let departureTime: String
+    let departureLocalMinutes: Int
+    let route: ScoredRoute?
+    let error: DepartureComparisonError?
+
+    var departureDate: Date? {
+        ISO8601DateFormatter().date(from: departureTime)
+    }
+}
+
+struct DepartureComparisonError: Decodable, Hashable {
+    let message: String
+}
+
+/// Pure calendar logic for the automatic before, selected, and after route
+/// comparison. It keeps the server's timestamp and the driver's local clock
+/// minutes separate, which matters at midnight and across daylight saving.
+enum DepartureComparisonWindowBuilder {
+    static func makeCandidates(
+        selectedDeparture: Date,
+        now: Date = Date(),
+        calendar: Calendar = .autoupdatingCurrent,
+        formatter: ISO8601DateFormatter = ISO8601DateFormatter()
+    ) -> [DepartureComparisonCandidate] {
+        let oneHourEarlier = calendar.date(byAdding: .hour, value: -1, to: selectedDeparture)
+            ?? selectedDeparture
+        let oneHourLater = calendar.date(byAdding: .hour, value: 1, to: selectedDeparture)
+            ?? selectedDeparture
+
+        let earlier: Date
+        if oneHourEarlier > now {
+            earlier = oneHourEarlier
+        } else {
+            let startOfCurrentHour = calendar.dateInterval(of: .hour, for: now)?.start ?? now
+            // The replacement must be a genuinely distinct comparison row.
+            // For example, when the selected time is exactly the next hour,
+            // the first future hourly slot would otherwise duplicate it.
+            var replacement = calendar.date(byAdding: .hour, value: 1, to: startOfCurrentHour) ?? now
+            while replacement <= now ||
+                sameMoment(replacement, selectedDeparture) ||
+                sameMoment(replacement, oneHourLater) {
+                replacement = calendar.date(byAdding: .hour, value: 1, to: replacement) ?? replacement.addingTimeInterval(3_600)
+            }
+            earlier = replacement
+        }
+
+        return [
+            candidate(id: "earlier", date: earlier, calendar: calendar, formatter: formatter),
+            candidate(id: "selected", date: selectedDeparture, calendar: calendar, formatter: formatter),
+            candidate(id: "later", date: oneHourLater, calendar: calendar, formatter: formatter)
+        ]
+    }
+
+    static func localMinutes(for date: Date, calendar: Calendar = .autoupdatingCurrent) -> Int {
+        let components = calendar.dateComponents([.hour, .minute], from: date)
+        return max(0, min(1_439, (components.hour ?? 0) * 60 + (components.minute ?? 0)))
+    }
+
+    private static func candidate(
+        id: String,
+        date: Date,
+        calendar: Calendar,
+        formatter: ISO8601DateFormatter
+    ) -> DepartureComparisonCandidate {
+        DepartureComparisonCandidate(
+            id: id,
+            departureTime: formatter.string(from: date),
+            departureLocalMinutes: localMinutes(for: date, calendar: calendar)
+        )
+    }
+
+    private static func sameMoment(_ lhs: Date, _ rhs: Date) -> Bool {
+        abs(lhs.timeIntervalSince(rhs)) < 1
+    }
+}
+
+/// The time comparison only calls a window calm when every required measured
+/// input is present. A missing provider signal is deliberately unavailable,
+/// not silently treated as calm.
+enum DepartureComparisonRanking {
+    static func calmestCandidateID(in results: [DepartureComparisonCandidateResult]) -> String? {
+        let usable = results.compactMap { result -> DepartureComparisonCandidateResult? in
+            guard result.route != nil, hasComparableConditions(result) else { return nil }
+            return result
+        }
+        guard usable.count == results.count, usable.count >= 2 else { return nil }
+
+        return usable.min { lhs, rhs in
+            guard let left = lhs.route, let right = rhs.route else { return false }
+            let leftLoad = comparisonLoad(for: left)
+            let rightLoad = comparisonLoad(for: right)
+            if leftLoad != rightLoad { return leftLoad < rightLoad }
+            if left.score != right.score { return left.score < right.score }
+            if left.durationSeconds != right.durationSeconds { return left.durationSeconds < right.durationSeconds }
+            return lhs.id < rhs.id
+        }?.id
+    }
+
+    static func hasComparableConditions(_ result: DepartureComparisonCandidateResult) -> Bool {
+        guard let route = result.route else { return false }
+        let demands = route.routeDemands ?? []
+        let trafficAvailable = demands.first(where: { $0.kind == .traffic })?.available == true
+        let nightAvailable = demands.first(where: { $0.kind == .afterDark })?.available == true
+        let weatherAvailable = route.conditions?.weather.available == true
+        return trafficAvailable && nightAvailable && weatherAvailable
+    }
+
+    static func comparisonLoad(for route: ScoredRoute) -> Double {
+        let demands = route.routeDemands ?? []
+        func intensity(_ kind: RouteDemandKind) -> Double {
+            demands.first(where: { $0.kind == kind && $0.available })?.intensity ?? 0
+        }
+
+        return intensity(.traffic) * 0.45
+            + intensity(.afterDark) * 0.30
+            + intensity(.weatherVisibility) * 0.25
+    }
 }
 
 struct ScoredRoute: Decodable, Identifiable, Hashable {
@@ -423,7 +563,7 @@ extension DifficultyLabel {
         case .easy: return (0.40, 0.85, 0.45)
         case .moderate: return (1.00, 0.80, 0.00)
         case .hard: return (1.00, 0.55, 0.20)
-        case .veryHard: return (0.95, 0.25, 0.25)
+        case .veryHard: return (1.00, 0.48, 0.12)
         }
     }
 }

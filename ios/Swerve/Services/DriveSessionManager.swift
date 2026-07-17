@@ -14,8 +14,10 @@ final class DriveSessionManager: NSObject, ObservableObject {
     @Published private(set) var currentHorizontalAccelerationG = 0.0
     @Published private(set) var statusMessage = "Ready when you are"
     @Published private(set) var lastScore: DrivingScore?
+    @Published private(set) var lastCompletedDrive: RecordedDrive?
     @Published private(set) var recordedDrives: [RecordedDrive] = []
     @Published private(set) var queuedPracticeRoute: PlannedRouteContext?
+    @Published private(set) var phonePlacementAssessment: PhonePlacementAssessment = .inconclusive
     /// A distinct presentation event for the root view. The queued context
     /// remains available until the driver explicitly starts or cancels it.
     @Published private(set) var practiceRoutePresentationRequest: UUID?
@@ -31,6 +33,7 @@ final class DriveSessionManager: NSObject, ObservableObject {
     private var lastEventAt: [DrivingEventKind: Date] = [:]
     private var recentMotionSamples: [DriveMotionSample] = []
     private var phoneMovementDetector = PhoneMovementDetector()
+    private var phonePlacementAnalyzer = PhonePlacementAnalyzer(startedAt: .distantPast)
     private var routePoints: [DriveRoutePoint] = []
     private var latestCoordinate: DriveCoordinate?
     private var latestAcceptedLocationAt: Date?
@@ -64,9 +67,13 @@ final class DriveSessionManager: NSObject, ObservableObject {
         queuedPracticeRoute = nil
         queuedPracticeRoutePolyline = nil
         resetCurrentDrive()
+        let driveStart = Date()
         recordingTimeZoneIdentifier = TimeZone.autoupdatingCurrent.identifier
         isRecording = true
-        startDate = Date()
+        startDate = driveStart
+        phonePlacementAnalyzer.reset(startedAt: driveStart)
+        phonePlacementAssessment = .inconclusive
+        lastCompletedDrive = nil
         statusMessage = "Recording this drive"
         startElapsedTimer()
         startMotionUpdates()
@@ -84,7 +91,7 @@ final class DriveSessionManager: NSObject, ObservableObject {
             // user has already started a drive.
             locationManager.requestAlwaysAuthorization()
         case .denied, .restricted:
-            statusMessage = "Location access is off — motion will still be recorded"
+            statusMessage = "Location access is off. Motion will still be recorded."
         @unknown default:
             statusMessage = "Waiting for location permission"
         }
@@ -92,7 +99,8 @@ final class DriveSessionManager: NSObject, ObservableObject {
 
     func endDrive() {
         guard isRecording else { return }
-        let duration = Date().timeIntervalSince(startDate ?? Date())
+        let driveEndedAt = Date()
+        let duration = driveEndedAt.timeIntervalSince(startDate ?? driveEndedAt)
         isRecording = false
         timer?.invalidate()
         timer = nil
@@ -109,6 +117,15 @@ final class DriveSessionManager: NSObject, ObservableObject {
             rejectedLocationSamples: rejectedLocationSamples,
             motionSamples: motionSamples
         )
+        let finalPlacementQuality = phonePlacementAnalyzer.finish(at: driveEndedAt)
+        phonePlacementAssessment = finalPlacementQuality
+        let dataQuality = DriveDataQuality(
+            acceptedLocationSamples: result.quality.acceptedLocationSamples,
+            rejectedLocationSamples: result.quality.rejectedLocationSamples,
+            motionSamples: result.quality.motionSamples,
+            confidence: result.quality.confidence,
+            placementQuality: finalPlacementQuality
+        )
         let score = DrivingScore(
             score: result.score,
             duration: duration,
@@ -116,7 +133,7 @@ final class DriveSessionManager: NSObject, ObservableObject {
             topSpeedMetersPerSecond: topSpeed,
             events: events,
             motionSamples: motionSamples,
-            dataQuality: result.quality
+            dataQuality: dataQuality
         )
         lastScore = score
         let practiceCoverage = activePracticeRoute.flatMap { context in
@@ -128,53 +145,89 @@ final class DriveSessionManager: NSObject, ObservableObject {
                 )
             }
         }
-        let routeMatched = practiceCoverage.map {
-            $0.overallCoverage >= 0.60 &&
-                $0.longestContinuousCoverage >= 0.45 &&
-                $0.originCoverage >= 0.60 &&
-                $0.destinationCoverage >= 0.60
-        } ?? false
-        let persistedPracticeRoute = activePracticeRoute.map { context in
-            return PlannedRouteContext(
+        let driveStartedAt = startDate ?? Date()
+        let coverageSummary = practiceCoverage.map {
+            PracticeRouteCoverageSummary(coverage: $0, recordedAt: driveEndedAt)
+        }
+        let routeMatched = coverageSummary?.isVerifiedRoutePractice ?? false
+        let contextBeforeDebrief = activePracticeRoute.map { context in
+            PlannedRouteContext(
                 id: context.id,
                 createdAt: context.createdAt,
                 routeDemands: context.routeDemands,
                 recordedRouteMatched: routeMatched,
-                // Demand-specific evidence is retained only if the whole
-                // manually recorded drive substantially followed the plan.
+                // Demand-specific evidence is retained only when enough of a
+                // directionally aligned route was measured.
                 verifiedDemandExposures: routeMatched
-                    ? practiceCoverage?.demandExposures
-                    : nil
+                    ? coverageSummary?.verifiedDemandExposures()
+                    : nil,
+                practicePlan: context.practicePlan,
+                coverageSummary: coverageSummary
             )
         }
-        let practiceRouteWasVerified = persistedPracticeRoute?.recordedRouteMatched
-        let driveStartedAt = startDate ?? Date()
         let unsummarizedDrive = RecordedDrive(
             startedAt: driveStartedAt,
             score: score,
             route: routePoints,
             recordingTimeZoneIdentifier: recordingTimeZoneIdentifier,
-            plannedRouteContext: persistedPracticeRoute
+            plannedRouteContext: contextBeforeDebrief
         )
-        let drive = RecordedDrive(
+        let summarizedDrive = RecordedDrive(
             id: unsummarizedDrive.id,
             startedAt: driveStartedAt,
             score: score,
             route: routePoints,
             recordingTimeZoneIdentifier: recordingTimeZoneIdentifier,
             experienceSummary: DriveExperienceEngine.summarize(drive: unsummarizedDrive),
+            plannedRouteContext: contextBeforeDebrief
+        )
+        let profileBefore = DriverReadinessEngine.profile(from: recordedDrives)
+        let profileAfter = DriverReadinessEngine.profile(from: [summarizedDrive] + recordedDrives)
+        let debrief = contextBeforeDebrief?.practicePlan.map { plan in
+            PracticePlanEngine.makeDebrief(
+                plan: plan,
+                savedDrive: summarizedDrive,
+                coverage: coverageSummary,
+                profileBefore: profileBefore,
+                profileAfter: profileAfter,
+                createdAt: driveEndedAt
+            )
+        }
+        let persistedPracticeRoute = contextBeforeDebrief.map { context in
+            PlannedRouteContext(
+                id: context.id,
+                createdAt: context.createdAt,
+                routeDemands: context.routeDemands,
+                recordedRouteMatched: context.recordedRouteMatched,
+                verifiedDemandExposures: context.verifiedDemandExposures,
+                practicePlan: context.practicePlan,
+                coverageSummary: context.coverageSummary,
+                debrief: debrief
+            )
+        }
+        let drive = RecordedDrive(
+            id: summarizedDrive.id,
+            startedAt: summarizedDrive.startedAt,
+            score: summarizedDrive.score,
+            route: summarizedDrive.route,
+            recordingTimeZoneIdentifier: summarizedDrive.recordingTimeZoneIdentifier,
+            experienceSummary: summarizedDrive.experienceSummary,
             plannedRouteContext: persistedPracticeRoute
         )
+        let practiceRouteWasVerified = persistedPracticeRoute?.recordedRouteMatched
         recordedDrives.insert(drive, at: 0)
         // Keep storage bounded while retaining a useful recent history.
         recordedDrives = Array(recordedDrives.prefix(50))
         saveRecordedDrives()
-        if motionSamples == 0 {
-            statusMessage = "No motion samples received — try a physical iPhone."
+        lastCompletedDrive = drive
+        if finalPlacementQuality == .needsAdjustment {
+            statusMessage = "Drive saved. Secure the phone when it is safe before your next drive."
+        } else if motionSamples == 0 {
+            statusMessage = "No motion samples received. Try a physical iPhone."
         } else if practiceRouteWasVerified == true {
-            statusMessage = "Drive saved — planned-route overlap verified on this device"
+            statusMessage = "Drive saved. Planned-route overlap was verified on this device."
         } else if practiceRouteWasVerified == false {
-            statusMessage = "Drive saved — planned-route overlap could not be verified from GPS"
+            statusMessage = "Drive saved. Planned-route overlap could not be verified from GPS."
         } else {
             statusMessage = "Drive saved on this device"
         }
@@ -186,9 +239,12 @@ final class DriveSessionManager: NSObject, ObservableObject {
     /// Queues a locally generated route context for the next manually started
     /// drive. The route geometry stays in memory solely to verify GPS overlap
     /// when the drive ends; this deliberately never calls `startDrive()`.
-    func queuePlannedPracticeRoute(_ route: ScoredRoute) {
+    func queuePlannedPracticeRoute(_ route: ScoredRoute, practicePlan: PracticePlan? = nil) {
         guard !isRecording else { return }
-        queuedPracticeRoute = PlannedRouteContext(routeDemands: route.routeDemands ?? [])
+        queuedPracticeRoute = PlannedRouteContext(
+            routeDemands: route.routeDemands ?? [],
+            practicePlan: practicePlan
+        )
         queuedPracticeRoutePolyline = route.polyline
         practiceRoutePresentationRequest = UUID()
     }
@@ -198,6 +254,7 @@ final class DriveSessionManager: NSObject, ObservableObject {
         guard !isRecording else { return }
         queuedPracticeRoute = nil
         queuedPracticeRoutePolyline = nil
+        practiceRoutePresentationRequest = nil
     }
 
     private func resetCurrentDrive() {
@@ -214,6 +271,8 @@ final class DriveSessionManager: NSObject, ObservableObject {
         lastEventAt = [:]
         recentMotionSamples = []
         phoneMovementDetector.reset()
+        phonePlacementAnalyzer.reset(startedAt: .distantPast)
+        phonePlacementAssessment = .inconclusive
         routePoints = []
         latestCoordinate = nil
         latestAcceptedLocationAt = nil
@@ -233,6 +292,7 @@ final class DriveSessionManager: NSObject, ObservableObject {
     private func startMotionUpdates() {
         guard motionManager.isDeviceMotionAvailable else {
             statusMessage = "Motion data is unavailable on this device"
+            phonePlacementAssessment = .unavailable
             return
         }
 
@@ -271,13 +331,25 @@ final class DriveSessionManager: NSObject, ObservableObject {
         recentMotionSamples.append(motionSample)
         recentMotionSamples.removeAll { timestamp.timeIntervalSince($0.timestamp) > 2 }
 
-        if phoneMovementDetector.ingest(
+        let hasFreshAcceptedGPS = latestAcceptedLocationAt.map {
+            abs(timestamp.timeIntervalSince($0)) <= 2
+        } ?? false
+        let handlingEpisode = phoneMovementDetector.ingest(
             motionSample,
             vehicleSpeedMetersPerSecond: currentSpeedMetersPerSecond,
-            hasRecentAcceptedGPS: latestAcceptedLocationAt.map {
-                abs(timestamp.timeIntervalSince($0)) <= 2
-            } ?? false
-        ) {
+            hasRecentAcceptedGPS: hasFreshAcceptedGPS
+        )
+        phonePlacementAssessment = phonePlacementAnalyzer.ingest(
+            PhonePlacementObservation(
+                timestamp: timestamp,
+                vehicleSpeedMetersPerSecond: currentSpeedMetersPerSecond,
+                hasRecentAcceptedGPS: hasFreshAcceptedGPS,
+                motionDataAvailable: true,
+                highConfidenceHandlingEpisode: handlingEpisode
+            )
+        )
+
+        if handlingEpisode {
             addEvent(
                 .phoneMovement,
                 timestamp: timestamp,
@@ -397,7 +469,7 @@ extension DriveSessionManager: CLLocationManagerDelegate {
                 manager.startUpdatingLocation()
                 self.statusMessage = "Recording this drive"
             case .denied, .restricted:
-                self.statusMessage = "Location access is off — motion will still be recorded"
+                self.statusMessage = "Location access is off. Motion will still be recorded."
             default:
                 break
             }
@@ -414,7 +486,7 @@ extension DriveSessionManager: CLLocationManagerDelegate {
     nonisolated func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
         Task { @MainActor [weak self] in
             guard self?.isRecording == true else { return }
-            self?.statusMessage = "Location update failed — motion recording continues"
+            self?.statusMessage = "Location update failed. Motion recording continues."
         }
     }
 }

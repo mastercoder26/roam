@@ -5,16 +5,31 @@ struct SwerveRootView: View {
     private enum Tab: String, CaseIterable, Identifiable {
         case routes
         case drive
+        case progress
 
         var id: String { rawValue }
-        var title: String { self == .routes ? "Routes" : "Drive" }
-        var symbol: String { self == .routes ? "map.fill" : "steeringwheel" }
+        var title: String {
+            switch self {
+            case .routes: "Routes"
+            case .drive: "Drive"
+            case .progress: "Progress"
+            }
+        }
+
+        var symbol: String {
+            switch self {
+            case .routes: "map.fill"
+            case .drive: "steeringwheel"
+            case .progress: "chart.line.uptrend.xyaxis"
+            }
+        }
     }
 
     @State private var selectedTab: Tab = .routes
     @StateObject private var driveSession = DriveSessionManager()
     @Namespace private var tabAnimation
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -22,19 +37,20 @@ struct SwerveRootView: View {
                 switch selectedTab {
                 case .routes: HomeView()
                 case .drive: DriveView()
+                case .progress: DriverProgressView()
                 }
             }
             .environmentObject(driveSession)
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 Color.clear.frame(height: 76).allowsHitTesting(false)
             }
-            .transition(reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.985)))
+            .transition(.opacity)
 
             liquidTabBar
                 .padding(.horizontal, 28)
                 .padding(.bottom, 10)
         }
-        .animation(reduceMotion ? .easeOut(duration: 0.18) : AppAnimation.spring, value: selectedTab)
+        .animation(.easeOut(duration: reduceMotion ? 0.12 : 0.18), value: selectedTab)
         .onChange(of: driveSession.practiceRoutePresentationRequest) { _, request in
             // The manager emits this only when a Results-screen action queues a
             // route for practice. Keeping the request separate from the route
@@ -60,7 +76,7 @@ struct SwerveRootView: View {
                             Text(tab.title)
                                 .font(.subheadline.weight(.semibold))
                                 .lineLimit(1)
-                                .transition(.opacity.combined(with: .move(edge: .leading)))
+                                .transition(.opacity)
                         }
                     }
                     .foregroundStyle(selectedTab == tab ? AppDesign.accent : Color.secondary)
@@ -68,10 +84,12 @@ struct SwerveRootView: View {
                     .padding(.vertical, 12)
                     .background {
                         if selectedTab == tab {
-                            Capsule(style: .continuous)
-                                .fill(AppDesign.accent.opacity(0.12))
-                                .overlay(Capsule(style: .continuous).stroke(AppDesign.accent.opacity(0.12), lineWidth: 0.8))
-                                .matchedGeometryEffect(id: "liquid-selection", in: tabAnimation)
+                            if reduceMotion {
+                                selectedCapsule
+                            } else {
+                                selectedCapsule
+                                    .matchedGeometryEffect(id: "liquid-selection", in: tabAnimation)
+                            }
                         }
                     }
                 }
@@ -81,10 +99,26 @@ struct SwerveRootView: View {
             }
         }
         .padding(6)
-        .background(.ultraThinMaterial, in: Capsule(style: .continuous))
+        .background {
+            Capsule(style: .continuous)
+                .fill(
+                    reduceTransparency
+                        ? AnyShapeStyle(Color(.systemBackground))
+                        : AnyShapeStyle(.ultraThinMaterial)
+                )
+        }
         .overlay(Capsule(style: .continuous).stroke(.white.opacity(0.35), lineWidth: 0.8))
         .shadow(color: .black.opacity(0.12), radius: 16, y: 8)
         .accessibilityElement(children: .contain)
+    }
+
+    private var selectedCapsule: some View {
+        Capsule(style: .continuous)
+            .fill(AppDesign.accent.opacity(0.12))
+            .overlay(
+                Capsule(style: .continuous)
+                    .stroke(AppDesign.accent.opacity(0.12), lineWidth: 0.8)
+            )
     }
 }
 

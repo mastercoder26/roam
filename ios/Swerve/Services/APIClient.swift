@@ -76,8 +76,75 @@ struct APIClient {
         }
     }
 
+    /// Compares only route conditions for a small set of departure windows.
+    /// The local readiness profile is intentionally not sent to the backend.
+    func compareDepartureTimes(
+        origin: String,
+        destination: String,
+        selectedDeparture: Date,
+        now: Date = Date(),
+        calendar: Calendar = .autoupdatingCurrent
+    ) async throws -> DepartureComparisonResponse {
+        let candidates = DepartureComparisonWindowBuilder.makeCandidates(
+            selectedDeparture: selectedDeparture,
+            now: now,
+            calendar: calendar
+        )
+        return try await compareDepartureTimes(
+            origin: origin,
+            destination: destination,
+            candidates: candidates
+        )
+    }
+
+    func compareDepartureTimes(
+        origin: String,
+        destination: String,
+        candidates: [DepartureComparisonCandidate]
+    ) async throws -> DepartureComparisonResponse {
+        let body = DepartureComparisonRequest(
+            origin: origin.trimmingCharacters(in: .whitespacesAndNewlines),
+            destination: destination.trimmingCharacters(in: .whitespacesAndNewlines),
+            candidates: candidates
+        )
+        let requestBody = try JSONEncoder().encode(body)
+
+        do {
+            return try await sendRequest(
+                to: baseURL,
+                path: "api/route/departure-comparison",
+                body: requestBody,
+                responseType: DepartureComparisonResponse.self
+            )
+        } catch APIError.networkError(let networkError) {
+            guard let fallbackBaseURL, fallbackBaseURL != baseURL else {
+                throw APIError.networkError(networkError)
+            }
+            return try await sendRequest(
+                to: fallbackBaseURL,
+                path: "api/route/departure-comparison",
+                body: requestBody,
+                responseType: DepartureComparisonResponse.self
+            )
+        }
+    }
+
     private func sendRouteRequest(to baseURL: URL, body: Data) async throws -> RouteDifficultyResponse {
-        let endpoint = baseURL.appendingPathComponent("api/route/difficulty")
+        try await sendRequest(
+            to: baseURL,
+            path: "api/route/difficulty",
+            body: body,
+            responseType: RouteDifficultyResponse.self
+        )
+    }
+
+    private func sendRequest<Response: Decodable>(
+        to baseURL: URL,
+        path: String,
+        body: Data,
+        responseType: Response.Type
+    ) async throws -> Response {
+        let endpoint = baseURL.appendingPathComponent(path)
 
         var request = URLRequest(url: endpoint)
         request.httpMethod = "POST"
@@ -105,7 +172,7 @@ struct APIClient {
 
         do {
             let decoder = JSONDecoder()
-            return try decoder.decode(RouteDifficultyResponse.self, from: data)
+            return try decoder.decode(Response.self, from: data)
         } catch {
             throw APIError.decodingError(error)
         }

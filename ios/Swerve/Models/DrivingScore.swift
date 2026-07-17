@@ -147,17 +147,14 @@ struct VerifiedDemandExposure: Identifiable, Codable, Hashable {
 }
 
 /// A minimal description of a planned route demand retained with a practice
-/// record. It intentionally leaves out evidence text, numeric metrics, and
-/// mapped route ranges; those are needed only while the plan is in memory.
+/// record. It intentionally retains only a stable demand ID. Display copy,
+/// numeric metrics, and mapped route ranges are needed only while the plan is
+/// in memory.
 struct PlannedRouteDemandTag: Codable, Hashable {
     let id: String
-    let title: String
-    let intensity: Double
 
     init(_ demand: RouteDemand) {
         id = demand.id
-        title = demand.title
-        intensity = demand.intensity
     }
 }
 
@@ -178,13 +175,24 @@ struct PlannedRouteContext: Identifiable, Codable, Hashable {
     /// Demand-specific coverage derived while the planned geometry was still
     /// in memory. Older contexts intentionally decode without these claims.
     let verifiedDemandExposures: [VerifiedDemandExposure]?
+    /// A typed, local coaching plan. It carries stable goal IDs only and never
+    /// planned addresses, map geometry, or route prose.
+    let practicePlan: PracticePlan?
+    /// Numeric coverage produced while the planned polyline was held in
+    /// memory. Saved history retains these measurements, not the geometry.
+    let coverageSummary: PracticeRouteCoverageSummary?
+    /// The local post-drive coaching result for a queued practice plan.
+    let debrief: PracticeDriveDebrief?
 
     init(
         id: UUID = UUID(),
         createdAt: Date = Date(),
         routeDemands: [RouteDemand],
         recordedRouteMatched: Bool? = nil,
-        verifiedDemandExposures: [VerifiedDemandExposure]? = nil
+        verifiedDemandExposures: [VerifiedDemandExposure]? = nil,
+        practicePlan: PracticePlan? = nil,
+        coverageSummary: PracticeRouteCoverageSummary? = nil,
+        debrief: PracticeDriveDebrief? = nil
     ) {
         self.id = id
         self.createdAt = createdAt
@@ -192,6 +200,9 @@ struct PlannedRouteContext: Identifiable, Codable, Hashable {
         self.routeDemandTags = routeDemands.map(PlannedRouteDemandTag.init)
         self.recordedRouteMatched = recordedRouteMatched
         self.verifiedDemandExposures = verifiedDemandExposures
+        self.practicePlan = practicePlan
+        self.coverageSummary = coverageSummary
+        self.debrief = debrief
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -201,6 +212,9 @@ struct PlannedRouteContext: Identifiable, Codable, Hashable {
         case routeDemandTags
         case recordedRouteMatched
         case verifiedDemandExposures
+        case practicePlan
+        case coverageSummary
+        case debrief
     }
 
     init(from decoder: Decoder) throws {
@@ -211,7 +225,7 @@ struct PlannedRouteContext: Identifiable, Codable, Hashable {
         let savedTags = try values.decodeIfPresent([PlannedRouteDemandTag].self, forKey: .routeDemandTags)
         routeDemandTags = savedTags ?? legacyDemands?.map(PlannedRouteDemandTag.init) ?? []
         // A restored context never needs detailed demand mapping to assess
-        // history—the verified numeric exposures below are the only evidence
+        // history. The verified numeric exposures below are the only evidence
         // used. Lightweight placeholders preserve compatibility for callers
         // that still inspect this property after decoding old history.
         routeDemands = legacyDemands ?? routeDemandTags.map(Self.placeholderDemand)
@@ -220,6 +234,9 @@ struct PlannedRouteContext: Identifiable, Codable, Hashable {
             [VerifiedDemandExposure].self,
             forKey: .verifiedDemandExposures
         )
+        practicePlan = try values.decodeIfPresent(PracticePlan.self, forKey: .practicePlan)
+        coverageSummary = try values.decodeIfPresent(PracticeRouteCoverageSummary.self, forKey: .coverageSummary)
+        debrief = try values.decodeIfPresent(PracticeDriveDebrief.self, forKey: .debrief)
     }
 
     func encode(to encoder: Encoder) throws {
@@ -231,20 +248,16 @@ struct PlannedRouteContext: Identifiable, Codable, Hashable {
         try values.encode(routeDemandTags, forKey: .routeDemandTags)
         try values.encodeIfPresent(recordedRouteMatched, forKey: .recordedRouteMatched)
         try values.encodeIfPresent(verifiedDemandExposures, forKey: .verifiedDemandExposures)
+        try values.encodeIfPresent(practicePlan, forKey: .practicePlan)
+        try values.encodeIfPresent(coverageSummary, forKey: .coverageSummary)
+        try values.encodeIfPresent(debrief, forKey: .debrief)
     }
 
     private static func placeholderDemand(for tag: PlannedRouteDemandTag) -> RouteDemand {
-        let level: RouteDemandLevel
-        switch tag.intensity {
-        case 0.67...: level = .high
-        case 0.34...: level = .moderate
-        default: level = .low
-        }
         return RouteDemand(
             id: tag.id,
-            title: tag.title,
-            intensity: tag.intensity,
-            level: level,
+            intensity: 0,
+            level: .low,
             evidence: "Saved planned-route category.",
             available: false
         )
