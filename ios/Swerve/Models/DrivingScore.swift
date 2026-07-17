@@ -14,7 +14,7 @@ enum DrivingEventKind: String, CaseIterable, Identifiable, Codable {
         case .hardBrake: "Hard braking"
         case .rapidAcceleration: "Rapid acceleration"
         case .sharpCorner: "Sharp corner"
-        case .phoneMovement: "Phone movement"
+        case .phoneMovement: "Possible phone handling"
         }
     }
 

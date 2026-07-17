@@ -23,7 +23,9 @@ that contributed to each result and shows an uncertainty band.
 Manual driving scores are local to the device. Swerve rejects poor GPS fixes,
 derives braking and acceleration from changes in accepted GPS speed, uses
 course change for sharp-corner signals, and transforms gravity-free Core Motion
-readings into a vertical reference frame to corroborate motion. Scores are
+readings into a vertical reference frame. Possible phone handling requires a
+sustained acceleration-and-rotation pattern while fresh GPS shows the vehicle
+is moving; a single bump or parked-phone movement is ignored. Scores are
 normalized to distance; short or sparse drives are labelled **Preliminary**
 instead of being presented as precise assessments.
 
@@ -75,7 +77,7 @@ npm test
 Run the deterministic manual-drive checks with:
 
 ```bash
-swiftc ios/Swerve/Models/DrivingScore.swift ios/Swerve/Models/DriveScoringEngine.swift ios/tests/DriveScoringEngineChecks.swift -o /tmp/swerve-drive-checks
+swiftc ios/Swerve/Models/RouteDifficultyModels.swift ios/Swerve/Models/DrivingScore.swift ios/Swerve/Models/DriveScoringEngine.swift ios/Swerve/Models/DriveExperienceEngine.swift ios/tests/DriveScoringEngineChecks.swift -o /tmp/swerve-drive-checks
 /tmp/swerve-drive-checks
 ```
 

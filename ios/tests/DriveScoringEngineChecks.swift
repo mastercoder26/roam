@@ -66,8 +66,103 @@ struct DriveScoringEngineChecks {
             ),
             "normal automotive movement should remain accepted"
         )
-        expect(!DriveScoringEngine.shouldFlagPhoneMovement(0.47), "motion below threshold must not flag phone movement")
-        expect(DriveScoringEngine.shouldFlagPhoneMovement(0.48), "motion at threshold should flag phone movement")
+        expect(!DriveScoringEngine.shouldFlagPhoneMovement(0.64), "motion below the abrupt-movement peak must not flag phone movement")
+        expect(DriveScoringEngine.shouldFlagPhoneMovement(0.65), "only a clearly abrupt single-sample peak should pass the legacy threshold helper")
+
+        var phoneDetector = PhoneMovementDetector()
+        expect(
+            !phoneDetector.ingest(
+                motion(0, acceleration: 1.1, rotation: 0.1),
+                vehicleSpeedMetersPerSecond: 14,
+                hasRecentAcceptedGPS: true
+            ),
+            "a rough-road acceleration spike without phone rotation must not flag handling"
+        )
+        expect(
+            !phoneDetector.ingest(
+                motion(0.1, acceleration: 0.7, rotation: 1.4),
+                vehicleSpeedMetersPerSecond: 0,
+                hasRecentAcceptedGPS: true
+            ),
+            "phone setup or movement while stopped must not create a driving event"
+        )
+        expect(
+            !phoneDetector.ingest(
+                motion(0.2, acceleration: 0.7, rotation: 1.4),
+                vehicleSpeedMetersPerSecond: 14,
+                hasRecentAcceptedGPS: false
+            ),
+            "motion before a fresh accepted GPS fix must not create a driving event"
+        )
+
+        var smallMovementDetector = PhoneMovementDetector()
+        for seconds in stride(from: 0.0, through: 0.3, by: 0.05) {
+            expect(
+                !smallMovementDetector.ingest(
+                    motion(seconds, acceleration: 0.20, rotation: 0.45),
+                    vehicleSpeedMetersPerSecond: 14,
+                    hasRecentAcceptedGPS: true
+                ),
+                "repeated small phone movement must remain below the coaching-event threshold"
+            )
+        }
+
+        expect(
+            !phoneDetector.ingest(
+                motion(1.00, acceleration: 0.42, rotation: 0.85),
+                vehicleSpeedMetersPerSecond: 14,
+                hasRecentAcceptedGPS: true
+            ),
+            "one sustained-pattern sample is not enough evidence"
+        )
+        expect(
+            !phoneDetector.ingest(
+                motion(1.05, acceleration: 0.43, rotation: 0.90),
+                vehicleSpeedMetersPerSecond: 14,
+                hasRecentAcceptedGPS: true
+            ),
+            "two sustained-pattern samples are not enough evidence"
+        )
+        expect(
+            phoneDetector.ingest(
+                motion(1.12, acceleration: 0.72, rotation: 1.30),
+                vehicleSpeedMetersPerSecond: 14,
+                hasRecentAcceptedGPS: true
+            ),
+            "a sustained acceleration-and-rotation burst while moving should flag one coaching event"
+        )
+        expect(
+            !phoneDetector.ingest(
+                motion(1.18, acceleration: 0.75, rotation: 1.35),
+                vehicleSpeedMetersPerSecond: 14,
+                hasRecentAcceptedGPS: true
+            ),
+            "a continuous movement burst must remain latched instead of creating repeated events"
+        )
+        expect(
+            !phoneDetector.ingest(
+                motion(1.25, acceleration: 0.08, rotation: 0.10),
+                vehicleSpeedMetersPerSecond: 14,
+                hasRecentAcceptedGPS: true
+            ),
+            "a quiet sample should only re-arm the detector, not create an event"
+        )
+
+        let motionTimestamp = Date(timeIntervalSinceReferenceDate: 10)
+        let isolatedMotion = DriveScoringEngine.corroboratingMotionG(
+            from: [motion(10, acceleration: 0.8, rotation: 1.2)],
+            near: motionTimestamp
+        )
+        expect(isolatedMotion == nil, "one motion spike must not upgrade a GPS event to fused provenance")
+        let sustainedMotion = DriveScoringEngine.corroboratingMotionG(
+            from: [
+                motion(9.9, acceleration: 0.15, rotation: 0.1),
+                motion(10.0, acceleration: 0.22, rotation: 0.1),
+                motion(10.1, acceleration: 0.24, rotation: 0.1)
+            ],
+            near: motionTimestamp
+        )
+        expect(sustainedMotion == 0.22, "motion corroboration should use the robust median, not a peak spike")
 
         let events = [
             DrivingEvent(kind: .hardBrake, timestamp: Date(), source: .gpsSpeed),
@@ -129,6 +224,18 @@ struct DriveScoringEngineChecks {
             courseDegrees: course,
             courseAccuracyDegrees: courseAccuracy,
             horizontalAccuracyMeters: accuracy
+        )
+    }
+
+    private static func motion(
+        _ seconds: TimeInterval,
+        acceleration: Double,
+        rotation: Double
+    ) -> DriveMotionSample {
+        DriveMotionSample(
+            timestamp: Date(timeIntervalSinceReferenceDate: seconds),
+            horizontalAccelerationG: acceleration,
+            rotationRateRadiansPerSecond: rotation
         )
     }
 }

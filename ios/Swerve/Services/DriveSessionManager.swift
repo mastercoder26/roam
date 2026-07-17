@@ -30,8 +30,10 @@ final class DriveSessionManager: NSObject, ObservableObject {
     private var events: [DrivingEvent] = []
     private var lastEventAt: [DrivingEventKind: Date] = [:]
     private var recentMotionSamples: [DriveMotionSample] = []
+    private var phoneMovementDetector = PhoneMovementDetector()
     private var routePoints: [DriveRoutePoint] = []
     private var latestCoordinate: DriveCoordinate?
+    private var latestAcceptedLocationAt: Date?
     private var recordingTimeZoneIdentifier: String?
     private var activePracticeRoute: PlannedRouteContext?
     // The encoded route is deliberately memory-only. Saved drives receive the
@@ -211,8 +213,10 @@ final class DriveSessionManager: NSObject, ObservableObject {
         events = []
         lastEventAt = [:]
         recentMotionSamples = []
+        phoneMovementDetector.reset()
         routePoints = []
         latestCoordinate = nil
+        latestAcceptedLocationAt = nil
         recordingTimeZoneIdentifier = nil
     }
 
@@ -251,14 +255,36 @@ final class DriveSessionManager: NSObject, ObservableObject {
         let worldY = matrix.m21 * acceleration.x + matrix.m22 * acceleration.y + matrix.m23 * acceleration.z
         let horizontalG = hypot(worldX, worldY)
         currentHorizontalAccelerationG = horizontalG
-
-        recentMotionSamples.append(
-            DriveMotionSample(timestamp: Date(), horizontalAccelerationG: horizontalG)
+        let rotation = motion.rotationRate
+        let rotationRate = sqrt(
+            rotation.x * rotation.x +
+                rotation.y * rotation.y +
+                rotation.z * rotation.z
         )
-        recentMotionSamples.removeAll { Date().timeIntervalSince($0.timestamp) > 2 }
+        let timestamp = Date()
+        let motionSample = DriveMotionSample(
+            timestamp: timestamp,
+            horizontalAccelerationG: horizontalG,
+            rotationRateRadiansPerSecond: rotationRate
+        )
 
-        if DriveScoringEngine.shouldFlagPhoneMovement(horizontalG) {
-            addEvent(.phoneMovement, timestamp: Date(), coordinate: latestCoordinate, source: .deviceMotion, cooldown: 3)
+        recentMotionSamples.append(motionSample)
+        recentMotionSamples.removeAll { timestamp.timeIntervalSince($0.timestamp) > 2 }
+
+        if phoneMovementDetector.ingest(
+            motionSample,
+            vehicleSpeedMetersPerSecond: currentSpeedMetersPerSecond,
+            hasRecentAcceptedGPS: latestAcceptedLocationAt.map {
+                abs(timestamp.timeIntervalSince($0)) <= 2
+            } ?? false
+        ) {
+            addEvent(
+                .phoneMovement,
+                timestamp: timestamp,
+                coordinate: latestCoordinate,
+                source: .deviceMotion,
+                cooldown: 10
+            )
         }
     }
 
@@ -303,10 +329,10 @@ final class DriveSessionManager: NSObject, ObservableObject {
                 }
                 distanceMeters += distance
                 appendRoutePoint(routePoint)
-                let nearbyMotion = recentMotionSamples
-                    .filter { abs($0.timestamp.timeIntervalSince(location.timestamp)) <= 1 }
-                    .map(\.horizontalAccelerationG)
-                    .max()
+                let nearbyMotion = DriveScoringEngine.corroboratingMotionG(
+                    from: recentMotionSamples,
+                    near: location.timestamp
+                )
                 for event in DriveScoringEngine.detectEvents(
                     previous: previousSample,
                     current: sample,
@@ -326,6 +352,7 @@ final class DriveSessionManager: NSObject, ObservableObject {
 
         previousLocation = location
         latestCoordinate = routePoint.coordinate
+        latestAcceptedLocationAt = location.timestamp
     }
 
     private func appendRoutePoint(_ point: DriveRoutePoint) {

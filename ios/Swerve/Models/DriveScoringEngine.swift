@@ -12,6 +12,93 @@ struct DriveMotionSample {
     let timestamp: Date
     /// Gravity-free horizontal acceleration in g, transformed into a vertical-Z reference frame.
     let horizontalAccelerationG: Double
+    /// Rotation rate in radians per second. Vehicle acceleration alone is not
+    /// enough to call something phone handling, so this is kept alongside the
+    /// acceleration signal for the short evidence window below.
+    let rotationRateRadiansPerSecond: Double
+
+    init(
+        timestamp: Date,
+        horizontalAccelerationG: Double,
+        rotationRateRadiansPerSecond: Double = 0
+    ) {
+        self.timestamp = timestamp
+        self.horizontalAccelerationG = horizontalAccelerationG
+        self.rotationRateRadiansPerSecond = rotationRateRadiansPerSecond
+    }
+}
+
+/// Filters Core Motion into a deliberately cautious phone-handling signal.
+/// Road texture, braking, and one-off sensor spikes can all create horizontal
+/// acceleration, so this requires a short sustained pattern with meaningful
+/// device rotation while the vehicle is moving. It is not a distraction
+/// detector; it only produces a coaching event for a clearly abrupt movement.
+struct PhoneMovementDetector {
+    static let minimumDrivingSpeedMetersPerSecond = 4.0
+    static let evidenceWindow: TimeInterval = 0.40
+    static let sustainedAccelerationThresholdG = 0.32
+    static let sustainedRotationThresholdRadiansPerSecond = 0.75
+    static let peakAccelerationThresholdG = 0.65
+    static let peakRotationThresholdRadiansPerSecond = 1.20
+    static let minimumEvidenceSampleCount = 3
+    static let resetAccelerationThresholdG = 0.18
+    static let resetRotationThresholdRadiansPerSecond = 0.40
+
+    private var evidence: [DriveMotionSample] = []
+    private var isLatched = false
+
+    mutating func ingest(
+        _ sample: DriveMotionSample,
+        vehicleSpeedMetersPerSecond: Double,
+        hasRecentAcceptedGPS: Bool
+    ) -> Bool {
+        guard hasRecentAcceptedGPS,
+              vehicleSpeedMetersPerSecond >= Self.minimumDrivingSpeedMetersPerSecond else {
+            reset()
+            return false
+        }
+
+        if isLatched {
+            if sample.horizontalAccelerationG < Self.resetAccelerationThresholdG,
+               sample.rotationRateRadiansPerSecond < Self.resetRotationThresholdRadiansPerSecond {
+                reset()
+            }
+            return false
+        }
+
+        evidence.append(sample)
+        evidence.removeAll {
+            sample.timestamp.timeIntervalSince($0.timestamp) > Self.evidenceWindow
+        }
+
+        let sustainedSamples = evidence.filter {
+            $0.horizontalAccelerationG >= Self.sustainedAccelerationThresholdG &&
+                $0.rotationRateRadiansPerSecond >= Self.sustainedRotationThresholdRadiansPerSecond
+        }
+        guard sustainedSamples.count >= Self.minimumEvidenceSampleCount else {
+            return false
+        }
+
+        let evidenceDuration = (sustainedSamples.last?.timestamp ?? sample.timestamp)
+            .timeIntervalSince(sustainedSamples.first?.timestamp ?? sample.timestamp)
+        guard evidenceDuration >= 0.08 else { return false }
+
+        let hasAbruptPeak = sustainedSamples.contains {
+            $0.horizontalAccelerationG >= Self.peakAccelerationThresholdG &&
+                $0.rotationRateRadiansPerSecond >= Self.peakRotationThresholdRadiansPerSecond
+        }
+        guard hasAbruptPeak else { return false }
+
+        // Do not let the same continuous shake become a stream of events. The
+        // detector must see a quiet sample before it can arm again.
+        isLatched = true
+        return true
+    }
+
+    mutating func reset() {
+        evidence.removeAll(keepingCapacity: true)
+        isLatched = false
+    }
 }
 
 enum DrivingEventSource: String, Codable {
@@ -65,7 +152,7 @@ enum DriveScoringEngine {
     static let hardBrakeThreshold = -3.2
     static let rapidAccelerationThreshold = 2.8
     static let sharpCornerDegreesPerSecond = 28.0
-    static let highMotionThresholdG = 0.48
+    static let highMotionThresholdG = PhoneMovementDetector.peakAccelerationThresholdG
 
     static func accepts(_ sample: DriveLocationSample) -> Bool {
         sample.horizontalAccuracyMeters > 0 &&
@@ -127,6 +214,22 @@ enum DriveScoringEngine {
         }
 
         return events
+    }
+
+    /// Returns a robust short-window motion value for GPS-event provenance.
+    /// A median prevents one sensor spike from making a GPS-derived braking or
+    /// acceleration event look motion-confirmed.
+    static func corroboratingMotionG(
+        from samples: [DriveMotionSample],
+        near timestamp: Date,
+        window: TimeInterval = 0.35
+    ) -> Double? {
+        let values = samples
+            .filter { abs($0.timestamp.timeIntervalSince(timestamp)) <= window }
+            .map(\.horizontalAccelerationG)
+            .sorted()
+        guard values.count >= 3 else { return nil }
+        return values[values.count / 2]
     }
 
     static func shouldFlagPhoneMovement(_ horizontalAccelerationG: Double) -> Bool {

@@ -159,7 +159,7 @@ struct DriveView: View {
         VStack(alignment: .leading, spacing: 12) {
             SectionHeader(title: "What gets measured", subtitle: "A first-pass, on-device drive score — not a safety guarantee.")
             Label("GPS speed changes flag hard braking and rapid acceleration.", systemImage: "location.fill")
-            Label("Motion is transformed against gravity and used as corroboration, not as a standalone verdict.", systemImage: "waveform.path.ecg")
+            Label("Possible phone handling needs sustained motion and device rotation while driving — one bump does not count.", systemImage: "waveform.path.ecg")
             Label("A physical iPhone is required for meaningful sensor data.", systemImage: "iphone")
         }
         .font(.footnote)
