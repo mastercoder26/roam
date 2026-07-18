@@ -500,7 +500,7 @@ private struct ReplayMomentRow: View {
             }
             Image(systemName: isSelected ? "checkmark.circle.fill" : "chevron.right")
                 .font(.caption.weight(.semibold))
-                .foregroundStyle(isSelected ? AppDesign.accent : .tertiary)
+                .foregroundStyle(isSelected ? AppDesign.accent : Color(.tertiaryLabel))
         }
         .padding(10)
         .background(isSelected ? AppDesign.accent.opacity(0.08) : Color.clear, in: RoundedRectangle(cornerRadius: 12, style: .continuous))

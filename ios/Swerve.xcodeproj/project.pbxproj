@@ -206,12 +206,20 @@
 			path = Root;
 			sourceTree = "<group>";
 		};
-			A5000000000000000000000D /* Drive */ = {
+		A5000000000000000000000D /* Drive */ = {
 			isa = PBXGroup;
 			children = (
 				A20000000000000000000013 /* DriveView.swift */,
 			);
 			path = Drive;
+			sourceTree = "<group>";
+		};
+		A5000000000000000000000E /* Progress */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000020 /* DriverProgressView.swift */,
+			);
+			path = Progress;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -248,14 +256,6 @@
 						CreatedOnToolsVersion = 15.0;
 					};
 				};
-			};
-			A5000000000000000000000E /* Progress */ = {
-				isa = PBXGroup;
-				children = (
-					A20000000000000000000020 /* DriverProgressView.swift */,
-				);
-				path = Progress;
-				sourceTree = "<group>";
 			};
 			buildConfigurationList = A80000000000000000000001 /* Build configuration list for PBXProject "Swerve" */;
 			compatibilityVersion = "Xcode 14.0";

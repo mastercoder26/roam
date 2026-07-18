@@ -976,7 +976,7 @@ private struct DepartureComparisonRow: View {
                         } else {
                             Image(systemName: isCurrentDeparture ? "checkmark.circle.fill" : "chevron.right")
                                 .font(.caption.weight(.semibold))
-                                .foregroundStyle(isCurrentDeparture ? AppDesign.accent : .tertiary)
+                                .foregroundStyle(isCurrentDeparture ? AppDesign.accent : Color(.tertiaryLabel))
                         }
                     }
                     .padding(10)
