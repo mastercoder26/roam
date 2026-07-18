@@ -5,6 +5,10 @@ import Foundation
 
 @MainActor
 final class DriveSessionManager: NSObject, ObservableObject {
+    /// The app, CarPlay scene, and Live Activity all reflect this one manual
+    /// drive session. Previews and tests can still create isolated instances.
+    static let shared = DriveSessionManager()
+
     @Published private(set) var isRecording = false
     @Published private(set) var elapsed: TimeInterval = 0
     @Published private(set) var currentSpeedMetersPerSecond: CLLocationSpeed = 0
@@ -27,7 +31,7 @@ final class DriveSessionManager: NSObject, ObservableObject {
     private var timer: Timer?
     private var startDate: Date?
     private var previousLocation: CLLocation?
-    private var distanceMeters: CLLocationDistance = 0
+    @Published private(set) var distanceMeters: CLLocationDistance = 0
     private var topSpeed: CLLocationSpeed = 0
     private var events: [DrivingEvent] = []
     private var lastEventAt: [DrivingEventKind: Date] = [:]
@@ -45,6 +49,16 @@ final class DriveSessionManager: NSObject, ObservableObject {
     private var queuedPracticeRoutePolyline: String?
     private var activePracticeRoutePolyline: String?
     private let historyKey = "recorded-drives-v1"
+
+    var currentDistanceMiles: Double { distanceMeters / 1_609.344 }
+    var currentSpeedMilesPerHour: Int { Int((max(currentSpeedMetersPerSecond, 0) * 2.23694).rounded()) }
+    var currentEventCount: Int { events.count }
+    var formattedElapsed: String {
+        let formatter = DateComponentsFormatter()
+        formatter.allowedUnits = elapsed >= 3_600 ? [.hour, .minute, .second] : [.minute, .second]
+        formatter.unitsStyle = .abbreviated
+        return formatter.string(from: elapsed) ?? "0m"
+    }
 
     override init() {
         super.init()
@@ -77,6 +91,13 @@ final class DriveSessionManager: NSObject, ObservableObject {
         statusMessage = "Recording this drive"
         startElapsedTimer()
         startMotionUpdates()
+        DriveLiveActivityManager.shared.start(
+            startedAt: driveStart,
+            speedMetersPerSecond: currentSpeedMetersPerSecond,
+            distanceMeters: distanceMeters,
+            eventCount: events.count,
+            status: statusMessage
+        )
 
         switch locationManager.authorizationStatus {
         case .notDetermined:
@@ -231,6 +252,12 @@ final class DriveSessionManager: NSObject, ObservableObject {
         } else {
             statusMessage = "Drive saved on this device"
         }
+        DriveLiveActivityManager.shared.end(
+            speedMetersPerSecond: 0,
+            distanceMeters: distanceMeters,
+            eventCount: events.count,
+            status: "Drive saved"
+        )
         activePracticeRoute = nil
         activePracticeRoutePolyline = nil
         recordingTimeZoneIdentifier = nil
@@ -285,6 +312,7 @@ final class DriveSessionManager: NSObject, ObservableObject {
             Task { @MainActor [weak self] in
                 guard let self, let startDate = self.startDate else { return }
                 self.elapsed = Date().timeIntervalSince(startDate)
+                self.publishLiveDriveSnapshot()
             }
         }
     }
@@ -425,6 +453,7 @@ final class DriveSessionManager: NSObject, ObservableObject {
         previousLocation = location
         latestCoordinate = routePoint.coordinate
         latestAcceptedLocationAt = location.timestamp
+        publishLiveDriveSnapshot()
     }
 
     private func appendRoutePoint(_ point: DriveRoutePoint) {
@@ -443,6 +472,18 @@ final class DriveSessionManager: NSObject, ObservableObject {
         if let lastEvent = lastEventAt[kind], timestamp.timeIntervalSince(lastEvent) < cooldown { return }
         lastEventAt[kind] = timestamp
         events.append(DrivingEvent(kind: kind, timestamp: timestamp, source: source, coordinate: coordinate))
+        publishLiveDriveSnapshot(force: true)
+    }
+
+    private func publishLiveDriveSnapshot(force: Bool = false) {
+        guard isRecording else { return }
+        DriveLiveActivityManager.shared.update(
+            speedMetersPerSecond: currentSpeedMetersPerSecond,
+            distanceMeters: distanceMeters,
+            eventCount: events.count,
+            status: statusMessage,
+            force: force
+        )
     }
 
     private func loadRecordedDrives() {

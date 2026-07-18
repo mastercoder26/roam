@@ -34,7 +34,37 @@
 		A1000000000000000000001E /* DriverProgressEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000001E /* DriverProgressEngine.swift */; };
 		A1000000000000000000001F /* PhonePlacementAnalyzer.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000001F /* PhonePlacementAnalyzer.swift */; };
 		A10000000000000000000020 /* DriverProgressView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000020 /* DriverProgressView.swift */; };
+		A10000000000000000000021 /* DriveActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000021 /* DriveActivityAttributes.swift */; };
+		A10000000000000000000022 /* DriveLiveActivityManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000022 /* DriveLiveActivityManager.swift */; };
+		A10000000000000000000023 /* CarPlaySceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000023 /* CarPlaySceneDelegate.swift */; };
+		A10000000000000000000024 /* DriveActivityWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000024 /* DriveActivityWidget.swift */; };
+		A10000000000000000000025 /* DriveActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000021 /* DriveActivityAttributes.swift */; };
+		A10000000000000000000026 /* SwerveDriveActivityExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = A30000000000000000000002 /* SwerveDriveActivityExtension.appex */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
 /* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		AB00000000000000000000002 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A90000000000000000000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A60000000000000000000002;
+			remoteInfo = SwerveDriveActivityExtension;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		A70000000000000000000005 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				A10000000000000000000026 /* SwerveDriveActivityExtension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		A20000000000000000000001 /* SwerveApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwerveApp.swift; sourceTree = "<group>"; };
@@ -67,11 +97,24 @@
 		A2000000000000000000001E /* DriverProgressEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriverProgressEngine.swift; sourceTree = "<group>"; };
 		A2000000000000000000001F /* PhonePlacementAnalyzer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhonePlacementAnalyzer.swift; sourceTree = "<group>"; };
 		A20000000000000000000020 /* DriverProgressView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriverProgressView.swift; sourceTree = "<group>"; };
+		A20000000000000000000021 /* DriveActivityAttributes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriveActivityAttributes.swift; sourceTree = "<group>"; };
+		A20000000000000000000022 /* DriveLiveActivityManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriveLiveActivityManager.swift; sourceTree = "<group>"; };
+		A20000000000000000000023 /* CarPlaySceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CarPlaySceneDelegate.swift; sourceTree = "<group>"; };
+		A20000000000000000000024 /* DriveActivityWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriveActivityWidget.swift; sourceTree = "<group>"; };
+		A20000000000000000000025 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		A30000000000000000000001 /* Swerve.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Swerve.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A30000000000000000000002 /* SwerveDriveActivityExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = SwerveDriveActivityExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		A40000000000000000000001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A40000000000000000000002 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -85,6 +128,7 @@
 			isa = PBXGroup;
 			children = (
 				A50000000000000000000002 /* Swerve */,
+				A5000000000000000000000F /* SwerveDriveActivityExtension */,
 				A50000000000000000000003 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -109,6 +153,7 @@
 			isa = PBXGroup;
 			children = (
 				A30000000000000000000001 /* Swerve.app */,
+				A30000000000000000000002 /* SwerveDriveActivityExtension.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -139,6 +184,7 @@
 					A2000000000000000000001F /* PhonePlacementAnalyzer.swift */,
 				A20000000000000000000019 /* DriverReadinessEngine.swift */,
 				A20000000000000000000018 /* RoutePlanningLocationCoordinator.swift */,
+				A20000000000000000000021 /* DriveActivityAttributes.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -148,6 +194,8 @@
 			children = (
 				A20000000000000000000005 /* APIClient.swift */,
 				A20000000000000000000014 /* DriveSessionManager.swift */,
+				A20000000000000000000022 /* DriveLiveActivityManager.swift */,
+				A20000000000000000000023 /* CarPlaySceneDelegate.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -222,6 +270,15 @@
 			path = Progress;
 			sourceTree = "<group>";
 		};
+		A5000000000000000000000F /* SwerveDriveActivityExtension */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000024 /* DriveActivityWidget.swift */,
+				A20000000000000000000025 /* Info.plist */,
+			);
+			path = SwerveDriveActivityExtension;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -232,15 +289,34 @@
 				A70000000000000000000001 /* Sources */,
 				A40000000000000000000001 /* Frameworks */,
 				A70000000000000000000002 /* Resources */,
+				A70000000000000000000005 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				AB00000000000000000000001 /* PBXTargetDependency */,
 			);
 			name = Swerve;
 			productName = Swerve;
 			productReference = A30000000000000000000001 /* Swerve.app */;
 			productType = "com.apple.product-type.application";
+		};
+		A60000000000000000000002 /* SwerveDriveActivityExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A80000000000000000000004 /* Build configuration list for PBXNativeTarget "SwerveDriveActivityExtension" */;
+			buildPhases = (
+				A70000000000000000000003 /* Sources */,
+				A40000000000000000000002 /* Frameworks */,
+				A70000000000000000000004 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = SwerveDriveActivityExtension;
+			productName = SwerveDriveActivityExtension;
+			productReference = A30000000000000000000002 /* SwerveDriveActivityExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
 		};
 /* End PBXNativeTarget section */
 
@@ -252,9 +328,12 @@
 				LastSwiftUpdateCheck = 1500;
 				LastUpgradeCheck = 1500;
 				TargetAttributes = {
-					A60000000000000000000001 = {
-						CreatedOnToolsVersion = 15.0;
-					};
+				A60000000000000000000001 = {
+					CreatedOnToolsVersion = 15.0;
+				};
+				A60000000000000000000002 = {
+					CreatedOnToolsVersion = 15.0;
+				};
 				};
 			};
 			buildConfigurationList = A80000000000000000000001 /* Build configuration list for PBXProject "Swerve" */;
@@ -271,6 +350,7 @@
 			projectRoot = "";
 			targets = (
 				A60000000000000000000001 /* Swerve */,
+				A60000000000000000000002 /* SwerveDriveActivityExtension */,
 			);
 		};
 /* End PBXProject section */
@@ -281,6 +361,13 @@
 			buildActionMask = 2147483647;
 			files = (
 				A1000000000000000000000C /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A70000000000000000000004 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -316,11 +403,31 @@
 					A1000000000000000000001D /* DriveReplayEngine.swift in Sources */,
 					A1000000000000000000001E /* DriverProgressEngine.swift in Sources */,
 					A1000000000000000000001F /* PhonePlacementAnalyzer.swift in Sources */,
-					A10000000000000000000020 /* DriverProgressView.swift in Sources */,
+				A10000000000000000000020 /* DriverProgressView.swift in Sources */,
+				A10000000000000000000021 /* DriveActivityAttributes.swift in Sources */,
+				A10000000000000000000022 /* DriveLiveActivityManager.swift in Sources */,
+				A10000000000000000000023 /* CarPlaySceneDelegate.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A70000000000000000000003 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A10000000000000000000024 /* DriveActivityWidget.swift in Sources */,
+				A10000000000000000000025 /* DriveActivityAttributes.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		AB00000000000000000000001 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A60000000000000000000002 /* SwerveDriveActivityExtension */;
+			targetProxy = AB00000000000000000000002 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		AA0000000000000000000001 /* Debug */ = {
@@ -492,6 +599,54 @@
 			};
 			name = Release;
 		};
+		AA0000000000000000000005 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 6RT6KBS4G9;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = SwerveDriveActivityExtension/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.akhilkonduru.swerve.driveactivity;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		AA0000000000000000000006 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 6RT6KBS4G9;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = SwerveDriveActivityExtension/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.akhilkonduru.swerve.driveactivity;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -509,6 +664,15 @@
 			buildConfigurations = (
 				AA0000000000000000000003 /* Debug */,
 				AA0000000000000000000004 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A80000000000000000000004 /* Build configuration list for PBXNativeTarget "SwerveDriveActivityExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				AA0000000000000000000005 /* Debug */,
+				AA0000000000000000000006 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

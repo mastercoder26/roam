@@ -9,7 +9,9 @@ has three focused modes:
   available.
 - **Drive** is a manually started, on-device driving session that combines GPS
   speed changes and phone motion to flag hard braking, rapid acceleration,
-  sharp corners, and abrupt phone movement.
+  sharp corners, and abrupt phone movement. While a drive is active, its
+  elapsed time and measured stats are available in a Live Activity on the Lock
+  Screen and Dynamic Island.
 - **Progress** shows measured local evidence such as validated miles,
   after-dark miles, 45+ mph miles, continuous-trace coverage, and an
   eight-week chart.
@@ -68,6 +70,21 @@ in the shared project configuration.
 For a manual drive that continues while the phone is locked, iOS may also ask
 for **Always Allow** location access after the drive begins. It enables location
 updates only for the active session and turns them off when the user ends it.
+
+## Live Activity and CarPlay
+
+Swerve starts a Live Activity only after the driver manually starts a drive. It
+shows elapsed time, measured speed, distance, and event count. It contains no
+route, address, or raw location data and ends when the drive ends.
+
+The project also includes a CarPlay information dashboard for an active drive.
+It mirrors elapsed time, distance, speed, current motion, and measured events;
+starting and ending drives remain iPhone-only. To appear on a real CarPlay head
+unit, the app's Apple Developer identifier and provisioning profile must be
+approved for the relevant CarPlay category, normally the Maps entitlement for a
+driving app. This Apple-controlled entitlement is intentionally not enabled in
+the repository, so adding the project to an iPhone will not fail for developers
+who have not received it.
 
 ## Run the backend
 

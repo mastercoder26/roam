@@ -26,7 +26,7 @@ struct SwerveRootView: View {
     }
 
     @State private var selectedTab: Tab = .routes
-    @StateObject private var driveSession = DriveSessionManager()
+    @StateObject private var driveSession = DriveSessionManager.shared
     @Namespace private var tabAnimation
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
