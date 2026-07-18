@@ -1,28 +1,65 @@
 import SwiftUI
 
 struct DriveView: View {
+    private enum RecordingPresentation: Equatable {
+        case idle
+        case active
+        case returning
+    }
+
     @EnvironmentObject private var session: DriveSessionManager
     @State private var showingHelp = false
-    @Namespace private var driveModeTransition
+    @State private var recordingPresentation: RecordingPresentation = .idle
+    @State private var actionShowsEnd = false
+    @State private var transitionToken = UUID()
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         NavigationStack {
-            Group {
-                if session.isRecording {
-                    activeDriveView
-                        .transition(driveModeContentTransition)
-                } else {
-                    idleDriveView
-                        .transition(driveModeContentTransition)
+            GeometryReader { geometry in
+                ScrollView {
+                    VStack(alignment: .leading, spacing: AppDesign.sectionSpacing) {
+                        if showsSupportingContent {
+                            header
+                            if session.queuedPracticeRoute != nil {
+                                practiceRouteReadyCard
+                                    .transition(reduceMotion ? .opacity : .opacity.combined(with: .move(edge: .top)))
+                            }
+                        }
+
+                        recordingCard(availableHeight: geometry.size.height)
+                            .id("drive-recording-surface")
+
+                        if showsSupportingContent {
+                            if let score = session.lastScore {
+                                if let drive = session.lastCompletedDrive,
+                                   drive.plannedRouteContext?.debrief != nil {
+                                    PracticeDebriefCard(drive: drive)
+                                        .transition(reduceMotion ? .opacity : .opacity.combined(with: .move(edge: .top)))
+                                }
+                                DriveScoreCard(score: score)
+                            } else {
+                                howItWorksCard
+                            }
+
+                            if !session.recordedDrives.isEmpty {
+                                driveHistory
+                            }
+                        }
+                    }
+                    .padding(.horizontal, AppDesign.contentPadding)
+                    .padding(.vertical, 12)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
+                .scrollDisabled(isTransitioningDriveSurface)
+                .background(isFocusedCanvas ? Color(.systemBackground) : Color(.systemGroupedBackground))
             }
-            .animation(driveModeAnimation, value: session.isRecording)
-            .navigationTitle(session.isRecording ? "" : "Drive")
+            .animation(driveModeAnimation, value: recordingPresentation)
+            .navigationTitle(isFocusedCanvas ? "" : "Drive")
             .navigationBarTitleDisplayMode(.large)
-            .toolbar(session.isRecording ? .hidden : .visible, for: .navigationBar)
+            .toolbar(isFocusedCanvas ? .hidden : .visible, for: .navigationBar)
             .toolbar {
-                if !session.isRecording {
+                if !isFocusedCanvas {
                     ToolbarItem(placement: .topBarTrailing) {
                         Button {
                             showingHelp = true
@@ -39,88 +76,11 @@ struct DriveView: View {
                 .presentationDetents([.medium])
                 .presentationDragIndicator(.visible)
         }
-    }
-
-    private var idleDriveView: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: AppDesign.sectionSpacing) {
-                header
-                if session.queuedPracticeRoute != nil {
-                    practiceRouteReadyCard
-                        .transition(reduceMotion ? .opacity : .opacity.combined(with: .move(edge: .top)))
-                }
-                recordingCard
-
-                if let score = session.lastScore {
-                    if let drive = session.lastCompletedDrive,
-                       drive.plannedRouteContext?.debrief != nil {
-                        PracticeDebriefCard(drive: drive)
-                            .transition(reduceMotion ? .opacity : .opacity.combined(with: .move(edge: .top)))
-                    }
-                    DriveScoreCard(score: score)
-                } else {
-                    howItWorksCard
-                }
-
-                if !session.recordedDrives.isEmpty {
-                    driveHistory
-                }
-            }
-            .padding(.horizontal, AppDesign.contentPadding)
-            .padding(.vertical, 12)
+        .onAppear {
+            guard session.isRecording else { return }
+            actionShowsEnd = true
+            recordingPresentation = .active
         }
-        .background(Color(.systemGroupedBackground))
-    }
-
-    /// Recording deliberately removes route-planning and historical content.
-    /// That leaves one clear status, one live measurement, and one action.
-    private var activeDriveView: some View {
-        VStack(spacing: 0) {
-            activeDriveClock
-
-            Spacer(minLength: 32)
-
-            activeSpeed
-
-            if session.phonePlacementAssessment == .needsAdjustment {
-                compactPlacementWarning
-                    .padding(.top, 20)
-                    .transition(reduceMotion ? .opacity : .opacity.combined(with: .move(edge: .top)))
-            }
-
-            Spacer(minLength: 32)
-
-            driveActionButton(isRecording: true)
-                .padding(.horizontal, AppDesign.contentPadding)
-                .padding(.bottom, 16)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(.systemBackground))
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel("Drive in progress")
-    }
-
-    private var activeDriveClock: some View {
-        VStack(spacing: 12) {
-            Label("DRIVE STARTED", systemImage: "record.circle.fill")
-                .font(.caption.weight(.bold))
-                .foregroundStyle(.red)
-
-            FlipClock(elapsed: session.elapsed, style: .active)
-                .matchedGeometryEffect(id: "drive-clock", in: driveModeTransition)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.top, 26)
-        .padding(.bottom, 28)
-        .background(Color(.secondarySystemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 30, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 30, style: .continuous)
-                .stroke(Color.primary.opacity(0.06), lineWidth: 1)
-        }
-        .shadow(color: .black.opacity(0.05), radius: 18, y: 8)
-        .padding(.horizontal, AppDesign.contentPadding)
-        .padding(.top, 12)
     }
 
     private var activeSpeed: some View {
@@ -157,8 +117,24 @@ struct DriveView: View {
         reduceMotion ? .easeOut(duration: 0.18) : AppAnimation.driveMode
     }
 
-    private var driveModeContentTransition: AnyTransition {
-        reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.985, anchor: .top))
+    private var actionSwapAnimation: Animation {
+        reduceMotion ? .easeOut(duration: 0.12) : .easeInOut(duration: 0.12)
+    }
+
+    private var isExpandedDriveSurface: Bool {
+        recordingPresentation == .active
+    }
+
+    private var isFocusedCanvas: Bool {
+        recordingPresentation == .active || recordingPresentation == .returning
+    }
+
+    private var isTransitioningDriveSurface: Bool {
+        recordingPresentation != .idle
+    }
+
+    private var showsSupportingContent: Bool {
+        recordingPresentation == .idle
     }
 
     private var header: some View {
@@ -229,46 +205,69 @@ struct DriveView: View {
         .accessibilityLabel("Practice route ready")
     }
 
-    private var recordingCard: some View {
-        VStack(spacing: 18) {
-            Label("MANUAL DRIVE", systemImage: "steeringwheel")
+    private func recordingCard(availableHeight: CGFloat) -> some View {
+        let expandedHeight = max(availableHeight - 24, 560)
+
+        return VStack(spacing: isExpandedDriveSurface ? 0 : 18) {
+            Label(isExpandedDriveSurface ? "DRIVE STARTED" : "MANUAL DRIVE", systemImage: isExpandedDriveSurface ? "record.circle.fill" : "steeringwheel")
                 .font(.caption.weight(.bold))
-                .foregroundStyle(.secondary)
-                .frame(maxWidth: .infinity, alignment: .leading)
+                .foregroundStyle(isExpandedDriveSurface ? .red : .secondary)
+                .frame(maxWidth: .infinity, alignment: isExpandedDriveSurface ? .center : .leading)
+                .padding(.top, isExpandedDriveSurface ? 28 : 0)
 
-            FlipClock(elapsed: session.elapsed, style: .preview)
-                .matchedGeometryEffect(id: "drive-clock", in: driveModeTransition)
+            FlipClock(elapsed: session.elapsed, style: isExpandedDriveSurface ? .active : .preview)
+                .padding(.top, isExpandedDriveSurface ? 12 : 0)
 
-            driveActionButton(isRecording: false)
+            if isExpandedDriveSurface {
+                Spacer(minLength: 34)
+                activeSpeed
 
-            Text(session.statusMessage)
+                if session.phonePlacementAssessment == .needsAdjustment {
+                    compactPlacementWarning
+                        .padding(.top, 20)
+                        .transition(reduceMotion ? .opacity : .opacity)
+                }
+
+                Spacer(minLength: 34)
+            }
+
+            driveActionButton(showsEnd: actionShowsEnd)
+                .padding(.horizontal, isExpandedDriveSurface ? AppDesign.contentPadding : 0)
+                .padding(.bottom, isExpandedDriveSurface ? AppDesign.contentPadding : 0)
+
+            if !isExpandedDriveSurface, recordingPresentation != .returning {
+                Text(session.statusMessage)
                 .font(.footnote)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
+            }
         }
-        .padding(20)
+        .padding(isExpandedDriveSurface ? 0 : 20)
         .frame(maxWidth: .infinity)
+        .frame(height: isExpandedDriveSurface ? expandedHeight : nil, alignment: .top)
         .background(
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .fill(Color(.secondarySystemGroupedBackground))
+            RoundedRectangle(cornerRadius: isExpandedDriveSurface ? 0 : 24, style: .continuous)
+                .fill(isFocusedCanvas ? Color(.systemBackground) : Color(.secondarySystemGroupedBackground))
         )
         .overlay {
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .stroke(Color.primary.opacity(0.05), lineWidth: 1)
+            RoundedRectangle(cornerRadius: isExpandedDriveSurface ? 0 : 24, style: .continuous)
+                .stroke(isFocusedCanvas ? .clear : Color.primary.opacity(0.05), lineWidth: 1)
         }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(actionShowsEnd ? "Drive in progress" : "Manual drive")
     }
 
-    private func driveActionButton(isRecording: Bool) -> some View {
+    private func driveActionButton(showsEnd: Bool) -> some View {
         Button {
-            if isRecording {
-                session.endDrive()
+            if showsEnd {
+                endDrive()
             } else {
-                session.startDrive()
+                startDrive()
             }
         } label: {
             HStack(spacing: 10) {
-                Image(systemName: isRecording ? "stop.fill" : "record.circle")
-                Text(isRecording ? "End drive" : "Start drive")
+                Image(systemName: showsEnd ? "stop.fill" : "record.circle")
+                Text(showsEnd ? "End drive" : "Start drive")
             }
             .font(.headline)
             .frame(maxWidth: .infinity)
@@ -276,13 +275,55 @@ struct DriveView: View {
             .foregroundStyle(.white)
             .background(
                 RoundedRectangle(cornerRadius: AppDesign.cornerRadius, style: .continuous)
-                    .fill(isRecording ? Color.red : Color.accentColor)
+                    .fill(showsEnd ? Color.red : Color.accentColor)
             )
         }
         .buttonStyle(PressableScaleStyle())
-        .matchedGeometryEffect(id: "drive-action", in: driveModeTransition)
         .contentTransition(.opacity)
-        .accessibilityLabel(isRecording ? "End drive" : "Start drive")
+        .accessibilityLabel(showsEnd ? "End drive" : "Start drive")
+    }
+
+    private func startDrive() {
+        guard !session.isRecording else { return }
+        transitionToken = UUID()
+        let token = transitionToken
+        session.startDrive()
+
+        // First, make the action's meaning explicit. Only after that label
+        // swap settles do we move the same button vertically to its driving
+        // position.
+        withAnimation(actionSwapAnimation) {
+            actionShowsEnd = true
+        }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + (reduceMotion ? 0 : 0.13)) {
+            guard transitionToken == token, session.isRecording else { return }
+            withAnimation(driveModeAnimation) {
+                recordingPresentation = .active
+            }
+        }
+    }
+
+    private func endDrive() {
+        guard session.isRecording else { return }
+        transitionToken = UUID()
+        let token = transitionToken
+        session.endDrive()
+
+        // Keep the End Drive label while its existing button returns along the
+        // same vertical path. The start label returns only after it reaches
+        // its original position.
+        withAnimation(driveModeAnimation) {
+            recordingPresentation = .returning
+        }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + (reduceMotion ? 0 : 0.50)) {
+            guard transitionToken == token else { return }
+            withAnimation(actionSwapAnimation) {
+                actionShowsEnd = false
+                recordingPresentation = .idle
+            }
+        }
     }
 
     private var howItWorksCard: some View {
