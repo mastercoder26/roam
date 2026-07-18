@@ -14,6 +14,11 @@ enum AppAnimation {
     /// or a meaningful summary becoming available.
     static let content = Animation.spring(response: 0.40, dampingFraction: 1.0)
 
+    /// The manual-drive state change carries a timer upward and the primary
+    /// action downward. It remains critically damped so it is calm and can be
+    /// immediately reversed when a drive ends.
+    static let driveMode = Animation.spring(response: 0.42, dampingFraction: 1.0)
+
     /// Deliberate reveal (score arc, breakdown bars)
     static let reveal = Animation.spring(response: 0.5, dampingFraction: 1.0)
 

@@ -3,53 +3,34 @@ import SwiftUI
 struct DriveView: View {
     @EnvironmentObject private var session: DriveSessionManager
     @State private var showingHelp = false
+    @Namespace private var driveModeTransition
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: AppDesign.sectionSpacing) {
-                    header
-                    if session.queuedPracticeRoute != nil, !session.isRecording {
-                        practiceRouteReadyCard
-                            .transition(reduceMotion ? .opacity : .opacity.combined(with: .move(edge: .top)))
-                    }
-                    recordingCard
-                    if session.isRecording, session.phonePlacementAssessment == .needsAdjustment {
-                        placementWarning
-                            .transition(reduceMotion ? .opacity : .opacity.combined(with: .move(edge: .top)))
-                    }
-                    liveMetrics
-
-                    if let score = session.lastScore, !session.isRecording {
-                        if let drive = session.lastCompletedDrive,
-                           drive.plannedRouteContext?.debrief != nil {
-                            PracticeDebriefCard(drive: drive)
-                                .transition(reduceMotion ? .opacity : .opacity.combined(with: .move(edge: .top)))
-                        }
-                        DriveScoreCard(score: score)
-                    } else {
-                        howItWorksCard
-                    }
-
-                    if !session.recordedDrives.isEmpty, !session.isRecording {
-                        driveHistory
-                    }
+            Group {
+                if session.isRecording {
+                    activeDriveView
+                        .transition(driveModeContentTransition)
+                } else {
+                    idleDriveView
+                        .transition(driveModeContentTransition)
                 }
-                .padding(.horizontal, AppDesign.contentPadding)
-                .padding(.vertical, 12)
             }
-            .background(Color(.systemGroupedBackground))
-            .navigationTitle("Drive")
+            .animation(driveModeAnimation, value: session.isRecording)
+            .navigationTitle(session.isRecording ? "" : "Drive")
             .navigationBarTitleDisplayMode(.large)
+            .toolbar(session.isRecording ? .hidden : .visible, for: .navigationBar)
             .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        showingHelp = true
-                    } label: {
-                        Label("Get help", systemImage: "lifepreserver.fill")
+                if !session.isRecording {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button {
+                            showingHelp = true
+                        } label: {
+                            Label("Get help", systemImage: "lifepreserver.fill")
+                        }
+                        .accessibilityHint("Shows safety and emergency options")
                     }
-                    .accessibilityHint("Shows safety and emergency options")
                 }
             }
         }
@@ -60,14 +41,132 @@ struct DriveView: View {
         }
     }
 
+    private var idleDriveView: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: AppDesign.sectionSpacing) {
+                header
+                if session.queuedPracticeRoute != nil {
+                    practiceRouteReadyCard
+                        .transition(reduceMotion ? .opacity : .opacity.combined(with: .move(edge: .top)))
+                }
+                recordingCard
+
+                if let score = session.lastScore {
+                    if let drive = session.lastCompletedDrive,
+                       drive.plannedRouteContext?.debrief != nil {
+                        PracticeDebriefCard(drive: drive)
+                            .transition(reduceMotion ? .opacity : .opacity.combined(with: .move(edge: .top)))
+                    }
+                    DriveScoreCard(score: score)
+                } else {
+                    howItWorksCard
+                }
+
+                if !session.recordedDrives.isEmpty {
+                    driveHistory
+                }
+            }
+            .padding(.horizontal, AppDesign.contentPadding)
+            .padding(.vertical, 12)
+        }
+        .background(Color(.systemGroupedBackground))
+    }
+
+    /// Recording deliberately removes route-planning and historical content.
+    /// That leaves one clear status, one live measurement, and one action.
+    private var activeDriveView: some View {
+        VStack(spacing: 0) {
+            activeDriveClock
+
+            Spacer(minLength: 32)
+
+            activeSpeed
+
+            if session.phonePlacementAssessment == .needsAdjustment {
+                compactPlacementWarning
+                    .padding(.top, 20)
+                    .transition(reduceMotion ? .opacity : .opacity.combined(with: .move(edge: .top)))
+            }
+
+            Spacer(minLength: 32)
+
+            driveActionButton(isRecording: true)
+                .padding(.horizontal, AppDesign.contentPadding)
+                .padding(.bottom, 16)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color(.systemBackground))
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Drive in progress")
+    }
+
+    private var activeDriveClock: some View {
+        VStack(spacing: 12) {
+            Label("DRIVE STARTED", systemImage: "record.circle.fill")
+                .font(.caption.weight(.bold))
+                .foregroundStyle(.red)
+
+            FlipClock(elapsed: session.elapsed, style: .active)
+                .matchedGeometryEffect(id: "drive-clock", in: driveModeTransition)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.top, 26)
+        .padding(.bottom, 28)
+        .background(Color(.secondarySystemBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 30, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 30, style: .continuous)
+                .stroke(Color.primary.opacity(0.06), lineWidth: 1)
+        }
+        .shadow(color: .black.opacity(0.05), radius: 18, y: 8)
+        .padding(.horizontal, AppDesign.contentPadding)
+        .padding(.top, 12)
+    }
+
+    private var activeSpeed: some View {
+        VStack(spacing: 8) {
+            Label("CURRENT SPEED", systemImage: "speedometer")
+                .font(.caption.weight(.bold))
+                .foregroundStyle(.secondary)
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Text("\(session.currentSpeedMilesPerHour)")
+                    .font(.system(size: 62, weight: .semibold, design: .rounded))
+                    .monospacedDigit()
+                    .contentTransition(.numericText())
+                Text("mph")
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Current speed \(session.currentSpeedMilesPerHour) miles per hour")
+    }
+
+    private var compactPlacementWarning: some View {
+        Label("Secure the phone when it is safe", systemImage: "iphone.gen3.radiowaves.left.and.right")
+            .font(.footnote.weight(.semibold))
+            .foregroundStyle(AppDesign.safety)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .background(AppDesign.safety.opacity(0.12), in: Capsule(style: .continuous))
+            .accessibilityLabel("Sensor placement may be unstable. Secure the phone when it is safe.")
+    }
+
+    private var driveModeAnimation: Animation {
+        reduceMotion ? .easeOut(duration: 0.18) : AppAnimation.driveMode
+    }
+
+    private var driveModeContentTransition: AnyTransition {
+        reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.985, anchor: .top))
+    }
+
     private var header: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(session.isRecording ? "Stay focused on the road" : "Practice with purpose")
+            Text("Practice with purpose")
                 .font(AppDesign.Typography.heroTitle)
                 .tracking(-0.5)
-            Text(session.isRecording
-                 ? "Swerve is quietly tracking motion and location."
-                 : "Start and end each drive yourself. Your raw readings stay on this device.")
+            Text("Start and end each drive yourself. Your raw readings stay on this device.")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
         }
@@ -130,57 +229,17 @@ struct DriveView: View {
         .accessibilityLabel("Practice route ready")
     }
 
-    private var placementWarning: some View {
-        HStack(alignment: .top, spacing: 12) {
-            Image(systemName: "iphone.gen3.radiowaves.left.and.right")
-                .font(.title3.weight(.semibold))
-                .foregroundStyle(AppDesign.safety)
-                .frame(width: 34, height: 34)
-                .background(AppDesign.safety.opacity(0.12), in: Circle())
-            VStack(alignment: .leading, spacing: 3) {
-                Text("Sensor placement may be unstable")
-                    .font(.subheadline.weight(.semibold))
-                Text("When it is safe, secure the phone before continuing. This does not identify how the phone is being used.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-        .padding(14)
-        .background(AppDesign.safety.opacity(0.10), in: RoundedRectangle(cornerRadius: AppDesign.cornerRadius, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: AppDesign.cornerRadius, style: .continuous)
-                .stroke(AppDesign.safety.opacity(0.20), lineWidth: 1)
-        }
-        .accessibilityElement(children: .combine)
-    }
-
     private var recordingCard: some View {
         VStack(spacing: 18) {
-            Label(session.isRecording ? "DRIVE IN PROGRESS" : "MANUAL DRIVE", systemImage: session.isRecording ? "record.circle.fill" : "steeringwheel")
+            Label("MANUAL DRIVE", systemImage: "steeringwheel")
                 .font(.caption.weight(.bold))
-                .foregroundStyle(session.isRecording ? .red : .secondary)
+                .foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity, alignment: .leading)
 
-            FlipClock(elapsed: session.elapsed)
+            FlipClock(elapsed: session.elapsed, style: .preview)
+                .matchedGeometryEffect(id: "drive-clock", in: driveModeTransition)
 
-            Button {
-                if session.isRecording { session.endDrive() } else { session.startDrive() }
-            } label: {
-                HStack(spacing: 10) {
-                    Image(systemName: session.isRecording ? "stop.fill" : "record.circle")
-                    Text(session.isRecording ? "End drive" : "Start drive")
-                }
-                .font(.headline)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 18)
-                .foregroundStyle(.white)
-                .background(
-                    RoundedRectangle(cornerRadius: AppDesign.cornerRadius, style: .continuous)
-                        .fill(session.isRecording ? Color.red : Color.accentColor)
-                )
-            }
-            .buttonStyle(PressableScaleStyle())
+            driveActionButton(isRecording: false)
 
             Text(session.statusMessage)
                 .font(.footnote)
@@ -191,20 +250,39 @@ struct DriveView: View {
         .frame(maxWidth: .infinity)
         .background(
             RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .fill(session.isRecording ? Color.red.opacity(0.08) : Color(.secondarySystemGroupedBackground))
+                .fill(Color(.secondarySystemGroupedBackground))
         )
         .overlay {
             RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .stroke(session.isRecording ? Color.red.opacity(0.22) : .clear, lineWidth: 1)
+                .stroke(Color.primary.opacity(0.05), lineWidth: 1)
         }
-        .animation(reduceMotion ? .easeOut(duration: 0.16) : AppAnimation.content, value: session.isRecording)
     }
 
-    private var liveMetrics: some View {
-        HStack(spacing: 12) {
-            DriveMetric(title: "Speed", value: "\(Int((session.currentSpeedMetersPerSecond * 2.23694).rounded()))", unit: "mph", symbol: "speedometer")
-            DriveMetric(title: "Motion", value: String(format: "%.2f", session.currentHorizontalAccelerationG), unit: "g", symbol: "waveform.path.ecg")
+    private func driveActionButton(isRecording: Bool) -> some View {
+        Button {
+            if isRecording {
+                session.endDrive()
+            } else {
+                session.startDrive()
+            }
+        } label: {
+            HStack(spacing: 10) {
+                Image(systemName: isRecording ? "stop.fill" : "record.circle")
+                Text(isRecording ? "End drive" : "Start drive")
+            }
+            .font(.headline)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 18)
+            .foregroundStyle(.white)
+            .background(
+                RoundedRectangle(cornerRadius: AppDesign.cornerRadius, style: .continuous)
+                    .fill(isRecording ? Color.red : Color.accentColor)
+            )
         }
+        .buttonStyle(PressableScaleStyle())
+        .matchedGeometryEffect(id: "drive-action", in: driveModeTransition)
+        .contentTransition(.opacity)
+        .accessibilityLabel(isRecording ? "End drive" : "Start drive")
     }
 
     private var howItWorksCard: some View {
@@ -540,23 +618,6 @@ private struct ReplayMomentDetail: View {
     }
 }
 
-private struct DriveMetric: View {
-    let title: String
-    let value: String
-    let unit: String
-    let symbol: String
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            IconTile(symbol: symbol)
-            Text(value).font(.title2.monospacedDigit().weight(.semibold))
-            Text("\(title) · \(unit)").font(.caption).foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .premiumCard()
-    }
-}
-
 private struct DriveScoreCard: View {
     let score: DrivingScore
 
@@ -642,7 +703,19 @@ private struct DriveScoreCard: View {
 }
 
 private struct FlipClock: View {
+    enum Style: Equatable {
+        case preview
+        case active
+
+        var digitWidth: CGFloat { self == .active ? 68 : 56 }
+        var digitHeight: CGFloat { self == .active ? 92 : 76 }
+        var digitFontSize: CGFloat { self == .active ? 60 : 48 }
+        var colonFontSize: CGFloat { self == .active ? 38 : 30 }
+        var spacing: CGFloat { self == .active ? 6 : 5 }
+    }
+
     let elapsed: TimeInterval
+    let style: Style
 
     private var digits: [String] {
         let minutes = Int(elapsed) / 60
@@ -651,15 +724,15 @@ private struct FlipClock: View {
     }
 
     var body: some View {
-        HStack(spacing: 5) {
+        HStack(spacing: style.spacing) {
             ForEach(Array(digits.enumerated()), id: \.offset) { index, digit in
                 if index == 2 {
                     Text(":")
-                        .font(.system(size: 30, weight: .bold, design: .rounded))
+                        .font(.system(size: style.colonFontSize, weight: .bold, design: .rounded))
                         .foregroundStyle(.secondary)
                         .padding(.horizontal, 1)
                 }
-                FlipClockDigit(digit: digit)
+                FlipClockDigit(digit: digit, style: style)
             }
         }
         .accessibilityElement(children: .ignore)
@@ -669,20 +742,21 @@ private struct FlipClock: View {
 
 private struct FlipClockDigit: View {
     let digit: String
+    let style: FlipClock.Style
 
     var body: some View {
         ZStack {
             RoundedRectangle(cornerRadius: 10, style: .continuous)
                 .fill(Color.black)
             Text(digit)
-                .font(.system(size: 48, weight: .semibold, design: .rounded))
+                .font(.system(size: style.digitFontSize, weight: .semibold, design: .rounded))
                 .monospacedDigit()
                 .foregroundStyle(Color.white.opacity(0.92))
             Rectangle()
                 .fill(Color.white.opacity(0.18))
                 .frame(height: 1)
         }
-        .frame(width: 56, height: 76)
+        .frame(width: style.digitWidth, height: style.digitHeight)
     }
 }
 
