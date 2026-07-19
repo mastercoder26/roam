@@ -41,6 +41,12 @@
 		A10000000000000000000025 /* DriveActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000021 /* DriveActivityAttributes.swift */; };
 		A10000000000000000000026 /* SwerveDriveActivityExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = A30000000000000000000002 /* SwerveDriveActivityExtension.appex */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
 		A10000000000000000000027 /* DrivePresentationEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000026 /* DrivePresentationEngine.swift */; };
+		A10000000000000000000028 /* SharedRouteImport.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000027 /* SharedRouteImport.swift */; };
+		A10000000000000000000029 /* RoutePlanningFormModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000028 /* RoutePlanningFormModel.swift */; };
+		A1000000000000000000002A /* SharedRouteImportCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000029 /* SharedRouteImportCoordinator.swift */; };
+		A1000000000000000000002B /* ShareViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000002A /* ShareViewController.swift */; };
+		A1000000000000000000002C /* SharedRouteImport.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000027 /* SharedRouteImport.swift */; };
+		A1000000000000000000002D /* SwerveRouteShareExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = A30000000000000000000003 /* SwerveRouteShareExtension.appex */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -50,6 +56,13 @@
 			proxyType = 1;
 			remoteGlobalIDString = A60000000000000000000002;
 			remoteInfo = SwerveDriveActivityExtension;
+		};
+		AB00000000000000000000003 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A90000000000000000000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A60000000000000000000003;
+			remoteInfo = SwerveRouteShareExtension;
 		};
 /* End PBXContainerItemProxy section */
 
@@ -61,6 +74,7 @@
 			dstSubfolderSpec = 13;
 			files = (
 				A10000000000000000000026 /* SwerveDriveActivityExtension.appex in Embed Foundation Extensions */,
+				A1000000000000000000002D /* SwerveRouteShareExtension.appex in Embed Foundation Extensions */,
 			);
 			name = "Embed Foundation Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -104,8 +118,16 @@
 		A20000000000000000000024 /* DriveActivityWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriveActivityWidget.swift; sourceTree = "<group>"; };
 		A20000000000000000000025 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		A20000000000000000000026 /* DrivePresentationEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DrivePresentationEngine.swift; sourceTree = "<group>"; };
+		A20000000000000000000027 /* SharedRouteImport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedRouteImport.swift; sourceTree = "<group>"; };
+		A20000000000000000000028 /* RoutePlanningFormModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoutePlanningFormModel.swift; sourceTree = "<group>"; };
+		A20000000000000000000029 /* SharedRouteImportCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedRouteImportCoordinator.swift; sourceTree = "<group>"; };
+		A2000000000000000000002A /* ShareViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareViewController.swift; sourceTree = "<group>"; };
+		A2000000000000000000002B /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		A2000000000000000000002C /* Swerve.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Swerve.entitlements; sourceTree = "<group>"; };
+		A2000000000000000000002D /* SwerveRouteShareExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = SwerveRouteShareExtension.entitlements; sourceTree = "<group>"; };
 		A30000000000000000000001 /* Swerve.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Swerve.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A30000000000000000000002 /* SwerveDriveActivityExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = SwerveDriveActivityExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		A30000000000000000000003 /* SwerveRouteShareExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = SwerveRouteShareExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -123,6 +145,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		A40000000000000000000003 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -131,6 +160,7 @@
 			children = (
 				A50000000000000000000002 /* Swerve */,
 				A5000000000000000000000F /* SwerveDriveActivityExtension */,
+				A50000000000000000000010 /* SwerveRouteShareExtension */,
 				A50000000000000000000003 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -147,6 +177,7 @@
 				A50000000000000000000008 /* Config */,
 				A2000000000000000000000C /* Assets.xcassets */,
 				A2000000000000000000000D /* Info.plist */,
+				A2000000000000000000002C /* Swerve.entitlements */,
 			);
 			path = Swerve;
 			sourceTree = "<group>";
@@ -156,6 +187,7 @@
 			children = (
 				A30000000000000000000001 /* Swerve.app */,
 				A30000000000000000000002 /* SwerveDriveActivityExtension.appex */,
+				A30000000000000000000003 /* SwerveRouteShareExtension.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -188,6 +220,7 @@
 				A20000000000000000000018 /* RoutePlanningLocationCoordinator.swift */,
 				A20000000000000000000021 /* DriveActivityAttributes.swift */,
 				A20000000000000000000026 /* DrivePresentationEngine.swift */,
+				A20000000000000000000027 /* SharedRouteImport.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -199,6 +232,7 @@
 				A20000000000000000000014 /* DriveSessionManager.swift */,
 				A20000000000000000000022 /* DriveLiveActivityManager.swift */,
 				A20000000000000000000023 /* CarPlaySceneDelegate.swift */,
+				A20000000000000000000029 /* SharedRouteImportCoordinator.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -228,6 +262,7 @@
 			isa = PBXGroup;
 			children = (
 				A20000000000000000000002 /* HomeView.swift */,
+				A20000000000000000000028 /* RoutePlanningFormModel.swift */,
 			);
 			path = Home;
 			sourceTree = "<group>";
@@ -282,6 +317,16 @@
 			path = SwerveDriveActivityExtension;
 			sourceTree = "<group>";
 		};
+		A50000000000000000000010 /* SwerveRouteShareExtension */ = {
+			isa = PBXGroup;
+			children = (
+				A2000000000000000000002A /* ShareViewController.swift */,
+				A2000000000000000000002B /* Info.plist */,
+				A2000000000000000000002D /* SwerveRouteShareExtension.entitlements */,
+			);
+			path = SwerveRouteShareExtension;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -298,6 +343,7 @@
 			);
 			dependencies = (
 				AB00000000000000000000001 /* PBXTargetDependency */,
+				AB00000000000000000000004 /* PBXTargetDependency */,
 			);
 			name = Swerve;
 			productName = Swerve;
@@ -321,6 +367,23 @@
 			productReference = A30000000000000000000002 /* SwerveDriveActivityExtension.appex */;
 			productType = "com.apple.product-type.app-extension";
 		};
+		A60000000000000000000003 /* SwerveRouteShareExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A80000000000000000000005 /* Build configuration list for PBXNativeTarget "SwerveRouteShareExtension" */;
+			buildPhases = (
+				A70000000000000000000006 /* Sources */,
+				A40000000000000000000003 /* Frameworks */,
+				A70000000000000000000007 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = SwerveRouteShareExtension;
+			productName = SwerveRouteShareExtension;
+			productReference = A30000000000000000000003 /* SwerveRouteShareExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -333,9 +396,22 @@
 				TargetAttributes = {
 				A60000000000000000000001 = {
 					CreatedOnToolsVersion = 15.0;
+					SystemCapabilities = {
+						com.apple.ApplicationGroups.iOS = {
+							enabled = 1;
+						};
+					};
 				};
 				A60000000000000000000002 = {
 					CreatedOnToolsVersion = 15.0;
+				};
+				A60000000000000000000003 = {
+					CreatedOnToolsVersion = 15.0;
+					SystemCapabilities = {
+						com.apple.ApplicationGroups.iOS = {
+							enabled = 1;
+						};
+					};
 				};
 				};
 			};
@@ -354,6 +430,7 @@
 			targets = (
 				A60000000000000000000001 /* Swerve */,
 				A60000000000000000000002 /* SwerveDriveActivityExtension */,
+				A60000000000000000000003 /* SwerveRouteShareExtension */,
 			);
 		};
 /* End PBXProject section */
@@ -368,6 +445,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		A70000000000000000000004 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A70000000000000000000007 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -411,6 +495,9 @@
 				A10000000000000000000022 /* DriveLiveActivityManager.swift in Sources */,
 				A10000000000000000000023 /* CarPlaySceneDelegate.swift in Sources */,
 				A10000000000000000000027 /* DrivePresentationEngine.swift in Sources */,
+				A10000000000000000000028 /* SharedRouteImport.swift in Sources */,
+				A10000000000000000000029 /* RoutePlanningFormModel.swift in Sources */,
+				A1000000000000000000002A /* SharedRouteImportCoordinator.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -423,6 +510,15 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		A70000000000000000000006 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A1000000000000000000002B /* ShareViewController.swift in Sources */,
+				A1000000000000000000002C /* SharedRouteImport.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -430,6 +526,11 @@
 			isa = PBXTargetDependency;
 			target = A60000000000000000000002 /* SwerveDriveActivityExtension */;
 			targetProxy = AB00000000000000000000002 /* PBXContainerItemProxy */;
+		};
+		AB00000000000000000000004 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A60000000000000000000003 /* SwerveRouteShareExtension */;
+			targetProxy = AB00000000000000000000003 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -554,6 +655,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = Swerve/Swerve.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 6RT6KBS4G9;
@@ -581,6 +683,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = Swerve/Swerve.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 6RT6KBS4G9;
@@ -651,6 +754,56 @@
 			};
 			name = Release;
 		};
+		AA0000000000000000000007 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = SwerveRouteShareExtension/SwerveRouteShareExtension.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 6RT6KBS4G9;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = SwerveRouteShareExtension/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.akhilkonduru.swerve.routeshare;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		AA0000000000000000000008 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = SwerveRouteShareExtension/SwerveRouteShareExtension.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 6RT6KBS4G9;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = SwerveRouteShareExtension/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.akhilkonduru.swerve.routeshare;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -677,6 +830,15 @@
 			buildConfigurations = (
 				AA0000000000000000000005 /* Debug */,
 				AA0000000000000000000006 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A80000000000000000000005 /* Build configuration list for PBXNativeTarget "SwerveRouteShareExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				AA0000000000000000000007 /* Debug */,
+				AA0000000000000000000008 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

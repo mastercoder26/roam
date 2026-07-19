@@ -1,10 +1,7 @@
 import SwiftUI
 
 struct HomeView: View {
-    @State private var origin = ""
-    @State private var destination = ""
-    @State private var usesCurrentLocation = true
-    @State private var departureTime = Date().addingTimeInterval(15 * 60)
+    @ObservedObject var form: RoutePlanningFormModel
     @State private var isLoading = false
     @State private var isCompletingLoading = false
     @State private var pendingResult: RouteAnalysisResult?
@@ -16,12 +13,19 @@ struct HomeView: View {
 
     private let apiClient = APIClient()
 
+    private var usesCurrentLocation: Binding<Bool> {
+        Binding(
+            get: { form.usesCurrentLocation },
+            set: { form.usesCurrentLocation = $0 }
+        )
+    }
+
     private var canEnterDestination: Bool {
-        !origin.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        !form.origin.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     private var canAnalyze: Bool {
-        canEnterDestination && !destination.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !isLoading
+        canEnterDestination && !form.destination.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !isLoading
     }
 
     var body: some View {
@@ -30,6 +34,10 @@ struct HomeView: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: AppDesign.sectionSpacing) {
                         headerSection
+                        if let notice = form.importNotice {
+                            importNoticeBanner(notice)
+                                .transition(reduceMotion ? .opacity : .opacity.combined(with: .move(edge: .top)))
+                        }
                         routeCard
                         if canEnterDestination { departureCard }
                         if let errorMessage { errorBanner(errorMessage).transition(.opacity.combined(with: .move(edge: .top))) }
@@ -55,11 +63,20 @@ struct HomeView: View {
             .navigationBarTitleDisplayMode(.large)
             .navigationDestination(for: RouteAnalysisResult.self) { ResultsView(result: $0) }
             .onChange(of: locationCoordinator.state) { _, state in
-                if case .resolved(let address) = state { origin = address }
+                if case .resolved(let address) = state, form.usesCurrentLocation {
+                    form.origin = address
+                }
             }
             .onAppear {
-                guard usesCurrentLocation, origin.isEmpty else { return }
+                guard form.usesCurrentLocation, form.origin.isEmpty else { return }
                 locationCoordinator.useCurrentLocation()
+            }
+            .onChange(of: form.importedRouteID) { _, importedRouteID in
+                guard importedRouteID != nil else { return }
+                navigationPath = NavigationPath()
+                if form.usesCurrentLocation {
+                    locationCoordinator.useCurrentLocation()
+                }
             }
         }
     }
@@ -88,7 +105,7 @@ struct HomeView: View {
             placeholder: "Search destinations",
             systemImage: "magnifyingglass",
             iconColor: .secondary,
-            text: $destination
+            text: $form.destination
         )
         .padding(.horizontal, 14)
         .padding(.vertical, 8)
@@ -105,12 +122,12 @@ struct HomeView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Starting point")
                         .font(.subheadline.weight(.semibold))
-                    Text(usesCurrentLocation ? "Use your current location" : "Use a specific address")
+                    Text(form.usesCurrentLocation ? "Use your current location" : "Use a specific address")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
-                Picker("Starting point", selection: $usesCurrentLocation) {
+                Picker("Starting point", selection: usesCurrentLocation) {
                     Text("Current").tag(true)
                     Text("Address").tag(false)
                 }
@@ -118,7 +135,7 @@ struct HomeView: View {
                 .frame(maxWidth: 190)
             }
 
-            if usesCurrentLocation {
+            if form.usesCurrentLocation {
                 Button {
                     locationCoordinator.useCurrentLocation()
                 } label: {
@@ -148,7 +165,7 @@ struct HomeView: View {
                     .transition(reduceMotion ? .opacity : .opacity.combined(with: .move(edge: .top)))
             }
         }
-        .animation(reduceMotion ? .easeOut(duration: 0.18) : AppAnimation.content, value: usesCurrentLocation)
+        .animation(reduceMotion ? .easeOut(duration: 0.18) : AppAnimation.content, value: form.usesCurrentLocation)
     }
 
     private var currentLocationTitle: String {
@@ -160,7 +177,7 @@ struct HomeView: View {
         case .manualEntry(let message):
             return message ?? "Current location unavailable"
         case .awaitingOrigin:
-            return origin.isEmpty ? "Current location" : origin
+            return form.origin.isEmpty ? "Current location" : form.origin
         }
     }
 
@@ -175,7 +192,7 @@ struct HomeView: View {
             VStack(alignment: .leading, spacing: 12) {
                 originField
                 if canEnterDestination {
-                    AddressSearchField(title: "Destination", placeholder: "Where are you going?", systemImage: "flag.fill", iconColor: .red, showsIcon: false, text: $destination)
+                    AddressSearchField(title: "Destination", placeholder: "Where are you going?", systemImage: "flag.fill", iconColor: .red, showsIcon: false, text: $form.destination)
                         .transition(reduceMotion ? .opacity : .opacity.combined(with: .move(edge: .top)))
                 }
             }
@@ -198,7 +215,7 @@ struct HomeView: View {
                     systemImage: "circle.fill",
                     iconColor: AppDesign.accent,
                     showsIcon: false,
-                    text: $origin,
+                    text: $form.origin,
                     onSuggestionsVisibilityChanged: { isOriginAutocompleteVisible = $0 }
                 )
 
@@ -225,7 +242,7 @@ struct HomeView: View {
     private var departureCard: some View {
         VStack(alignment: .leading, spacing: 12) {
             SectionHeader(title: "Departure", subtitle: "Traffic estimates use your departure time.")
-            DatePicker("When", selection: $departureTime, in: Date()..., displayedComponents: [.date, .hourAndMinute])
+            DatePicker("When", selection: $form.departureTime, in: Date()..., displayedComponents: [.date, .hourAndMinute])
                 .datePickerStyle(.compact).labelsHidden()
         }.premiumCard()
     }
@@ -250,17 +267,61 @@ struct HomeView: View {
         }.padding(14).background(Color.red.opacity(0.08)).clipShape(RoundedRectangle(cornerRadius: AppDesign.cornerRadiusSmall, style: .continuous))
     }
 
+    private func importNoticeBanner(_ notice: RouteImportNotice) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: notice.isError ? "exclamationmark.triangle.fill" : "map.fill")
+                .foregroundStyle(notice.isError ? .red : AppDesign.accent)
+                .frame(width: 20)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(notice.title)
+                    .font(.subheadline.weight(.semibold))
+                Text(notice.message)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+            Button {
+                form.clearImportNotice()
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 28, height: 28)
+                    .background(Color(.tertiarySystemFill), in: Circle())
+            }
+            .buttonStyle(PressableScaleStyle())
+            .accessibilityLabel("Dismiss imported route notice")
+        }
+        .padding(14)
+        .background(
+            (notice.isError ? Color.red : AppDesign.accent).opacity(0.08),
+            in: RoundedRectangle(cornerRadius: AppDesign.cornerRadiusSmall, style: .continuous)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: AppDesign.cornerRadiusSmall, style: .continuous)
+                .stroke((notice.isError ? Color.red : AppDesign.accent).opacity(0.14), lineWidth: 1)
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("\(notice.title). \(notice.message)")
+    }
+
     private func analyzeRoute() async {
         withAnimation(AppAnimation.quick) { errorMessage = nil }
         withAnimation(reduceMotion ? .easeOut(duration: 0.12) : AppAnimation.quick) {
             isLoading = true
         }
         do {
-            let response = try await apiClient.analyzeRoute(origin: origin, destination: destination, departureTime: departureTime, includeAlternates: true)
+            let response = try await apiClient.analyzeRoute(
+                origin: form.origin,
+                destination: form.destination,
+                departureTime: form.departureTime,
+                includeAlternates: true
+            )
             pendingResult = RouteAnalysisResult(
-                origin: origin,
-                destination: destination,
-                departureTime: departureTime,
+                origin: form.origin,
+                destination: form.destination,
+                departureTime: form.departureTime,
                 primaryRoute: response.primaryRoute,
                 alternateRoutes: response.alternateRoutes
             )
@@ -353,4 +414,4 @@ struct RouteAnalysisResult: Hashable {
     let alternateRoutes: [ScoredRoute]
 }
 
-#Preview { HomeView() }
+#Preview { HomeView(form: RoutePlanningFormModel()) }

@@ -2,7 +2,7 @@ import Foundation
 
 @main
 struct SharedRouteImportChecks {
-    static func main() {
+    static func main() async {
         appleDrivingDirectionsDecodeBothEndpoints()
         destinationOnlyAppleLinkUsesCurrentLocation()
         googleDirectionsDecodeRouteAndWaypoints()
@@ -12,6 +12,7 @@ struct SharedRouteImportChecks {
         untrustedLinksAreRejected()
         inboxIsFIFOAndAcknowledgesPrecisely()
         formReducerPreservesUserControl()
+        await googleShortLinkResolutionStaysOutsideTheScoringBackend()
 
         print("Shared route import checks passed")
     }
@@ -161,11 +162,47 @@ struct SharedRouteImportChecks {
         expect(currentState.destination == "Houston, TX", "a destination-only link should still fill its destination")
     }
 
+    @MainActor
+    private static func googleShortLinkResolutionStaysOutsideTheScoringBackend() async {
+        let suiteName = "SharedRouteImportCoordinatorChecks.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let shortURL = URL(string: "https://maps.app.goo.gl/abc123")!
+        let inbox = SharedRouteInbox(defaults: defaults)
+        expect(inbox.enqueueGoogleShortLink(shortURL, id: UUID()), "a Google short link should be queued locally")
+
+        let resolvedURL = URL(string: "https://www.google.com/maps/dir/?api=1&origin=Austin&destination=Dallas&travelmode=driving")!
+        let coordinator = SharedRouteImportCoordinator(
+            inbox: inbox,
+            shortLinkResolver: StubGoogleShortLinkResolver(url: resolvedURL)
+        )
+        await coordinator.refresh()
+
+        guard case let .ready(route) = coordinator.state else {
+            fail("a resolved Google short link should become a local editable route")
+        }
+        expect(route.origin == "Austin", "the resolver should preserve the parsed origin")
+        expect(route.destination == "Dallas", "the resolver should preserve the parsed destination")
+        expect(inbox.peek()?.id == route.id, "the resolved route should remain local until the form accepts it")
+
+        coordinator.acknowledgeReadyRoute(id: route.id)
+        expect(inbox.peek() == nil, "accepting the route should consume only the saved local handoff")
+    }
+
     private static func expect(_ condition: @autoclosure () -> Bool, _ message: String) {
         guard condition() else { fail(message) }
     }
 
     private static func fail(_ message: String) -> Never {
         fatalError("Shared route import check failed: \(message)")
+    }
+}
+
+private struct StubGoogleShortLinkResolver: GoogleMapsShortLinkResolving {
+    let url: URL
+
+    func resolve(_ url: URL) async throws -> URL {
+        self.url
     }
 }

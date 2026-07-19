@@ -27,14 +27,17 @@ struct SwerveRootView: View {
 
     @State private var selectedTab: Tab = .routes
     @StateObject private var driveSession = DriveSessionManager.shared
+    @StateObject private var routeForm = RoutePlanningFormModel()
+    @StateObject private var sharedRouteImport = SharedRouteImportCoordinator()
     @Namespace private var tabAnimation
+    @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     var body: some View {
         Group {
             switch selectedTab {
-            case .routes: HomeView()
+            case .routes: HomeView(form: routeForm)
             case .drive: DriveView()
             case .progress: DriverProgressView()
             }
@@ -58,6 +61,48 @@ struct SwerveRootView: View {
             guard request != nil, selectedTab != .drive else { return }
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
             selectedTab = .drive
+        }
+        .onAppear {
+            refreshSharedRouteIfSafe()
+        }
+        .onChange(of: scenePhase) { _, phase in
+            guard phase == .active else { return }
+            refreshSharedRouteIfSafe()
+        }
+        .onChange(of: driveSession.isRecording) { _, isRecording in
+            guard !isRecording else { return }
+            refreshSharedRouteIfSafe()
+        }
+        .onChange(of: sharedRouteImport.state) { _, state in
+            applySharedRouteStateIfSafe(state)
+        }
+    }
+
+    private func refreshSharedRouteIfSafe() {
+        // A route import must never pull someone out of a manually started
+        // drive. The inbox remains local and will be read after the drive ends.
+        guard !driveSession.isRecording else { return }
+        Task {
+            await sharedRouteImport.refresh()
+        }
+    }
+
+    private func applySharedRouteStateIfSafe(_ state: SharedRouteImportCoordinator.State) {
+        guard !driveSession.isRecording else { return }
+
+        switch state {
+        case let .ready(route):
+            routeForm.apply(route)
+            sharedRouteImport.acknowledgeReadyRoute(id: route.id)
+            selectedTab = .routes
+
+        case let .failed(message):
+            routeForm.presentImportError(message)
+            sharedRouteImport.dismissFailure()
+            selectedTab = .routes
+
+        case .idle, .resolvingGoogleMapsLink:
+            break
         }
     }
 
