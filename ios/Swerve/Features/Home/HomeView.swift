@@ -3,6 +3,7 @@ import SwiftUI
 struct HomeView: View {
     @State private var origin = ""
     @State private var destination = ""
+    @State private var usesCurrentLocation = true
     @State private var departureTime = Date().addingTimeInterval(15 * 60)
     @State private var isLoading = false
     @State private var isCompletingLoading = false
@@ -56,6 +57,10 @@ struct HomeView: View {
             .onChange(of: locationCoordinator.state) { _, state in
                 if case .resolved(let address) = state { origin = address }
             }
+            .onAppear {
+                guard usesCurrentLocation, origin.isEmpty else { return }
+                locationCoordinator.useCurrentLocation()
+            }
         }
     }
 
@@ -69,13 +74,97 @@ struct HomeView: View {
 
     private var routeCard: some View {
         VStack(alignment: .leading, spacing: 16) {
-            SectionHeader(title: "Your route", subtitle: "Add a starting location to continue.")
-            routeFields
+            SectionHeader(title: "Where?", subtitle: "Search your destination and choose how Swerve should start the route.")
+            destinationFirstField
+            startingPointSelector
         }
         .premiumCard()
     }
 
-    private var routeFields: some View {
+
+    private var destinationFirstField: some View {
+        AddressSearchField(
+            title: "Destination",
+            placeholder: "Search destinations",
+            systemImage: "magnifyingglass",
+            iconColor: .secondary,
+            text: $destination
+        )
+        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
+        .background(Color(.systemBackground), in: RoundedRectangle(cornerRadius: AppDesign.cornerRadiusSmall, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: AppDesign.cornerRadiusSmall, style: .continuous)
+                .stroke(Color.primary.opacity(0.18), lineWidth: 1)
+        }
+    }
+
+    private var startingPointSelector: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Starting point")
+                        .font(.subheadline.weight(.semibold))
+                    Text(usesCurrentLocation ? "Use your current location" : "Use a specific address")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                Picker("Starting point", selection: $usesCurrentLocation) {
+                    Text("Current").tag(true)
+                    Text("Address").tag(false)
+                }
+                .pickerStyle(.segmented)
+                .frame(maxWidth: 190)
+            }
+
+            if usesCurrentLocation {
+                Button {
+                    locationCoordinator.useCurrentLocation()
+                } label: {
+                    HStack(spacing: 10) {
+                        Image(systemName: "location.fill")
+                            .foregroundStyle(AppDesign.accent)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(currentLocationTitle)
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(.primary)
+                            Text("Swerve will fill the route from where you are.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        if case .locating = locationCoordinator.state {
+                            ProgressView().tint(AppDesign.accent)
+                        }
+                    }
+                    .padding(14)
+                    .background(AppDesign.accent.opacity(0.08), in: RoundedRectangle(cornerRadius: AppDesign.cornerRadiusSmall, style: .continuous))
+                }
+                .buttonStyle(PressableScaleStyle())
+                .transition(reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.98, anchor: .top)))
+            } else {
+                originField
+                    .transition(reduceMotion ? .opacity : .opacity.combined(with: .move(edge: .top)))
+            }
+        }
+        .animation(reduceMotion ? .easeOut(duration: 0.18) : AppAnimation.content, value: usesCurrentLocation)
+    }
+
+    private var currentLocationTitle: String {
+        switch locationCoordinator.state {
+        case .locating:
+            return "Finding current location"
+        case .resolved(let address):
+            return address
+        case .manualEntry(let message):
+            return message ?? "Current location unavailable"
+        case .awaitingOrigin:
+            return origin.isEmpty ? "Current location" : origin
+        }
+    }
+
+    private var oldRouteFields: some View {
         HStack(alignment: .top, spacing: 10) {
             RouteConnector(
                 showDestination: canEnterDestination,
