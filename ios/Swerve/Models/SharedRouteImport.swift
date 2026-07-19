@@ -115,13 +115,10 @@ enum SharedRouteImportParser {
         if host == "maps.apple.com" {
             return parseApple(url: url)
         }
-        if isGoogleShortLinkHost(host) {
-            guard scheme == "https" else {
-                return .unsupported("Google Maps short links must use HTTPS.")
-            }
+        if isGoogleShortLink(url) {
             return .needsGoogleShortLinkResolution(url)
         }
-        if isGoogleMapsHost(host) {
+        if isGoogleMapsURL(url) {
             return parseGoogle(url: url)
         }
         return .unsupported("This link is not from Apple Maps or Google Maps.")
@@ -130,6 +127,9 @@ enum SharedRouteImportParser {
     private static func parseApple(url: URL) -> SharedRouteImportParseResult {
         guard case let .success(query) = queryValues(in: url) else {
             return .unsupported("The Apple Maps link has invalid query values.")
+        }
+        guard !hasConflictingValues(named: ["saddr", "source", "daddr", "destination", "address", "q", "query"], in: query) else {
+            return .unsupported("The Apple Maps link contains conflicting route details.")
         }
         let origin = singleEndpoint(named: ["saddr", "source"], in: query)
         guard let destination = singleEndpoint(named: ["daddr", "destination", "address", "q", "query"], in: query)
@@ -157,6 +157,9 @@ enum SharedRouteImportParser {
         guard case let .success(query) = queryValues(in: url) else {
             return .unsupported("The Google Maps link has invalid query values.")
         }
+        guard !hasConflictingValues(named: ["origin", "saddr", "destination", "daddr", "query", "q"], in: query) else {
+            return .unsupported("The Google Maps link contains conflicting route details.")
+        }
 
         let mode = travelMode(from: singleValue(named: ["travelmode", "directionsmode", "dirflg"], in: query))
         guard mode == .driving || mode == .unknown else {
@@ -172,7 +175,10 @@ enum SharedRouteImportParser {
             return .unsupported("Swerve could not find a destination in this Google Maps link.")
         }
 
-        let waypointCount = waypointCount(from: singleValue(named: ["waypoints"], in: query))
+        let waypointCount = max(
+            waypointCount(from: singleValue(named: ["waypoints"], in: query)),
+            pathRoute?.waypointCount ?? 0
+        )
         return .ready(
             SharedRouteCandidate(
                 provider: .googleMaps,
@@ -199,11 +205,30 @@ enum SharedRouteImportParser {
         named names: [String],
         in query: [String: [String]]
     ) -> String? {
-        let values = names.flatMap { query[$0] ?? [] }
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty }
-        guard values.count <= 1 else { return nil }
-        return values.first
+        for name in names {
+            let values = (query[name] ?? [])
+                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                .filter { !$0.isEmpty }
+            guard !values.isEmpty else { continue }
+            guard let first = values.first,
+                  values.allSatisfy({ $0 == first }) else {
+                return nil
+            }
+            return first
+        }
+        return nil
+    }
+
+    private static func hasConflictingValues(
+        named names: [String],
+        in query: [String: [String]]
+    ) -> Bool {
+        names.contains { name in
+            let values = (query[name] ?? [])
+                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                .filter { !$0.isEmpty }
+            return Set(values).count > 1
+        }
     }
 
     private static func coordinateEndpoint(from query: [String: [String]]) -> String? {
@@ -219,35 +244,45 @@ enum SharedRouteImportParser {
         return "\(latitude),\(longitude)"
     }
 
-    private static func routeFromGooglePath(_ url: URL) -> (origin: String?, destination: String?)? {
+    private static func routeFromGooglePath(_ url: URL) -> (origin: String?, destination: String, waypointCount: Int)? {
         let path = url.path.split(separator: "/", omittingEmptySubsequences: false)
         guard let directoryIndex = path.firstIndex(where: { $0.lowercased() == "dir" }) else {
             return nil
         }
 
         let endpointParts = path.dropFirst(directoryIndex + 1)
-            .prefix { !$0.lowercased().hasPrefix("data=") }
+            .prefix {
+                let component = $0.lowercased()
+                return !component.hasPrefix("data=") && !component.hasPrefix("@")
+            }
             .map(String.init)
         guard !endpointParts.isEmpty else { return nil }
 
         let decoded = endpointParts.map { component -> String? in
             let formDecoded = component.replacingOccurrences(of: "+", with: " ")
-            return formDecoded.removingPercentEncoding ?? formDecoded
+            return formDecoded.removingPercentEncoding
         }
-        guard let firstDecoded = decoded.first ?? nil,
-              let first = cleanEndpoint(firstDecoded) else {
+        guard !decoded.contains(where: { $0 == nil }) else {
             return nil
         }
+        let endpoints = decoded.compactMap { $0 }.compactMap(cleanEndpoint)
+        guard let destination = endpoints.last else { return nil }
 
-        if decoded.count >= 2,
-           let secondDecoded = decoded[1],
-           let second = cleanEndpoint(secondDecoded) {
-            return (first, second)
+        if endpoints.count >= 2 {
+            return (
+                origin: endpoints.first,
+                destination: destination,
+                waypointCount: max(0, endpoints.count - 2)
+            )
         }
-        return (nil, first)
+        return (origin: nil, destination: destination, waypointCount: 0)
     }
 
-    private static func queryValues(in url: URL) -> Result<[String: [String]], Never> {
+    private enum QueryValuesError: Error {
+        case malformed
+    }
+
+    private static func queryValues(in url: URL) -> Result<[String: [String]], QueryValuesError> {
         guard let rawQuery = URLComponents(url: url, resolvingAgainstBaseURL: false)?.percentEncodedQuery,
               !rawQuery.isEmpty else {
             return .success([:])
@@ -259,11 +294,11 @@ enum SharedRouteImportParser {
             guard let rawName = pieces.first,
                   let name = decodeFormComponent(String(rawName)),
                   !name.isEmpty else {
-                return .success([:])
+                return .failure(.malformed)
             }
             let rawValue = pieces.count == 2 ? String(pieces[1]) : ""
             guard let value = decodeFormComponent(rawValue) else {
-                return .success([:])
+                return .failure(.malformed)
             }
             values[name.lowercased(), default: []].append(value)
         }
@@ -328,40 +363,82 @@ enum SharedRouteImportParser {
         !url.absoluteString.isEmpty && url.absoluteString.count <= maximumURLLength
     }
 
-    private static func isGoogleShortLinkHost(_ host: String?) -> Bool {
-        host == "maps.app.goo.gl" || host == "goo.gl"
+    private static let supportedGoogleDomains: Set<String> = [
+        "google.com", "google.ca", "google.co.uk", "google.com.au", "google.co.nz",
+        "google.de", "google.fr", "google.es", "google.it", "google.nl", "google.be",
+        "google.ch", "google.at", "google.se", "google.no", "google.dk", "google.fi",
+        "google.pl", "google.pt", "google.ie", "google.co.jp", "google.co.in",
+        "google.com.sg", "google.com.my", "google.com.ph", "google.co.kr", "google.com.hk",
+        "google.com.tw", "google.co.th", "google.com.br", "google.com.mx", "google.com.ar",
+        "google.cl", "google.co.za", "google.ae", "google.co.il", "google.com.tr"
+    ]
+
+    private static func isGoogleShortLink(_ url: URL) -> Bool {
+        url.scheme?.lowercased() == "https" &&
+            url.host?.lowercased() == "maps.app.goo.gl" &&
+            !url.path.trimmingCharacters(in: CharacterSet(charactersIn: "/")).isEmpty
     }
 
-    private static func isGoogleMapsHost(_ host: String?) -> Bool {
+    static func isTrustedGoogleMapsHost(_ host: String?) -> Bool {
         guard let host else { return false }
-        return host == "google.com" ||
-            host == "www.google.com" ||
-            host == "maps.google.com" ||
-            host.hasPrefix("www.google.") ||
-            host.hasPrefix("maps.google.")
+        let normalizedHost = host.lowercased()
+        if supportedGoogleDomains.contains(normalizedHost) {
+            return true
+        }
+        for prefix in ["www.", "maps."] where normalizedHost.hasPrefix(prefix) {
+            return supportedGoogleDomains.contains(String(normalizedHost.dropFirst(prefix.count)))
+        }
+        return false
+    }
+
+    static func isTrustedGoogleRedirectURL(_ url: URL) -> Bool {
+        guard url.scheme?.lowercased() == "https",
+              url.user == nil,
+              url.password == nil,
+              isSafeLength(url) else {
+            return false
+        }
+        return url.host?.lowercased() == "maps.app.goo.gl" || isTrustedGoogleMapsHost(url.host)
+    }
+
+    private static func isGoogleMapsURL(_ url: URL) -> Bool {
+        guard isTrustedGoogleMapsHost(url.host) else { return false }
+        let host = url.host?.lowercased() ?? ""
+        if host.hasPrefix("maps.") {
+            return true
+        }
+        return url.path == "/maps" || url.path.hasPrefix("/maps/")
     }
 }
 
 /// Small, bounded local handoff storage shared by the app and its Share
-/// extension. Direct routes persist no raw provider URL.
+/// extension. It uses a coordinated App Group file instead of a shared
+/// UserDefaults blob so an acknowledgement in the app cannot overwrite a
+/// route that the Share extension saves at the same time. Direct routes
+/// persist no raw provider URL.
 struct SharedRouteInbox {
     static let appGroupIdentifier = "group.com.akhilkonduru.swerve"
 
-    private static let storageKey = "shared-route-inbox-v1"
+    private static let storageFileName = "shared-route-inbox-v1.json"
     private static let maximumEntries = 5
     private static let directRouteLifetime: TimeInterval = 60 * 60 * 24
     private static let unresolvedLinkLifetime: TimeInterval = 60 * 15
 
-    private let defaults: UserDefaults?
+    private let storageDirectory: URL?
 
-    init(defaults: UserDefaults? = UserDefaults(suiteName: Self.appGroupIdentifier)) {
-        self.defaults = defaults
+    init(
+        storageDirectory: URL? = FileManager.default.containerURL(
+            forSecurityApplicationGroupIdentifier: Self.appGroupIdentifier
+        )
+    ) {
+        self.storageDirectory = storageDirectory
     }
 
     @discardableResult
     func enqueue(route: SharedRouteDraft, now: Date = Date()) -> Bool {
-        update(now: now) { entries in
-            entries + [
+        mutate(now: now) { entries in
+            entries.removeAll { $0.id == route.id }
+            entries.append(
                 StoredEntry(
                     id: route.id,
                     receivedAt: route.importedAt,
@@ -369,7 +446,8 @@ struct SharedRouteInbox {
                     route: route,
                     unresolvedGoogleURL: nil
                 )
-            ]
+            )
+            return true
         }
     }
 
@@ -379,8 +457,9 @@ struct SharedRouteInbox {
               url.absoluteString.count <= SharedRouteImportParser.maximumURLLength else {
             return false
         }
-        return update(now: now) { entries in
-            entries + [
+        return mutate(now: now) { entries in
+            entries.removeAll { $0.id == id }
+            entries.append(
                 StoredEntry(
                     id: id,
                     receivedAt: now,
@@ -388,66 +467,138 @@ struct SharedRouteInbox {
                     route: nil,
                     unresolvedGoogleURL: url.absoluteString
                 )
-            ]
+            )
+            return true
         }
     }
 
     func peek(now: Date = Date()) -> SharedRouteInboxItem? {
-        let entries = prunedEntries(now: now)
-        persist(entries)
-        return entries.first?.item
+        // Persist the pruning pass before returning an item. This keeps the
+        // privacy lifetime real: expired endpoints and temporary raw short
+        // links are removed from the App Group file, not merely hidden.
+        guard pruneExpiredEntries(now: now) else { return nil }
+        return readEntries()
+            .filter { $0.expiresAt > now && $0.item != nil }
+            .sorted { $0.receivedAt < $1.receivedAt }
+            .first?.item
     }
 
     func acknowledge(id: UUID, now: Date = Date()) {
-        _ = update(now: now) { entries in
-            entries.filter { $0.id != id }
+        _ = mutate(now: now) { entries in
+            let countBefore = entries.count
+            entries.removeAll { $0.id == id }
+            return entries.count != countBefore
         }
     }
 
     @discardableResult
     func replaceGoogleShortLink(id: UUID, with route: SharedRouteDraft, now: Date = Date()) -> Bool {
-        update(now: now) { entries in
-            entries.map { entry in
-                guard entry.id == id, entry.unresolvedGoogleURL != nil else { return entry }
-                return StoredEntry(
-                    id: id,
-                    receivedAt: entry.receivedAt,
-                    expiresAt: max(route.importedAt, now).addingTimeInterval(Self.directRouteLifetime),
-                    route: route,
-                    unresolvedGoogleURL: nil
-                )
+        mutate(now: now) { entries in
+            guard let index = entries.firstIndex(where: { entry in
+                entry.id == id && entry.unresolvedGoogleURL != nil
+            }) else {
+                return false
             }
+            let previousEntry = entries[index]
+            entries[index] = StoredEntry(
+                id: id,
+                receivedAt: previousEntry.receivedAt,
+                expiresAt: max(route.importedAt, now).addingTimeInterval(Self.directRouteLifetime),
+                route: route,
+                unresolvedGoogleURL: nil
+            )
+            return true
         }
     }
 
-    private func update(now: Date, transform: ([StoredEntry]) -> [StoredEntry]) -> Bool {
-        guard defaults != nil else { return false }
-        let entries = transform(prunedEntries(now: now))
-            .sorted { $0.receivedAt < $1.receivedAt }
-        persist(Array(entries.suffix(Self.maximumEntries)))
-        return true
+    private func mutate(
+        now: Date,
+        transform: (inout [StoredEntry]) -> Bool
+    ) -> Bool {
+        guard let directory = preparedStorageDirectory() else { return false }
+
+        let coordinator = NSFileCoordinator(filePresenter: nil)
+        var coordinationError: NSError?
+        var didPersist = false
+        coordinator.coordinate(
+            writingItemAt: directory,
+            options: .forReplacing,
+            error: &coordinationError
+        ) { coordinatedDirectory in
+            var entries = decodedEntries(in: coordinatedDirectory)
+                .filter { $0.expiresAt > now && $0.item != nil }
+            guard transform(&entries) else { return }
+
+            entries.sort { $0.receivedAt < $1.receivedAt }
+            didPersist = persist(
+                Array(entries.suffix(Self.maximumEntries)),
+                in: coordinatedDirectory
+            )
+        }
+        return coordinationError == nil && didPersist
     }
 
-    private func prunedEntries(now: Date) -> [StoredEntry] {
-        decodedEntries().filter { $0.expiresAt > now && $0.item != nil }
+    private func pruneExpiredEntries(now: Date) -> Bool {
+        mutate(now: now) { _ in true }
     }
 
-    private func decodedEntries() -> [StoredEntry] {
-        guard let data = defaults?.data(forKey: Self.storageKey),
+    private func readEntries() -> [StoredEntry] {
+        guard let directory = preparedStorageDirectory() else { return [] }
+
+        let coordinator = NSFileCoordinator(filePresenter: nil)
+        var coordinationError: NSError?
+        var entries: [StoredEntry] = []
+        coordinator.coordinate(
+            readingItemAt: directory,
+            options: .withoutChanges,
+            error: &coordinationError
+        ) { coordinatedDirectory in
+            entries = decodedEntries(in: coordinatedDirectory)
+        }
+        return coordinationError == nil ? entries : []
+    }
+
+    private func preparedStorageDirectory() -> URL? {
+        guard let storageDirectory else { return nil }
+        do {
+            try FileManager.default.createDirectory(
+                at: storageDirectory,
+                withIntermediateDirectories: true,
+                attributes: nil
+            )
+            return storageDirectory
+        } catch {
+            return nil
+        }
+    }
+
+    private func decodedEntries(in directory: URL) -> [StoredEntry] {
+        let fileURL = directory.appendingPathComponent(Self.storageFileName, isDirectory: false)
+        guard let data = try? Data(contentsOf: fileURL),
               let entries = try? JSONDecoder().decode([StoredEntry].self, from: data) else {
             return []
         }
         return entries
     }
 
-    private func persist(_ entries: [StoredEntry]) {
-        guard let defaults else { return }
+    private func persist(_ entries: [StoredEntry], in directory: URL) -> Bool {
+        let fileURL = directory.appendingPathComponent(Self.storageFileName, isDirectory: false)
         if entries.isEmpty {
-            defaults.removeObject(forKey: Self.storageKey)
-            return
+            guard FileManager.default.fileExists(atPath: fileURL.path) else { return true }
+            do {
+                try FileManager.default.removeItem(at: fileURL)
+                return true
+            } catch {
+                return false
+            }
         }
-        guard let data = try? JSONEncoder().encode(entries) else { return }
-        defaults.set(data, forKey: Self.storageKey)
+        guard let data = try? JSONEncoder().encode(entries) else { return false }
+        do {
+            try data.write(to: fileURL, options: .atomic)
+            return true
+        } catch {
+            return false
+        }
     }
 
     private struct StoredEntry: Codable, Equatable, Identifiable {
@@ -501,6 +652,7 @@ protocol GoogleMapsShortLinkResolving {
 enum GoogleMapsShortLinkResolverError: LocalizedError {
     case invalidLink
     case unsupportedRedirect
+    case responseTooLarge
 
     var errorDescription: String? {
         switch self {
@@ -508,47 +660,153 @@ enum GoogleMapsShortLinkResolverError: LocalizedError {
             "That Google Maps link could not be resolved."
         case .unsupportedRedirect:
             "That Google Maps link did not lead to a supported directions route."
+        case .responseTooLarge:
+            "That Google Maps link returned more data than Swerve can safely read."
         }
     }
 }
 
 struct GoogleMapsShortLinkResolver: GoogleMapsShortLinkResolving {
-    private let session: URLSession
-
-    init(session: URLSession = GoogleMapsShortLinkResolver.makeSession()) {
-        self.session = session
-    }
-
     func resolve(_ url: URL) async throws -> URL {
         guard url.scheme?.lowercased() == "https",
-              url.host?.lowercased() == "maps.app.goo.gl" || url.host?.lowercased() == "goo.gl",
-              url.absoluteString.count <= SharedRouteImportParser.maximumURLLength else {
+              url.host?.lowercased() == "maps.app.goo.gl",
+              SharedRouteImportParser.isTrustedGoogleRedirectURL(url) else {
             throw GoogleMapsShortLinkResolverError.invalidLink
         }
+        return try await GoogleMapsRedirectWalker().resolve(url)
+    }
+}
 
-        var request = URLRequest(url: url)
-        request.httpMethod = "GET"
-        request.timeoutInterval = 8
-        request.setValue("Swerve Route Import", forHTTPHeaderField: "User-Agent")
+/// Resolves a Google Maps short link without allowing the network request to
+/// become a general-purpose URL fetcher. Every redirect must remain HTTPS on a
+/// small Google allowlist. The final response is accepted from its headers and
+/// cancelled before its body is read.
+private final class GoogleMapsRedirectWalker: NSObject, URLSessionDataDelegate, URLSessionTaskDelegate {
+    private static let maximumRedirects = 5
+    private static let maximumResponseBytes = 32 * 1_024
 
-        let (_, response) = try await session.data(for: request)
-        guard let finalURL = response.url,
-              finalURL.scheme?.lowercased() == "https" else {
-            throw GoogleMapsShortLinkResolverError.unsupportedRedirect
+    private let lock = NSLock()
+    private var redirectCount = 0
+    private var receivedBytes = 0
+    private var continuation: CheckedContinuation<URL, Error>?
+    private var session: URLSession?
+    private var didFinish = false
+
+    func resolve(_ url: URL) async throws -> URL {
+        try await withCheckedThrowingContinuation { continuation in
+            let configuration = URLSessionConfiguration.ephemeral
+            configuration.timeoutIntervalForRequest = 8
+            configuration.timeoutIntervalForResource = 10
+            configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
+            configuration.httpShouldSetCookies = false
+            configuration.httpCookieStorage = nil
+            configuration.httpMaximumConnectionsPerHost = 1
+
+            var request = URLRequest(url: url)
+            request.httpMethod = "GET"
+            request.timeoutInterval = 8
+            request.setValue("Swerve Route Import", forHTTPHeaderField: "User-Agent")
+
+            lock.lock()
+            self.continuation = continuation
+            let session = URLSession(configuration: configuration, delegate: self, delegateQueue: nil)
+            self.session = session
+            lock.unlock()
+            let task = session.dataTask(with: request)
+            task.resume()
         }
-        guard case .ready = SharedRouteImportParser.parse(url: finalURL, text: nil) else {
-            throw GoogleMapsShortLinkResolverError.unsupportedRedirect
-        }
-        return finalURL
     }
 
-    private static func makeSession() -> URLSession {
-        let configuration = URLSessionConfiguration.ephemeral
-        configuration.timeoutIntervalForRequest = 8
-        configuration.timeoutIntervalForResource = 10
-        configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
-        configuration.httpShouldSetCookies = false
-        configuration.httpCookieStorage = nil
-        return URLSession(configuration: configuration)
+    func urlSession(
+        _ session: URLSession,
+        task: URLSessionTask,
+        willPerformHTTPRedirection response: HTTPURLResponse,
+        newRequest request: URLRequest,
+        completionHandler: @escaping (URLRequest?) -> Void
+    ) {
+        guard let currentURL = response.url,
+              let redirectURL = request.url,
+              SharedRouteImportParser.isTrustedGoogleRedirectURL(currentURL),
+              SharedRouteImportParser.isTrustedGoogleRedirectURL(redirectURL),
+              incrementRedirectCountIfAllowed() else {
+            completionHandler(nil)
+            finish(.failure(GoogleMapsShortLinkResolverError.unsupportedRedirect))
+            return
+        }
+        completionHandler(request)
+    }
+
+    func urlSession(
+        _ session: URLSession,
+        dataTask: URLSessionDataTask,
+        didReceive response: URLResponse,
+        completionHandler: @escaping (URLSession.ResponseDisposition) -> Void
+    ) {
+        guard let httpResponse = response as? HTTPURLResponse,
+              (200 ... 299).contains(httpResponse.statusCode),
+              let finalURL = response.url,
+              SharedRouteImportParser.isTrustedGoogleRedirectURL(finalURL),
+              case .ready = SharedRouteImportParser.parse(url: finalURL, text: nil) else {
+            completionHandler(.cancel)
+            finish(.failure(GoogleMapsShortLinkResolverError.unsupportedRedirect))
+            return
+        }
+
+        finish(.success(finalURL))
+        completionHandler(.cancel)
+    }
+
+    func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive data: Data) {
+        lock.lock()
+        receivedBytes += data.count
+        let exceededLimit = receivedBytes > Self.maximumResponseBytes
+        lock.unlock()
+
+        guard exceededLimit else { return }
+        dataTask.cancel()
+        finish(.failure(GoogleMapsShortLinkResolverError.responseTooLarge))
+    }
+
+    func urlSession(
+        _ session: URLSession,
+        task: URLSessionTask,
+        didCompleteWithError error: Error?
+    ) {
+        if let error {
+            finish(.failure(error))
+        } else {
+            finish(.failure(GoogleMapsShortLinkResolverError.unsupportedRedirect))
+        }
+    }
+
+    private func incrementRedirectCountIfAllowed() -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        guard redirectCount < Self.maximumRedirects else { return false }
+        redirectCount += 1
+        return true
+    }
+
+    private func finish(_ result: Result<URL, Error>) {
+        lock.lock()
+        guard !didFinish else {
+            lock.unlock()
+            return
+        }
+        didFinish = true
+        let continuation = self.continuation
+        let session = self.session
+        self.continuation = nil
+        self.session = nil
+        lock.unlock()
+
+        session?.invalidateAndCancel()
+
+        switch result {
+        case let .success(url):
+            continuation?.resume(returning: url)
+        case let .failure(error):
+            continuation?.resume(throwing: error)
+        }
     }
 }

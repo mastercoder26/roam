@@ -63,8 +63,14 @@ final class SharedRouteImportCoordinator: ObservableObject {
                 }
                 state = .ready(route)
             } catch {
-                inbox.acknowledge(id: link.id)
-                state = .failed(error.localizedDescription)
+                if isPermanentResolutionFailure(error) {
+                    inbox.acknowledge(id: link.id)
+                    state = .failed(error.localizedDescription)
+                } else {
+                    state = .failed(
+                        "Swerve could not finish reading this Google Maps link right now. The route is saved and will be tried again when Swerve is next active."
+                    )
+                }
             }
         }
     }
@@ -78,5 +84,15 @@ final class SharedRouteImportCoordinator: ObservableObject {
     func dismissFailure() {
         guard case .failed = state else { return }
         state = .idle
+    }
+
+    private func isPermanentResolutionFailure(_ error: Error) -> Bool {
+        guard let resolverError = error as? GoogleMapsShortLinkResolverError else {
+            return false
+        }
+        switch resolverError {
+        case .invalidLink, .unsupportedRedirect, .responseTooLarge:
+            return true
+        }
     }
 }

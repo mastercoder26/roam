@@ -6,13 +6,19 @@ struct SharedRouteImportChecks {
         appleDrivingDirectionsDecodeBothEndpoints()
         destinationOnlyAppleLinkUsesCurrentLocation()
         googleDirectionsDecodeRouteAndWaypoints()
+        googlePathDirectionsKeepTheFinalDestination()
         googleShortLinksRequireResolution()
         nonDrivingLinksAreRejected()
         textFallbackFindsAMapLink()
         untrustedLinksAreRejected()
+        lookalikeGoogleHostsAreRejected()
+        genericGoogleShortLinksAreRejected()
         inboxIsFIFOAndAcknowledgesPrecisely()
+        staleAcknowledgementDoesNotDropANewerRoute()
+        expiredSharesArePhysicallyPurged()
         formReducerPreservesUserControl()
         await googleShortLinkResolutionStaysOutsideTheScoringBackend()
+        await transientGoogleShortLinkFailureKeepsTheRoute()
 
         print("Shared route import checks passed")
     }
@@ -52,6 +58,18 @@ struct SharedRouteImportChecks {
         expect(route.origin == "Austin, TX", "the Google Maps origin should decode")
         expect(route.destination == "Dallas, TX", "the Google Maps destination should decode")
         expect(route.waypointCount == 2, "extra stops must be disclosed instead of silently claimed as preserved")
+    }
+
+    private static func googlePathDirectionsKeepTheFinalDestination() {
+        let url = URL(string: "https://www.google.com/maps/dir/Austin%2C+TX/Waco%2C+TX/Dallas%2C+TX")!
+
+        guard case let .ready(route) = SharedRouteImportParser.parse(url: url, text: nil) else {
+            fail("a Google Maps path route should parse")
+        }
+
+        expect(route.origin == "Austin, TX", "a path route should retain its first endpoint as the origin")
+        expect(route.destination == "Dallas, TX", "a path route must use its final endpoint as the destination")
+        expect(route.waypointCount == 1, "middle path endpoints must be disclosed as additional stops")
     }
 
     private static func googleShortLinksRequireResolution() {
@@ -96,10 +114,32 @@ struct SharedRouteImportChecks {
         }
     }
 
+    private static func lookalikeGoogleHostsAreRejected() {
+        let lookalikes = [
+            "https://www.google.evil.example/maps/dir/?origin=Austin&destination=Dallas",
+            "https://maps.google.attacker.tld/maps/dir/?origin=Austin&destination=Dallas"
+        ]
+
+        for value in lookalikes {
+            guard let url = URL(string: value) else {
+                fail("the test URL should be valid")
+            }
+            guard case .unsupported = SharedRouteImportParser.parse(url: url, text: nil) else {
+                fail("lookalike Google hosts must not be trusted")
+            }
+        }
+    }
+
+    private static func genericGoogleShortLinksAreRejected() {
+        let url = URL(string: "https://goo.gl/maps/abc123")!
+        guard case .unsupported = SharedRouteImportParser.parse(url: url, text: nil) else {
+            fail("generic goo.gl links must not become unrestricted redirect requests")
+        }
+    }
+
     private static func inboxIsFIFOAndAcknowledgesPrecisely() {
-        let suiteName = "SharedRouteImportChecks.\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suiteName)!
-        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let directory = temporaryInboxDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
 
         let first = SharedRouteDraft(
             id: UUID(),
@@ -117,7 +157,7 @@ struct SharedRouteImportChecks {
             importedAt: Date(timeIntervalSince1970: 101),
             waypointCount: 0
         )
-        let inbox = SharedRouteInbox(defaults: defaults)
+        let inbox = SharedRouteInbox(storageDirectory: directory)
 
         inbox.enqueue(route: first, now: first.importedAt)
         inbox.enqueue(route: second, now: second.importedAt)
@@ -127,6 +167,56 @@ struct SharedRouteImportChecks {
         expect(inbox.peek(now: Date(timeIntervalSince1970: 102))?.id == first.id, "acknowledging a later route must not remove an earlier route")
         inbox.acknowledge(id: first.id, now: Date(timeIntervalSince1970: 102))
         expect(inbox.peek(now: Date(timeIntervalSince1970: 102)) == nil, "acknowledging the active route should remove it")
+    }
+
+    private static func staleAcknowledgementDoesNotDropANewerRoute() {
+        let directory = temporaryInboxDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let first = SharedRouteDraft(
+            id: UUID(),
+            provider: .appleMaps,
+            origin: "Austin, TX",
+            destination: "Dallas, TX",
+            importedAt: Date(timeIntervalSince1970: 100),
+            waypointCount: 0
+        )
+        let second = SharedRouteDraft(
+            id: UUID(),
+            provider: .googleMaps,
+            origin: "Dallas, TX",
+            destination: "Houston, TX",
+            importedAt: Date(timeIntervalSince1970: 101),
+            waypointCount: 0
+        )
+        let reader = SharedRouteInbox(storageDirectory: directory)
+        let writer = SharedRouteInbox(storageDirectory: directory)
+
+        expect(reader.enqueue(route: first, now: first.importedAt), "the first route should be stored")
+        expect(reader.peek(now: Date(timeIntervalSince1970: 102))?.id == first.id, "the reader should see the first route before the extension writes")
+        expect(writer.enqueue(route: second, now: second.importedAt), "the extension-side writer should preserve its route")
+        reader.acknowledge(id: first.id, now: Date(timeIntervalSince1970: 102))
+        expect(reader.peek(now: Date(timeIntervalSince1970: 102))?.id == second.id, "acknowledging an earlier route must preserve a concurrently saved route")
+    }
+
+    private static func expiredSharesArePhysicallyPurged() {
+        let directory = temporaryInboxDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let inbox = SharedRouteInbox(storageDirectory: directory)
+        let sharedAt = Date(timeIntervalSince1970: 100)
+        let shortURL = URL(string: "https://maps.app.goo.gl/abc123")!
+        expect(
+            inbox.enqueueGoogleShortLink(shortURL, now: sharedAt),
+            "a temporary Google Maps URL should be saved before it expires"
+        )
+
+        expect(
+            inbox.peek(now: sharedAt.addingTimeInterval(16 * 60)) == nil,
+            "expired shared links should not be returned"
+        )
+        let remainingFiles = (try? FileManager.default.contentsOfDirectory(atPath: directory.path)) ?? []
+        expect(remainingFiles.isEmpty, "expired shared links must be physically removed from the App Group inbox")
     }
 
     private static func formReducerPreservesUserControl() {
@@ -164,12 +254,11 @@ struct SharedRouteImportChecks {
 
     @MainActor
     private static func googleShortLinkResolutionStaysOutsideTheScoringBackend() async {
-        let suiteName = "SharedRouteImportCoordinatorChecks.\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suiteName)!
-        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let directory = temporaryInboxDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
 
         let shortURL = URL(string: "https://maps.app.goo.gl/abc123")!
-        let inbox = SharedRouteInbox(defaults: defaults)
+        let inbox = SharedRouteInbox(storageDirectory: directory)
         expect(inbox.enqueueGoogleShortLink(shortURL, id: UUID()), "a Google short link should be queued locally")
 
         let resolvedURL = URL(string: "https://www.google.com/maps/dir/?api=1&origin=Austin&destination=Dallas&travelmode=driving")!
@@ -190,6 +279,34 @@ struct SharedRouteImportChecks {
         expect(inbox.peek() == nil, "accepting the route should consume only the saved local handoff")
     }
 
+    @MainActor
+    private static func transientGoogleShortLinkFailureKeepsTheRoute() async {
+        let directory = temporaryInboxDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let shortURL = URL(string: "https://maps.app.goo.gl/abc123")!
+        let id = UUID()
+        let inbox = SharedRouteInbox(storageDirectory: directory)
+        expect(inbox.enqueueGoogleShortLink(shortURL, id: id), "a Google short link should be queued before a retry")
+
+        let coordinator = SharedRouteImportCoordinator(
+            inbox: inbox,
+            shortLinkResolver: StubGoogleShortLinkResolver(error: URLError(.notConnectedToInternet))
+        )
+        await coordinator.refresh()
+
+        guard case .failed = coordinator.state else {
+            fail("a temporary resolution failure should be shown honestly")
+        }
+        expect(inbox.peek()?.id == id, "a temporary network failure must not discard the saved route")
+    }
+
+    private static func temporaryInboxDirectory() -> URL {
+        FileManager.default.temporaryDirectory
+            .appendingPathComponent("SharedRouteImportChecks", isDirectory: true)
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+    }
+
     private static func expect(_ condition: @autoclosure () -> Bool, _ message: String) {
         guard condition() else { fail(message) }
     }
@@ -200,9 +317,26 @@ struct SharedRouteImportChecks {
 }
 
 private struct StubGoogleShortLinkResolver: GoogleMapsShortLinkResolving {
-    let url: URL
+    private let url: URL?
+    private let error: Error?
+
+    init(url: URL) {
+        self.url = url
+        error = nil
+    }
+
+    init(error: Error) {
+        url = nil
+        self.error = error
+    }
 
     func resolve(_ url: URL) async throws -> URL {
-        self.url
+        if let error {
+            throw error
+        }
+        guard let url = self.url else {
+            throw URLError(.badURL)
+        }
+        return url
     }
 }
