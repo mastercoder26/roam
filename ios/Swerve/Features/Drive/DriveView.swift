@@ -12,6 +12,15 @@ struct DriveView: View {
     @State private var recordingPresentation: RecordingPresentation = .idle
     @State private var actionShowsEnd = false
     @State private var transitionToken = UUID()
+    @State private var routeOrigin = ""
+    @State private var routeDestination = ""
+    @State private var routeDepartureTime = Date().addingTimeInterval(15 * 60)
+    @State private var isPlanningBreaks = false
+    @State private var plannedBreakRoute: ScoredRoute?
+    @State private var breakPlanningError: String?
+    @State private var usesCurrentRouteOrigin = true
+    @StateObject private var routeLocationCoordinator = RoutePlanningLocationCoordinator()
+    private let apiClient = APIClient()
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
@@ -21,6 +30,7 @@ struct DriveView: View {
                     VStack(alignment: .leading, spacing: AppDesign.sectionSpacing) {
                         if showsSupportingContent {
                             header
+                            breakPlanningCard
                             if session.queuedPracticeRoute != nil {
                                 practiceRouteReadyCard
                                     .transition(reduceMotion ? .opacity : .opacity.combined(with: .move(edge: .top)))
@@ -77,9 +87,15 @@ struct DriveView: View {
                 .presentationDragIndicator(.visible)
         }
         .onAppear {
+            if usesCurrentRouteOrigin, routeOrigin.isEmpty {
+                routeLocationCoordinator.useCurrentLocation()
+            }
             guard session.isRecording else { return }
             actionShowsEnd = true
             recordingPresentation = .active
+        }
+        .onChange(of: routeLocationCoordinator.state) { _, state in
+            if case .resolved(let address) = state { routeOrigin = address }
         }
     }
 
@@ -145,6 +161,144 @@ struct DriveView: View {
             Text("Start and end each drive yourself. Your raw readings stay on this device.")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
+        }
+    }
+
+
+    private var breakPlanningCard: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            SectionHeader(title: "Plan rest stops", subtitle: "Add a specific route before you start. Long or high-demand drives show recommended break timing.")
+
+            AddressSearchField(
+                title: "Break-plan destination",
+                placeholder: "Where are you driving?",
+                systemImage: "magnifyingglass",
+                iconColor: .secondary,
+                text: $routeDestination
+            )
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
+            .background(Color(.systemBackground), in: RoundedRectangle(cornerRadius: AppDesign.cornerRadiusSmall, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: AppDesign.cornerRadiusSmall, style: .continuous)
+                    .stroke(Color.primary.opacity(0.14), lineWidth: 1)
+            }
+
+            VStack(alignment: .leading, spacing: 10) {
+                HStack {
+                    Text("Starting point")
+                        .font(.subheadline.weight(.semibold))
+                    Spacer()
+                    Picker("Starting point", selection: $usesCurrentRouteOrigin) {
+                        Text("Current").tag(true)
+                        Text("Address").tag(false)
+                    }
+                    .pickerStyle(.segmented)
+                    .frame(maxWidth: 190)
+                }
+
+                if usesCurrentRouteOrigin {
+                    Button {
+                        routeLocationCoordinator.useCurrentLocation()
+                    } label: {
+                        HStack(spacing: 10) {
+                            Image(systemName: "location.fill")
+                                .foregroundStyle(AppDesign.accent)
+                            Text(routeOrigin.isEmpty ? "Use current location" : routeOrigin)
+                                .font(.footnote.weight(.semibold))
+                                .foregroundStyle(.primary)
+                                .lineLimit(2)
+                            Spacer()
+                            if case .locating = routeLocationCoordinator.state {
+                                ProgressView().tint(AppDesign.accent)
+                            }
+                        }
+                        .padding(12)
+                        .background(AppDesign.accent.opacity(0.08), in: RoundedRectangle(cornerRadius: AppDesign.cornerRadiusSmall, style: .continuous))
+                    }
+                    .buttonStyle(PressableScaleStyle())
+                    .transition(reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.98, anchor: .top)))
+                } else {
+                    AddressSearchField(
+                        title: "Break-plan starting address",
+                        placeholder: "Enter starting address",
+                        systemImage: "circle.fill",
+                        iconColor: AppDesign.accent,
+                        text: $routeOrigin
+                    )
+                    .transition(reduceMotion ? .opacity : .opacity.combined(with: .move(edge: .top)))
+                }
+            }
+            .animation(reduceMotion ? .easeOut(duration: 0.18) : AppAnimation.content, value: usesCurrentRouteOrigin)
+
+            DatePicker("Departure", selection: $routeDepartureTime, in: Date()..., displayedComponents: [.date, .hourAndMinute])
+                .datePickerStyle(.compact)
+
+            if let breakPlanningError {
+                Label(breakPlanningError, systemImage: "exclamationmark.triangle.fill")
+                    .font(.footnote)
+                    .foregroundStyle(AppDesign.safety)
+                    .transition(.opacity)
+            }
+
+            if let plannedBreakRoute {
+                BreakRecommendationsView(route: plannedBreakRoute, continuousMinutes: session.elapsed / 60)
+                    .transition(reduceMotion ? .opacity : .opacity.combined(with: .move(edge: .top)))
+            }
+
+            Button {
+                Task { await planBreaks() }
+            } label: {
+                HStack(spacing: 10) {
+                    if isPlanningBreaks { ProgressView().tint(.white) }
+                    Image(systemName: "cup.and.saucer.fill")
+                    Text(isPlanningBreaks ? "Checking route…" : "Show break timing")
+                }
+                .font(.subheadline.weight(.semibold))
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 13)
+                .foregroundStyle(.white)
+                .background(RoundedRectangle(cornerRadius: AppDesign.cornerRadiusSmall, style: .continuous).fill(canPlanBreaks ? AppDesign.accent : Color(.systemGray3)))
+            }
+            .buttonStyle(PressableScaleStyle())
+            .disabled(!canPlanBreaks)
+        }
+        .premiumCard()
+        .animation(reduceMotion ? .easeOut(duration: 0.18) : AppAnimation.content, value: plannedBreakRoute)
+        .animation(AppAnimation.quick, value: breakPlanningError)
+    }
+
+    private var canPlanBreaks: Bool {
+        !isPlanningBreaks &&
+            !routeOrigin.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+            !routeDestination.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private func planBreaks() async {
+        guard canPlanBreaks else { return }
+        withAnimation(AppAnimation.quick) {
+            isPlanningBreaks = true
+            breakPlanningError = nil
+        }
+        do {
+            let response = try await apiClient.analyzeRoute(
+                origin: routeOrigin,
+                destination: routeDestination,
+                departureTime: routeDepartureTime,
+                includeAlternates: false,
+                continuousDriveMinutes: session.elapsed / 60
+            )
+            withAnimation(reduceMotion ? .easeOut(duration: 0.18) : AppAnimation.content) {
+                plannedBreakRoute = response.primaryRoute
+                isPlanningBreaks = false
+            }
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        } catch {
+            UINotificationFeedbackGenerator().notificationOccurred(.error)
+            withAnimation(AppAnimation.quick) {
+                breakPlanningError = error.localizedDescription
+                isPlanningBreaks = false
+            }
         }
     }
 
@@ -373,6 +527,112 @@ struct DriveView: View {
         .premiumCard()
     }
 
+}
+
+private struct BreakRecommendationsView: View {
+    let route: ScoredRoute
+    let continuousMinutes: Double
+
+    private var recommendation: BreakRecommendation {
+        BreakRecommendation(route: route, continuousMinutes: continuousMinutes)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .top, spacing: 12) {
+                IconTile(symbol: recommendation.symbol, color: recommendation.color)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(recommendation.title)
+                        .font(.subheadline.weight(.semibold))
+                    Text(recommendation.detail)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+
+            if !recommendation.stops.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    ForEach(recommendation.stops) { stop in
+                        HStack(spacing: 10) {
+                            Text(stop.label)
+                                .font(.caption.weight(.bold).monospacedDigit())
+                                .foregroundStyle(recommendation.color)
+                                .frame(width: 54, alignment: .leading)
+                            Capsule(style: .continuous)
+                                .fill(recommendation.color.opacity(0.18))
+                                .frame(width: 3, height: 22)
+                            Text(stop.reason)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Spacer(minLength: 0)
+                        }
+                    }
+                }
+                .padding(12)
+                .background(Color(.systemBackground), in: RoundedRectangle(cornerRadius: AppDesign.cornerRadiusSmall, style: .continuous))
+            }
+        }
+    }
+}
+
+private struct BreakRecommendation {
+    struct Stop: Identifiable {
+        let id = UUID()
+        let minute: Int
+        let reason: String
+
+        var label: String {
+            let hours = minute / 60
+            let minutes = minute % 60
+            if hours > 0, minutes > 0 { return "~\(hours)h \(minutes)m" }
+            if hours > 0 { return "~\(hours)h" }
+            return "~\(minutes)m"
+        }
+    }
+
+    let title: String
+    let detail: String
+    let symbol: String
+    let color: Color
+    let stops: [Stop]
+
+    init(route: ScoredRoute, continuousMinutes: Double) {
+        let routeMinutes = Double(route.durationSeconds) / 60
+        let highDemand = (route.routeDemands ?? []).contains { demand in
+            demand.available && (demand.level == .high || demand.intensity >= 0.66)
+        } || route.score >= 70
+        let longDrive = routeMinutes >= 90
+        let interval = highDemand ? 60 : 90
+        let firstBreak = max(30, interval - Int(continuousMinutes.rounded(.down)))
+        let breakMinutes = stride(from: firstBreak, through: Int(routeMinutes.rounded(.down)), by: interval)
+            .filter { $0 < Int(routeMinutes.rounded(.down)) - 10 }
+            .prefix(3)
+            .map { Stop(minute: $0, reason: highDemand ? "Reset attention before the demanding stretch continues." : "Step out before fatigue builds.") }
+
+        if longDrive || highDemand || continuousMinutes >= 45 {
+            title = highDemand ? "Breaks recommended" : "Long-drive breaks"
+            detail = "This route is about \(Self.durationLabel(routeMinutes)). Swerve factors in your current continuous driving time and suggests rest timing before you start."
+            symbol = "cup.and.saucer.fill"
+            color = highDemand ? AppDesign.safety : AppDesign.accent
+            stops = Array(breakMinutes)
+        } else {
+            title = "No planned stop needed"
+            detail = "This route is about \(Self.durationLabel(routeMinutes)), so Swerve does not recommend an automatic rest stop right now."
+            symbol = "checkmark.circle.fill"
+            color = AppDesign.positive
+            stops = []
+        }
+    }
+
+    private static func durationLabel(_ minutes: Double) -> String {
+        let rounded = Int(minutes.rounded())
+        let hours = rounded / 60
+        let mins = rounded % 60
+        if hours > 0, mins > 0 { return "\(hours) hr \(mins) min" }
+        if hours > 0 { return "\(hours) hr" }
+        return "\(mins) min"
+    }
 }
 
 private struct PracticeDebriefCard: View {
