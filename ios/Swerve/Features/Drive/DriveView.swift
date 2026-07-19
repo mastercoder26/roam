@@ -1,16 +1,9 @@
 import SwiftUI
 
 struct DriveView: View {
-    private enum RecordingPresentation: Equatable {
-        case idle
-        case active
-        case returning
-    }
-
     @EnvironmentObject private var session: DriveSessionManager
     @State private var showingHelp = false
-    @State private var recordingPresentation: RecordingPresentation = .idle
-    @State private var actionShowsEnd = false
+    @State private var presentationState = DrivePresentationState()
     @State private var transitionToken = UUID()
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -54,7 +47,6 @@ struct DriveView: View {
                 .scrollDisabled(isTransitioningDriveSurface)
                 .background(isFocusedCanvas ? Color(.systemBackground) : Color(.systemGroupedBackground))
             }
-            .animation(driveModeAnimation, value: recordingPresentation)
             .navigationTitle(isFocusedCanvas ? "" : "Drive")
             .navigationBarTitleDisplayMode(.large)
             .toolbar(isFocusedCanvas ? .hidden : .visible, for: .navigationBar)
@@ -78,8 +70,7 @@ struct DriveView: View {
         }
         .onAppear {
             guard session.isRecording else { return }
-            actionShowsEnd = true
-            recordingPresentation = .active
+            presentationState = DrivePresentationState(phase: .active)
         }
     }
 
@@ -122,19 +113,19 @@ struct DriveView: View {
     }
 
     private var isExpandedDriveSurface: Bool {
-        recordingPresentation == .active
+        presentationState.isExpanded
     }
 
     private var isFocusedCanvas: Bool {
-        recordingPresentation == .active || recordingPresentation == .returning
+        presentationState.preservesFocusedCanvas
     }
 
     private var isTransitioningDriveSurface: Bool {
-        recordingPresentation != .idle
+        presentationState.disablesScrolling
     }
 
     private var showsSupportingContent: Bool {
-        recordingPresentation == .idle
+        presentationState.showsSupportingContent
     }
 
     private var header: some View {
@@ -207,12 +198,16 @@ struct DriveView: View {
 
     private func recordingCard(availableHeight: CGFloat) -> some View {
         let expandedHeight = max(availableHeight - 24, 560)
+        let keepsFocusedCanvas = presentationState.preservesFocusedCanvas
+        let actionShowsEnd = presentationState.action == .end
 
         return VStack(spacing: isExpandedDriveSurface ? 0 : 18) {
-            Label(isExpandedDriveSurface ? "DRIVE STARTED" : "MANUAL DRIVE", systemImage: isExpandedDriveSurface ? "record.circle.fill" : "steeringwheel")
+            Label(actionShowsEnd ? "DRIVE STARTED" : "MANUAL DRIVE", systemImage: actionShowsEnd ? "record.circle.fill" : "steeringwheel")
                 .font(.caption.weight(.bold))
-                .foregroundStyle(isExpandedDriveSurface ? .red : .secondary)
-                .frame(maxWidth: .infinity, alignment: isExpandedDriveSurface ? .center : .leading)
+                .foregroundStyle(actionShowsEnd ? .red : .secondary)
+                // Keeping this anchor centered through the complete sequence
+                // prevents the title from taking a sideways path on return.
+                .frame(maxWidth: .infinity, alignment: .center)
                 .padding(.top, isExpandedDriveSurface ? 28 : 0)
 
             FlipClock(elapsed: session.elapsed, style: isExpandedDriveSurface ? .active : .preview)
@@ -233,24 +228,31 @@ struct DriveView: View {
 
             driveActionButton(showsEnd: actionShowsEnd)
                 .padding(.horizontal, isExpandedDriveSurface ? AppDesign.contentPadding : 0)
-                .padding(.bottom, isExpandedDriveSurface ? AppDesign.contentPadding : 0)
+                .padding(
+                    .bottom,
+                    isExpandedDriveSurface
+                        ? CGFloat(DrivePresentationEngine.activeButtonBottomInset)
+                        : 0
+                )
 
-            if !isExpandedDriveSurface, recordingPresentation != .returning {
+            if !isExpandedDriveSurface, !keepsFocusedCanvas {
                 Text(session.statusMessage)
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
             }
         }
         .padding(isExpandedDriveSurface ? 0 : 20)
         .frame(maxWidth: .infinity)
-        .frame(height: isExpandedDriveSurface ? expandedHeight : nil, alignment: .top)
+        // Do not collapse the canvas while the End Drive control is travelling
+        // back to the compact position. That keeps the reverse path vertical.
+        .frame(height: keepsFocusedCanvas ? expandedHeight : nil, alignment: .top)
         .background(
-            RoundedRectangle(cornerRadius: isExpandedDriveSurface ? 0 : 24, style: .continuous)
+            RoundedRectangle(cornerRadius: keepsFocusedCanvas ? 0 : 24, style: .continuous)
                 .fill(isFocusedCanvas ? Color(.systemBackground) : Color(.secondarySystemGroupedBackground))
         )
         .overlay {
-            RoundedRectangle(cornerRadius: isExpandedDriveSurface ? 0 : 24, style: .continuous)
+            RoundedRectangle(cornerRadius: keepsFocusedCanvas ? 0 : 24, style: .continuous)
                 .stroke(isFocusedCanvas ? .clear : Color.primary.opacity(0.05), lineWidth: 1)
         }
         .accessibilityElement(children: .contain)
@@ -284,28 +286,37 @@ struct DriveView: View {
     }
 
     private func startDrive() {
-        guard !session.isRecording else { return }
+        guard presentationState.phase == .idle, !session.isRecording else { return }
         transitionToken = UUID()
         let token = transitionToken
-        session.startDrive()
 
         // First, make the action's meaning explicit. Only after that label
         // swap settles do we move the same button vertically to its driving
         // position.
-        withAnimation(actionSwapAnimation) {
-            actionShowsEnd = true
-        }
+        withAnimation(actionSwapAnimation, completionCriteria: .logicallyComplete) {
+            presentationState = DrivePresentationEngine.reduce(
+                presentationState,
+                event: .startTapped
+            )
+        } completion: {
+            guard transitionToken == token,
+                  presentationState.phase == .switchingToEnd,
+                  !session.isRecording else {
+                return
+            }
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + (reduceMotion ? 0 : 0.13)) {
-            guard transitionToken == token, session.isRecording else { return }
+            session.startDrive()
             withAnimation(driveModeAnimation) {
-                recordingPresentation = .active
+                presentationState = DrivePresentationEngine.reduce(
+                    presentationState,
+                    event: .actionSwapCompleted
+                )
             }
         }
     }
 
     private func endDrive() {
-        guard session.isRecording else { return }
+        guard presentationState.phase == .active, session.isRecording else { return }
         transitionToken = UUID()
         let token = transitionToken
         session.endDrive()
@@ -313,15 +324,34 @@ struct DriveView: View {
         // Keep the End Drive label while its existing button returns along the
         // same vertical path. The start label returns only after it reaches
         // its original position.
-        withAnimation(driveModeAnimation) {
-            recordingPresentation = .returning
-        }
+        withAnimation(driveModeAnimation, completionCriteria: .logicallyComplete) {
+            presentationState = DrivePresentationEngine.reduce(
+                presentationState,
+                event: .endTapped
+            )
+        } completion: {
+            guard transitionToken == token,
+                  presentationState.phase == .returning else {
+                return
+            }
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + (reduceMotion ? 0 : 0.50)) {
-            guard transitionToken == token else { return }
-            withAnimation(actionSwapAnimation) {
-                actionShowsEnd = false
-                recordingPresentation = .idle
+            withAnimation(actionSwapAnimation, completionCriteria: .logicallyComplete) {
+                presentationState = DrivePresentationEngine.reduce(
+                    presentationState,
+                    event: .returnMotionCompleted
+                )
+            } completion: {
+                guard transitionToken == token,
+                      presentationState.phase == .switchingToStart else {
+                    return
+                }
+
+                withAnimation(driveModeAnimation) {
+                    presentationState = DrivePresentationEngine.reduce(
+                        presentationState,
+                        event: .startSwapCompleted
+                    )
+                }
             }
         }
     }

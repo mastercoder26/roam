@@ -32,24 +32,24 @@ struct SwerveRootView: View {
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     var body: some View {
-        ZStack(alignment: .bottom) {
-            Group {
-                switch selectedTab {
-                case .routes: HomeView()
-                case .drive: DriveView()
-                case .progress: DriverProgressView()
-                }
+        Group {
+            switch selectedTab {
+            case .routes: HomeView()
+            case .drive: DriveView()
+            case .progress: DriverProgressView()
             }
-            .environmentObject(driveSession)
-            .safeAreaInset(edge: .bottom, spacing: 0) {
-                Color.clear.frame(height: 76).allowsHitTesting(false)
-            }
-            .transition(.opacity)
-
+        }
+        .environmentObject(driveSession)
+        // This reserves the tab bar's measured height for every tab. Unlike a
+        // fixed invisible spacer, it remains correct when Dynamic Type grows
+        // the selected tab label and keeps End Drive unobstructed.
+        .safeAreaInset(edge: .bottom, spacing: 0) {
             liquidTabBar
                 .padding(.horizontal, 28)
+                .padding(.top, 8)
                 .padding(.bottom, 10)
         }
+        .transition(.opacity)
         .animation(.easeOut(duration: reduceMotion ? 0.12 : 0.18), value: selectedTab)
         .onChange(of: driveSession.practiceRoutePresentationRequest) { _, request in
             // The manager emits this only when a Results-screen action queues a

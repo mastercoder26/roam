@@ -40,6 +40,7 @@
 		A10000000000000000000024 /* DriveActivityWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000024 /* DriveActivityWidget.swift */; };
 		A10000000000000000000025 /* DriveActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000021 /* DriveActivityAttributes.swift */; };
 		A10000000000000000000026 /* SwerveDriveActivityExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = A30000000000000000000002 /* SwerveDriveActivityExtension.appex */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
+		A10000000000000000000027 /* DrivePresentationEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000026 /* DrivePresentationEngine.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -102,6 +103,7 @@
 		A20000000000000000000023 /* CarPlaySceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CarPlaySceneDelegate.swift; sourceTree = "<group>"; };
 		A20000000000000000000024 /* DriveActivityWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriveActivityWidget.swift; sourceTree = "<group>"; };
 		A20000000000000000000025 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		A20000000000000000000026 /* DrivePresentationEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DrivePresentationEngine.swift; sourceTree = "<group>"; };
 		A30000000000000000000001 /* Swerve.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Swerve.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A30000000000000000000002 /* SwerveDriveActivityExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = SwerveDriveActivityExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -185,6 +187,7 @@
 				A20000000000000000000019 /* DriverReadinessEngine.swift */,
 				A20000000000000000000018 /* RoutePlanningLocationCoordinator.swift */,
 				A20000000000000000000021 /* DriveActivityAttributes.swift */,
+				A20000000000000000000026 /* DrivePresentationEngine.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -407,6 +410,7 @@
 				A10000000000000000000021 /* DriveActivityAttributes.swift in Sources */,
 				A10000000000000000000022 /* DriveLiveActivityManager.swift in Sources */,
 				A10000000000000000000023 /* CarPlaySceneDelegate.swift in Sources */,
+				A10000000000000000000027 /* DrivePresentationEngine.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

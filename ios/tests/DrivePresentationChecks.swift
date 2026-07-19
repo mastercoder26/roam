@@ -18,19 +18,21 @@ struct DrivePresentationChecks {
         expect(state.phase == .active && state.isExpanded, "the action should expand only after the End Drive label settles")
         expect(!state.showsSupportingContent, "active recording should hide secondary content")
         expect(
-            DrivePresentationEngine.activeButtonBottomInset >= 96,
-            "the active action needs enough clearance above the floating tab bar"
+            DrivePresentationEngine.activeButtonBottomInset >= 16,
+            "the active action needs local spacing once the root reserves the tab bar"
         )
 
         state = DrivePresentationEngine.reduce(state, event: .endTapped)
         expect(state.phase == .returning, "an end tap should begin the reverse vertical path")
         expect(state.action == .end, "the End Drive label must remain during its upward return")
         expect(!state.isExpanded, "the timer and button should return to their compact positions")
+        expect(state.preservesFocusedCanvas, "the canvas must stay tall while the button returns vertically")
         expect(!state.showsSupportingContent, "normal content must stay hidden while the control returns")
 
         state = DrivePresentationEngine.reduce(state, event: .returnMotionCompleted)
         expect(state.phase == .switchingToStart, "the action should swap back only after return motion completes")
         expect(state.action == .start, "the returned control should now become Start Drive")
+        expect(state.preservesFocusedCanvas, "the Start Drive label swap must stay on the same canvas")
         expect(!state.showsSupportingContent, "the label swap must not reveal the card contents early")
 
         state = DrivePresentationEngine.reduce(state, event: .startSwapCompleted)
