@@ -5,6 +5,8 @@ struct RoutePlanningPresentationChecks {
     static func main() {
         destinationStaysHiddenUntilAUsableOriginExists()
         analyzeBecomesAvailableOnlyAfterBothEndpointsExist()
+        mapPreviewProgressesFromStartPinToRouteLine()
+        freshPlansWaitForAnExplicitOriginChoice()
 
         print("Route planning presentation checks passed")
     }
@@ -32,6 +34,40 @@ struct RoutePlanningPresentationChecks {
         expect(
             RoutePlanningStage(origin: "Austin, TX", destination: "  ") == .chooseDestination,
             "an empty destination must not create an analyzable route"
+        )
+    }
+
+    private static func mapPreviewProgressesFromStartPinToRouteLine() {
+        expect(
+            RoutePlanningMapPreviewStage(
+                origin: "Austin, TX",
+                destination: "",
+                usesCurrentLocation: false
+            ) == .startingPoint,
+            "a typed starting location should plot before a destination is entered"
+        )
+        expect(
+            RoutePlanningMapPreviewStage(
+                origin: "Austin, TX",
+                destination: "Dallas, TX",
+                usesCurrentLocation: false
+            ) == .route,
+            "two valid endpoints should request a route line"
+        )
+        expect(
+            RoutePlanningMapPreviewStage(
+                origin: "",
+                destination: "Dallas, TX",
+                usesCurrentLocation: false
+            ) == .overview,
+            "a destination alone must not invent a starting location"
+        )
+    }
+
+    private static func freshPlansWaitForAnExplicitOriginChoice() {
+        expect(
+            RoutePlanningFormState().originMode == .manual,
+            "a fresh plan should wait for a typed start or an explicit current-location choice"
         )
     }
 

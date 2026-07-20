@@ -6,6 +6,50 @@ enum RoutePlanningOriginMode: Equatable {
     case manual
 }
 
+/// The visible planning step. Keeping this pure means the origin-to-
+/// destination progression stays consistent whether the start comes from the
+/// current-location flow, manual entry, or a shared Maps route.
+enum RoutePlanningStage: Equatable {
+    case chooseOrigin
+    case chooseDestination
+    case readyToAnalyze
+
+    init(origin: String, destination: String) {
+        let hasOrigin = !origin.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        let hasDestination = !destination.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+
+        if !hasOrigin {
+            self = .chooseOrigin
+        } else if !hasDestination {
+            self = .chooseDestination
+        } else {
+            self = .readyToAnalyze
+        }
+    }
+}
+
+/// The visual state for the Apple Maps planning preview. It deliberately
+/// follows the same endpoint validation as the form so the map never invents
+/// a route before the user has supplied both endpoints.
+enum RoutePlanningMapPreviewStage: Equatable {
+    case overview
+    case startingPoint
+    case route
+
+    init(origin: String, destination: String, usesCurrentLocation: Bool) {
+        let hasOrigin = usesCurrentLocation || !origin.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        let hasDestination = !destination.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+
+        if hasOrigin && hasDestination {
+            self = .route
+        } else if hasOrigin {
+            self = .startingPoint
+        } else {
+            self = .overview
+        }
+    }
+}
+
 struct RouteImportNotice: Equatable {
     let title: String
     let message: String
@@ -23,7 +67,7 @@ struct RoutePlanningFormState: Equatable {
     init(
         origin: String = "",
         destination: String = "",
-        originMode: RoutePlanningOriginMode = .currentLocation,
+        originMode: RoutePlanningOriginMode = .manual,
         departureTime: Date = Date().addingTimeInterval(15 * 60),
         importedRouteID: UUID? = nil,
         importNotice: RouteImportNotice? = nil

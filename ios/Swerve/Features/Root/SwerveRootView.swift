@@ -43,6 +43,7 @@ struct SwerveRootView: View {
             }
         }
         .environmentObject(driveSession)
+        .preferredColorScheme(.dark)
         // This reserves the tab bar's measured height for every tab. Unlike a
         // fixed invisible spacer, it remains correct when Dynamic Type grows
         // the selected tab label and keeps End Drive unobstructed.

@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct HomeView: View {
     @ObservedObject var form: RoutePlanningFormModel
@@ -7,51 +8,93 @@ struct HomeView: View {
     @State private var pendingResult: RouteAnalysisResult?
     @State private var errorMessage: String?
     @State private var navigationPath = NavigationPath()
-    @State private var isOriginAutocompleteVisible = false
+    @State private var mapPreview: RoutePlanningMapSummary?
     @StateObject private var locationCoordinator = RoutePlanningLocationCoordinator()
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     private let apiClient = APIClient()
 
-    private var usesCurrentLocation: Binding<Bool> {
-        Binding(
-            get: { form.usesCurrentLocation },
-            set: { form.usesCurrentLocation = $0 }
-        )
+    private var planningStage: RoutePlanningStage {
+        RoutePlanningStage(origin: form.origin, destination: form.destination)
     }
 
     private var canEnterDestination: Bool {
-        !form.origin.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        planningStage != .chooseOrigin
+    }
+
+    /// Current-location selection is already a deliberate choice, even while
+    /// MapKit is still resolving its human-readable address. Reveal the next
+    /// field at that moment, but keep Analyze disabled until the origin is
+    /// actually confirmed.
+    private var destinationIsRevealed: Bool {
+        guard !canEnterDestination else { return true }
+        if !form.destination.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return true
+        }
+        guard form.usesCurrentLocation else { return false }
+        if case .locating = locationCoordinator.state {
+            return true
+        }
+        return false
     }
 
     private var canAnalyze: Bool {
-        canEnterDestination && !form.destination.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !isLoading
+        planningStage == .readyToAnalyze && !isLoading
+    }
+
+    /// A shared Maps route may prefer the current location when no explicit
+    /// origin is supplied. That preference is not consent to expose the blue
+    /// dot. MapKit gets location access only after the person taps the visible
+    /// current-location control and the coordinator begins resolving it.
+    private var shouldShowCurrentLocationOnMap: Bool {
+        guard form.usesCurrentLocation else { return false }
+        switch locationCoordinator.state {
+        case .locating, .resolved:
+            return true
+        case .awaitingOrigin, .manualEntry:
+            return false
+        }
+    }
+
+    private var progressiveReveal: AnyTransition {
+        reduceMotion
+            ? .opacity
+            : .opacity.combined(with: .scale(scale: 0.98, anchor: .top))
     }
 
     var body: some View {
         NavigationStack(path: $navigationPath) {
             ZStack {
+                routeBackground.ignoresSafeArea()
+
                 ScrollView {
-                    VStack(alignment: .leading, spacing: AppDesign.sectionSpacing) {
+                    VStack(alignment: .leading, spacing: 22) {
                         headerSection
+
                         if let notice = form.importNotice {
                             importNoticeBanner(notice)
-                                .transition(reduceMotion ? .opacity : .opacity.combined(with: .move(edge: .top)))
+                                .transition(progressiveReveal)
                         }
+
                         routeCard
-                        if canEnterDestination { departureCard }
-                        if let errorMessage { errorBanner(errorMessage).transition(.opacity.combined(with: .move(edge: .top))) }
-                        PrimaryActionButton(title: "Analyze Difficulty", isLoading: isLoading, isEnabled: canAnalyze) {
-                            Task { await analyzeRoute() }
+
+                        mapPreviewSection
+
+                        departureContainer
+
+                        if let errorMessage {
+                            errorBanner(errorMessage)
+                                .transition(.opacity)
                         }
-                        .padding(.top, 4)
-                        howItWorksSection
+
+                        analyzeButton
+                        routeChecksSection
                     }
-                    .padding(.horizontal, AppDesign.contentPadding)
-                    .padding(.vertical, 12)
+                    .padding(.horizontal, 20)
+                    .padding(.top, 14)
+                    .padding(.bottom, 28)
                 }
-                .background(Color(.systemGroupedBackground))
-                .animation(AppAnimation.quick, value: errorMessage)
 
                 if isLoading {
                     RouteAnalysisLoadingView(isFinishing: isCompletingLoading) { completeLoading() }
@@ -59,225 +102,412 @@ struct HomeView: View {
                         .zIndex(1)
                 }
             }
-            .navigationTitle("Swerve")
-            .navigationBarTitleDisplayMode(.large)
+            .toolbar(.hidden, for: .navigationBar)
             .navigationDestination(for: RouteAnalysisResult.self) { ResultsView(result: $0) }
             .onChange(of: locationCoordinator.state) { _, state in
-                if case .resolved(let address) = state, form.usesCurrentLocation {
+                switch state {
+                case .resolved(let address) where form.usesCurrentLocation:
                     form.origin = address
+                case .manualEntry where form.usesCurrentLocation:
+                    withAnimation(reduceMotion ? .easeOut(duration: 0.18) : AppAnimation.selection) {
+                        form.usesCurrentLocation = false
+                    }
+                default:
+                    break
                 }
-            }
-            .onAppear {
-                guard form.usesCurrentLocation, form.origin.isEmpty else { return }
-                locationCoordinator.useCurrentLocation()
             }
             .onChange(of: form.importedRouteID) { _, importedRouteID in
                 guard importedRouteID != nil else { return }
                 navigationPath = NavigationPath()
-                if form.usesCurrentLocation {
-                    locationCoordinator.useCurrentLocation()
-                }
+                mapPreview = nil
             }
         }
+        .preferredColorScheme(.dark)
+    }
+
+    private var routeBackground: Color {
+        Color(red: 0.045, green: 0.045, blue: 0.05)
+    }
+
+    private var routeSurface: Color {
+        Color.white.opacity(reduceTransparency ? 0.12 : 0.075)
     }
 
     private var headerSection: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("Find your calmest route").font(AppDesign.Typography.heroTitle).tracking(-0.7)
-            Text("Start where you are, then see what the road asks of you.").font(.subheadline).foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: 9) {
+            Text("SWERVE")
+                .font(.caption.weight(.bold))
+                .tracking(2.2)
+                .foregroundStyle(.white.opacity(0.48))
+
+            HStack(alignment: .center, spacing: 16) {
+                Text("Plan your route")
+                    .font(.system(.largeTitle, design: .rounded, weight: .bold))
+                    .tracking(-0.8)
+                    .foregroundStyle(.white)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                Spacer(minLength: 8)
+
+                Image(systemName: "location.north.circle.fill")
+                    .font(.system(size: 34, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.92))
+                    .frame(width: 48, height: 48)
+                    .background(.white.opacity(0.09), in: Circle())
+                    .accessibilityHidden(true)
+            }
+
+            Text("Set your start, then see the road before you take it.")
+                .font(.subheadline)
+                .foregroundStyle(.white.opacity(0.58))
         }
-        .padding(.bottom, 4)
     }
 
     private var routeCard: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            SectionHeader(title: "Where?", subtitle: "Search your destination and choose how Swerve should start the route.")
-            destinationFirstField
-            startingPointSelector
-        }
-        .premiumCard()
-    }
+        VStack(spacing: 0) {
+            originRow
 
+            if destinationIsRevealed {
+                Divider()
+                    .overlay(.white.opacity(0.1))
+                    .padding(.leading, 68)
+                    .transition(.opacity)
 
-    private var destinationFirstField: some View {
-        AddressSearchField(
-            title: "Destination",
-            placeholder: "Search destinations",
-            systemImage: "magnifyingglass",
-            iconColor: .secondary,
-            text: $form.destination
-        )
-        .padding(.horizontal, 14)
-        .padding(.vertical, 8)
-        .background(Color(.systemBackground), in: RoundedRectangle(cornerRadius: AppDesign.cornerRadiusSmall, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: AppDesign.cornerRadiusSmall, style: .continuous)
-                .stroke(Color.primary.opacity(0.18), lineWidth: 1)
-        }
-    }
-
-    private var startingPointSelector: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Starting point")
-                        .font(.subheadline.weight(.semibold))
-                    Text(form.usesCurrentLocation ? "Use your current location" : "Use a specific address")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                Spacer()
-                Picker("Starting point", selection: usesCurrentLocation) {
-                    Text("Current").tag(true)
-                    Text("Address").tag(false)
-                }
-                .pickerStyle(.segmented)
-                .frame(maxWidth: 190)
+                destinationRow
+                    .transition(progressiveReveal)
             }
+        }
+        .padding(.vertical, 6)
+        .background(routeSurface, in: RoundedRectangle(cornerRadius: 26, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 26, style: .continuous)
+                .stroke(.white.opacity(0.06), lineWidth: 1)
+        }
+        .animation(reduceMotion ? .easeOut(duration: 0.18) : AppAnimation.selection, value: destinationIsRevealed)
+    }
 
-            if form.usesCurrentLocation {
+    @ViewBuilder
+    private var originRow: some View {
+        if form.usesCurrentLocation {
+            HStack(alignment: .center, spacing: 14) {
+                RoutePlanningFieldIcon(symbol: "location.circle.fill", tint: .white)
+
                 Button {
                     locationCoordinator.useCurrentLocation()
                 } label: {
-                    HStack(spacing: 10) {
-                        Image(systemName: "location.fill")
-                            .foregroundStyle(AppDesign.accent)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(currentLocationTitle)
-                                .font(.subheadline.weight(.semibold))
-                                .foregroundStyle(.primary)
-                            Text("Swerve will fill the route from where you are.")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                        Spacer()
-                        if case .locating = locationCoordinator.state {
-                            ProgressView().tint(AppDesign.accent)
-                        }
-                    }
-                    .padding(14)
-                    .background(AppDesign.accent.opacity(0.08), in: RoundedRectangle(cornerRadius: AppDesign.cornerRadiusSmall, style: .continuous))
+                    routeFieldCopy(
+                        label: "FROM",
+                        value: currentLocationTitle,
+                        valueColor: .white.opacity(0.94)
+                    )
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Starting location")
+                .accessibilityValue(currentLocationTitle)
+                .accessibilityHint("Double tap to refresh your current location")
+
+                if case .locating = locationCoordinator.state {
+                    ProgressView()
+                        .controlSize(.small)
+                        .tint(.white)
+                }
+
+                Button(action: switchToManualOrigin) {
+                    Image(systemName: "pencil")
+                        .font(.subheadline.weight(.bold))
+                        .foregroundStyle(.white.opacity(0.72))
+                        .frame(width: 36, height: 36)
+                        .background(.white.opacity(0.07), in: Circle())
                 }
                 .buttonStyle(PressableScaleStyle())
-                .transition(reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.98, anchor: .top)))
-            } else {
-                originField
-                    .transition(reduceMotion ? .opacity : .opacity.combined(with: .move(edge: .top)))
+                .accessibilityLabel("Enter a different starting location")
+            }
+            .padding(.horizontal, 18)
+            .padding(.vertical, 17)
+        } else {
+            HStack(alignment: .top, spacing: 14) {
+                RoutePlanningFieldIcon(symbol: "circle.inset.filled", tint: AppDesign.accent)
+                    .padding(.top, 8)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    routeFieldLabel("FROM")
+                    AddressSearchField(
+                        title: "Starting location",
+                        placeholder: "Enter starting location",
+                        systemImage: "circle.fill",
+                        iconColor: AppDesign.accent,
+                        showsIcon: false,
+                        text: $form.origin
+                    )
+                    .layoutPriority(1)
+
+                    if case .manualEntry(let message) = locationCoordinator.state,
+                       let message {
+                        Text(message)
+                            .font(.caption)
+                            .foregroundStyle(.orange.opacity(0.9))
+                            .fixedSize(horizontal: false, vertical: true)
+                            .transition(.opacity)
+                    }
+                }
+
+                Button(action: chooseCurrentLocation) {
+                    Image(systemName: "location.fill")
+                        .font(.subheadline.weight(.bold))
+                        .foregroundStyle(.white.opacity(0.8))
+                        .frame(width: 36, height: 36)
+                        .background(.white.opacity(0.07), in: Circle())
+                }
+                .buttonStyle(PressableScaleStyle())
+                .padding(.top, 8)
+                .accessibilityLabel("Use current location")
+            }
+            .padding(.horizontal, 18)
+            .padding(.vertical, 15)
+        }
+    }
+
+    private var destinationRow: some View {
+        HStack(alignment: .top, spacing: 14) {
+            RoutePlanningFieldIcon(symbol: "mappin.circle.fill", tint: .white.opacity(0.82))
+                .padding(.top, 8)
+
+            VStack(alignment: .leading, spacing: 4) {
+                routeFieldLabel("TO")
+                AddressSearchField(
+                    title: "Destination",
+                    placeholder: "Where are you headed?",
+                    systemImage: "mappin",
+                    iconColor: .white.opacity(0.82),
+                    showsIcon: false,
+                    text: $form.destination
+                )
+                .layoutPriority(1)
             }
         }
-        .animation(reduceMotion ? .easeOut(duration: 0.18) : AppAnimation.content, value: form.usesCurrentLocation)
+        .padding(.horizontal, 18)
+        .padding(.vertical, 15)
+        .accessibilityElement(children: .contain)
+    }
+
+    private func routeFieldCopy(label: String, value: String, valueColor: Color) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            routeFieldLabel(label)
+            Text(value)
+                .font(.headline.weight(.medium))
+                .foregroundStyle(valueColor)
+                .lineLimit(2)
+                .multilineTextAlignment(.leading)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func routeFieldLabel(_ value: String) -> some View {
+        Text(value)
+            .font(.caption.weight(.bold))
+            .tracking(1.1)
+            .foregroundStyle(.white.opacity(0.4))
     }
 
     private var currentLocationTitle: String {
         switch locationCoordinator.state {
         case .locating:
-            return "Finding current location"
+            "Finding current location"
         case .resolved(let address):
-            return address
+            address
         case .manualEntry(let message):
-            return message ?? "Current location unavailable"
+            message ?? "Current location unavailable"
         case .awaitingOrigin:
-            return form.origin.isEmpty ? "Current location" : form.origin
+            form.origin.isEmpty ? "Current location" : form.origin
         }
     }
 
-    private var oldRouteFields: some View {
-        HStack(alignment: .top, spacing: 10) {
-            RouteConnector(
-                showDestination: canEnterDestination,
-                isOriginAutocompleteVisible: isOriginAutocompleteVisible
+    private var mapPreviewSection: some View {
+        ZStack(alignment: .bottomLeading) {
+            RoutePlanningMapPreview(
+                origin: form.origin,
+                destination: form.destination,
+                usesCurrentLocation: form.usesCurrentLocation,
+                showsCurrentLocation: shouldShowCurrentLocationOnMap,
+                summary: $mapPreview
             )
-            .frame(width: 24)
+            .allowsHitTesting(false)
 
-            VStack(alignment: .leading, spacing: 12) {
-                originField
-                if canEnterDestination {
-                    AddressSearchField(title: "Destination", placeholder: "Where are you going?", systemImage: "flag.fill", iconColor: .red, showsIcon: false, text: $form.destination)
-                        .transition(reduceMotion ? .opacity : .opacity.combined(with: .move(edge: .top)))
-                }
+            LinearGradient(
+                colors: [.clear, .black.opacity(0.7)],
+                startPoint: .center,
+                endPoint: .bottom
+            )
+            .allowsHitTesting(false)
+
+            HStack(spacing: 8) {
+                Image(systemName: mapPreview == nil ? "map.fill" : "arrow.triangle.turn.up.right.diamond.fill")
+                    .foregroundStyle(.white.opacity(0.86))
+                Text(mapPreview?.displayText ?? mapPlaceholderText)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.white.opacity(0.92))
+                    .lineLimit(1)
             }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .background(.black.opacity(0.72), in: Capsule(style: .continuous))
+            .padding(14)
+            .accessibilityElement(children: .combine)
         }
-        .animation(reduceMotion ? .easeOut(duration: 0.2) : AppAnimation.spring, value: canEnterDestination)
+        .frame(height: 248)
+        .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 26, style: .continuous)
+                .stroke(.white.opacity(0.07), lineWidth: 1)
+        }
+        .accessibilityLabel(mapPreview?.accessibilityLabel ?? mapPlaceholderText)
     }
 
-    private var originField: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            if case .manualEntry(let message) = locationCoordinator.state, let message {
-                Label(message, systemImage: "info.circle.fill")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            }
-
-            HStack(alignment: .top, spacing: 8) {
-                AddressSearchField(
-                    title: "Starting location",
-                    placeholder: "Enter starting address",
-                    systemImage: "circle.fill",
-                    iconColor: AppDesign.accent,
-                    showsIcon: false,
-                    text: $form.origin,
-                    onSuggestionsVisibilityChanged: { isOriginAutocompleteVisible = $0 }
-                )
-
-                Button { locationCoordinator.useCurrentLocation() } label: {
-                    Group {
-                        if case .locating = locationCoordinator.state {
-                            ProgressView().tint(AppDesign.accent)
-                        } else {
-                            Image(systemName: "location.fill")
-                        }
-                    }
-                    .font(.body.weight(.semibold))
-                    .frame(width: 28, height: 28)
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-                .tint(AppDesign.accent)
-                .accessibilityLabel("Use current location")
-                .accessibilityHint("Fills the starting location with your current address")
-            }
+    private var mapPlaceholderText: String {
+        switch planningStage {
+        case .chooseOrigin:
+            "Apple Maps preview"
+        case .chooseDestination:
+            "Add a destination to preview your route"
+        case .readyToAnalyze:
+            "Preparing Apple Maps preview"
         }
     }
 
-    private var departureCard: some View {
+    private var departureSection: some View {
+        HStack(spacing: 14) {
+            Image(systemName: "clock.fill")
+                .font(.body.weight(.semibold))
+                .foregroundStyle(AppDesign.accent)
+                .frame(width: 38, height: 38)
+                .background(AppDesign.accent.opacity(0.16), in: Circle())
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Departure")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.white)
+                Text("Traffic estimates use this time")
+                    .font(.caption)
+                    .foregroundStyle(.white.opacity(0.5))
+            }
+
+            Spacer(minLength: 8)
+
+            DatePicker(
+                "Departure time",
+                selection: $form.departureTime,
+                in: Date()...,
+                displayedComponents: [.date, .hourAndMinute]
+            )
+            .datePickerStyle(.compact)
+            .labelsHidden()
+            .tint(AppDesign.accent)
+            .colorScheme(.dark)
+        }
+        .padding(16)
+        .background(routeSurface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .stroke(.white.opacity(0.06), lineWidth: 1)
+        }
+    }
+
+    private var departureContainer: some View {
+        Group {
+            if planningStage == .readyToAnalyze {
+                departureSection
+                    .transition(progressiveReveal)
+            }
+        }
+        .animation(reduceMotion ? .easeOut(duration: 0.18) : AppAnimation.selection, value: planningStage)
+    }
+
+    private var analyzeButton: some View {
+        Button {
+            Task { await analyzeRoute() }
+        } label: {
+            HStack(spacing: 10) {
+                if isLoading {
+                    ProgressView()
+                        .tint(.black)
+                } else {
+                    Image(systemName: "sparkles")
+                }
+                Text(isLoading ? "Analyzing route" : analyzeButtonTitle)
+                    .font(.headline.weight(.semibold))
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 17)
+            .foregroundStyle(canAnalyze ? .black : .white.opacity(0.45))
+            .background(
+                canAnalyze ? Color.white : Color.white.opacity(0.1),
+                in: RoundedRectangle(cornerRadius: 22, style: .continuous)
+            )
+        }
+        .buttonStyle(PressableScaleStyle())
+        .disabled(!canAnalyze)
+        .animation(AppAnimation.quick, value: canAnalyze)
+        .animation(AppAnimation.quick, value: isLoading)
+        .accessibilityHint(canAnalyze ? "Analyzes road conditions and route difficulty" : "Complete your start and destination first")
+    }
+
+    private var analyzeButtonTitle: String {
+        switch planningStage {
+        case .chooseOrigin:
+            "Choose a starting point"
+        case .chooseDestination:
+            "Choose a destination"
+        case .readyToAnalyze:
+            "Analyze difficulty"
+        }
+    }
+
+    private var routeChecksSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            SectionHeader(title: "Departure", subtitle: "Traffic estimates use your departure time.")
-            DatePicker("When", selection: $form.departureTime, in: Date()..., displayedComponents: [.date, .hourAndMinute])
-                .datePickerStyle(.compact).labelsHidden()
-        }.premiumCard()
-    }
+            Text("What Swerve checks")
+                .font(.headline.weight(.semibold))
+                .foregroundStyle(.white)
 
-    private var howItWorksSection: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            SectionHeader(title: "How Swerve scores a route", subtitle: "The road conditions behind each score.")
-            FactorExplanationRow(symbol: "speedometer", title: "Speed & highways", detail: "High-speed segments and long highway runs.")
-            FactorExplanationRow(symbol: "arrow.triangle.merge", title: "Merges & lane changes", detail: "Interchanges, ramps, and urgent lane decisions.")
-            FactorExplanationRow(symbol: "arrow.triangle.turn.up.right.diamond.fill", title: "Turns & decisions", detail: "Maneuver density, turn clusters, and unprotected lefts.")
-            FactorExplanationRow(symbol: "car.2.fill", title: "Traffic & trip load", detail: "Live congestion, drive duration, and sustained attention.")
-            FactorExplanationRow(symbol: "cloud.sun.rain.fill", title: "Conditions & roads", detail: "Weather, visibility, construction, and road geometry when available.")
-            Label("Missing live or road data is left out. Swerve never guesses.", systemImage: "checkmark.shield.fill").font(.footnote).foregroundStyle(.secondary)
-        }.premiumCard()
+            HStack(spacing: 8) {
+                RouteCheckPill(symbol: "car.2.fill", title: "Traffic")
+                RouteCheckPill(symbol: "arrow.triangle.merge", title: "Merges")
+                RouteCheckPill(symbol: "cloud.sun.rain.fill", title: "Conditions")
+            }
+
+            Text("Route analysis combines road geometry with available traffic and weather data. Missing signals are left out, never guessed.")
+                .font(.footnote)
+                .foregroundStyle(.white.opacity(0.48))
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(.top, 4)
     }
 
     private func errorBanner(_ message: String) -> some View {
-        HStack(spacing: 10) {
-            Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.red)
-            Text(message).font(.subheadline).fixedSize(horizontal: false, vertical: true)
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundStyle(.orange)
+            Text(message)
+                .font(.subheadline)
+                .foregroundStyle(.white.opacity(0.86))
+                .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 0)
-        }.padding(14).background(Color.red.opacity(0.08)).clipShape(RoundedRectangle(cornerRadius: AppDesign.cornerRadiusSmall, style: .continuous))
+        }
+        .padding(14)
+        .background(.orange.opacity(0.12), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
     private func importNoticeBanner(_ notice: RouteImportNotice) -> some View {
         HStack(alignment: .top, spacing: 10) {
-            Image(systemName: notice.isError ? "exclamationmark.triangle.fill" : "map.fill")
-                .foregroundStyle(notice.isError ? .red : AppDesign.accent)
+            Image(systemName: notice.isError ? "exclamationmark.triangle.fill" : "arrow.down.doc.fill")
+                .foregroundStyle(notice.isError ? .orange : AppDesign.accent)
                 .frame(width: 20)
             VStack(alignment: .leading, spacing: 2) {
                 Text(notice.title)
                     .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.white)
                 Text(notice.message)
                     .font(.footnote)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.white.opacity(0.58))
                     .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 0)
@@ -286,24 +516,39 @@ struct HomeView: View {
             } label: {
                 Image(systemName: "xmark")
                     .font(.caption.weight(.bold))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.white.opacity(0.58))
                     .frame(width: 28, height: 28)
-                    .background(Color(.tertiarySystemFill), in: Circle())
+                    .background(.white.opacity(0.08), in: Circle())
             }
             .buttonStyle(PressableScaleStyle())
             .accessibilityLabel("Dismiss imported route notice")
         }
         .padding(14)
-        .background(
-            (notice.isError ? Color.red : AppDesign.accent).opacity(0.08),
-            in: RoundedRectangle(cornerRadius: AppDesign.cornerRadiusSmall, style: .continuous)
-        )
+        .background(routeSurface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: AppDesign.cornerRadiusSmall, style: .continuous)
-                .stroke((notice.isError ? Color.red : AppDesign.accent).opacity(0.14), lineWidth: 1)
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke((notice.isError ? Color.orange : AppDesign.accent).opacity(0.26), lineWidth: 1)
         }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("\(notice.title). \(notice.message)")
+    }
+
+    private func switchToManualOrigin() {
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        withAnimation(reduceMotion ? .easeOut(duration: 0.18) : AppAnimation.selection) {
+            form.usesCurrentLocation = false
+            form.origin = ""
+            locationCoordinator.useManualEntry()
+        }
+    }
+
+    private func chooseCurrentLocation() {
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        withAnimation(reduceMotion ? .easeOut(duration: 0.18) : AppAnimation.selection) {
+            form.usesCurrentLocation = true
+            form.origin = ""
+        }
+        locationCoordinator.useCurrentLocation()
     }
 
     private func analyzeRoute() async {
@@ -349,60 +594,35 @@ struct HomeView: View {
     }
 }
 
-private struct RouteConnector: View {
-    let showDestination: Bool
-    let isOriginAutocompleteVisible: Bool
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    private var showDestinationIndicator: Bool { showDestination && !isOriginAutocompleteVisible }
+private struct RoutePlanningFieldIcon: View {
+    let symbol: String
+    let tint: Color
 
     var body: some View {
-        VStack(spacing: 0) {
-            Circle().fill(AppDesign.accent).frame(width: 12, height: 12).overlay(Circle().stroke(.white, lineWidth: 3))
-            // This fixed segment matches the origin row + 12pt inter-row gap,
-            // keeping the flag centered on the destination text field.
-            VStack(spacing: 4) {
-                ForEach(0..<4, id: \.self) { index in
-                    Circle()
-                        .fill(Color.secondary.opacity(0.55))
-                        .frame(width: 3, height: 3)
-                        .opacity(showDestinationIndicator ? 1 : 0)
-                        .animation(dotAnimation(for: index), value: showDestinationIndicator)
-                }
-            }
-            .frame(height: 32)
-            Image(systemName: "flag.fill")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(.red)
-                // The glyph is visually top-heavy, so center its drawing—not
-                // merely its text line—against the destination input.
-                .frame(width: 12, height: 12)
-                .offset(y: 3)
-                .opacity(showDestinationIndicator ? 1 : 0)
-                .animation(flagAnimation, value: showDestinationIndicator)
-        }
-        .padding(.top, 11)
-        .accessibilityHidden(true)
-    }
-
-    private func dotAnimation(for index: Int) -> Animation? {
-        guard !reduceMotion else { return .easeOut(duration: 0.15) }
-        return AppAnimation.spring.delay(Double(index) * 0.08)
-    }
-
-    private var flagAnimation: Animation? {
-        guard !reduceMotion else { return .easeOut(duration: 0.15) }
-        return AppAnimation.spring.delay(0.36)
+        Image(systemName: symbol)
+            .font(.system(size: 24, weight: .semibold))
+            .foregroundStyle(tint)
+            .frame(width: 36, height: 44)
+            .accessibilityHidden(true)
     }
 }
 
-private struct FactorExplanationRow: View {
-    let symbol: String; let title: String; let detail: String
+private struct RouteCheckPill: View {
+    let symbol: String
+    let title: String
+
     var body: some View {
-        HStack(alignment: .top, spacing: 12) {
-            IconTile(symbol: symbol)
-            VStack(alignment: .leading, spacing: 2) { Text(title).font(.subheadline.weight(.semibold)); Text(detail).font(.caption).foregroundStyle(.secondary) }
-        }
+        Label(title, systemImage: symbol)
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(.white.opacity(0.7))
+            .lineLimit(1)
+            .padding(.horizontal, 11)
+            .padding(.vertical, 9)
+            .background(.white.opacity(0.075), in: Capsule(style: .continuous))
+            .overlay {
+                Capsule(style: .continuous)
+                    .stroke(.white.opacity(0.055), lineWidth: 1)
+            }
     }
 }
 
@@ -414,4 +634,6 @@ struct RouteAnalysisResult: Hashable {
     let alternateRoutes: [ScoredRoute]
 }
 
-#Preview { HomeView(form: RoutePlanningFormModel()) }
+#Preview {
+    HomeView(form: RoutePlanningFormModel())
+}

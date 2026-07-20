@@ -47,7 +47,7 @@ struct DriverProgressView: View {
                 .padding(.horizontal, AppDesign.contentPadding)
                 .padding(.vertical, 12)
             }
-            .background(Color(.systemGroupedBackground))
+            .background(AppDesign.canvas)
             .navigationTitle("Progress")
             .navigationBarTitleDisplayMode(.large)
         }

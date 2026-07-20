@@ -132,7 +132,7 @@ struct ResultsView: View {
             .padding(.horizontal, AppDesign.contentPadding)
             .padding(.vertical, 12)
         }
-        .background(Color(.systemGroupedBackground))
+        .background(AppDesign.canvas)
         .navigationTitle("Results")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {

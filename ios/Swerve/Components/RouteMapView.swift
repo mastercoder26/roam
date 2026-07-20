@@ -10,6 +10,7 @@ struct RouteMapView: UIViewRepresentable {
     func makeUIView(context: Context) -> MKMapView {
         let mapView = MKMapView()
         mapView.delegate = context.coordinator
+        mapView.overrideUserInterfaceStyle = .dark
         mapView.isRotateEnabled = false
         mapView.pointOfInterestFilter = .excludingAll
         mapView.showsCompass = false
@@ -205,6 +206,7 @@ struct RecordedDriveMapView: UIViewRepresentable {
     func makeUIView(context: Context) -> MKMapView {
         let map = MKMapView()
         map.delegate = context.coordinator
+        map.overrideUserInterfaceStyle = .dark
         map.isRotateEnabled = false
         map.showsCompass = false
         map.pointOfInterestFilter = .excludingAll
@@ -364,5 +366,345 @@ private final class DriveReplayAnnotation: MKPointAnnotation {
         super.init()
         title = moment.kind.title
         subtitle = "Tap to review this moment"
+    }
+}
+
+/// A lightweight, visual-only Apple Maps preview used while planning a route.
+/// It never calls Swerve's backend or creates a route-difficulty score. When
+/// both endpoints are available, MapKit draws its own automobile route so the
+/// user can sanity-check the route before opting into analysis.
+struct RoutePlanningMapSummary: Equatable {
+    let distanceMeters: CLLocationDistance
+    let expectedTravelTime: TimeInterval
+
+    var displayText: String {
+        "\(distanceText) · \(durationText)"
+    }
+
+    var accessibilityLabel: String {
+        "Apple Maps preview, \(distanceText), estimated \(durationText)"
+    }
+
+    private var distanceText: String {
+        let miles = distanceMeters / 1_609.344
+        if miles < 0.1 {
+            return "less than 0.1 mi"
+        }
+        return String(format: "%.1f mi", miles)
+    }
+
+    private var durationText: String {
+        let formatter = DateComponentsFormatter()
+        formatter.allowedUnits = expectedTravelTime >= 3_600 ? [.hour, .minute] : [.minute]
+        formatter.unitsStyle = .abbreviated
+        return formatter.string(from: expectedTravelTime) ?? "0 min"
+    }
+}
+
+struct RoutePlanningMapPreview: UIViewRepresentable {
+    let origin: String
+    let destination: String
+    let usesCurrentLocation: Bool
+    let showsCurrentLocation: Bool
+    @Binding var summary: RoutePlanningMapSummary?
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    func makeUIView(context: Context) -> MKMapView {
+        let map = MKMapView()
+        map.delegate = context.coordinator
+        map.mapType = .standard
+        map.overrideUserInterfaceStyle = .dark
+        map.showsUserLocation = false
+        map.showsCompass = false
+        map.showsScale = false
+        map.isRotateEnabled = false
+        map.isPitchEnabled = false
+        map.pointOfInterestFilter = .excludingAll
+        map.setRegion(Coordinator.fallbackRegion, animated: false)
+        return map
+    }
+
+    func updateUIView(_ map: MKMapView, context: Context) {
+        context.coordinator.reduceMotion = reduceMotion
+        let summaryBinding = $summary
+        context.coordinator.onSummaryChange = { value in
+            DispatchQueue.main.async {
+                guard summaryBinding.wrappedValue != value else { return }
+                summaryBinding.wrappedValue = value
+            }
+        }
+        context.coordinator.update(
+            map: map,
+            origin: origin,
+            destination: destination,
+            usesCurrentLocation: usesCurrentLocation,
+            showsCurrentLocation: showsCurrentLocation
+        )
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator() }
+
+    final class Coordinator: NSObject, MKMapViewDelegate {
+        static let fallbackRegion = MKCoordinateRegion(
+            center: CLLocationCoordinate2D(latitude: 39.5, longitude: -98.35),
+            span: MKCoordinateSpan(latitudeDelta: 33, longitudeDelta: 42)
+        )
+
+        var reduceMotion = false
+        var onSummaryChange: (RoutePlanningMapSummary?) -> Void = { _ in }
+
+        private var renderedRequest: RouteRequest?
+        private var routeTask: Task<Void, Never>?
+        private var hasFocusedUserLocation = false
+        private var isShowingRoute = false
+
+        deinit {
+            routeTask?.cancel()
+        }
+
+        func update(
+            map: MKMapView,
+            origin: String,
+            destination: String,
+            usesCurrentLocation: Bool,
+            showsCurrentLocation: Bool
+        ) {
+            if map.showsUserLocation != showsCurrentLocation {
+                map.showsUserLocation = showsCurrentLocation
+                hasFocusedUserLocation = false
+            }
+            let request = RouteRequest(
+                origin: origin,
+                destination: destination,
+                usesCurrentLocation: usesCurrentLocation,
+                showsCurrentLocation: showsCurrentLocation
+            )
+            guard request != renderedRequest else { return }
+            renderedRequest = request
+            routeTask?.cancel()
+            isShowingRoute = false
+            clearRoute(in: map)
+            onSummaryChange(nil)
+
+            switch request.previewStage {
+            case .overview:
+                return
+            case .startingPoint where request.usesCurrentLocation:
+                // MKMapView already renders the user's Apple Maps location dot.
+                // Do not fabricate a coordinate until Core Location supplies one.
+                return
+            case .route where request.usesCurrentLocation && !request.showsCurrentLocation:
+                // A shared route can prefer the current location before the
+                // person has chosen it. Do not request or reveal it yet.
+                return
+            case .startingPoint, .route:
+                break
+            }
+
+            routeTask = Task { @MainActor [weak self, weak map] in
+                do {
+                    try await Task.sleep(nanoseconds: 400_000_000)
+                    guard !Task.isCancelled,
+                          let self,
+                          let map,
+                          self.renderedRequest == request else { return }
+
+                    let sourceItem = request.usesCurrentLocation
+                        ? MKMapItem.forCurrentLocation()
+                        : try await Self.mapItem(for: request.origin, near: map.region)
+                    guard !Task.isCancelled, self.renderedRequest == request else { return }
+
+                    guard request.previewStage == .route else {
+                        self.renderStartingPoint(sourceItem, in: map)
+                        return
+                    }
+
+                    let destinationItem = try await Self.mapItem(for: request.destination, near: map.region)
+                    guard !Task.isCancelled, self.renderedRequest == request else { return }
+
+                    let directionsRequest = MKDirections.Request()
+                    directionsRequest.source = sourceItem
+                    directionsRequest.destination = destinationItem
+                    directionsRequest.transportType = .automobile
+                    let response = try await MKDirections(request: directionsRequest).calculate()
+                    guard !Task.isCancelled,
+                          self.renderedRequest == request,
+                          let route = response.routes.first else { return }
+
+                    self.render(route, source: sourceItem, destination: destinationItem, in: map)
+                } catch is CancellationError {
+                    return
+                } catch {
+                    // A visual preview is optional. The planning form remains
+                    // usable if MapKit cannot resolve an address or route.
+                    guard let self, self.renderedRequest == request else { return }
+                    self.onSummaryChange(nil)
+                }
+            }
+        }
+
+        func mapView(_ mapView: MKMapView, didUpdate userLocation: MKUserLocation) {
+            guard mapView.showsUserLocation,
+                  !hasFocusedUserLocation,
+                  !isShowingRoute,
+                  let location = userLocation.location,
+                  location.horizontalAccuracy >= 0 else { return }
+            hasFocusedUserLocation = true
+            mapView.setRegion(
+                MKCoordinateRegion(
+                    center: location.coordinate,
+                    span: MKCoordinateSpan(latitudeDelta: 0.12, longitudeDelta: 0.12)
+                ),
+                animated: false
+            )
+        }
+
+        func mapView(_ mapView: MKMapView, rendererFor overlay: MKOverlay) -> MKOverlayRenderer {
+            guard let polyline = overlay as? MKPolyline else {
+                return MKOverlayRenderer(overlay: overlay)
+            }
+            let renderer = MKPolylineRenderer(polyline: polyline)
+            renderer.strokeColor = .systemBlue
+            renderer.lineWidth = 5
+            renderer.lineCap = .round
+            renderer.lineJoin = .round
+            return renderer
+        }
+
+        func mapView(_ mapView: MKMapView, viewFor annotation: MKAnnotation) -> MKAnnotationView? {
+            guard let annotation = annotation as? RoutePlanningAnnotation else { return nil }
+            let identifier = "route-planning-\(annotation.kind.rawValue)"
+            let view = mapView.dequeueReusableAnnotationView(withIdentifier: identifier) as? MKMarkerAnnotationView
+                ?? MKMarkerAnnotationView(annotation: annotation, reuseIdentifier: identifier)
+            view.annotation = annotation
+            view.canShowCallout = false
+            view.markerTintColor = annotation.kind == .origin ? .systemBlue : .white
+            view.glyphImage = UIImage(systemName: annotation.kind == .origin ? "circle.inset.filled" : "mappin")
+            view.displayPriority = .required
+            return view
+        }
+
+        private static func mapItem(
+            for address: String,
+            near region: MKCoordinateRegion
+        ) async throws -> MKMapItem {
+            let request = MKLocalSearch.Request()
+            request.naturalLanguageQuery = address
+            request.region = region
+            request.resultTypes = .address
+            let response = try await MKLocalSearch(request: request).start()
+            guard let item = response.mapItems.first else {
+                throw RoutePlanningMapError.addressNotFound
+            }
+            return item
+        }
+
+        private func clearRoute(in map: MKMapView) {
+            map.removeOverlays(map.overlays)
+            let routeAnnotations = map.annotations.filter { !($0 is MKUserLocation) }
+            map.removeAnnotations(routeAnnotations)
+        }
+
+        private func render(
+            _ route: MKRoute,
+            source: MKMapItem,
+            destination: MKMapItem,
+            in map: MKMapView
+        ) {
+            clearRoute(in: map)
+            isShowingRoute = true
+            map.addOverlay(route.polyline)
+            let annotations = [
+                (source.placemark.coordinate, RoutePlanningAnnotation.Kind.origin),
+                (destination.placemark.coordinate, RoutePlanningAnnotation.Kind.destination),
+            ].compactMap { coordinate, kind -> RoutePlanningAnnotation? in
+                guard CLLocationCoordinate2DIsValid(coordinate) else { return nil }
+                return RoutePlanningAnnotation(coordinate: coordinate, kind: kind)
+            }
+            map.addAnnotations(annotations)
+            onSummaryChange(
+                RoutePlanningMapSummary(
+                    distanceMeters: route.distance,
+                    expectedTravelTime: route.expectedTravelTime
+                )
+            )
+
+            CATransaction.begin()
+            if reduceMotion {
+                CATransaction.setDisableActions(true)
+            } else {
+                CATransaction.setAnimationDuration(AppAnimation.mapDuration)
+                CATransaction.setAnimationTimingFunction(
+                    CAMediaTimingFunction(controlPoints: 0.42, 0, 0.58, 1)
+                )
+            }
+            map.setVisibleMapRect(
+                route.polyline.boundingMapRect,
+                edgePadding: UIEdgeInsets(top: 36, left: 28, bottom: 44, right: 28),
+                animated: !reduceMotion
+            )
+            CATransaction.commit()
+        }
+
+        private func renderStartingPoint(_ item: MKMapItem, in map: MKMapView) {
+            clearRoute(in: map)
+            isShowingRoute = false
+
+            let coordinate = item.placemark.coordinate
+            guard CLLocationCoordinate2DIsValid(coordinate) else { return }
+            map.addAnnotation(RoutePlanningAnnotation(coordinate: coordinate, kind: .origin))
+
+            CATransaction.begin()
+            if reduceMotion {
+                CATransaction.setDisableActions(true)
+            } else {
+                CATransaction.setAnimationDuration(AppAnimation.mapDuration)
+                CATransaction.setAnimationTimingFunction(
+                    CAMediaTimingFunction(controlPoints: 0.42, 0, 0.58, 1)
+                )
+            }
+            map.setRegion(
+                MKCoordinateRegion(
+                    center: coordinate,
+                    span: MKCoordinateSpan(latitudeDelta: 0.12, longitudeDelta: 0.12)
+                ),
+                animated: !reduceMotion
+            )
+            CATransaction.commit()
+        }
+    }
+
+    private struct RouteRequest: Equatable {
+        let origin: String
+        let destination: String
+        let usesCurrentLocation: Bool
+        let showsCurrentLocation: Bool
+
+        var previewStage: RoutePlanningMapPreviewStage {
+            RoutePlanningMapPreviewStage(
+                origin: origin,
+                destination: destination,
+                usesCurrentLocation: usesCurrentLocation
+            )
+        }
+    }
+
+    private enum RoutePlanningMapError: Error {
+        case addressNotFound
+    }
+}
+
+private final class RoutePlanningAnnotation: MKPointAnnotation {
+    enum Kind: String {
+        case origin
+        case destination
+    }
+
+    let kind: Kind
+
+    init(coordinate: CLLocationCoordinate2D, kind: Kind) {
+        self.kind = kind
+        super.init()
+        self.coordinate = coordinate
     }
 }

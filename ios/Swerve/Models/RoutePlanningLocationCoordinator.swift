@@ -8,10 +8,6 @@ enum RoutePlanningOriginState: Equatable {
     case resolved(String)
     case manualEntry(message: String?)
 
-    var allowsDestination: Bool {
-        if case .resolved = self { return true }
-        return false
-    }
 }
 
 @MainActor

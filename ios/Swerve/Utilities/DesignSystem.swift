@@ -6,6 +6,11 @@ enum AppDesign {
     static let accent = Color(red: 0.02, green: 0.42, blue: 0.92)
     static let safety = Color.orange
     static let positive = Color.green
+    /// Shared dark canvas used by every primary tab. Cards remain solid and
+    /// legible, leaving liquid glass to the floating tab bar and small controls.
+    static let canvas = Color(red: 0.045, green: 0.045, blue: 0.05)
+    static let cardSurface = Color(red: 0.115, green: 0.115, blue: 0.125)
+    static let cardStroke = Color.white.opacity(0.065)
     static let space4: CGFloat = 4
     static let space8: CGFloat = 8
     static let space12: CGFloat = 12
@@ -42,11 +47,11 @@ struct PremiumCardModifier: ViewModifier {
         content
             .padding(AppDesign.cardPadding)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color(.secondarySystemGroupedBackground))
+            .background(AppDesign.cardSurface)
             .clipShape(RoundedRectangle(cornerRadius: AppDesign.cornerRadius, style: .continuous))
             .overlay {
                 RoundedRectangle(cornerRadius: AppDesign.cornerRadius, style: .continuous)
-                    .stroke(Color.primary.opacity(0.05), lineWidth: 1)
+                    .stroke(AppDesign.cardStroke, lineWidth: 1)
             }
     }
 }
@@ -67,11 +72,11 @@ struct SectionHeader: View {
         VStack(alignment: .leading, spacing: 4) {
             Text(title)
                 .font(AppDesign.Typography.sectionTitle)
-                .foregroundStyle(.primary)
+                .foregroundStyle(.white)
             if let subtitle {
                 Text(subtitle)
                     .font(.footnote)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.white.opacity(0.56))
             }
         }
     }

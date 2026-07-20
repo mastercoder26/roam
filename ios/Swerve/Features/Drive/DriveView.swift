@@ -55,7 +55,7 @@ struct DriveView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .scrollDisabled(isTransitioningDriveSurface)
-                .background(isFocusedCanvas ? Color(.systemBackground) : Color(.systemGroupedBackground))
+                .background(isFocusedCanvas ? Color(.systemBackground) : AppDesign.canvas)
             }
             .navigationTitle(isFocusedCanvas ? "" : "Drive")
             .navigationBarTitleDisplayMode(.large)
