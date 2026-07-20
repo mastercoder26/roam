@@ -82,6 +82,16 @@ struct SectionHeader: View {
     }
 }
 
+struct BrandWordmark: View {
+    var body: some View {
+        Text("Swerve")
+            .font(.custom("Baskerville-SemiBoldItalic", size: 29))
+            .tracking(-0.35)
+            .foregroundStyle(.white.opacity(0.92))
+            .accessibilityLabel("Swerve")
+    }
+}
+
 // MARK: - Press feedback (scale 0.97 on active)
 
 struct PressableScaleStyle: ButtonStyle {

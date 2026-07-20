@@ -55,6 +55,7 @@ struct DriverProgressView: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 6) {
+            BrandWordmark()
             Text("Recorded progress")
                 .font(AppDesign.Typography.heroTitle)
                 .tracking(-0.5)

@@ -21,6 +21,9 @@ struct DriveView: View {
             GeometryReader { geometry in
                 ScrollView {
                     VStack(alignment: .leading, spacing: AppDesign.sectionSpacing) {
+                        recordingCard(availableHeight: geometry.size.height)
+                            .id("drive-recording-surface")
+
                         if showsSupportingContent {
                             header
                             breakPlanningCard
@@ -29,9 +32,6 @@ struct DriveView: View {
                                     .transition(reduceMotion ? .opacity : .opacity.combined(with: .move(edge: .top)))
                             }
                         }
-
-                        recordingCard(availableHeight: geometry.size.height)
-                            .id("drive-recording-surface")
 
                         if showsSupportingContent {
                             if let score = session.lastScore {
@@ -146,6 +146,7 @@ struct DriveView: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 6) {
+            BrandWordmark()
             Text("Practice with purpose")
                 .font(AppDesign.Typography.heroTitle)
                 .tracking(-0.5)

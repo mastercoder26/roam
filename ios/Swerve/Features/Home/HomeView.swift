@@ -135,10 +135,7 @@ struct HomeView: View {
 
     private var headerSection: some View {
         VStack(alignment: .leading, spacing: 9) {
-            Text("SWERVE")
-                .font(.caption.weight(.bold))
-                .tracking(2.2)
-                .foregroundStyle(.white.opacity(0.48))
+            BrandWordmark()
 
             HStack(alignment: .center, spacing: 16) {
                 Text("Plan your route")
