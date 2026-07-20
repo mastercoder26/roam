@@ -150,17 +150,12 @@ struct DriveView: View {
             Text("Practice with purpose")
                 .font(AppDesign.Typography.heroTitle)
                 .tracking(-0.5)
-            Text("Start and end each drive yourself. Your raw readings stay on this device.")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
         }
     }
 
 
     private var breakPlanningCard: some View {
         VStack(alignment: .leading, spacing: 14) {
-            SectionHeader(title: "Plan rest stops", subtitle: "Add a specific route before you start. Long or high-demand drives show recommended break timing.")
-
             AddressSearchField(
                 title: "Break-plan destination",
                 placeholder: "Where are you driving?",
@@ -304,9 +299,9 @@ struct DriveView: View {
                     .background(AppDesign.accent.opacity(0.12), in: Circle())
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Practice route ready")
+                    Text("Practice route")
                         .font(.subheadline.weight(.semibold))
-                    Text("Start manually when you’re ready. Swerve only counts this as route practice when saved GPS overlaps the route.")
+                    Text("Swerve only counts this as route practice when saved GPS overlaps the route.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -357,14 +352,6 @@ struct DriveView: View {
         let actionShowsEnd = presentationState.action == .end
 
         return VStack(spacing: isExpandedDriveSurface ? 0 : 18) {
-            Label(actionShowsEnd ? "DRIVE STARTED" : "MANUAL DRIVE", systemImage: actionShowsEnd ? "record.circle.fill" : "steeringwheel")
-                .font(.caption.weight(.bold))
-                .foregroundStyle(actionShowsEnd ? .red : .secondary)
-                // Keeping this anchor centered through the complete sequence
-                // prevents the title from taking a sideways path on return.
-                .frame(maxWidth: .infinity, alignment: .center)
-                .padding(.top, isExpandedDriveSurface ? 28 : 0)
-
             FlipClock(elapsed: session.elapsed, style: isExpandedDriveSurface ? .active : .preview)
                 .padding(.top, isExpandedDriveSurface ? 12 : 0)
 

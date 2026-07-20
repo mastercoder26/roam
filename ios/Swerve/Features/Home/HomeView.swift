@@ -154,9 +154,6 @@ struct HomeView: View {
                     .accessibilityHidden(true)
             }
 
-            Text("Set your start, then see the road before you take it.")
-                .font(.subheadline)
-                .foregroundStyle(.white.opacity(0.58))
         }
     }
 
@@ -337,19 +334,6 @@ struct HomeView: View {
             )
             .allowsHitTesting(false)
 
-            HStack(spacing: 8) {
-                Image(systemName: mapPreview == nil ? "map.fill" : "arrow.triangle.turn.up.right.diamond.fill")
-                    .foregroundStyle(.white.opacity(0.86))
-                Text(mapPreview?.displayText ?? mapPlaceholderText)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.white.opacity(0.92))
-                    .lineLimit(1)
-            }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 10)
-            .background(.black.opacity(0.72), in: Capsule(style: .continuous))
-            .padding(14)
-            .accessibilityElement(children: .combine)
         }
         .frame(height: 248)
         .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
@@ -357,18 +341,7 @@ struct HomeView: View {
             RoundedRectangle(cornerRadius: 26, style: .continuous)
                 .stroke(.white.opacity(0.07), lineWidth: 1)
         }
-        .accessibilityLabel(mapPreview?.accessibilityLabel ?? mapPlaceholderText)
-    }
-
-    private var mapPlaceholderText: String {
-        switch planningStage {
-        case .chooseOrigin:
-            "Apple Maps preview"
-        case .chooseDestination:
-            "Add a destination to preview your route"
-        case .readyToAnalyze:
-            "Preparing Apple Maps preview"
-        }
+        .accessibilityLabel(mapPreview?.accessibilityLabel ?? "Route map")
     }
 
     private var departureSection: some View {
@@ -471,10 +444,6 @@ struct HomeView: View {
                 RouteCheckPill(symbol: "cloud.sun.rain.fill", title: "Conditions")
             }
 
-            Text("Route analysis combines road geometry with available traffic and weather data. Missing signals are left out, never guessed.")
-                .font(.footnote)
-                .foregroundStyle(.white.opacity(0.48))
-                .fixedSize(horizontal: false, vertical: true)
         }
         .padding(.top, 4)
     }
