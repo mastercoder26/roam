@@ -50,28 +50,19 @@ struct DriveView: View {
                             }
                         }
                     }
-                    .padding(.horizontal, AppDesign.contentPadding)
-                    .padding(.vertical, 12)
+                    // Drop outer padding while focused so the canvas height matches
+                    // GeometryReader exactly. That keeps the End Drive path vertical
+                    // and prevents the control from sliding under the tab bar.
+                    .padding(.horizontal, isFocusedCanvas ? 0 : AppDesign.contentPadding)
+                    .padding(.vertical, isFocusedCanvas ? 0 : 12)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .scrollDisabled(isTransitioningDriveSurface)
                 .background(isFocusedCanvas ? Color(.systemBackground) : AppDesign.canvas)
             }
-            .navigationTitle(isFocusedCanvas ? "" : "Drive")
-            .navigationBarTitleDisplayMode(.large)
-            .toolbar(isFocusedCanvas ? .hidden : .visible, for: .navigationBar)
-            .toolbar {
-                if !isFocusedCanvas {
-                    ToolbarItem(placement: .topBarTrailing) {
-                        Button {
-                            showingHelp = true
-                        } label: {
-                            Label("Get help", systemImage: "lifepreserver.fill")
-                        }
-                        .accessibilityHint("Shows safety and emergency options")
-                    }
-                }
-            }
+            // Keep the nav bar hidden so GeometryReader height stays stable across
+            // start/stop — a large-title collapse was fighting the button motion.
+            .toolbar(.hidden, for: .navigationBar)
         }
         .sheet(isPresented: $showingHelp) {
             DriveHelpSheet()
@@ -128,6 +119,16 @@ struct DriveView: View {
         reduceMotion ? .easeOut(duration: 0.12) : .easeInOut(duration: 0.12)
     }
 
+    /// Settling windows used when chaining start/stop phases. Slightly longer
+    /// than the spring response so layout finishes before the next step.
+    private var actionSwapSettlingNanos: UInt64 {
+        reduceMotion ? 130_000_000 : 150_000_000
+    }
+
+    private var driveModeSettlingNanos: UInt64 {
+        reduceMotion ? 200_000_000 : 480_000_000
+    }
+
     private var isExpandedDriveSurface: Bool {
         presentationState.isExpanded
     }
@@ -145,11 +146,26 @@ struct DriveView: View {
     }
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            BrandWordmark()
+        HStack(alignment: .center, spacing: 12) {
             Text("Practice with purpose")
                 .font(AppDesign.Typography.heroTitle)
                 .tracking(-0.5)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Spacer(minLength: 8)
+
+            Button {
+                showingHelp = true
+            } label: {
+                Image(systemName: "lifepreserver.fill")
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(.primary)
+                    .frame(width: 36, height: 36)
+                    .background(Color.primary.opacity(0.06), in: Circle())
+            }
+            .buttonStyle(PressableScaleStyle())
+            .accessibilityLabel("Get help")
+            .accessibilityHint("Shows safety and emergency options")
         }
     }
 
@@ -347,29 +363,32 @@ struct DriveView: View {
     }
 
     private func recordingCard(availableHeight: CGFloat) -> some View {
-        let expandedHeight = max(availableHeight - 24, 560)
+        // Never force a taller canvas than the visible area. A floor here used
+        // to push End Drive under the floating tab bar once the brand mark and
+        // tab inset reduced available height.
+        let expandedHeight = max(availableHeight, 0)
         let keepsFocusedCanvas = presentationState.preservesFocusedCanvas
         let actionShowsEnd = presentationState.action == .end
 
         return VStack(spacing: isExpandedDriveSurface ? 0 : 18) {
             FlipClock(elapsed: session.elapsed, style: isExpandedDriveSurface ? .active : .preview)
-                .padding(.top, isExpandedDriveSurface ? 12 : 0)
+                .padding(.top, isExpandedDriveSurface ? 20 : 0)
 
             if isExpandedDriveSurface {
-                Spacer(minLength: 34)
+                Spacer(minLength: 28)
                 activeSpeed
 
                 if session.phonePlacementAssessment == .needsAdjustment {
                     compactPlacementWarning
                         .padding(.top, 20)
-                        .transition(reduceMotion ? .opacity : .opacity)
+                        .transition(.opacity)
                 }
 
-                Spacer(minLength: 34)
+                Spacer(minLength: 28)
             }
 
             driveActionButton(showsEnd: actionShowsEnd)
-                .padding(.horizontal, isExpandedDriveSurface ? AppDesign.contentPadding : 0)
+                .padding(.horizontal, keepsFocusedCanvas ? AppDesign.contentPadding : 0)
                 .padding(
                     .bottom,
                     isExpandedDriveSurface
@@ -384,7 +403,7 @@ struct DriveView: View {
                     .multilineTextAlignment(.center)
             }
         }
-        .padding(isExpandedDriveSurface ? 0 : 20)
+        .padding(keepsFocusedCanvas ? 0 : 20)
         .frame(maxWidth: .infinity)
         // Do not collapse the canvas while the End Drive control is travelling
         // back to the compact position. That keeps the reverse path vertical.
@@ -432,15 +451,18 @@ struct DriveView: View {
         transitionToken = UUID()
         let token = transitionToken
 
-        // First, make the action's meaning explicit. Only after that label
-        // swap settles do we move the same button vertically to its driving
-        // position.
-        withAnimation(actionSwapAnimation, completionCriteria: .logicallyComplete) {
+        // Label swap first, then the vertical expand. Timed settles are more
+        // reliable here than spring completion callbacks, which can skip steps
+        // when layout and toolbar chrome change in the same turn.
+        withAnimation(actionSwapAnimation) {
             presentationState = DrivePresentationEngine.reduce(
                 presentationState,
                 event: .startTapped
             )
-        } completion: {
+        }
+
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: actionSwapSettlingNanos)
             guard transitionToken == token,
                   presentationState.phase == .switchingToEnd,
                   !session.isRecording else {
@@ -463,37 +485,40 @@ struct DriveView: View {
         let token = transitionToken
         session.endDrive()
 
-        // Keep the End Drive label while its existing button returns along the
-        // same vertical path. The start label returns only after it reaches
-        // its original position.
-        withAnimation(driveModeAnimation, completionCriteria: .logicallyComplete) {
+        // Keep the End Drive label while the control travels back up the same
+        // vertical path, then swap to Start only after that motion settles.
+        withAnimation(driveModeAnimation) {
             presentationState = DrivePresentationEngine.reduce(
                 presentationState,
                 event: .endTapped
             )
-        } completion: {
+        }
+
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: driveModeSettlingNanos)
             guard transitionToken == token,
                   presentationState.phase == .returning else {
                 return
             }
 
-            withAnimation(actionSwapAnimation, completionCriteria: .logicallyComplete) {
+            withAnimation(actionSwapAnimation) {
                 presentationState = DrivePresentationEngine.reduce(
                     presentationState,
                     event: .returnMotionCompleted
                 )
-            } completion: {
-                guard transitionToken == token,
-                      presentationState.phase == .switchingToStart else {
-                    return
-                }
+            }
 
-                withAnimation(driveModeAnimation) {
-                    presentationState = DrivePresentationEngine.reduce(
-                        presentationState,
-                        event: .startSwapCompleted
-                    )
-                }
+            try? await Task.sleep(nanoseconds: actionSwapSettlingNanos)
+            guard transitionToken == token,
+                  presentationState.phase == .switchingToStart else {
+                return
+            }
+
+            withAnimation(driveModeAnimation) {
+                presentationState = DrivePresentationEngine.reduce(
+                    presentationState,
+                    event: .startSwapCompleted
+                )
             }
         }
     }

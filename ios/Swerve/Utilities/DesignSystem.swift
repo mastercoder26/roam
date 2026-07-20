@@ -85,10 +85,12 @@ struct SectionHeader: View {
 struct BrandWordmark: View {
     var body: some View {
         Text("Swerve")
-            .font(.custom("Baskerville-SemiBoldItalic", size: 29))
-            .tracking(-0.35)
+            .font(.custom("Baskerville-SemiBoldItalic", size: 36))
+            .tracking(-0.4)
             .foregroundStyle(.white.opacity(0.92))
+            .frame(maxWidth: .infinity)
             .accessibilityLabel("Swerve")
+            .accessibilityAddTraits(.isHeader)
     }
 }
 

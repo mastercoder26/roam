@@ -71,9 +71,10 @@ struct DrivePresentationState: Equatable {
 }
 
 enum DrivePresentationEngine {
-    /// The root view reserves the floating tab bar's measured height with a
-    /// safe-area inset. This is only the card's local breathing room.
-    static let activeButtonBottomInset: Double = 24
+    /// Local breathing room above the floating tab bar. The root already
+    /// reserves the tab bar with a safe-area inset; this keeps End Drive
+    /// clearly clear of that chrome.
+    static let activeButtonBottomInset: Double = 44
 
     static func reduce(
         _ state: DrivePresentationState,

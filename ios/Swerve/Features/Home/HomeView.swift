@@ -66,8 +66,6 @@ struct HomeView: View {
     var body: some View {
         NavigationStack(path: $navigationPath) {
             ZStack {
-                routeBackground.ignoresSafeArea()
-
                 ScrollView {
                     VStack(alignment: .leading, spacing: 22) {
                         headerSection
@@ -92,7 +90,7 @@ struct HomeView: View {
                         routeChecksSection
                     }
                     .padding(.horizontal, 20)
-                    .padding(.top, 14)
+                    .padding(.top, 10)
                     .padding(.bottom, 28)
                 }
 
@@ -102,6 +100,9 @@ struct HomeView: View {
                         .zIndex(1)
                 }
             }
+            // Keep the canvas edge-to-edge without letting the scroll content
+            // climb into the persistent Swerve wordmark safe-area inset.
+            .background(routeBackground.ignoresSafeArea())
             .toolbar(.hidden, for: .navigationBar)
             .navigationDestination(for: RouteAnalysisResult.self) { ResultsView(result: $0) }
             .onChange(of: locationCoordinator.state) { _, state in
@@ -134,26 +135,21 @@ struct HomeView: View {
     }
 
     private var headerSection: some View {
-        VStack(alignment: .leading, spacing: 9) {
-            BrandWordmark()
+        HStack(alignment: .center, spacing: 16) {
+            Text("Plan your route")
+                .font(.system(.largeTitle, design: .rounded, weight: .bold))
+                .tracking(-0.8)
+                .foregroundStyle(.white)
+                .fixedSize(horizontal: false, vertical: true)
 
-            HStack(alignment: .center, spacing: 16) {
-                Text("Plan your route")
-                    .font(.system(.largeTitle, design: .rounded, weight: .bold))
-                    .tracking(-0.8)
-                    .foregroundStyle(.white)
-                    .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 8)
 
-                Spacer(minLength: 8)
-
-                Image(systemName: "location.north.circle.fill")
-                    .font(.system(size: 34, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.92))
-                    .frame(width: 48, height: 48)
-                    .background(.white.opacity(0.09), in: Circle())
-                    .accessibilityHidden(true)
-            }
-
+            Image(systemName: "location.north.circle.fill")
+                .font(.system(size: 34, weight: .medium))
+                .foregroundStyle(.white.opacity(0.92))
+                .frame(width: 48, height: 48)
+                .background(.white.opacity(0.09), in: Circle())
+                .accessibilityHidden(true)
         }
     }
 

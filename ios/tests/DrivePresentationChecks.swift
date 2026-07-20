@@ -18,8 +18,8 @@ struct DrivePresentationChecks {
         expect(state.phase == .active && state.isExpanded, "the action should expand only after the End Drive label settles")
         expect(!state.showsSupportingContent, "active recording should hide secondary content")
         expect(
-            DrivePresentationEngine.activeButtonBottomInset >= 16,
-            "the active action needs local spacing once the root reserves the tab bar"
+            DrivePresentationEngine.activeButtonBottomInset >= 36,
+            "the active action needs clear local spacing above the floating tab bar"
         )
 
         state = DrivePresentationEngine.reduce(state, event: .endTapped)

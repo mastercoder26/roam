@@ -44,6 +44,15 @@ struct SwerveRootView: View {
         }
         .environmentObject(driveSession)
         .preferredColorScheme(.dark)
+        // Persistent brand mark across every primary tab and nested screen.
+        .safeAreaInset(edge: .top, spacing: 0) {
+            BrandWordmark()
+                .padding(.horizontal, 20)
+                .padding(.top, 6)
+                .padding(.bottom, 12)
+                .frame(maxWidth: .infinity)
+                .background(AppDesign.canvas)
+        }
         // This reserves the tab bar's measured height for every tab. Unlike a
         // fixed invisible spacer, it remains correct when Dynamic Type grows
         // the selected tab label and keeps End Drive unobstructed.
