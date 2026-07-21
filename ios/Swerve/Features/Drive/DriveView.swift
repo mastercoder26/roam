@@ -12,56 +12,67 @@ struct DriveView: View {
     @State private var plannedBreakRoute: ScoredRoute?
     @State private var breakPlanningError: String?
     @State private var usesCurrentRouteOrigin = true
+    /// Visible viewport height below the Swerve wordmark / above the tab bar.
+    @State private var viewportHeight: CGFloat = 640
     @StateObject private var routeLocationCoordinator = RoutePlanningLocationCoordinator()
     private let apiClient = APIClient()
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         NavigationStack {
-            GeometryReader { geometry in
-                ScrollView {
-                    VStack(alignment: .leading, spacing: AppDesign.sectionSpacing) {
-                        recordingCard(availableHeight: geometry.size.height)
-                            .id("drive-recording-surface")
+            ScrollView {
+                VStack(alignment: .leading, spacing: AppDesign.sectionSpacing) {
+                    if showsSupportingContent {
+                        driveToolbar
+                    }
 
-                        if showsSupportingContent {
-                            header
-                            breakPlanningCard
-                            if session.queuedPracticeRoute != nil {
-                                practiceRouteReadyCard
+                    recordingCard(availableHeight: viewportHeight)
+                        .id("drive-recording-surface")
+
+                    if showsSupportingContent {
+                        breakPlanningCard
+                        if session.queuedPracticeRoute != nil {
+                            practiceRouteReadyCard
+                                .transition(reduceMotion ? .opacity : .opacity.combined(with: .move(edge: .top)))
+                        }
+
+                        if let score = session.lastScore {
+                            if let drive = session.lastCompletedDrive,
+                               drive.plannedRouteContext?.debrief != nil {
+                                PracticeDebriefCard(drive: drive)
                                     .transition(reduceMotion ? .opacity : .opacity.combined(with: .move(edge: .top)))
                             }
+                            DriveScoreCard(score: score)
+                        } else {
+                            howItWorksCard
                         }
 
-                        if showsSupportingContent {
-                            if let score = session.lastScore {
-                                if let drive = session.lastCompletedDrive,
-                                   drive.plannedRouteContext?.debrief != nil {
-                                    PracticeDebriefCard(drive: drive)
-                                        .transition(reduceMotion ? .opacity : .opacity.combined(with: .move(edge: .top)))
-                                }
-                                DriveScoreCard(score: score)
-                            } else {
-                                howItWorksCard
-                            }
-
-                            if !session.recordedDrives.isEmpty {
-                                driveHistory
-                            }
+                        if !session.recordedDrives.isEmpty {
+                            driveHistory
                         }
                     }
-                    // Drop outer padding while focused so the canvas height matches
-                    // GeometryReader exactly. That keeps the End Drive path vertical
-                    // and prevents the control from sliding under the tab bar.
-                    .padding(.horizontal, isFocusedCanvas ? 0 : AppDesign.contentPadding)
-                    .padding(.vertical, isFocusedCanvas ? 0 : 12)
-                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .scrollDisabled(isTransitioningDriveSurface)
-                .background(isFocusedCanvas ? Color(.systemBackground) : AppDesign.canvas)
+                // Drop outer padding while focused so the canvas height matches
+                // the viewport exactly. That keeps the End Drive path vertical
+                // and prevents the control from sliding under the tab bar.
+                .padding(.horizontal, isFocusedCanvas ? 0 : AppDesign.contentPadding)
+                .padding(.top, isFocusedCanvas ? 0 : 8)
+                .padding(.bottom, isFocusedCanvas ? 0 : 20)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            // Keep the nav bar hidden so GeometryReader height stays stable across
-            // start/stop — a large-title collapse was fighting the button motion.
+            .scrollDisabled(isTransitioningDriveSurface)
+            // Avoid wrapping ScrollView in GeometryReader — that ignores the
+            // top wordmark safe-area inset and clips the start-drive card.
+            .background(isFocusedCanvas ? Color(.systemBackground) : AppDesign.canvas)
+            .background {
+                GeometryReader { geometry in
+                    Color.clear
+                        .onAppear { viewportHeight = geometry.size.height }
+                        .onChange(of: geometry.size.height) { _, height in
+                            viewportHeight = height
+                        }
+                }
+            }
             .toolbar(.hidden, for: .navigationBar)
         }
         .sheet(isPresented: $showingHelp) {
@@ -145,23 +156,17 @@ struct DriveView: View {
         presentationState.showsSupportingContent
     }
 
-    private var header: some View {
-        HStack(alignment: .center, spacing: 12) {
-            Text("Practice with purpose")
-                .font(AppDesign.Typography.heroTitle)
-                .tracking(-0.5)
-                .fixedSize(horizontal: false, vertical: true)
-
-            Spacer(minLength: 8)
-
+    private var driveToolbar: some View {
+        HStack {
+            Spacer(minLength: 0)
             Button {
                 showingHelp = true
             } label: {
                 Image(systemName: "lifepreserver.fill")
                     .font(.body.weight(.semibold))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(AppDesign.Ink.primary.opacity(0.88))
                     .frame(width: 36, height: 36)
-                    .background(Color.primary.opacity(0.06), in: Circle())
+                    .background(AppDesign.Ink.primary.opacity(0.10), in: Circle())
             }
             .buttonStyle(PressableScaleStyle())
             .accessibilityLabel("Get help")

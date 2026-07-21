@@ -67,7 +67,7 @@ struct HomeView: View {
         NavigationStack(path: $navigationPath) {
             ZStack {
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 22) {
+                    VStack(alignment: .leading, spacing: 20) {
                         headerSection
 
                         if let notice = form.importNotice {
@@ -91,7 +91,8 @@ struct HomeView: View {
                     }
                     .padding(.horizontal, 20)
                     .padding(.top, 10)
-                    .padding(.bottom, 28)
+                    // Extra clearance so "What Swerve checks" clears the floating tab bar.
+                    .padding(.bottom, 36)
                 }
 
                 if isLoading {
@@ -100,9 +101,7 @@ struct HomeView: View {
                         .zIndex(1)
                 }
             }
-            // Keep the canvas edge-to-edge without letting the scroll content
-            // climb into the persistent Swerve wordmark safe-area inset.
-            .background(routeBackground.ignoresSafeArea())
+            .background(AppDesign.canvas.ignoresSafeArea())
             .toolbar(.hidden, for: .navigationBar)
             .navigationDestination(for: RouteAnalysisResult.self) { ResultsView(result: $0) }
             .onChange(of: locationCoordinator.state) { _, state in
@@ -126,29 +125,25 @@ struct HomeView: View {
         .preferredColorScheme(.dark)
     }
 
-    private var routeBackground: Color {
-        Color(red: 0.045, green: 0.045, blue: 0.05)
-    }
-
     private var routeSurface: Color {
-        Color.white.opacity(reduceTransparency ? 0.12 : 0.075)
+        reduceTransparency ? AppDesign.cardSurfaceElevated : AppDesign.cardSurface
     }
 
     private var headerSection: some View {
         HStack(alignment: .center, spacing: 16) {
             Text("Plan your route")
-                .font(.system(.largeTitle, design: .rounded, weight: .bold))
+                .font(AppDesign.Typography.heroTitle)
                 .tracking(-0.8)
-                .foregroundStyle(.white)
+                .foregroundStyle(AppDesign.Ink.primary)
                 .fixedSize(horizontal: false, vertical: true)
 
             Spacer(minLength: 8)
 
             Image(systemName: "location.north.circle.fill")
                 .font(.system(size: 34, weight: .medium))
-                .foregroundStyle(.white.opacity(0.92))
+                .foregroundStyle(AppDesign.Ink.primary.opacity(0.9))
                 .frame(width: 48, height: 48)
-                .background(.white.opacity(0.09), in: Circle())
+                .background(AppDesign.Ink.primary.opacity(0.10), in: Circle())
                 .accessibilityHidden(true)
         }
     }
@@ -159,7 +154,7 @@ struct HomeView: View {
 
             if destinationIsRevealed {
                 Divider()
-                    .overlay(.white.opacity(0.1))
+                    .overlay(AppDesign.Ink.tertiary.opacity(0.55))
                     .padding(.leading, 68)
                     .transition(.opacity)
 
@@ -168,11 +163,12 @@ struct HomeView: View {
             }
         }
         .padding(.vertical, 6)
-        .background(routeSurface, in: RoundedRectangle(cornerRadius: 26, style: .continuous))
+        .background(routeSurface, in: RoundedRectangle(cornerRadius: AppDesign.cornerRadiusLarge, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 26, style: .continuous)
-                .stroke(.white.opacity(0.06), lineWidth: 1)
+            RoundedRectangle(cornerRadius: AppDesign.cornerRadiusLarge, style: .continuous)
+                .stroke(AppDesign.cardStroke, lineWidth: 1)
         }
+        .shadow(color: .black.opacity(0.32), radius: 14, y: 8)
         .animation(reduceMotion ? .easeOut(duration: 0.18) : AppAnimation.selection, value: destinationIsRevealed)
     }
 
@@ -180,7 +176,7 @@ struct HomeView: View {
     private var originRow: some View {
         if form.usesCurrentLocation {
             HStack(alignment: .center, spacing: 14) {
-                RoutePlanningFieldIcon(symbol: "location.circle.fill", tint: .white)
+                RoutePlanningFieldIcon(symbol: "location.circle.fill", tint: AppDesign.Ink.primary)
 
                 Button {
                     locationCoordinator.useCurrentLocation()
@@ -188,7 +184,7 @@ struct HomeView: View {
                     routeFieldCopy(
                         label: "FROM",
                         value: currentLocationTitle,
-                        valueColor: .white.opacity(0.94)
+                        valueColor: AppDesign.Ink.primary
                     )
                 }
                 .buttonStyle(.plain)
@@ -199,15 +195,15 @@ struct HomeView: View {
                 if case .locating = locationCoordinator.state {
                     ProgressView()
                         .controlSize(.small)
-                        .tint(.white)
+                        .tint(AppDesign.Ink.primary)
                 }
 
                 Button(action: switchToManualOrigin) {
                     Image(systemName: "pencil")
                         .font(.subheadline.weight(.bold))
-                        .foregroundStyle(.white.opacity(0.72))
+                        .foregroundStyle(AppDesign.Ink.primary.opacity(0.88))
                         .frame(width: 36, height: 36)
-                        .background(.white.opacity(0.07), in: Circle())
+                        .background(AppDesign.Ink.primary.opacity(0.14), in: Circle())
                 }
                 .buttonStyle(PressableScaleStyle())
                 .accessibilityLabel("Enter a different starting location")
@@ -235,7 +231,7 @@ struct HomeView: View {
                        let message {
                         Text(message)
                             .font(.caption)
-                            .foregroundStyle(.orange.opacity(0.9))
+                            .foregroundStyle(AppDesign.safety.opacity(0.95))
                             .fixedSize(horizontal: false, vertical: true)
                             .transition(.opacity)
                     }
@@ -244,9 +240,9 @@ struct HomeView: View {
                 Button(action: chooseCurrentLocation) {
                     Image(systemName: "location.fill")
                         .font(.subheadline.weight(.bold))
-                        .foregroundStyle(.white.opacity(0.8))
+                        .foregroundStyle(AppDesign.Ink.primary.opacity(0.88))
                         .frame(width: 36, height: 36)
-                        .background(.white.opacity(0.07), in: Circle())
+                        .background(AppDesign.Ink.primary.opacity(0.14), in: Circle())
                 }
                 .buttonStyle(PressableScaleStyle())
                 .padding(.top, 8)
@@ -259,7 +255,7 @@ struct HomeView: View {
 
     private var destinationRow: some View {
         HStack(alignment: .top, spacing: 14) {
-            RoutePlanningFieldIcon(symbol: "mappin.circle.fill", tint: .white.opacity(0.82))
+            RoutePlanningFieldIcon(symbol: "mappin.circle.fill", tint: AppDesign.Ink.secondary)
                 .padding(.top, 8)
 
             VStack(alignment: .leading, spacing: 4) {
@@ -268,7 +264,7 @@ struct HomeView: View {
                     title: "Destination",
                     placeholder: "Where are you headed?",
                     systemImage: "mappin",
-                    iconColor: .white.opacity(0.82),
+                    iconColor: AppDesign.Ink.secondary,
                     showsIcon: false,
                     text: $form.destination
                 )
@@ -284,7 +280,7 @@ struct HomeView: View {
         VStack(alignment: .leading, spacing: 4) {
             routeFieldLabel(label)
             Text(value)
-                .font(.headline.weight(.medium))
+                .font(AppDesign.Typography.bodyEmphasized)
                 .foregroundStyle(valueColor)
                 .lineLimit(2)
                 .multilineTextAlignment(.leading)
@@ -296,7 +292,7 @@ struct HomeView: View {
         Text(value)
             .font(.caption.weight(.bold))
             .tracking(1.1)
-            .foregroundStyle(.white.opacity(0.4))
+            .foregroundStyle(AppDesign.Ink.label)
     }
 
     private var currentLocationTitle: String {
@@ -324,40 +320,32 @@ struct HomeView: View {
             .allowsHitTesting(false)
 
             LinearGradient(
-                colors: [.clear, .black.opacity(0.7)],
+                colors: [.clear, AppDesign.canvas.opacity(0.72)],
                 startPoint: .center,
                 endPoint: .bottom
             )
             .allowsHitTesting(false)
-
         }
         .frame(height: 248)
-        .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
+        .background(AppDesign.cardSurfaceElevated)
+        .clipShape(RoundedRectangle(cornerRadius: AppDesign.cornerRadiusLarge, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 26, style: .continuous)
-                .stroke(.white.opacity(0.07), lineWidth: 1)
+            RoundedRectangle(cornerRadius: AppDesign.cornerRadiusLarge, style: .continuous)
+                .stroke(AppDesign.cardStrokeStrong, lineWidth: 1)
         }
+        .shadow(color: AppDesign.accent.opacity(0.12), radius: 16, y: 8)
+        .shadow(color: .black.opacity(0.35), radius: 18, y: 10)
         .accessibilityLabel(mapPreview?.accessibilityLabel ?? "Route map")
     }
 
     private var departureSection: some View {
-        HStack(spacing: 14) {
-            Image(systemName: "clock.fill")
-                .font(.body.weight(.semibold))
-                .foregroundStyle(AppDesign.accent)
-                .frame(width: 38, height: 38)
-                .background(AppDesign.accent.opacity(0.16), in: Circle())
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Departure")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.white)
-                Text("Traffic estimates use this time")
-                    .font(.caption)
-                    .foregroundStyle(.white.opacity(0.5))
-            }
-
-            Spacer(minLength: 8)
+        HStack(spacing: 10) {
+            Image(systemName: "calendar")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(AppDesign.Ink.secondary)
+                .frame(width: 28, height: 28)
+                .background(AppDesign.Ink.primary.opacity(0.10), in: Circle())
+                .accessibilityHidden(true)
 
             DatePicker(
                 "Departure time",
@@ -369,13 +357,26 @@ struct HomeView: View {
             .labelsHidden()
             .tint(AppDesign.accent)
             .colorScheme(.dark)
+
+            Image(systemName: "pencil")
+                .font(.caption.weight(.bold))
+                .foregroundStyle(AppDesign.Ink.tertiary)
+                .accessibilityHidden(true)
         }
-        .padding(16)
-        .background(routeSurface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .padding(.horizontal, 14)
+        .padding(.vertical, 11)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            AppDesign.cardSurface,
+            in: RoundedRectangle(cornerRadius: AppDesign.cornerRadiusSmall, style: .continuous)
+        )
         .overlay {
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .stroke(.white.opacity(0.06), lineWidth: 1)
+            RoundedRectangle(cornerRadius: AppDesign.cornerRadiusSmall, style: .continuous)
+                .stroke(AppDesign.cardStroke, lineWidth: 1)
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Departure time")
+        .accessibilityHint("Double tap to change the date or time")
     }
 
     private var departureContainer: some View {
@@ -395,7 +396,7 @@ struct HomeView: View {
             HStack(spacing: 10) {
                 if isLoading {
                     ProgressView()
-                        .tint(.black)
+                        .tint(canAnalyze ? Color(red: 0.07, green: 0.07, blue: 0.07) : AppDesign.Ink.tertiary)
                 } else {
                     Image(systemName: "sparkles")
                 }
@@ -404,10 +405,10 @@ struct HomeView: View {
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 17)
-            .foregroundStyle(canAnalyze ? .black : .white.opacity(0.45))
+            .foregroundStyle(canAnalyze ? Color(red: 0.07, green: 0.07, blue: 0.07) : AppDesign.Ink.tertiary)
             .background(
-                canAnalyze ? Color.white : Color.white.opacity(0.1),
-                in: RoundedRectangle(cornerRadius: 22, style: .continuous)
+                canAnalyze ? AppDesign.Ink.primary : AppDesign.Ink.primary.opacity(0.10),
+                in: RoundedRectangle(cornerRadius: AppDesign.cornerRadiusLarge, style: .continuous)
             )
         }
         .buttonStyle(PressableScaleStyle())
@@ -431,45 +432,48 @@ struct HomeView: View {
     private var routeChecksSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("What Swerve checks")
-                .font(.headline.weight(.semibold))
-                .foregroundStyle(.white)
+                .font(AppDesign.Typography.sectionTitle)
+                .foregroundStyle(AppDesign.Ink.primary)
 
             HStack(spacing: 8) {
                 RouteCheckPill(symbol: "car.2.fill", title: "Traffic")
                 RouteCheckPill(symbol: "arrow.triangle.merge", title: "Merges")
                 RouteCheckPill(symbol: "cloud.sun.rain.fill", title: "Conditions")
             }
-
         }
         .padding(.top, 4)
+        .padding(.bottom, 8)
     }
 
     private func errorBanner(_ message: String) -> some View {
         HStack(alignment: .top, spacing: 10) {
             Image(systemName: "exclamationmark.triangle.fill")
-                .foregroundStyle(.orange)
+                .foregroundStyle(AppDesign.safety)
             Text(message)
                 .font(.subheadline)
-                .foregroundStyle(.white.opacity(0.86))
+                .foregroundStyle(AppDesign.Ink.primary.opacity(0.9))
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 0)
         }
         .padding(14)
-        .background(.orange.opacity(0.12), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .background(
+            AppDesign.safety.opacity(0.12),
+            in: RoundedRectangle(cornerRadius: AppDesign.cornerRadius, style: .continuous)
+        )
     }
 
     private func importNoticeBanner(_ notice: RouteImportNotice) -> some View {
         HStack(alignment: .top, spacing: 10) {
             Image(systemName: notice.isError ? "exclamationmark.triangle.fill" : "arrow.down.doc.fill")
-                .foregroundStyle(notice.isError ? .orange : AppDesign.accent)
+                .foregroundStyle(notice.isError ? AppDesign.safety : AppDesign.accent)
                 .frame(width: 20)
             VStack(alignment: .leading, spacing: 2) {
                 Text(notice.title)
                     .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(AppDesign.Ink.primary)
                 Text(notice.message)
                     .font(.footnote)
-                    .foregroundStyle(.white.opacity(0.58))
+                    .foregroundStyle(AppDesign.Ink.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 0)
@@ -478,18 +482,18 @@ struct HomeView: View {
             } label: {
                 Image(systemName: "xmark")
                     .font(.caption.weight(.bold))
-                    .foregroundStyle(.white.opacity(0.58))
+                    .foregroundStyle(AppDesign.Ink.secondary)
                     .frame(width: 28, height: 28)
-                    .background(.white.opacity(0.08), in: Circle())
+                    .background(AppDesign.Ink.primary.opacity(0.10), in: Circle())
             }
             .buttonStyle(PressableScaleStyle())
             .accessibilityLabel("Dismiss imported route notice")
         }
         .padding(14)
-        .background(routeSurface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .background(routeSurface, in: RoundedRectangle(cornerRadius: AppDesign.cornerRadius, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .stroke((notice.isError ? Color.orange : AppDesign.accent).opacity(0.26), lineWidth: 1)
+            RoundedRectangle(cornerRadius: AppDesign.cornerRadius, style: .continuous)
+                .stroke((notice.isError ? AppDesign.safety : AppDesign.accent).opacity(0.28), lineWidth: 1)
         }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("\(notice.title). \(notice.message)")
@@ -576,14 +580,17 @@ private struct RouteCheckPill: View {
     var body: some View {
         Label(title, systemImage: symbol)
             .font(.caption.weight(.semibold))
-            .foregroundStyle(.white.opacity(0.7))
+            .foregroundStyle(AppDesign.Ink.secondary)
             .lineLimit(1)
             .padding(.horizontal, 11)
             .padding(.vertical, 9)
-            .background(.white.opacity(0.075), in: Capsule(style: .continuous))
+            .background(
+                AppDesign.Ink.primary.opacity(0.08),
+                in: Capsule(style: .continuous)
+            )
             .overlay {
                 Capsule(style: .continuous)
-                    .stroke(.white.opacity(0.055), lineWidth: 1)
+                    .stroke(AppDesign.cardStroke, lineWidth: 1)
             }
     }
 }

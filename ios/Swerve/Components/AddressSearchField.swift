@@ -30,6 +30,8 @@ struct AddressSearchField: View {
 
                 TextField(placeholder, text: $text)
                     .focused($isFocused)
+                    .font(AppDesign.Typography.body)
+                    .foregroundStyle(AppDesign.Ink.primary)
                     .textInputAutocapitalization(.words)
                     .autocorrectionDisabled()
                     .onChange(of: text) { _, newValue in

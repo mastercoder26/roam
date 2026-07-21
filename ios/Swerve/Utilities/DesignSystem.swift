@@ -6,28 +6,49 @@ enum AppDesign {
     static let accent = Color(red: 0.02, green: 0.42, blue: 0.92)
     static let safety = Color.orange
     static let positive = Color.green
-    /// Shared dark canvas used by every primary tab. Cards remain solid and
-    /// legible, leaving liquid glass to the floating tab bar and small controls.
-    static let canvas = Color(red: 0.045, green: 0.045, blue: 0.05)
-    static let cardSurface = Color(red: 0.115, green: 0.115, blue: 0.125)
-    static let cardStroke = Color.white.opacity(0.065)
+
+    /// Soft dark canvas (#121212) — avoids harsh true-black edges in low light.
+    static let canvas = Color(red: 18 / 255, green: 18 / 255, blue: 18 / 255)
+    /// Raised surface for primary cards (#1E1E1E).
+    static let cardSurface = Color(red: 30 / 255, green: 30 / 255, blue: 30 / 255)
+    /// Slightly higher elevation for map / featured panels (#242424).
+    static let cardSurfaceElevated = Color(red: 36 / 255, green: 36 / 255, blue: 36 / 255)
+    static let cardStroke = Color.white.opacity(0.10)
+    static let cardStrokeStrong = Color.white.opacity(0.16)
+
     static let space4: CGFloat = 4
     static let space8: CGFloat = 8
     static let space12: CGFloat = 12
     static let space16: CGFloat = 16
     static let space24: CGFloat = 24
+    /// Shared radius scale — keep cards, buttons, and pills on this ladder.
     static let cornerRadius: CGFloat = 16
     static let cornerRadiusSmall: CGFloat = 12
-    static let cornerRadiusLarge: CGFloat = 24
+    static let cornerRadiusLarge: CGFloat = 20
     static let cardPadding: CGFloat = 16
     static let sectionSpacing: CGFloat = 20
     static let contentPadding: CGFloat = 16
+
+    /// Material-style emphasis tiers for dark UI (high / medium / low).
+    enum Ink {
+        /// Off-white primary copy (#F1F1F1) — ~high emphasis without glare.
+        static let primary = Color(red: 241 / 255, green: 241 / 255, blue: 241 / 255)
+        /// Medium emphasis (~60% white).
+        static let secondary = Color.white.opacity(0.60)
+        /// Low emphasis / placeholders (~38% white).
+        static let tertiary = Color.white.opacity(0.38)
+        /// Section micro-labels (FROM / TO) — kept above 4.5:1 on card surfaces.
+        static let label = Color.white.opacity(0.64)
+    }
 
     enum Typography {
         static let heroTitle = Font.system(.largeTitle, design: .rounded, weight: .bold)
         static let sectionTitle = Font.headline
         static let metricValue = Font.subheadline.weight(.semibold)
         static let metricLabel = Font.caption
+        /// Functional UI — addresses, buttons, field values.
+        static let body = Font.system(.body, design: .default, weight: .regular)
+        static let bodyEmphasized = Font.system(.body, design: .default, weight: .medium)
     }
 }
 
@@ -53,6 +74,7 @@ struct PremiumCardModifier: ViewModifier {
                 RoundedRectangle(cornerRadius: AppDesign.cornerRadius, style: .continuous)
                     .stroke(AppDesign.cardStroke, lineWidth: 1)
             }
+            .shadow(color: .black.opacity(0.28), radius: 12, y: 6)
     }
 }
 
@@ -72,11 +94,11 @@ struct SectionHeader: View {
         VStack(alignment: .leading, spacing: 4) {
             Text(title)
                 .font(AppDesign.Typography.sectionTitle)
-                .foregroundStyle(.white)
+                .foregroundStyle(AppDesign.Ink.primary)
             if let subtitle {
                 Text(subtitle)
                     .font(.footnote)
-                    .foregroundStyle(.white.opacity(0.56))
+                    .foregroundStyle(AppDesign.Ink.secondary)
             }
         }
     }
@@ -87,7 +109,7 @@ struct BrandWordmark: View {
         Text("Swerve")
             .font(.custom("Baskerville-SemiBoldItalic", size: 36))
             .tracking(-0.4)
-            .foregroundStyle(.white.opacity(0.92))
+            .foregroundStyle(AppDesign.Ink.primary.opacity(0.92))
             .frame(maxWidth: .infinity)
             .accessibilityLabel("Swerve")
             .accessibilityAddTraits(.isHeader)
@@ -102,6 +124,7 @@ struct PressableScaleStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .scaleEffect(configuration.isPressed && !reduceMotion ? 0.97 : 1)
+            .opacity(configuration.isPressed ? 0.88 : 1)
             .animation(AppAnimation.press, value: configuration.isPressed)
     }
 }
@@ -149,7 +172,7 @@ struct IconTile: View {
             .font(.subheadline.weight(.semibold))
             .foregroundStyle(color)
             .frame(width: 34, height: 34)
-            .background(color.opacity(0.12), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .background(color.opacity(0.14), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 }
 
@@ -161,9 +184,12 @@ struct StatRow: View {
     var body: some View {
         HStack(spacing: AppDesign.space12) {
             IconTile(symbol: symbol)
-            Text(title).font(.subheadline).foregroundStyle(.secondary)
+            Text(title).font(.subheadline).foregroundStyle(AppDesign.Ink.secondary)
             Spacer()
-            Text(value).font(.subheadline.weight(.semibold)).monospacedDigit()
+            Text(value)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(AppDesign.Ink.primary)
+                .monospacedDigit()
         }
     }
 }
