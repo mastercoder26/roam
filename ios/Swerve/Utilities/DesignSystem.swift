@@ -3,18 +3,23 @@ import SwiftUI
 // MARK: - Design tokens
 
 enum AppDesign {
-    static let accent = Color(red: 0.02, green: 0.42, blue: 0.92)
-    static let safety = Color.orange
-    static let positive = Color.green
+    private static var palette: ThemePalette {
+        ThemeManager.cachedPalette
+    }
 
-    /// Soft dark canvas (#121212) — avoids harsh true-black edges in low light.
-    static let canvas = Color(red: 18 / 255, green: 18 / 255, blue: 18 / 255)
-    /// Raised surface for primary cards (#1E1E1E).
-    static let cardSurface = Color(red: 30 / 255, green: 30 / 255, blue: 30 / 255)
-    /// Slightly higher elevation for map / featured panels (#242424).
-    static let cardSurfaceElevated = Color(red: 36 / 255, green: 36 / 255, blue: 36 / 255)
-    static let cardStroke = Color.white.opacity(0.10)
-    static let cardStrokeStrong = Color.white.opacity(0.16)
+    static var accent: Color { palette.accent.color }
+    static var safety: Color { palette.safety.color }
+    static var positive: Color { palette.positive.color }
+
+    /// Soft canvas — theme-aware background for primary surfaces.
+    static var canvas: Color { palette.canvas.color }
+    /// Raised surface for primary cards.
+    static var cardSurface: Color { palette.cardSurface.color }
+    /// Slightly higher elevation for map / featured panels.
+    static var cardSurfaceElevated: Color { palette.cardSurfaceElevated.color }
+    static var cardStroke: Color { palette.cardStroke.color }
+    static var cardStrokeStrong: Color { palette.cardStrokeStrong.color }
+    static var cardShadow: Color { palette.cardShadow.color }
 
     static let space4: CGFloat = 4
     static let space8: CGFloat = 8
@@ -29,16 +34,13 @@ enum AppDesign {
     static let sectionSpacing: CGFloat = 20
     static let contentPadding: CGFloat = 16
 
-    /// Material-style emphasis tiers for dark UI (high / medium / low).
+    /// Material-style emphasis tiers (high / medium / low).
     enum Ink {
-        /// Off-white primary copy (#F1F1F1) — ~high emphasis without glare.
-        static let primary = Color(red: 241 / 255, green: 241 / 255, blue: 241 / 255)
-        /// Medium emphasis (~60% white).
-        static let secondary = Color.white.opacity(0.60)
-        /// Low emphasis / placeholders (~38% white).
-        static let tertiary = Color.white.opacity(0.38)
-        /// Section micro-labels (FROM / TO) — kept above 4.5:1 on card surfaces.
-        static let label = Color.white.opacity(0.64)
+        static var primary: Color { AppDesign.palette.inkPrimary.color }
+        static var secondary: Color { AppDesign.palette.inkSecondary.color }
+        static var tertiary: Color { AppDesign.palette.inkTertiary.color }
+        /// Section micro-labels (FROM / TO).
+        static var label: Color { AppDesign.palette.inkLabel.color }
     }
 
     enum Typography {
@@ -74,7 +76,7 @@ struct PremiumCardModifier: ViewModifier {
                 RoundedRectangle(cornerRadius: AppDesign.cornerRadius, style: .continuous)
                     .stroke(AppDesign.cardStroke, lineWidth: 1)
             }
-            .shadow(color: .black.opacity(0.28), radius: 12, y: 6)
+            .shadow(color: AppDesign.cardShadow, radius: 12, y: 6)
     }
 }
 
@@ -105,14 +107,27 @@ struct SectionHeader: View {
 }
 
 struct BrandWordmark: View {
+    // Observe the shared manager directly. safeAreaInset content does not always
+    // inherit EnvironmentObject from the modified ancestor, which crashed launch.
+    @ObservedObject private var themeManager = ThemeManager.shared
+
     var body: some View {
         Text("Swerve")
             .font(.custom("Baskerville-SemiBoldItalic", size: 36))
             .tracking(-0.4)
-            .foregroundStyle(AppDesign.Ink.primary.opacity(0.92))
+            .foregroundStyle(wordmarkColor)
             .frame(maxWidth: .infinity)
+            .contentShape(Rectangle())
             .accessibilityLabel("Swerve")
             .accessibilityAddTraits(.isHeader)
+            .accessibilityHint("Opens color scheme options")
+            // Re-evaluate when the palette changes so ink stays readable on canvas.
+            .id(themeManager.currentID)
+    }
+
+    /// High-contrast brand ink for the current canvas (never uses a stale palette).
+    private var wordmarkColor: Color {
+        themeManager.palette.inkPrimary.color.opacity(0.92)
     }
 }
 

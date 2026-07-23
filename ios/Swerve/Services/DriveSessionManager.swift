@@ -130,6 +130,28 @@ final class DriveSessionManager: NSObject, ObservableObject {
         locationManager.allowsBackgroundLocationUpdates = false
         currentSpeedMetersPerSecond = 0
 
+        defer {
+            activePracticeRoute = nil
+            activePracticeRoutePolyline = nil
+            recordingTimeZoneIdentifier = nil
+        }
+
+        // Accidental taps and false starts should not clutter history.
+        // Elapsed/distance stay visible through the return animation, matching
+        // the saved-drive path; startDrive() clears them via resetCurrentDrive().
+        guard DriveHistoryPolicy.shouldSave(duration: duration) else {
+            _ = phonePlacementAnalyzer.finish(at: driveEndedAt)
+            phonePlacementAssessment = .inconclusive
+            statusMessage = "Drive under 30s was not saved"
+            DriveLiveActivityManager.shared.end(
+                speedMetersPerSecond: 0,
+                distanceMeters: distanceMeters,
+                eventCount: events.count,
+                status: "Drive discarded"
+            )
+            return
+        }
+
         let result = DriveScoringEngine.score(
             duration: duration,
             distanceMeters: distanceMeters,
@@ -236,9 +258,7 @@ final class DriveSessionManager: NSObject, ObservableObject {
             plannedRouteContext: persistedPracticeRoute
         )
         let practiceRouteWasVerified = persistedPracticeRoute?.recordedRouteMatched
-        recordedDrives.insert(drive, at: 0)
-        // Keep storage bounded while retaining a useful recent history.
-        recordedDrives = Array(recordedDrives.prefix(50))
+        recordedDrives = Array(([drive] + recordedDrives).prefix(50))
         saveRecordedDrives()
         lastCompletedDrive = drive
         if finalPlacementQuality == .needsAdjustment {
@@ -258,9 +278,18 @@ final class DriveSessionManager: NSObject, ObservableObject {
             eventCount: events.count,
             status: "Drive saved"
         )
-        activePracticeRoute = nil
-        activePracticeRoutePolyline = nil
-        recordingTimeZoneIdentifier = nil
+    }
+
+    /// Removes a saved drive from on-device history. No-ops when the id is absent.
+    func deleteDrive(id: UUID) {
+        let next = DriveHistoryPolicy.removing(id: id, from: recordedDrives)
+        guard next.count != recordedDrives.count else { return }
+        recordedDrives = next
+        saveRecordedDrives()
+        if lastCompletedDrive?.id == id {
+            lastCompletedDrive = nil
+            lastScore = nil
+        }
     }
 
     /// Queues a locally generated route context for the next manually started
@@ -285,6 +314,7 @@ final class DriveSessionManager: NSObject, ObservableObject {
     }
 
     private func resetCurrentDrive() {
+        startDate = nil
         elapsed = 0
         currentSpeedMetersPerSecond = 0
         motionSamples = 0

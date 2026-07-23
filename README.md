@@ -118,6 +118,20 @@ swiftc ios/Swerve/Models/RouteDifficultyModels.swift ios/Swerve/Models/PhonePlac
 /tmp/swerve-drive-checks
 ```
 
+Run the drive-history policy checks with:
+
+```bash
+swiftc ios/Swerve/Models/DriveHistoryPolicy.swift ios/tests/DriveHistoryPolicyChecks.swift -o /tmp/swerve-history-checks
+/tmp/swerve-history-checks
+```
+
+Run the theme catalog checks with:
+
+```bash
+swiftc ios/Swerve/Models/Theme.swift ios/tests/ThemeCatalogChecks.swift -o /tmp/swerve-theme-checks
+/tmp/swerve-theme-checks
+```
+
 Run the route-entry state checks with:
 
 ```bash

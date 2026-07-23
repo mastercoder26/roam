@@ -74,7 +74,7 @@ enum DrivePresentationEngine {
     /// Local breathing room above the floating tab bar. The root already
     /// reserves the tab bar with a safe-area inset; this keeps End Drive
     /// clearly clear of that chrome.
-    static let activeButtonBottomInset: Double = 44
+    static let activeButtonBottomInset: Double = 52
 
     static func reduce(
         _ state: DrivePresentationState,

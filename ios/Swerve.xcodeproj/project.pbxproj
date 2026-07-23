@@ -47,6 +47,10 @@
 		A1000000000000000000002B /* ShareViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000002A /* ShareViewController.swift */; };
 		A1000000000000000000002C /* SharedRouteImport.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000027 /* SharedRouteImport.swift */; };
 		A1000000000000000000002D /* SwerveRouteShareExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = A30000000000000000000003 /* SwerveRouteShareExtension.appex */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
+		A1000000000000000000002E /* DriveHistoryPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000002E /* DriveHistoryPolicy.swift */; };
+		A1000000000000000000002F /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000002F /* Theme.swift */; };
+		A10000000000000000000030 /* ThemeManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000030 /* ThemeManager.swift */; };
+		A10000000000000000000031 /* ThemePickerSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000031 /* ThemePickerSheet.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -118,6 +122,10 @@
 		A20000000000000000000024 /* DriveActivityWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriveActivityWidget.swift; sourceTree = "<group>"; };
 		A20000000000000000000025 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		A20000000000000000000026 /* DrivePresentationEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DrivePresentationEngine.swift; sourceTree = "<group>"; };
+		A2000000000000000000002E /* DriveHistoryPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriveHistoryPolicy.swift; sourceTree = "<group>"; };
+		A2000000000000000000002F /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
+		A20000000000000000000030 /* ThemeManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThemeManager.swift; sourceTree = "<group>"; };
+		A20000000000000000000031 /* ThemePickerSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThemePickerSheet.swift; sourceTree = "<group>"; };
 		A20000000000000000000027 /* SharedRouteImport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedRouteImport.swift; sourceTree = "<group>"; };
 		A20000000000000000000028 /* RoutePlanningFormModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoutePlanningFormModel.swift; sourceTree = "<group>"; };
 		A20000000000000000000029 /* SharedRouteImportCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedRouteImportCoordinator.swift; sourceTree = "<group>"; };
@@ -220,6 +228,8 @@
 				A20000000000000000000018 /* RoutePlanningLocationCoordinator.swift */,
 				A20000000000000000000021 /* DriveActivityAttributes.swift */,
 				A20000000000000000000026 /* DrivePresentationEngine.swift */,
+				A2000000000000000000002E /* DriveHistoryPolicy.swift */,
+				A2000000000000000000002F /* Theme.swift */,
 				A20000000000000000000027 /* SharedRouteImport.swift */,
 			);
 			path = Models;
@@ -233,6 +243,7 @@
 				A20000000000000000000022 /* DriveLiveActivityManager.swift */,
 				A20000000000000000000023 /* CarPlaySceneDelegate.swift */,
 				A20000000000000000000029 /* SharedRouteImportCoordinator.swift */,
+				A20000000000000000000030 /* ThemeManager.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -288,6 +299,7 @@
 			isa = PBXGroup;
 			children = (
 				A20000000000000000000012 /* SwerveRootView.swift */,
+				A20000000000000000000031 /* ThemePickerSheet.swift */,
 			);
 			path = Root;
 			sourceTree = "<group>";
@@ -495,6 +507,10 @@
 				A10000000000000000000022 /* DriveLiveActivityManager.swift in Sources */,
 				A10000000000000000000023 /* CarPlaySceneDelegate.swift in Sources */,
 				A10000000000000000000027 /* DrivePresentationEngine.swift in Sources */,
+				A1000000000000000000002E /* DriveHistoryPolicy.swift in Sources */,
+				A1000000000000000000002F /* Theme.swift in Sources */,
+				A10000000000000000000030 /* ThemeManager.swift in Sources */,
+				A10000000000000000000031 /* ThemePickerSheet.swift in Sources */,
 				A10000000000000000000028 /* SharedRouteImport.swift in Sources */,
 				A10000000000000000000029 /* RoutePlanningFormModel.swift in Sources */,
 				A1000000000000000000002A /* SharedRouteImportCoordinator.swift in Sources */,

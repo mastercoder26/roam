@@ -122,7 +122,6 @@ struct HomeView: View {
                 mapPreview = nil
             }
         }
-        .preferredColorScheme(.dark)
     }
 
     private var routeSurface: Color {
@@ -356,7 +355,6 @@ struct HomeView: View {
             .datePickerStyle(.compact)
             .labelsHidden()
             .tint(AppDesign.accent)
-            .colorScheme(.dark)
 
             Image(systemName: "pencil")
                 .font(.caption.weight(.bold))

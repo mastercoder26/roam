@@ -26,7 +26,9 @@ struct SwerveRootView: View {
     }
 
     @State private var selectedTab: Tab = .routes
-    @StateObject private var driveSession = DriveSessionManager.shared
+    @State private var showingThemePicker = false
+    @EnvironmentObject private var driveSession: DriveSessionManager
+    @EnvironmentObject private var themeManager: ThemeManager
     @StateObject private var routeForm = RoutePlanningFormModel()
     @StateObject private var sharedRouteImport = SharedRouteImportCoordinator()
     @Namespace private var tabAnimation
@@ -42,16 +44,25 @@ struct SwerveRootView: View {
             case .progress: DriverProgressView()
             }
         }
+        .id(themeManager.currentID)
         .environmentObject(driveSession)
-        .preferredColorScheme(.dark)
+        .environmentObject(themeManager)
+        .preferredColorScheme(themeManager.preferredColorScheme)
         // Persistent brand mark across every primary tab and nested screen.
         .safeAreaInset(edge: .top, spacing: 0) {
-            BrandWordmark()
-                .padding(.horizontal, 20)
-                .padding(.top, 6)
-                .padding(.bottom, 12)
-                .frame(maxWidth: .infinity)
-                .background(AppDesign.canvas)
+            Button {
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                showingThemePicker = true
+            } label: {
+                BrandWordmark()
+            }
+            .buttonStyle(PressableScaleStyle())
+            .padding(.horizontal, 20)
+            .padding(.top, 6)
+            .padding(.bottom, 12)
+            .frame(maxWidth: .infinity)
+            .background(themeManager.palette.canvas.color)
+            .accessibilityHint("Opens color scheme options")
         }
         // This reserves the tab bar's measured height for every tab. Unlike a
         // fixed invisible spacer, it remains correct when Dynamic Type grows
@@ -62,8 +73,13 @@ struct SwerveRootView: View {
                 .padding(.top, 8)
                 .padding(.bottom, 10)
         }
+        .sheet(isPresented: $showingThemePicker) {
+            ThemePickerSheet(themeManager: themeManager)
+                .environmentObject(driveSession)
+        }
         .transition(.opacity)
         .animation(.easeOut(duration: reduceMotion ? 0.12 : 0.18), value: selectedTab)
+        .animation(reduceMotion ? .easeOut(duration: 0.16) : AppAnimation.content, value: themeManager.currentID)
         .onChange(of: driveSession.practiceRoutePresentationRequest) { _, request in
             // The manager emits this only when a Results-screen action queues a
             // route for practice. Keeping the request separate from the route
@@ -162,7 +178,10 @@ struct SwerveRootView: View {
                         : AnyShapeStyle(.ultraThinMaterial)
                 )
         }
-        .overlay(Capsule(style: .continuous).stroke(.white.opacity(0.35), lineWidth: 0.8))
+        .overlay(
+            Capsule(style: .continuous)
+                .stroke(AppDesign.cardStrokeStrong.opacity(themeManager.palette.appearance == .light ? 1 : 0.9), lineWidth: 0.8)
+        )
         .shadow(color: .black.opacity(0.12), radius: 16, y: 8)
         .accessibilityElement(children: .contain)
     }
@@ -179,4 +198,6 @@ struct SwerveRootView: View {
 
 #Preview {
     SwerveRootView()
+        .environmentObject(ThemeManager.shared)
+        .environmentObject(DriveSessionManager.shared)
 }

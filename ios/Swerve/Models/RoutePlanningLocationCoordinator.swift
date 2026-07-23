@@ -8,6 +8,17 @@ enum RoutePlanningOriginState: Equatable {
     case resolved(String)
     case manualEntry(message: String?)
 
+    /// Destination entry unlocks once the driver has chosen current location
+    /// (including while it resolves) or a resolved address exists. Manual entry
+    /// must finish before the destination field appears.
+    var allowsDestination: Bool {
+        switch self {
+        case .awaitingOrigin, .manualEntry:
+            return false
+        case .locating, .resolved:
+            return true
+        }
+    }
 }
 
 @MainActor

@@ -14,6 +14,7 @@ struct DriveView: View {
     @State private var usesCurrentRouteOrigin = true
     /// Visible viewport height below the Swerve wordmark / above the tab bar.
     @State private var viewportHeight: CGFloat = 640
+    @State private var pendingDeletionID: UUID?
     @StateObject private var routeLocationCoordinator = RoutePlanningLocationCoordinator()
     private let apiClient = APIClient()
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -74,6 +75,27 @@ struct DriveView: View {
                 }
             }
             .toolbar(.hidden, for: .navigationBar)
+            .confirmationDialog(
+                "Delete this drive?",
+                isPresented: Binding(
+                    get: { pendingDeletionID != nil },
+                    set: { if !$0 { pendingDeletionID = nil } }
+                ),
+                titleVisibility: .visible
+            ) {
+                Button("Delete drive", role: .destructive) {
+                    guard let pendingDeletionID else { return }
+                    withAnimation(reduceMotion ? .easeOut(duration: 0.16) : AppAnimation.content) {
+                        session.deleteDrive(id: pendingDeletionID)
+                    }
+                    self.pendingDeletionID = nil
+                }
+                Button("Cancel", role: .cancel) {
+                    pendingDeletionID = nil
+                }
+            } message: {
+                Text("This removes the drive from this device. It cannot be undone.")
+            }
         }
         .sheet(isPresented: $showingHelp) {
             DriveHelpSheet()
@@ -374,40 +396,45 @@ struct DriveView: View {
         let expandedHeight = max(availableHeight, 0)
         let keepsFocusedCanvas = presentationState.preservesFocusedCanvas
         let actionShowsEnd = presentationState.action == .end
+        // Clearance below the persistent Swerve wordmark so the flip clock
+        // never sits under the header chrome.
+        let focusedTopClearance: CGFloat = 28
 
         return VStack(spacing: isExpandedDriveSurface ? 0 : 18) {
-            FlipClock(elapsed: session.elapsed, style: isExpandedDriveSurface ? .active : .preview)
-                .padding(.top, isExpandedDriveSurface ? 20 : 0)
-
             if isExpandedDriveSurface {
-                Spacer(minLength: 28)
-                activeSpeed
+                Spacer(minLength: 8)
 
-                if session.phonePlacementAssessment == .needsAdjustment {
-                    compactPlacementWarning
-                        .padding(.top, 20)
-                        .transition(.opacity)
+                VStack(spacing: 24) {
+                    FlipClock(elapsed: session.elapsed, style: .active)
+
+                    activeSpeed
+
+                    if session.phonePlacementAssessment == .needsAdjustment {
+                        compactPlacementWarning
+                            .transition(.opacity)
+                    }
                 }
 
-                Spacer(minLength: 28)
-            }
+                Spacer(minLength: 16)
 
-            driveActionButton(showsEnd: actionShowsEnd)
-                .padding(.horizontal, keepsFocusedCanvas ? AppDesign.contentPadding : 0)
-                .padding(
-                    .bottom,
-                    isExpandedDriveSurface
-                        ? CGFloat(DrivePresentationEngine.activeButtonBottomInset)
-                        : 0
-                )
+                driveActionButton(showsEnd: actionShowsEnd)
+                    .padding(.horizontal, AppDesign.contentPadding)
+                    .padding(.bottom, CGFloat(DrivePresentationEngine.activeButtonBottomInset))
+            } else {
+                FlipClock(elapsed: session.elapsed, style: .preview)
 
-            if !isExpandedDriveSurface, !keepsFocusedCanvas {
-                Text(session.statusMessage)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
+                driveActionButton(showsEnd: actionShowsEnd)
+                    .padding(.horizontal, keepsFocusedCanvas ? AppDesign.contentPadding : 0)
+
+                if !keepsFocusedCanvas {
+                    Text(session.statusMessage)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                }
             }
         }
+        .padding(.top, keepsFocusedCanvas ? focusedTopClearance : 0)
         .padding(keepsFocusedCanvas ? 0 : 20)
         .frame(maxWidth: .infinity)
         // Do not collapse the canvas while the End Drive control is travelling
@@ -542,7 +569,7 @@ struct DriveView: View {
 
     private var driveHistory: some View {
         VStack(alignment: .leading, spacing: 12) {
-            SectionHeader(title: "Past drives", subtitle: "Routes and coaching events stay on this device.")
+            SectionHeader(title: "Past drives", subtitle: "Routes and coaching events stay on this device. Touch and hold to delete.")
             ForEach(session.recordedDrives) { drive in
                 NavigationLink {
                     DriveDetailView(drive: drive)
@@ -569,6 +596,14 @@ struct DriveView: View {
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .contextMenu {
+                    Button(role: .destructive) {
+                        pendingDeletionID = drive.id
+                    } label: {
+                        Label("Delete drive", systemImage: "trash")
+                    }
+                }
+                .accessibilityHint("Touch and hold to delete this drive")
                 if drive.id != session.recordedDrives.last?.id { Divider() }
             }
         }
@@ -782,7 +817,10 @@ private struct PracticeDebriefCard: View {
 
 private struct DriveDetailView: View {
     let drive: RecordedDrive
+    @EnvironmentObject private var session: DriveSessionManager
     @State private var selectedMomentID: UUID?
+    @State private var confirmingDelete = false
+    @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     init(drive: RecordedDrive, initialSelectedMomentID: UUID? = nil) {
@@ -840,6 +878,29 @@ private struct DriveDetailView: View {
         .background(Color(.systemGroupedBackground))
         .navigationTitle("Past drive")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button(role: .destructive) {
+                    confirmingDelete = true
+                } label: {
+                    Image(systemName: "trash")
+                }
+                .accessibilityLabel("Delete drive")
+            }
+        }
+        .confirmationDialog(
+            "Delete this drive?",
+            isPresented: $confirmingDelete,
+            titleVisibility: .visible
+        ) {
+            Button("Delete drive", role: .destructive) {
+                session.deleteDrive(id: drive.id)
+                dismiss()
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This removes the drive from this device. It cannot be undone.")
+        }
     }
 
     private var replaySection: some View {
@@ -1057,8 +1118,8 @@ private struct FlipClock: View {
         case active
 
         var digitWidth: CGFloat { self == .active ? 68 : 56 }
-        var digitHeight: CGFloat { self == .active ? 92 : 76 }
-        var digitFontSize: CGFloat { self == .active ? 60 : 48 }
+        var digitHeight: CGFloat { self == .active ? 96 : 76 }
+        var digitFontSize: CGFloat { self == .active ? 56 : 48 }
         var colonFontSize: CGFloat { self == .active ? 38 : 30 }
         var spacing: CGFloat { self == .active ? 6 : 5 }
     }
