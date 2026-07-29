@@ -203,7 +203,11 @@ export interface DepartureComparisonRequest {
 export interface DepartureComparisonCandidateResult
   extends DepartureComparisonCandidate {
   route?: ScoredRoute;
-  error?: { message: string };
+  error?: {
+    message: string;
+    code?: "INVALID_REQUEST" | "ROUTE_UNAVAILABLE";
+    requestId?: string;
+  };
 }
 
 export interface DepartureComparisonResponse {

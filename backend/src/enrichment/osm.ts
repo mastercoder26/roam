@@ -6,13 +6,13 @@ import {
   type RoadConditions,
   type TurnExposure,
 } from "./types.js";
+import { determineTurnProtection } from "./turnProtection.js";
 
 const DEFAULT_OVERPASS_URL = "https://overpass-api.de/api/interpreter";
 const FETCH_TIMEOUT_MS = 9000;
 const ROAD_SAMPLE_POINTS = 24;
 const MAX_TURN_POINTS = 25;
 const WAY_MATCH_RADIUS_M = 40;
-const SIGNAL_MATCH_RADIUS_M = 65;
 
 const LEFT_TURN_MANEUVERS = new Set([
   "TURN_LEFT",
@@ -171,7 +171,7 @@ function buildQuery(samples: LatLng[], turnPoints: LatLng[]): string {
   const nodeClauses = turnPoints
     .map(
       (p) =>
-        `node(around:${SIGNAL_MATCH_RADIUS_M},${p.lat.toFixed(5)},${p.lng.toFixed(5)})["highway"~"^(traffic_signals|stop)$"];`
+        `node(around:25,${p.lat.toFixed(5)},${p.lng.toFixed(5)})["highway"="traffic_signals"];`
     )
     .join("\n");
 
@@ -314,32 +314,7 @@ export async function fetchOsmRouteData(route: ParsedRoute): Promise<OsmRouteDat
           classCounts,
         };
 
-  // --- Turn protection: signal or stop nearby counts as protected.
-  // Yield (give_way) alone is not enough — still treated as unprotected. ---
-  let turns: TurnExposure = neutralTurns();
-  if (turnPoints.length > 0) {
-    let unprotected = 0;
-    let protectedCount = 0;
-    for (const tp of turnPoints) {
-      const hasControl = signalNodes.some((n) => {
-        const highway = n.tags?.highway ?? "";
-        if (highway !== "traffic_signals" && highway !== "stop") return false;
-        return metersBetween(tp, { lat: n.lat, lng: n.lon }) <= SIGNAL_MATCH_RADIUS_M;
-      });
-      if (hasControl) protectedCount++;
-      else unprotected++;
-    }
-    turns = {
-      available: true,
-      unprotectedLeftTurns: unprotected,
-      protectedLeftTurns: protectedCount,
-      unprotectedTurnShare:
-        Math.round((unprotected / turnPoints.length) * 100) / 100,
-    };
-  } else {
-    // No left turns on this route — full data, zero exposure.
-    turns = { ...neutralTurns(), available: true };
-  }
+  const turns: TurnExposure = determineTurnProtection(turnPoints, signalNodes);
 
   return { road, turns, available: road.available || turns.available };
 }

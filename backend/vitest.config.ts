@@ -10,5 +10,20 @@ export default defineConfig({
   test: {
     globals: true,
     environment: "node",
+    coverage: {
+      provider: "v8",
+      reporter: ["text", "json-summary"],
+      include: [
+        "src/handlers/difficulty.ts",
+        "src/google/routes.ts",
+        "src/enrichment/turnProtection.ts",
+      ],
+      thresholds: {
+        lines: 80,
+        functions: 80,
+        branches: 80,
+        statements: 80,
+      },
+    },
   },
 });
