@@ -170,6 +170,15 @@ function estimateSolarWindow(
   if (utcOffsetMinutes > 12 * 60) utcOffsetMinutes -= 24 * 60;
   if (utcOffsetMinutes < -12 * 60) utcOffsetMinutes += 24 * 60;
 
+  // `departureLocalMinutes` is authoritative for scoring, even if an older
+  // client sent an unrelated or stale timestamp. Solar timing needs a real
+  // location/timezone pairing, however, so use the deterministic clock
+  // fallback rather than manufacturing a sunrise when they disagree wildly.
+  const longitudeOffsetMinutes = Math.round(longitude / 15) * 60;
+  if (Math.abs(utcOffsetMinutes - longitudeOffsetMinutes) > 3 * 60) {
+    return FALLBACK_SOLAR_WINDOW;
+  }
+
   const gamma = (2 * Math.PI / 365) * (dayOfYear - 1);
   const equationOfTime =
     229.18 *
