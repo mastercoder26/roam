@@ -15,9 +15,11 @@ struct DriveView: View {
     /// Visible viewport height below the Swerve wordmark / above the tab bar.
     @State private var viewportHeight: CGFloat = 640
     @State private var pendingDeletionID: UUID?
+    @State private var breakPlanningControlsWidth: CGFloat = 0
     @StateObject private var routeLocationCoordinator = RoutePlanningLocationCoordinator()
     private let apiClient = APIClient()
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
         NavigationStack {
@@ -215,17 +217,7 @@ struct DriveView: View {
             }
 
             VStack(alignment: .leading, spacing: 10) {
-                HStack {
-                    Text("Starting point")
-                        .font(.subheadline.weight(.semibold))
-                    Spacer()
-                    Picker("Starting point", selection: $usesCurrentRouteOrigin) {
-                        Text("Current").tag(true)
-                        Text("Address").tag(false)
-                    }
-                    .pickerStyle(.segmented)
-                    .frame(maxWidth: 190)
-                }
+                startingPointControl
 
                 if usesCurrentRouteOrigin {
                     Button {
@@ -296,6 +288,62 @@ struct DriveView: View {
         .premiumCard()
         .animation(reduceMotion ? .easeOut(duration: 0.18) : AppAnimation.content, value: plannedBreakRoute)
         .animation(AppAnimation.quick, value: breakPlanningError)
+    }
+
+    private var usesLargeText: Bool {
+        dynamicTypeSize.isAccessibilitySize || dynamicTypeSize >= .xxLarge
+    }
+
+    private var shouldStackBreakPlanningControls: Bool {
+        LayoutResponsiveness.stacksInlineControls(
+            availableWidth: breakPlanningControlsWidth,
+            usesLargeText: usesLargeText
+        )
+    }
+
+    private var startingPointControl: some View {
+        Group {
+            if shouldStackBreakPlanningControls {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Starting point")
+                        .font(.subheadline.weight(.semibold))
+                    startingPointPicker
+                        .frame(maxWidth: .infinity)
+                }
+            } else {
+                HStack {
+                    Text("Starting point")
+                        .font(.subheadline.weight(.semibold))
+                    Spacer(minLength: 12)
+                    startingPointPicker
+                        .frame(maxWidth: 190)
+                }
+            }
+        }
+        .background {
+            GeometryReader { geometry in
+                Color.clear
+                    .onAppear {
+                        updateBreakPlanningControlsWidth(geometry.size.width)
+                    }
+                    .onChange(of: geometry.size.width) { _, width in
+                        updateBreakPlanningControlsWidth(width)
+                    }
+            }
+        }
+    }
+
+    private var startingPointPicker: some View {
+        Picker("Starting point", selection: $usesCurrentRouteOrigin) {
+            Text("Current").tag(true)
+            Text("Address").tag(false)
+        }
+        .pickerStyle(.segmented)
+    }
+
+    private func updateBreakPlanningControlsWidth(_ width: CGFloat) {
+        guard width > 0, abs(breakPlanningControlsWidth - width) > 0.5 else { return }
+        breakPlanningControlsWidth = width
     }
 
     private var canPlanBreaks: Bool {

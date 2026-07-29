@@ -433,7 +433,7 @@ struct HomeView: View {
                 .font(AppDesign.Typography.sectionTitle)
                 .foregroundStyle(AppDesign.Ink.primary)
 
-            HStack(spacing: 8) {
+            FlowLayout(spacing: 8) {
                 RouteCheckPill(symbol: "car.2.fill", title: "Traffic")
                 RouteCheckPill(symbol: "arrow.triangle.merge", title: "Merges")
                 RouteCheckPill(symbol: "cloud.sun.rain.fill", title: "Conditions")
@@ -579,15 +579,16 @@ private struct RouteCheckPill: View {
         Label(title, systemImage: symbol)
             .font(.caption.weight(.semibold))
             .foregroundStyle(AppDesign.Ink.secondary)
-            .lineLimit(1)
+            .lineLimit(2)
+            .fixedSize(horizontal: false, vertical: true)
             .padding(.horizontal, 11)
             .padding(.vertical, 9)
             .background(
                 AppDesign.Ink.primary.opacity(0.08),
-                in: Capsule(style: .continuous)
+                in: RoundedRectangle(cornerRadius: AppDesign.cornerRadiusSmall, style: .continuous)
             )
             .overlay {
-                Capsule(style: .continuous)
+                RoundedRectangle(cornerRadius: AppDesign.cornerRadiusSmall, style: .continuous)
                     .stroke(AppDesign.cardStroke, lineWidth: 1)
             }
     }

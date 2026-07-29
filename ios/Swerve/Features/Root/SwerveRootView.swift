@@ -35,6 +35,7 @@ struct SwerveRootView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
         Group {
@@ -132,7 +133,24 @@ struct SwerveRootView: View {
         }
     }
 
+    private var usesLargeText: Bool {
+        dynamicTypeSize.isAccessibilitySize || dynamicTypeSize >= .xxLarge
+    }
+
     private var liquidTabBar: some View {
+        GeometryReader { geometry in
+            let showsCompactTabs = LayoutResponsiveness.usesCompactTabBar(
+                availableWidth: geometry.size.width,
+                usesLargeText: usesLargeText
+            )
+
+            tabBarContent(showsCompactTabs: showsCompactTabs)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+        .frame(height: 60)
+    }
+
+    private func tabBarContent(showsCompactTabs: Bool) -> some View {
         HStack(spacing: 6) {
             ForEach(Tab.allCases) { tab in
                 Button {
@@ -140,10 +158,10 @@ struct SwerveRootView: View {
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
                     selectedTab = tab
                 } label: {
-                    HStack(spacing: 7) {
+                    HStack(spacing: showsCompactTabs ? 0 : 7) {
                         Image(systemName: tab.symbol)
                             .font(.body.weight(.semibold))
-                        if selectedTab == tab {
+                        if selectedTab == tab, !showsCompactTabs {
                             Text(tab.title)
                                 .font(.subheadline.weight(.semibold))
                                 .lineLimit(1)
@@ -151,7 +169,8 @@ struct SwerveRootView: View {
                         }
                     }
                     .foregroundStyle(selectedTab == tab ? AppDesign.accent : Color.secondary)
-                    .padding(.horizontal, selectedTab == tab ? 16 : 14)
+                    .frame(minWidth: showsCompactTabs ? 44 : nil)
+                    .padding(.horizontal, showsCompactTabs ? 10 : (selectedTab == tab ? 16 : 14))
                     .padding(.vertical, 12)
                     .background {
                         if selectedTab == tab {

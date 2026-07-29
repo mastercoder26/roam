@@ -16,30 +16,42 @@ struct RouteAnalysisLoadingView: View {
         ZStack {
             Color.black.ignoresSafeArea()
 
-            VStack(spacing: 28) {
-                DotCarIllustration(
-                    routeProgress: routeProgress,
-                    dotsAreFormed: dotsAreFormed,
-                    isDrivingAway: isDrivingAway,
-                    reduceMotion: reduceMotion
+            GeometryReader { geometry in
+                let horizontalPadding: CGFloat = 28
+                let sceneWidth = LayoutResponsiveness.loadingSceneWidth(
+                    availableWidth: geometry.size.width,
+                    horizontalPadding: horizontalPadding
                 )
-                .frame(width: 320, height: 190)
+                let sceneScale = sceneWidth / 320
 
-                VStack(spacing: 8) {
-                    Text(statusTitle)
-                        .font(.title2.weight(.semibold))
-                        .foregroundStyle(.white)
-                    Text("Tracing the route, then checking the road signals that shape its difficulty.")
-                        .font(.subheadline)
-                        .foregroundStyle(.white.opacity(0.64))
-                        .multilineTextAlignment(.center)
-                        .frame(maxWidth: 290)
+                VStack(spacing: 28) {
+                    DotCarIllustration(
+                        routeProgress: routeProgress,
+                        dotsAreFormed: dotsAreFormed,
+                        isDrivingAway: isDrivingAway,
+                        reduceMotion: reduceMotion
+                    )
+                    .scaleEffect(sceneScale)
+                    .frame(width: sceneWidth, height: sceneWidth * (190 / 320))
+                    .clipped()
+
+                    VStack(spacing: 8) {
+                        Text(statusTitle)
+                            .font(.title2.weight(.semibold))
+                            .foregroundStyle(.white)
+                        Text("Tracing the route, then checking the road signals that shape its difficulty.")
+                            .font(.subheadline)
+                            .foregroundStyle(.white.opacity(0.64))
+                            .multilineTextAlignment(.center)
+                            .frame(maxWidth: min(290, sceneWidth))
+                    }
+
+                    ProgressView()
+                        .tint(.orange)
                 }
-
-                ProgressView()
-                    .tint(.orange)
+                .padding(horizontalPadding)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
-            .padding(28)
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Analyzing route difficulty")

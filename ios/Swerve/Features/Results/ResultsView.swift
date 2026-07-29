@@ -1311,10 +1311,14 @@ struct ReasonChipView: View {
         Text(text)
             .font(.subheadline.weight(.medium))
             .foregroundStyle(.primary)
+            .lineLimit(2)
+            .fixedSize(horizontal: false, vertical: true)
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
-            .background(Color(.tertiarySystemGroupedBackground))
-            .clipShape(Capsule())
+            .background(
+                Color(.tertiarySystemGroupedBackground),
+                in: RoundedRectangle(cornerRadius: AppDesign.cornerRadiusSmall, style: .continuous)
+            )
     }
 }
 
@@ -1350,14 +1354,22 @@ struct FlowLayout: Layout {
     }
 
     private func arrange(proposal: ProposedViewSize, subviews: Subviews) -> (size: CGSize, frames: [CGRect]) {
-        let maxWidth = proposal.width ?? .infinity
+        let intrinsicWidth = subviews.enumerated().reduce(CGFloat.zero) { partialWidth, item in
+            let spacingBefore = item.offset == 0 ? 0 : spacing
+            return partialWidth + spacingBefore + item.element.sizeThatFits(.unspecified).width
+        }
+        let proposedWidth = proposal.width ?? intrinsicWidth
+        let maxWidth = max(0, proposedWidth.isFinite ? proposedWidth : intrinsicWidth)
         var x: CGFloat = 0
         var y: CGFloat = 0
         var rowHeight: CGFloat = 0
         var frames: [CGRect] = []
 
         for subview in subviews {
-            let size = subview.sizeThatFits(.unspecified)
+            let fittedSize = subview.sizeThatFits(
+                ProposedViewSize(width: maxWidth, height: proposal.height)
+            )
+            let size = CGSize(width: min(fittedSize.width, maxWidth), height: fittedSize.height)
             if x + size.width > maxWidth, x > 0 {
                 x = 0
                 y += rowHeight + spacing
