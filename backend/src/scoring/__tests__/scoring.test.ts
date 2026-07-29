@@ -67,6 +67,30 @@ describe("highway route scoring", () => {
   });
 });
 
+describe("after-dark timing", () => {
+  const chicagoCorridor = {
+    ...highwayRoute,
+    bounds: {
+      southwest: { lat: 41.78, lng: -87.72 },
+      northeast: { lat: 41.9, lng: -87.55 },
+    },
+  };
+
+  it("uses seasonal daylight rather than a fixed clock window", () => {
+    const winter = buildFeaturesFromRoute(chicagoCorridor, {
+      departureTime: "2026-01-15T00:30:00.000Z",
+      departureLocalMinutes: 18 * 60 + 30,
+    }).features;
+    const summer = buildFeaturesFromRoute(chicagoCorridor, {
+      departureTime: "2026-07-15T23:30:00.000Z",
+      departureLocalMinutes: 18 * 60 + 30,
+    }).features;
+
+    expect(winter.nighttimeShare).toBeGreaterThan(0.95);
+    expect(summer.nighttimeShare).toBeLessThan(0.05);
+  });
+});
+
 describe("urban route scoring", () => {
   it("scores a dense urban grid as hard without defaulting to very hard", () => {
     const result = scoreRoute(urbanRoute);

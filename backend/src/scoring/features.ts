@@ -1,4 +1,4 @@
-import type { ParsedRoute } from "../types.js";
+import type { Bounds, ParsedRoute } from "../types.js";
 import type { RouteConditions } from "../enrichment/types.js";
 import { smoothstep } from "./helpers.js";
 import {
@@ -120,32 +120,125 @@ export function resolveDepartureLocalMinutes(
   );
 }
 
-function isNightLocalMinute(localMinutes: number): boolean {
-  const hour = Math.floor(localMinutes / 60);
-  return hour >= 20 || hour < 6;
+interface SolarWindow {
+  sunriseLocalMinutes: number;
+  sunsetLocalMinutes: number;
 }
 
-/** Exact overlap with the repeating 8 PM–6 AM local-time window. */
+const FALLBACK_SOLAR_WINDOW: SolarWindow = {
+  sunriseLocalMinutes: 6 * 60,
+  sunsetLocalMinutes: 20 * 60,
+};
+
+function normalizeDayMinutes(value: number): number {
+  return ((value % (24 * 60)) + 24 * 60) % (24 * 60);
+}
+
+/**
+ * Estimates local sunrise and sunset from the route midpoint and departure
+ * date using NOAA's standard solar-position approximation. The client gives
+ * both an absolute timestamp and local clock time, which lets us infer the
+ * route's UTC offset without relying on the server's timezone.
+ */
+function estimateSolarWindow(
+  bounds: Bounds,
+  departureTime?: string,
+  departureLocalMinutes?: number
+): SolarWindow {
+  if (!departureTime || !isValidDepartureLocalMinutes(departureLocalMinutes)) {
+    return FALLBACK_SOLAR_WINDOW;
+  }
+
+  const date = new Date(departureTime);
+  if (Number.isNaN(date.getTime())) return FALLBACK_SOLAR_WINDOW;
+
+  const latitude = (bounds.southwest.lat + bounds.northeast.lat) / 2;
+  const longitude = (bounds.southwest.lng + bounds.northeast.lng) / 2;
+  if (
+    !Number.isFinite(latitude) ||
+    !Number.isFinite(longitude) ||
+    Math.abs(latitude) > 90 ||
+    Math.abs(longitude) > 180
+  ) {
+    return FALLBACK_SOLAR_WINDOW;
+  }
+
+  const startOfYearUtc = Date.UTC(date.getUTCFullYear(), 0, 0);
+  const dayOfYear = Math.floor((date.getTime() - startOfYearUtc) / 86_400_000);
+  const utcMinutes = date.getUTCHours() * 60 + date.getUTCMinutes();
+  let utcOffsetMinutes = departureLocalMinutes - utcMinutes;
+  if (utcOffsetMinutes > 12 * 60) utcOffsetMinutes -= 24 * 60;
+  if (utcOffsetMinutes < -12 * 60) utcOffsetMinutes += 24 * 60;
+
+  // `departureLocalMinutes` is authoritative for scoring, even if an older
+  // client sent an unrelated or stale timestamp. Solar timing needs a real
+  // location/timezone pairing, however, so use the deterministic clock
+  // fallback rather than manufacturing a sunrise when they disagree wildly.
+  const longitudeOffsetMinutes = Math.round(longitude / 15) * 60;
+  if (Math.abs(utcOffsetMinutes - longitudeOffsetMinutes) > 3 * 60) {
+    return FALLBACK_SOLAR_WINDOW;
+  }
+
+  const gamma = (2 * Math.PI / 365) * (dayOfYear - 1);
+  const equationOfTime =
+    229.18 *
+    (0.000075 +
+      0.001868 * Math.cos(gamma) -
+      0.032077 * Math.sin(gamma) -
+      0.014615 * Math.cos(2 * gamma) -
+      0.040849 * Math.sin(2 * gamma));
+  const declination =
+    0.006918 -
+    0.399912 * Math.cos(gamma) +
+    0.070257 * Math.sin(gamma) -
+    0.006758 * Math.cos(2 * gamma) +
+    0.000907 * Math.sin(2 * gamma) -
+    0.002697 * Math.cos(3 * gamma) +
+    0.00148 * Math.sin(3 * gamma);
+  const latitudeRadians = (latitude * Math.PI) / 180;
+  const zenithRadians = (90.833 * Math.PI) / 180;
+  const hourAngleCosine =
+    (Math.cos(zenithRadians) - Math.sin(latitudeRadians) * Math.sin(declination)) /
+    (Math.cos(latitudeRadians) * Math.cos(declination));
+  if (hourAngleCosine < -1 || hourAngleCosine > 1) {
+    return FALLBACK_SOLAR_WINDOW;
+  }
+
+  const hourAngleDegrees = (Math.acos(hourAngleCosine) * 180) / Math.PI;
+  const solarNoonUtcMinutes = 720 - 4 * longitude - equationOfTime;
+  return {
+    sunriseLocalMinutes: normalizeDayMinutes(
+      solarNoonUtcMinutes - 4 * hourAngleDegrees + utcOffsetMinutes
+    ),
+    sunsetLocalMinutes: normalizeDayMinutes(
+      solarNoonUtcMinutes + 4 * hourAngleDegrees + utcOffsetMinutes
+    ),
+  };
+}
+
+function isNightLocalMinute(localMinutes: number, solar: SolarWindow): boolean {
+  const minute = normalizeDayMinutes(localMinutes);
+  return minute >= solar.sunsetLocalMinutes || minute < solar.sunriseLocalMinutes;
+}
+
+/** Exact overlap with the repeating local solar-night window. */
 function nighttimeSecondsInInterval(
   startLocalMinutes: number,
-  durationSeconds: number
+  durationSeconds: number,
+  solar: SolarWindow
 ): number {
   let remainingSeconds = Math.max(0, durationSeconds);
   let cursorMinutes = startLocalMinutes % (24 * 60);
   let nighttimeSeconds = 0;
 
   while (remainingSeconds > 0.001) {
-    const nighttime = isNightLocalMinute(cursorMinutes);
-    const hour = Math.floor(cursorMinutes / 60);
+    const nighttime = isNightLocalMinute(cursorMinutes, solar);
     const boundaryMinutes = nighttime
-      ? hour < 6
-        ? 6 * 60
-        : 24 * 60
-      : 20 * 60;
-    const secondsUntilBoundary = Math.max(
-      0.001,
-      (boundaryMinutes - cursorMinutes) * 60
-    );
+      ? cursorMinutes < solar.sunriseLocalMinutes
+        ? solar.sunriseLocalMinutes
+        : 24 * 60 + solar.sunriseLocalMinutes
+      : solar.sunsetLocalMinutes;
+    const secondsUntilBoundary = Math.max(0.001, (boundaryMinutes - cursorMinutes) * 60);
     const spanSeconds = Math.min(remainingSeconds, secondsUntilBoundary);
 
     if (nighttime) nighttimeSeconds += spanSeconds;
@@ -214,6 +307,7 @@ function longestHighwayRunMiles(
 
 function computeNighttimeShare(
   segments: RouteSegment[],
+  bounds: Bounds,
   departureLocalMinutes?: number,
   departureTime?: string
 ): number {
@@ -224,13 +318,16 @@ function computeNighttimeShare(
   );
   if (startLocalMinutes === undefined) return 0;
 
+  const solar = estimateSolarWindow(bounds, departureTime, startLocalMinutes);
+
   let nightSeconds = 0;
   let totalSeconds = 0;
   for (const seg of segments) {
     totalSeconds += seg.durationSeconds;
     nightSeconds += nighttimeSecondsInInterval(
       startLocalMinutes + seg.cumulativeSecondsFromStart / 60,
-      seg.durationSeconds
+      seg.durationSeconds,
+      solar
     );
   }
   return totalSeconds > 0 ? nightSeconds / totalSeconds : 0;
@@ -315,7 +412,11 @@ function deriveConditionFeatures(
   const unprotectedLeftTurns = turns?.available ? turns.unprotectedLeftTurns : 0;
   const unprotectedTurnShare = turns?.available ? turns.unprotectedTurnShare : 0;
 
-  const constructionZones = road?.constructionZones ?? 0;
+  // A provider may return a partial/stale payload alongside `available: false`.
+  // Treat every road-derived field as unavailable in that case so missing data
+  // never turns into a difficulty penalty or an apparently factual reason.
+  const verifiedRoad = road?.available ? road : undefined;
+  const constructionZones = verifiedRoad?.constructionZones ?? 0;
 
   return {
     weatherSeverity: weather?.available ? weather.severity : 0,
@@ -324,11 +425,11 @@ function deriveConditionFeatures(
     windSeverity: weather?.windSeverity ?? 0,
     lowVisibilityRisk: weather?.lowVisibilityRisk ?? 0,
     icyRisk: weather?.icyRisk ?? 0,
-    roadSizeScore: road?.available ? road.roadSizeScore : 0,
-    narrowRoadShare: road?.narrowRoadShare ?? 0,
-    majorRoadShare: road?.majorRoadShare ?? 0,
-    unpavedShare: road?.unpavedShare ?? 0,
-    avgLanes: road?.avgLanes ?? 0,
+    roadSizeScore: verifiedRoad?.roadSizeScore ?? 0,
+    narrowRoadShare: verifiedRoad?.narrowRoadShare ?? 0,
+    majorRoadShare: verifiedRoad?.majorRoadShare ?? 0,
+    unpavedShare: verifiedRoad?.unpavedShare ?? 0,
+    avgLanes: verifiedRoad?.avgLanes ?? 0,
     constructionZones,
     constructionSeverity: smoothstep(constructionZones / 4),
     unprotectedLeftTurns,
@@ -404,6 +505,7 @@ export function buildFeatures(input: BuildFeaturesInput): RouteFeatures {
     trafficVariance: trafficVariance * (1 + delayRatio),
     nighttimeShare: computeNighttimeShare(
       segments,
+      route.bounds,
       departureLocalMinutes,
       departureTime
     ),

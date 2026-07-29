@@ -21,12 +21,18 @@ is coaching feedback, not a guarantee that a person or route is safe.
 
 ## How scoring uses data
 
-Route difficulty combines Google Routes geometry, maneuvers, traffic-aware ETA,
-and best-effort live enrichment from Open-Meteo and OpenStreetMap/Overpass.
+Route difficulty is a **driver task-demand estimate**, not a crash-risk
+prediction or a guarantee of safety. It combines Google Routes geometry,
+maneuvers, traffic-aware ETA, and best-effort live enrichment from Open-Meteo
+and OpenStreetMap/Overpass.
 Posted speed limits are assigned only to the matching sampled portion of a
 route; when that coverage is unavailable, Swerve falls back to per-step route
-timing instead of applying a route-wide average. The app lists the live sources
-that contributed to each result and shows an uncertainty band.
+timing instead of applying a route-wide average. After-dark exposure uses the
+route location, travel date, and local departure time to estimate sunrise and
+sunset (with a conservative clock-time fallback when those inputs are
+unavailable). Every OSM road field is ignored unless its lookup succeeded. The
+app lists the live sources that contributed to each result and shows an
+uncertainty band.
 
 Manual driving scores are local to the device. Swerve rejects poor GPS fixes,
 derives braking and acceleration from changes in accepted GPS speed, uses

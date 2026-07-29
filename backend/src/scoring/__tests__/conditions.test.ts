@@ -54,6 +54,29 @@ describe("weather conditions", () => {
 });
 
 describe("road conditions", () => {
+  it("ignores unverified road payloads instead of charging unavailable data", () => {
+    const base = neutralConditions();
+    const unavailablePayload: RouteConditions = {
+      ...base,
+      road: {
+        ...base.road,
+        available: false,
+        roadSizeScore: 1,
+        narrowRoadShare: 1,
+        unpavedShare: 1,
+        constructionZones: 6,
+      },
+    };
+
+    const plain = scoreRoute(highwayRoute);
+    const unverified = scoreRoute(highwayRoute, {
+      conditions: unavailablePayload,
+    });
+
+    expect(unverified.score).toBe(plain.score);
+    expect(unverified.reasons).toEqual(plain.reasons);
+  });
+
   it("construction zones increase difficulty", () => {
     const base = neutralConditions();
     const withConstruction: RouteConditions = {
