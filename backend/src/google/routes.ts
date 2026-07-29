@@ -1,5 +1,7 @@
+import { z } from "zod";
+import { RouteProviderError } from "../errors.js";
 import type { Bounds, LatLng, ParsedRoute, RouteStep } from "../types.js";
-import { parseDurationSeconds } from "../utils/polyline.js";
+import { buildPolylineGeometry, parseDurationSeconds } from "../utils/polyline.js";
 
 const ROUTES_URL = "https://routes.googleapis.com/directions/v2:computeRoutes";
 
@@ -25,91 +27,83 @@ interface ComputeRoutesParams {
   apiKey: string;
 }
 
-interface GoogleLatLng {
-  latitude: number;
-  longitude: number;
-}
+const protobufDuration = z.string()
+  .regex(/^\d+(?:\.\d+)?s$/)
+  .refine((value) => parseDurationSeconds(value) >= 0);
 
-interface GoogleViewport {
-  low: GoogleLatLng;
-  high: GoogleLatLng;
-}
+const positiveProtobufDuration = protobufDuration
+  .refine((value) => parseDurationSeconds(value) > 0);
 
-interface GoogleNavigationInstruction {
-  maneuver?: string;
-  instructions?: string;
-}
+const latLng = z.object({
+  latitude: z.number().finite().min(-90).max(90),
+  longitude: z.number().finite().min(-180).max(180),
+});
 
-interface GoogleStep {
-  distanceMeters?: number;
-  staticDuration?: string;
-  navigationInstruction?: GoogleNavigationInstruction;
-  polyline?: { encodedPolyline?: string };
-}
+const routeStep = z.object({
+  distanceMeters: z.number().finite().nonnegative(),
+  staticDuration: protobufDuration,
+  navigationInstruction: z.object({
+    maneuver: z.string().optional(),
+    instructions: z.string().optional(),
+  }).optional(),
+  polyline: z.object({ encodedPolyline: z.string().min(1) }).optional(),
+});
 
-interface GoogleLeg {
-  steps?: GoogleStep[];
-}
+const googleRoute = z.object({
+  duration: positiveProtobufDuration,
+  staticDuration: positiveProtobufDuration,
+  distanceMeters: z.number().finite().positive(),
+  polyline: z.object({ encodedPolyline: z.string().min(1) }),
+  routeLabels: z.array(z.string()).optional(),
+  warnings: z.array(z.string()).optional(),
+  legs: z.array(z.object({ steps: z.array(routeStep).min(1) })).min(1),
+  viewport: z.object({ low: latLng, high: latLng }),
+}).superRefine((route, ctx) => {
+  if (!buildPolylineGeometry(route.polyline.encodedPolyline)) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Invalid overview polyline" });
+  }
 
-interface GoogleRoute {
-  duration?: string;
-  staticDuration?: string;
-  distanceMeters?: number;
-  polyline?: { encodedPolyline?: string };
-  routeLabels?: string[];
-  warnings?: string[];
-  legs?: GoogleLeg[];
-  viewport?: GoogleViewport;
-}
+  const steps = route.legs.flatMap((leg) => leg.steps);
+  if (!steps.some((step) => step.distanceMeters > 0)) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Route must contain a usable step" });
+  }
+});
 
-interface ComputeRoutesResponse {
-  routes?: GoogleRoute[];
-  error?: { message?: string; code?: number };
-}
+const computeRoutesResponse = z.object({
+  routes: z.array(googleRoute).min(1),
+});
 
-function toLatLng(point: GoogleLatLng): LatLng {
+type GoogleRoute = z.infer<typeof googleRoute>;
+
+function toLatLng(point: { latitude: number; longitude: number }): LatLng {
   return { lat: point.latitude, lng: point.longitude };
 }
 
-function parseBounds(viewport?: GoogleViewport): Bounds {
-  if (!viewport?.low || !viewport?.high) {
-    return {
-      southwest: { lat: 0, lng: 0 },
-      northeast: { lat: 0, lng: 0 },
-    };
-  }
+function parseBounds(route: GoogleRoute): Bounds {
   return {
-    southwest: toLatLng(viewport.low),
-    northeast: toLatLng(viewport.high),
+    southwest: toLatLng(route.viewport.low),
+    northeast: toLatLng(route.viewport.high),
   };
 }
 
-function parseSteps(legs?: GoogleLeg[]): RouteStep[] {
-  if (!legs) return [];
-
-  const steps: RouteStep[] = [];
-  for (const leg of legs) {
-    for (const step of leg.steps ?? []) {
-      steps.push({
-        distanceMeters: step.distanceMeters ?? 0,
-        staticDurationSeconds: parseDurationSeconds(step.staticDuration),
-        maneuver: step.navigationInstruction?.maneuver,
-        navigationInstruction: step.navigationInstruction?.instructions,
-        polyline: step.polyline?.encodedPolyline,
-      });
-    }
-  }
-  return steps;
+function parseSteps(route: GoogleRoute): RouteStep[] {
+  return route.legs.flatMap((leg) => leg.steps.map((step) => ({
+    distanceMeters: step.distanceMeters,
+    staticDurationSeconds: parseDurationSeconds(step.staticDuration),
+    maneuver: step.navigationInstruction?.maneuver,
+    navigationInstruction: step.navigationInstruction?.instructions,
+    polyline: step.polyline?.encodedPolyline,
+  })));
 }
 
 function parseRoute(route: GoogleRoute): ParsedRoute {
   return {
-    distanceMeters: route.distanceMeters ?? 0,
+    distanceMeters: route.distanceMeters,
     durationSeconds: parseDurationSeconds(route.duration),
     staticDurationSeconds: parseDurationSeconds(route.staticDuration),
-    polyline: route.polyline?.encodedPolyline ?? "",
-    bounds: parseBounds(route.viewport),
-    steps: parseSteps(route.legs),
+    polyline: route.polyline.encodedPolyline,
+    bounds: parseBounds(route),
+    steps: parseSteps(route),
     routeLabels: route.routeLabels,
     warnings: route.warnings,
   };
@@ -131,28 +125,36 @@ export async function computeRoutes(
     body.departureTime = params.departureTime;
   }
 
-  const response = await fetch(ROUTES_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-Goog-Api-Key": params.apiKey,
-      "X-Goog-FieldMask": FIELD_MASK,
-    },
-    body: JSON.stringify(body),
-  });
-
-  const data = (await response.json()) as ComputeRoutesResponse;
+  let response: Response;
+  try {
+    response = await fetch(ROUTES_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Goog-Api-Key": params.apiKey,
+        "X-Goog-FieldMask": FIELD_MASK,
+      },
+      body: JSON.stringify(body),
+    });
+  } catch {
+    throw new RouteProviderError();
+  }
 
   if (!response.ok) {
-    const message =
-      data.error?.message ?? `Routes API error: ${response.status}`;
-    throw new Error(message);
+    throw new RouteProviderError(response.status);
   }
 
-  const routes = data.routes ?? [];
-  if (routes.length === 0) {
-    throw new Error("No routes found between origin and destination");
+  let data: unknown;
+  try {
+    data = await response.json();
+  } catch {
+    throw new RouteProviderError(response.status);
   }
 
-  return routes.map(parseRoute);
+  const parsed = computeRoutesResponse.safeParse(data);
+  if (!parsed.success) {
+    throw new RouteProviderError(response.status);
+  }
+
+  return parsed.data.routes.map(parseRoute);
 }

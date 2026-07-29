@@ -2,6 +2,7 @@ import type { Request, Response } from "express";
 import { describe, expect, it, vi } from "vitest";
 import {
   analyzeDepartureComparisonRequest,
+  handleDifficulty,
   handleDepartureComparison,
   type RouteAnalysisDependencies,
   validateDepartureComparisonRequest,
@@ -30,6 +31,37 @@ describe("difficulty request validation", () => {
         departureLocalMinutes: 24 * 60,
       })
     ).toThrow("departureLocalMinutes must be an integer between 0 and 1439");
+  });
+
+  it("rejects malformed and unrecognized route inputs", () => {
+    const valid = {
+      origin: "A",
+      destination: "B",
+      departureTime: "2026-07-18T18:30:00-05:00",
+      departureLocalMinutes: 18 * 60 + 30,
+      includeAlternates: true,
+      continuousDriveMinutes: 90.5,
+    };
+
+    expect(validateDifficultyRequest(valid)).toEqual(valid);
+    expect(() =>
+      validateDifficultyRequest({ ...valid, departureTime: "later tonight" })
+    ).toThrow("departureTime must be a valid ISO-8601 timestamp");
+    expect(() =>
+      validateDifficultyRequest({ ...valid, includeAlternates: "yes" })
+    ).toThrow("includeAlternates must be a boolean");
+    expect(() =>
+      validateDifficultyRequest({ ...valid, continuousDriveMinutes: -1 })
+    ).toThrow("continuousDriveMinutes must be between 0 and 1440");
+    expect(() =>
+      validateDifficultyRequest({ ...valid, continuousDriveMinutes: 1440.1 })
+    ).toThrow("continuousDriveMinutes must be between 0 and 1440");
+    expect(() =>
+      validateDifficultyRequest({ ...valid, origin: "x".repeat(513) })
+    ).toThrow("origin must be at most 512 characters");
+    expect(() =>
+      validateDifficultyRequest({ ...valid, unexpected: true })
+    ).toThrow("Request body contains unrecognized field: unexpected");
   });
 });
 
@@ -119,6 +151,68 @@ describe("departure comparison HTTP validation", () => {
       expect(response.status).toHaveBeenCalledWith(400);
       expect(response.json).toHaveBeenCalledWith({
         error: "candidates must contain between 1 and 3 items",
+        code: "INVALID_REQUEST",
+        requestId: expect.any(String),
+      });
+    } finally {
+      if (previousAPIKey === undefined) {
+        delete process.env.GOOGLE_MAPS_API_KEY;
+      } else {
+        process.env.GOOGLE_MAPS_API_KEY = previousAPIKey;
+      }
+    }
+  });
+
+  it("does not expose missing configuration details", async () => {
+    const previousAPIKey = process.env.GOOGLE_MAPS_API_KEY;
+    delete process.env.GOOGLE_MAPS_API_KEY;
+    const response = {
+      status: vi.fn(),
+      json: vi.fn(),
+    };
+    response.status.mockReturnValue(response);
+
+    try {
+      await handleDifficulty(
+        { body: { origin: "A", destination: "B" } } as Request,
+        response as unknown as Response
+      );
+
+      expect(response.status).toHaveBeenCalledWith(503);
+      expect(response.json).toHaveBeenCalledWith({
+        error: "Route analysis is temporarily unavailable.",
+        code: "ROUTE_UNAVAILABLE",
+        requestId: expect.any(String),
+      });
+    } finally {
+      if (previousAPIKey === undefined) {
+        delete process.env.GOOGLE_MAPS_API_KEY;
+      } else {
+        process.env.GOOGLE_MAPS_API_KEY = previousAPIKey;
+      }
+    }
+  });
+
+  it("validates requests before checking backend configuration", async () => {
+    const previousAPIKey = process.env.GOOGLE_MAPS_API_KEY;
+    delete process.env.GOOGLE_MAPS_API_KEY;
+    const response = {
+      status: vi.fn(),
+      json: vi.fn(),
+    };
+    response.status.mockReturnValue(response);
+
+    try {
+      await handleDifficulty(
+        { body: { origin: "A", destination: "B", unexpected: true } } as Request,
+        response as unknown as Response
+      );
+
+      expect(response.status).toHaveBeenCalledWith(400);
+      expect(response.json).toHaveBeenCalledWith({
+        error: "Request body contains unrecognized field: unexpected",
+        code: "INVALID_REQUEST",
+        requestId: expect.any(String),
       });
     } finally {
       if (previousAPIKey === undefined) {
@@ -224,7 +318,11 @@ describe("departure comparison analysis", () => {
     expect(response.candidates[0].route).toBeDefined();
     expect(response.candidates[1]).toEqual({
       ...request.candidates[1],
-      error: { message: "Routes provider timed out" },
+      error: {
+        message: "Route analysis is temporarily unavailable.",
+        code: "ROUTE_UNAVAILABLE",
+        requestId: expect.any(String),
+      },
     });
     expect(response.candidates[2].route).toBeDefined();
   });
