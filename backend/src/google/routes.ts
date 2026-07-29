@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { RouteProviderError } from "../errors.js";
-import type { Bounds, LatLng, ParsedRoute, RouteStep } from "../types.js";
+import type { Bounds, LatLng, ParsedRoute, RouteEndpoint, RouteStep } from "../types.js";
 import { buildPolylineGeometry, parseDurationSeconds } from "../utils/polyline.js";
 
 const ROUTES_URL = "https://routes.googleapis.com/directions/v2:computeRoutes";
@@ -20,8 +20,8 @@ const FIELD_MASK = [
 ].join(",");
 
 interface ComputeRoutesParams {
-  origin: string;
-  destination: string;
+  origin: RouteEndpoint;
+  destination: RouteEndpoint;
   departureTime?: string;
   includeAlternates?: boolean;
   apiKey: string;
@@ -75,6 +75,20 @@ const computeRoutesResponse = z.object({
 
 type GoogleRoute = z.infer<typeof googleRoute>;
 
+function waypoint(endpoint: RouteEndpoint): Record<string, unknown> {
+  if (typeof endpoint === "string") {
+    return { address: endpoint };
+  }
+  return {
+    location: {
+      latLng: {
+        latitude: endpoint.latitude,
+        longitude: endpoint.longitude,
+      },
+    },
+  };
+}
+
 function toLatLng(point: { latitude: number; longitude: number }): LatLng {
   return { lat: point.latitude, lng: point.longitude };
 }
@@ -113,8 +127,8 @@ export async function computeRoutes(
   params: ComputeRoutesParams
 ): Promise<ParsedRoute[]> {
   const body: Record<string, unknown> = {
-    origin: { address: params.origin },
-    destination: { address: params.destination },
+    origin: waypoint(params.origin),
+    destination: waypoint(params.destination),
     travelMode: "DRIVE",
     routingPreference: "TRAFFIC_AWARE_OPTIMAL",
     computeAlternativeRoutes: params.includeAlternates ?? false,

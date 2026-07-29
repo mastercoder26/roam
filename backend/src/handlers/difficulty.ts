@@ -69,6 +69,24 @@ const addressSchema = (field: "origin" | "destination") => z.string({
   .min(1, `${field} is required and must be a string`)
   .max(MAX_ADDRESS_LENGTH, `${field} must be at most ${MAX_ADDRESS_LENGTH} characters`);
 
+const coordinateEndpointSchema = (field: "origin" | "destination") => z.object({
+  latitude: z.number({
+    invalid_type_error: `${field} latitude must be a number between -90 and 90`,
+  }).finite(`${field} latitude must be a number between -90 and 90`)
+    .min(-90, `${field} latitude must be between -90 and 90`)
+    .max(90, `${field} latitude must be between -90 and 90`),
+  longitude: z.number({
+    invalid_type_error: `${field} longitude must be a number between -180 and 180`,
+  }).finite(`${field} longitude must be a number between -180 and 180`)
+    .min(-180, `${field} longitude must be between -180 and 180`)
+    .max(180, `${field} longitude must be between -180 and 180`),
+}).strict();
+
+const routeEndpointSchema = (field: "origin" | "destination") => z.union([
+  addressSchema(field),
+  coordinateEndpointSchema(field),
+]);
+
 const departureLocalMinutesSchema = z.number({
   invalid_type_error: "departureLocalMinutes must be an integer between 0 and 1439",
 }).int("departureLocalMinutes must be an integer between 0 and 1439")
@@ -80,8 +98,8 @@ const departureTimeSchema = z.string({
 }).refine(isValidIsoTimestamp, "departureTime must be a valid ISO-8601 timestamp");
 
 const difficultyRequestSchema = z.object({
-  origin: addressSchema("origin"),
-  destination: addressSchema("destination"),
+  origin: routeEndpointSchema("origin"),
+  destination: routeEndpointSchema("destination"),
   departureTime: departureTimeSchema.optional(),
   departureLocalMinutes: departureLocalMinutesSchema.optional(),
   includeAlternates: z.boolean({

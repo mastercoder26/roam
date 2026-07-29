@@ -3,9 +3,29 @@ import CoreLocation
 
 // MARK: - Request
 
+struct RouteCoordinateEndpoint: Codable, Hashable {
+    let latitude: Double
+    let longitude: Double
+}
+
+enum RouteRequestEndpoint: Encodable {
+    case address(String)
+    case coordinate(RouteCoordinateEndpoint)
+
+    func encode(to encoder: Encoder) throws {
+        switch self {
+        case .address(let address):
+            var container = encoder.singleValueContainer()
+            try container.encode(address)
+        case .coordinate(let coordinate):
+            try coordinate.encode(to: encoder)
+        }
+    }
+}
+
 struct RouteDifficultyRequest: Encodable {
-    let origin: String
-    let destination: String
+    let origin: RouteRequestEndpoint
+    let destination: RouteRequestEndpoint
     let departureTime: String
     /// The driver's selected local clock time, independent from server timezone.
     let departureLocalMinutes: Int
@@ -479,7 +499,7 @@ struct Coordinate: Decodable {
     }
 }
 
-enum DifficultyLabel: String, Decodable, CaseIterable {
+enum DifficultyLabel: String, Codable, CaseIterable {
     case veryEasy = "Very Easy"
     case easy = "Easy"
     case moderate = "Moderate"

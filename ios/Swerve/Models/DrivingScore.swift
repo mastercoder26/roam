@@ -278,6 +278,9 @@ struct RecordedDrive: Identifiable, Codable {
     /// Absent on historical drives and on ordinary manual drives. Its optional
     /// type makes old `recorded-drives-v1` data decode without a migration.
     let plannedRouteContext: PlannedRouteContext?
+    /// Compact result of the automatic start-to-destination route analysis.
+    /// It deliberately retains no endpoint text, coordinates, or route geometry.
+    let routeAnalysis: DriveRouteAnalysis?
 
     init(
         id: UUID = UUID(),
@@ -286,7 +289,8 @@ struct RecordedDrive: Identifiable, Codable {
         route: [DriveRoutePoint],
         recordingTimeZoneIdentifier: String? = nil,
         experienceSummary: DriveExperienceSummary? = nil,
-        plannedRouteContext: PlannedRouteContext? = nil
+        plannedRouteContext: PlannedRouteContext? = nil,
+        routeAnalysis: DriveRouteAnalysis? = nil
     ) {
         self.id = id
         self.startedAt = startedAt
@@ -295,5 +299,19 @@ struct RecordedDrive: Identifiable, Codable {
         self.recordingTimeZoneIdentifier = recordingTimeZoneIdentifier
         self.experienceSummary = experienceSummary
         self.plannedRouteContext = plannedRouteContext
+        self.routeAnalysis = routeAnalysis
+    }
+
+    func replacingRouteAnalysis(with routeAnalysis: DriveRouteAnalysis) -> RecordedDrive {
+        RecordedDrive(
+            id: id,
+            startedAt: startedAt,
+            score: score,
+            route: route,
+            recordingTimeZoneIdentifier: recordingTimeZoneIdentifier,
+            experienceSummary: experienceSummary,
+            plannedRouteContext: plannedRouteContext,
+            routeAnalysis: routeAnalysis
+        )
     }
 }

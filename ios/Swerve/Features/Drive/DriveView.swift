@@ -634,11 +634,17 @@ struct DriveView: View {
                             Text("\(String(format: "%.1f", drive.score.distanceMiles)) mi · \(drive.score.events.count) coaching events")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
+                            DriveRouteAnalysisBadge(analysis: drive.routeAnalysis)
                         }
                         Spacer()
-                        Text("\(drive.score.score)")
-                            .font(.headline.monospacedDigit())
-                            .foregroundStyle(drive.score.score >= 78 ? .green : .orange)
+                        VStack(alignment: .trailing, spacing: 1) {
+                            Text("\(drive.score.score)")
+                                .font(.headline.monospacedDigit())
+                                .foregroundStyle(drive.score.score >= 78 ? .green : .orange)
+                            Text("drive score")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
                         Image(systemName: "chevron.right").font(.caption.weight(.bold)).foregroundStyle(.tertiary)
                     }
                     .contentShape(Rectangle())
@@ -917,7 +923,8 @@ private struct DriveDetailView: View {
                 if let debrief = drive.plannedRouteContext?.debrief {
                     DriveDebriefSummary(debrief: debrief)
                 }
-                DriveScoreCard(score: drive.score)
+                DriveRouteDifficultyCard(analysis: drive.routeAnalysis)
+                DriveScoreCard(score: drive.score, title: "Drive score")
                 replaySection
             }
             .padding(.horizontal, AppDesign.contentPadding)
@@ -1007,6 +1014,133 @@ private struct DriveDebriefSummary: View {
     }
 }
 
+private struct DriveRouteAnalysisBadge: View {
+    let analysis: DriveRouteAnalysis?
+
+    var body: some View {
+        HStack(spacing: 5) {
+            switch analysis?.status {
+            case .some(.available):
+                Image(systemName: "map.fill")
+                Text(routeDifficultyText)
+            case .some(.pending):
+                ProgressView().controlSize(.mini)
+                Text("Analyzing route")
+            case .some(.unavailable), nil:
+                Image(systemName: "map.fill.badge.ellipsis")
+                Text("Route difficulty unavailable")
+            }
+        }
+        .font(.caption2.weight(.semibold))
+        .foregroundStyle(badgeColor)
+        .accessibilityElement(children: .combine)
+    }
+
+    private var routeDifficultyText: String {
+        guard let analysis,
+              let score = analysis.difficultyScore,
+              let label = analysis.label else {
+            return "Route difficulty available"
+        }
+        return "Route \(String(format: "%.1f", score))/10 · \(label.rawValue)"
+    }
+
+    private var badgeColor: Color {
+        guard let label = analysis?.label, analysis?.status == .available else { return .secondary }
+        return label.color
+    }
+}
+
+private struct DriveRouteDifficultyCard: View {
+    let analysis: DriveRouteAnalysis?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            switch analysis?.status {
+            case .some(.available):
+                availableContent
+            case .some(.pending):
+                pendingContent
+            case .some(.unavailable), nil:
+                unavailableContent
+            }
+        }
+        .premiumCard()
+    }
+
+    private var availableContent: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .top, spacing: 12) {
+                IconTile(symbol: "map.fill", color: analysis?.label?.color ?? AppDesign.accent)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Route difficulty")
+                        .font(.headline)
+                    Text("Analyzed automatically from this drive’s start to destination.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 8)
+                VStack(alignment: .trailing, spacing: 1) {
+                    Text(String(format: "%.1f", analysis?.difficultyScore ?? 0))
+                        .font(.system(size: 32, weight: .bold, design: .rounded))
+                        .monospacedDigit()
+                    Text("/10 · \(analysis?.label?.rawValue ?? "Route")")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(analysis?.label?.color ?? .secondary)
+                }
+            }
+
+            if let highlights = analysis?.highlights, !highlights.isEmpty {
+                VStack(alignment: .leading, spacing: 7) {
+                    Text("What added demand")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(.secondary)
+                    ForEach(highlights, id: \.self) { highlight in
+                        Label(highlight, systemImage: "plus.circle.fill")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+
+            if let detail = analysis?.detail {
+                Text(detail)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private var pendingContent: some View {
+        HStack(alignment: .top, spacing: 12) {
+            ProgressView().tint(AppDesign.accent)
+                .frame(width: 34, height: 34)
+            VStack(alignment: .leading, spacing: 3) {
+                Text("Analyzing route difficulty")
+                    .font(.headline)
+                Text("Swerve saved this drive already and is analyzing the measured start and destination in the background.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    private var unavailableContent: some View {
+        HStack(alignment: .top, spacing: 12) {
+            IconTile(symbol: "map.fill.badge.ellipsis", color: .secondary)
+            VStack(alignment: .leading, spacing: 3) {
+                Text("Route difficulty unavailable")
+                    .font(.headline)
+                Text(analysis?.detail ?? "This saved drive did not have enough continuous GPS data to analyze a route from start to destination.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+}
+
 private struct ReplayMomentRow: View {
     let moment: DriveReplayMoment
     let isSelected: Bool
@@ -1078,12 +1212,18 @@ private struct ReplayMomentDetail: View {
 
 private struct DriveScoreCard: View {
     let score: DrivingScore
+    let title: String
+
+    init(score: DrivingScore, title: String = "Last drive") {
+        self.score = score
+        self.title = title
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack(alignment: .firstTextBaseline) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Last drive").font(.headline)
+                    Text(title).font(.headline)
                     Text(score.grade).font(.footnote.weight(.semibold)).foregroundStyle(score.dataQuality.confidence == .low ? .orange : (score.score >= 78 ? .green : .orange))
                 }
                 Spacer()

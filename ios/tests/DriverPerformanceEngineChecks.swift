@@ -75,13 +75,42 @@ struct DriverPerformanceEngineChecks {
         expect(
             DriverPerformanceEngine.makeSummary(
                 from: [missingAnalysis], referenceDate: reference, calendar: calendar
-            ).score == nil,
-            "a drive remains in history but must wait for its route analysis before changing the overall score"
+            ).score != nil,
+            "an older saved drive should receive a local trace estimate instead of being excluded from the overall score"
+        )
+
+        let localEstimate = DriveRouteAnalysisEngine.estimated(from: missingAnalysis, calendar: calendar)
+        expect(
+            localEstimate?.source == .recordedTrace,
+            "historical-drive estimates must be explicitly marked as local trace context"
+        )
+
+        let retryAt = reference.addingTimeInterval(-300)
+        let retryable = DriveRouteAnalysis.unavailable(
+            "Temporary route service outage.",
+            retryEligible: true,
+            lastAttemptAt: retryAt,
+            retryCount: 1
+        )
+        expect(
+            !retryable.shouldRetry(at: retryAt.addingTimeInterval(4 * 60)),
+            "automatic analysis retries should respect backoff instead of retrying on every launch"
+        )
+        expect(
+            retryable.shouldRetry(at: retryAt.addingTimeInterval(5 * 60)),
+            "a temporary route-service failure should be retried after the persisted backoff"
         )
 
         let endpoints = DriveRouteAnalysisEngine.endpoints(for: hardStrong)
         expect(endpoints?.origin.latitude == 30, "automatic analysis should begin at the measured start of the usable trace")
         expect(endpoints?.destination.latitude ?? 0 > 30.01, "automatic analysis should end at the measured destination")
+
+        let encodedDrive = try! JSONEncoder().encode(hardStrong)
+        let decodedDrive = try! JSONDecoder().decode(RecordedDrive.self, from: encodedDrive)
+        expect(
+            decodedDrive.routeAnalysis?.difficultyScore == 9,
+            "completed route difficulty must persist with its saved drive"
+        )
 
         print("DriverPerformanceEngine checks passed")
     }

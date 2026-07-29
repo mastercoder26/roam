@@ -49,6 +49,7 @@ final class DriveSessionManager: NSObject, ObservableObject {
     private var queuedPracticeRoutePolyline: String?
     private var activePracticeRoutePolyline: String?
     private let historyKey = "recorded-drives-v1"
+    private var routeAnalysisTasks: [UUID: Task<Void, Never>] = [:]
 
     var currentDistanceMiles: Double { distanceMeters / 1_609.344 }
     var currentSpeedMilesPerHour: Int { Int((max(currentSpeedMetersPerSecond, 0) * 2.23694).rounded()) }
@@ -68,6 +69,7 @@ final class DriveSessionManager: NSObject, ObservableObject {
         locationManager.distanceFilter = 5
         locationManager.pausesLocationUpdatesAutomatically = false
         loadRecordedDrives()
+        resumeRouteAnalysesIfNeeded()
     }
 
     func startDrive() {
@@ -215,6 +217,9 @@ final class DriveSessionManager: NSObject, ObservableObject {
             recordingTimeZoneIdentifier: recordingTimeZoneIdentifier,
             plannedRouteContext: contextBeforeDebrief
         )
+        let initialRouteAnalysis: DriveRouteAnalysis = DriveRouteAnalysisEngine.endpoints(for: unsummarizedDrive) == nil
+            ? .unavailable("Route difficulty needs a longer continuous GPS trace from start to destination.")
+            : .pending
         let summarizedDrive = RecordedDrive(
             id: unsummarizedDrive.id,
             startedAt: driveStartedAt,
@@ -222,7 +227,8 @@ final class DriveSessionManager: NSObject, ObservableObject {
             route: routePoints,
             recordingTimeZoneIdentifier: recordingTimeZoneIdentifier,
             experienceSummary: DriveExperienceEngine.summarize(drive: unsummarizedDrive),
-            plannedRouteContext: contextBeforeDebrief
+            plannedRouteContext: contextBeforeDebrief,
+            routeAnalysis: initialRouteAnalysis
         )
         let profileBefore = DriverReadinessEngine.profile(from: recordedDrives)
         let profileAfter = DriverReadinessEngine.profile(from: [summarizedDrive] + recordedDrives)
@@ -255,13 +261,16 @@ final class DriveSessionManager: NSObject, ObservableObject {
             route: summarizedDrive.route,
             recordingTimeZoneIdentifier: summarizedDrive.recordingTimeZoneIdentifier,
             experienceSummary: summarizedDrive.experienceSummary,
-            plannedRouteContext: persistedPracticeRoute
+            plannedRouteContext: persistedPracticeRoute,
+            routeAnalysis: initialRouteAnalysis
         )
         let practiceRouteWasVerified = persistedPracticeRoute?.recordedRouteMatched
         recordedDrives = Array(([drive] + recordedDrives).prefix(50))
         saveRecordedDrives()
         lastCompletedDrive = drive
-        if finalPlacementQuality == .needsAdjustment {
+        if initialRouteAnalysis.status == .pending {
+            statusMessage = "Drive saved. Analyzing route difficulty."
+        } else if finalPlacementQuality == .needsAdjustment {
             statusMessage = "Drive saved. Secure the phone when it is safe before your next drive."
         } else if motionSamples == 0 {
             statusMessage = "No motion samples received. Try a physical iPhone."
@@ -278,6 +287,9 @@ final class DriveSessionManager: NSObject, ObservableObject {
             eventCount: events.count,
             status: "Drive saved"
         )
+        if initialRouteAnalysis.status == .pending {
+            beginAutomaticRouteAnalysis(for: drive)
+        }
     }
 
     /// Removes a saved drive from on-device history. No-ops when the id is absent.
@@ -290,6 +302,71 @@ final class DriveSessionManager: NSObject, ObservableObject {
             lastCompletedDrive = nil
             lastScore = nil
         }
+    }
+
+    /// Analyzes only the start and destination of a completed drive after its
+    /// local record is safely persisted. Any unavailable network or provider
+    /// result is recorded as analysis context; it never removes the drive.
+    private func beginAutomaticRouteAnalysis(for drive: RecordedDrive) {
+        guard routeAnalysisTasks[drive.id] == nil,
+              let currentAnalysis = drive.routeAnalysis,
+              currentAnalysis.shouldRetry() else {
+            return
+        }
+        guard let endpoints = DriveRouteAnalysisEngine.endpoints(for: drive) else {
+            replaceSavedDrive(
+                id: drive.id,
+                routeAnalysis: .unavailable("Route difficulty needs a longer continuous GPS trace from start to destination.")
+            )
+            return
+        }
+
+        let attemptedAnalysis = currentAnalysis.recordingAttempt()
+        replaceSavedDrive(id: drive.id, routeAnalysis: attemptedAnalysis)
+
+        let task = Task { [weak self] in
+            defer { self?.routeAnalysisTasks[drive.id] = nil }
+            guard let self else { return }
+
+            do {
+                let response = try await APIClient().analyzeRoute(
+                    origin: endpoints.origin,
+                    destination: endpoints.destination,
+                    departureTime: Date(),
+                    includeAlternates: false,
+                    continuousDriveMinutes: drive.score.duration / 60
+                )
+                guard !Task.isCancelled else { return }
+                self.replaceSavedDrive(
+                    id: drive.id,
+                    routeAnalysis: DriveRouteAnalysisEngine.result(from: response.primaryRoute)
+                )
+            } catch {
+                guard !Task.isCancelled else { return }
+                self.replaceSavedDrive(
+                    id: drive.id,
+                    routeAnalysis: .unavailable(
+                        "Route difficulty could not be analyzed right now. The drive and its coaching score are still saved.",
+                        retryEligible: true,
+                        lastAttemptAt: attemptedAnalysis.lastAttemptAt,
+                        retryCount: attemptedAnalysis.retryCount ?? 1
+                    )
+                )
+            }
+        }
+        routeAnalysisTasks[drive.id] = task
+    }
+
+    private func replaceSavedDrive(id: UUID, routeAnalysis: DriveRouteAnalysis) {
+        guard recordedDrives.contains(where: { $0.id == id }) else { return }
+        let updatedDrives = recordedDrives.map { drive in
+            drive.id == id ? drive.replacingRouteAnalysis(with: routeAnalysis) : drive
+        }
+        recordedDrives = updatedDrives
+        if lastCompletedDrive?.id == id {
+            lastCompletedDrive = updatedDrives.first(where: { $0.id == id })
+        }
+        saveRecordedDrives()
     }
 
     /// Queues a locally generated route context for the next manually started
@@ -519,6 +596,29 @@ final class DriveSessionManager: NSObject, ObservableObject {
     private func loadRecordedDrives() {
         guard let data = UserDefaults.standard.data(forKey: historyKey) else { return }
         recordedDrives = (try? JSONDecoder().decode([RecordedDrive].self, from: data)) ?? []
+        backfillHistoricalRouteAnalysis()
+    }
+
+    /// Older drives are assessed locally from their saved trace. This gives
+    /// existing history a transparent score contribution without uploading past
+    /// endpoints simply because the app was updated.
+    private func backfillHistoricalRouteAnalysis() {
+        let updated = recordedDrives.map { drive -> RecordedDrive in
+            guard drive.routeAnalysis == nil,
+                  let localEstimate = DriveRouteAnalysisEngine.estimated(from: drive) else {
+                return drive
+            }
+            return drive.replacingRouteAnalysis(with: localEstimate)
+        }
+        guard zip(recordedDrives, updated).contains(where: { $0.routeAnalysis != $1.routeAnalysis }) else { return }
+        recordedDrives = updated
+        saveRecordedDrives()
+    }
+
+    private func resumeRouteAnalysesIfNeeded() {
+        for drive in recordedDrives where drive.routeAnalysis?.shouldRetry() == true {
+            beginAutomaticRouteAnalysis(for: drive)
+        }
     }
 
     private func saveRecordedDrives() {
