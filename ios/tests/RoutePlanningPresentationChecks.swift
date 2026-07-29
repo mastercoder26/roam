@@ -6,6 +6,7 @@ struct RoutePlanningPresentationChecks {
         destinationStaysHiddenUntilAUsableOriginExists()
         analyzeBecomesAvailableOnlyAfterBothEndpointsExist()
         mapPreviewProgressesFromStartPinToRouteLine()
+        freshPlansUseACompactLocationPromptInsteadOfAWorldMap()
         freshPlansWaitForAnExplicitOriginChoice()
 
         print("Route planning presentation checks passed")
@@ -61,6 +62,17 @@ struct RoutePlanningPresentationChecks {
                 usesCurrentLocation: false
             ) == .overview,
             "a destination alone must not invent a starting location"
+        )
+    }
+
+    private static func freshPlansUseACompactLocationPromptInsteadOfAWorldMap() {
+        expect(
+            RoutePlanningMapPreviewStage(
+                origin: "",
+                destination: "",
+                usesCurrentLocation: false
+            ) == .locationPrompt,
+            "a fresh plan should focus on choosing a location instead of showing a world overview"
         )
     }
 
