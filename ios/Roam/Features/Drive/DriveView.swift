@@ -66,7 +66,7 @@ struct DriveView: View {
             .scrollDisabled(isTransitioningDriveSurface)
             // Avoid wrapping ScrollView in GeometryReader — that ignores the
             // top wordmark safe-area inset and clips the start-drive card.
-            .background(isFocusedCanvas ? Color(.systemBackground) : AppDesign.canvas)
+            .background(AppDesign.canvas)
             .background {
                 GeometryReader { geometry in
                     Color.clear
@@ -272,14 +272,17 @@ struct DriveView: View {
                 Task { await planBreaks() }
             } label: {
                 HStack(spacing: 10) {
-                    if isPlanningBreaks { ProgressView().tint(.white) }
+                    if isPlanningBreaks {
+                        ProgressView()
+                            .tint(canPlanBreaks ? AppDesign.accentForeground : AppDesign.Ink.tertiary)
+                    }
                     Image(systemName: "cup.and.saucer.fill")
                     Text(isPlanningBreaks ? "Checking route…" : "Show break timing")
                 }
                 .font(.subheadline.weight(.semibold))
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 13)
-                .foregroundStyle(.white)
+                .foregroundStyle(canPlanBreaks ? AppDesign.accentForeground : AppDesign.Ink.tertiary)
                 .background(RoundedRectangle(cornerRadius: AppDesign.cornerRadiusSmall, style: .continuous).fill(canPlanBreaks ? AppDesign.accent : Color(.systemGray3)))
             }
             .buttonStyle(PressableScaleStyle())
@@ -490,11 +493,11 @@ struct DriveView: View {
         .frame(height: keepsFocusedCanvas ? expandedHeight : nil, alignment: .top)
         .background(
             RoundedRectangle(cornerRadius: keepsFocusedCanvas ? 0 : 24, style: .continuous)
-                .fill(isFocusedCanvas ? Color(.systemBackground) : Color(.secondarySystemGroupedBackground))
+                .fill(isFocusedCanvas ? AppDesign.canvas : AppDesign.cardSurfaceElevated)
         )
         .overlay {
             RoundedRectangle(cornerRadius: keepsFocusedCanvas ? 0 : 24, style: .continuous)
-                .stroke(isFocusedCanvas ? .clear : Color.primary.opacity(0.05), lineWidth: 1)
+                .stroke(isFocusedCanvas ? .clear : AppDesign.cardStroke, lineWidth: 1)
         }
         .accessibilityElement(children: .contain)
         .accessibilityLabel(actionShowsEnd ? "Drive in progress" : "Manual drive")
@@ -515,10 +518,10 @@ struct DriveView: View {
             .font(.headline)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 18)
-            .foregroundStyle(.white)
+            .foregroundStyle(showsEnd ? Color.white : AppDesign.accentForeground)
             .background(
                 RoundedRectangle(cornerRadius: AppDesign.cornerRadius, style: .continuous)
-                    .fill(showsEnd ? Color.red : Color.accentColor)
+                    .fill(showsEnd ? Color.red : AppDesign.accent)
             )
         }
         .buttonStyle(PressableScaleStyle())
@@ -634,11 +637,17 @@ struct DriveView: View {
                             Text("\(String(format: "%.1f", drive.score.distanceMiles)) mi · \(drive.score.events.count) coaching events")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
+                            DriveRouteAnalysisBadge(analysis: drive.routeAnalysis)
                         }
                         Spacer()
-                        Text("\(drive.score.score)")
-                            .font(.headline.monospacedDigit())
-                            .foregroundStyle(drive.score.score >= 78 ? .green : .orange)
+                        VStack(alignment: .trailing, spacing: 1) {
+                            Text("\(drive.score.score)")
+                                .font(.headline.monospacedDigit())
+                                .foregroundStyle(drive.score.score >= 78 ? .green : .orange)
+                            Text("drive score")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
                         Image(systemName: "chevron.right").font(.caption.weight(.bold)).foregroundStyle(.tertiary)
                     }
                     .contentShape(Rectangle())
@@ -658,589 +667,6 @@ struct DriveView: View {
         .premiumCard()
     }
 
-}
-
-private struct BreakRecommendationsView: View {
-    let route: ScoredRoute
-    let continuousMinutes: Double
-
-    private var recommendation: BreakRecommendation {
-        BreakRecommendation(route: route, continuousMinutes: continuousMinutes)
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .top, spacing: 12) {
-                IconTile(symbol: recommendation.symbol, color: recommendation.color)
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(recommendation.title)
-                        .font(.subheadline.weight(.semibold))
-                    Text(recommendation.detail)
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-
-            if !recommendation.stops.isEmpty {
-                VStack(alignment: .leading, spacing: 8) {
-                    ForEach(recommendation.stops) { stop in
-                        HStack(spacing: 10) {
-                            Text(stop.label)
-                                .font(.caption.weight(.bold).monospacedDigit())
-                                .foregroundStyle(recommendation.color)
-                                .frame(width: 54, alignment: .leading)
-                            Capsule(style: .continuous)
-                                .fill(recommendation.color.opacity(0.18))
-                                .frame(width: 3, height: 22)
-                            Text(stop.reason)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                            Spacer(minLength: 0)
-                        }
-                    }
-                }
-                .padding(12)
-                .background(Color(.systemBackground), in: RoundedRectangle(cornerRadius: AppDesign.cornerRadiusSmall, style: .continuous))
-            }
-        }
-    }
-}
-
-private struct BreakRecommendation {
-    struct Stop: Identifiable {
-        let id = UUID()
-        let minute: Int
-        let reason: String
-
-        var label: String {
-            let hours = minute / 60
-            let minutes = minute % 60
-            if hours > 0, minutes > 0 { return "~\(hours)h \(minutes)m" }
-            if hours > 0 { return "~\(hours)h" }
-            return "~\(minutes)m"
-        }
-    }
-
-    let title: String
-    let detail: String
-    let symbol: String
-    let color: Color
-    let stops: [Stop]
-
-    init(route: ScoredRoute, continuousMinutes: Double) {
-        let routeMinutes = Double(route.durationSeconds) / 60
-        let highDemand = (route.routeDemands ?? []).contains { demand in
-            demand.available && (demand.level == .high || demand.intensity >= 0.66)
-        } || route.score >= 70
-        let longDrive = routeMinutes >= 90
-        let interval = highDemand ? 60 : 90
-        let firstBreak = max(30, interval - Int(continuousMinutes.rounded(.down)))
-        let breakMinutes = stride(from: firstBreak, through: Int(routeMinutes.rounded(.down)), by: interval)
-            .filter { $0 < Int(routeMinutes.rounded(.down)) - 10 }
-            .prefix(3)
-            .map { Stop(minute: $0, reason: highDemand ? "Reset attention before the demanding stretch continues." : "Step out before fatigue builds.") }
-
-        if longDrive || highDemand || continuousMinutes >= 45 {
-            title = highDemand ? "Breaks recommended" : "Long-drive breaks"
-            detail = "This route is about \(Self.durationLabel(routeMinutes)). Roam factors in your current continuous driving time and suggests rest timing before you start."
-            symbol = "cup.and.saucer.fill"
-            color = highDemand ? AppDesign.safety : AppDesign.accent
-            stops = Array(breakMinutes)
-        } else {
-            title = "No planned stop needed"
-            detail = "This route is about \(Self.durationLabel(routeMinutes)), so Roam does not recommend an automatic rest stop right now."
-            symbol = "checkmark.circle.fill"
-            color = AppDesign.positive
-            stops = []
-        }
-    }
-
-    private static func durationLabel(_ minutes: Double) -> String {
-        let rounded = Int(minutes.rounded())
-        let hours = rounded / 60
-        let mins = rounded % 60
-        if hours > 0, mins > 0 { return "\(hours) hr \(mins) min" }
-        if hours > 0 { return "\(hours) hr" }
-        return "\(mins) min"
-    }
-}
-
-private struct PracticeDebriefCard: View {
-    let drive: RecordedDrive
-
-    private var debrief: PracticeDriveDebrief? {
-        drive.plannedRouteContext?.debrief
-    }
-
-    private var planGoals: [PracticeGoal] {
-        drive.plannedRouteContext?.practicePlan?.goals ?? []
-    }
-
-    var body: some View {
-        if let debrief {
-            VStack(alignment: .leading, spacing: 14) {
-                HStack(alignment: .top, spacing: 12) {
-                    Image(systemName: debriefSymbol)
-                        .font(.title3.weight(.semibold))
-                        .foregroundStyle(debriefColor)
-                        .frame(width: 40, height: 40)
-                        .background(debriefColor.opacity(0.12), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(debrief.headline).font(.headline)
-                        Text(debrief.summary)
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                }
-
-                if !debrief.goalCompletions.isEmpty {
-                    Divider()
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Practice goals")
-                            .font(.caption.weight(.bold))
-                            .foregroundStyle(.secondary)
-                        ForEach(debrief.goalCompletions) { completion in
-                            let goal = planGoals.first(where: { $0.id == completion.goalID })
-                            HStack(alignment: .top, spacing: 8) {
-                                Image(systemName: completion.wasMeasuredToday ? "checkmark.circle.fill" : "circle")
-                                    .foregroundStyle(completion.wasMeasuredToday ? AppDesign.positive : .secondary)
-                                VStack(alignment: .leading, spacing: 1) {
-                                    Text(goal?.title ?? "Practice goal")
-                                        .font(.footnote.weight(.semibold))
-                                    Text(completion.status.title)
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                }
-                                Spacer(minLength: 0)
-                            }
-                        }
-                    }
-                }
-
-                NavigationLink {
-                    DriveDetailView(drive: drive)
-                } label: {
-                    Label("Review moments", systemImage: "play.circle.fill")
-                        .font(.subheadline.weight(.semibold))
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 10)
-                }
-                .buttonStyle(.bordered)
-                .tint(AppDesign.accent)
-            }
-            .premiumCard()
-        }
-    }
-
-    private var debriefColor: Color {
-        switch debrief?.outcome {
-        case .some(.verifiedRoutePractice):
-            return AppDesign.positive
-        case .some(.partialRouteCoverage):
-            return AppDesign.safety
-        case .some(.insufficientGPSCoverage), .some(.savedNotYetQualifying):
-            return AppDesign.accent
-        case nil:
-            return .secondary
-        }
-    }
-
-    private var debriefSymbol: String {
-        switch debrief?.outcome {
-        case .some(.verifiedRoutePractice):
-            return "checkmark.seal.fill"
-        case .some(.partialRouteCoverage):
-            return "point.3.connected.trianglepath.dotted"
-        case .some(.insufficientGPSCoverage):
-            return "location.slash"
-        case .some(.savedNotYetQualifying):
-            return "chart.bar.xaxis"
-        case nil:
-            return "checkmark.circle"
-        }
-    }
-}
-
-private struct DriveDetailView: View {
-    let drive: RecordedDrive
-    @EnvironmentObject private var session: DriveSessionManager
-    @State private var selectedMomentID: UUID?
-    @State private var confirmingDelete = false
-    @Environment(\.dismiss) private var dismiss
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    init(drive: RecordedDrive, initialSelectedMomentID: UUID? = nil) {
-        self.drive = drive
-        _selectedMomentID = State(initialValue: initialSelectedMomentID)
-    }
-
-    private var replayMoments: [DriveReplayMoment] {
-        DriveReplayEngine.moments(for: drive)
-    }
-
-    private var selectedMoment: DriveReplayMoment? {
-        guard let selectedMomentID else { return nil }
-        return replayMoments.first(where: { $0.id == selectedMomentID })
-    }
-
-    private var hasUsableRoute: Bool {
-        !DriveExperienceEngine.validTraceSegments(for: drive.route).isEmpty
-    }
-
-    var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: AppDesign.sectionSpacing) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Drive details").font(AppDesign.Typography.heroTitle)
-                    Text(drive.startedAt.formatted(date: .complete, time: .shortened)).font(.subheadline).foregroundStyle(.secondary)
-                }
-
-                if hasUsableRoute {
-                    RecordedDriveMapView(
-                        route: drive.route,
-                        moments: replayMoments,
-                        selectedEventID: selectedMomentID
-                    ) { moment in
-                        select(moment)
-                    }
-                    .frame(height: 300)
-                    .clipShape(RoundedRectangle(cornerRadius: AppDesign.cornerRadius, style: .continuous))
-                } else {
-                    ContentUnavailableView("Route unavailable", systemImage: "location.slash", description: Text("This drive did not receive a continuous accurate GPS trace to draw a route."))
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 36)
-                        .premiumCard()
-                }
-
-                if let debrief = drive.plannedRouteContext?.debrief {
-                    DriveDebriefSummary(debrief: debrief)
-                }
-                DriveScoreCard(score: drive.score)
-                replaySection
-            }
-            .padding(.horizontal, AppDesign.contentPadding)
-            .padding(.vertical, 12)
-        }
-        .background(Color(.systemGroupedBackground))
-        .navigationTitle("Past drive")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button(role: .destructive) {
-                    confirmingDelete = true
-                } label: {
-                    Image(systemName: "trash")
-                }
-                .accessibilityLabel("Delete drive")
-            }
-        }
-        .confirmationDialog(
-            "Delete this drive?",
-            isPresented: $confirmingDelete,
-            titleVisibility: .visible
-        ) {
-            Button("Delete drive", role: .destructive) {
-                session.deleteDrive(id: drive.id)
-                dismiss()
-            }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("This removes the drive from this device. It cannot be undone.")
-        }
-    }
-
-    private var replaySection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            SectionHeader(title: "Moments that mattered", subtitle: "Tap a moment or map marker to review the measured context.")
-
-            if replayMoments.isEmpty {
-                Label("No coaching events were detected on this drive.", systemImage: "checkmark.circle.fill")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-            } else {
-                ForEach(replayMoments) { moment in
-                    Button {
-                        select(moment)
-                    } label: {
-                        ReplayMomentRow(moment: moment, isSelected: selectedMomentID == moment.id)
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-
-            if let selectedMoment {
-                Divider()
-                ReplayMomentDetail(moment: selectedMoment)
-                    .transition(reduceMotion ? .opacity : .opacity.combined(with: .move(edge: .top)))
-            }
-        }
-        .premiumCard()
-        .animation(reduceMotion ? .easeOut(duration: 0.16) : AppAnimation.selection, value: selectedMomentID)
-    }
-
-    private func select(_ moment: DriveReplayMoment) {
-        guard selectedMomentID != moment.id else { return }
-        withAnimation(reduceMotion ? .easeOut(duration: 0.16) : AppAnimation.selection) {
-            selectedMomentID = moment.id
-        }
-        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-    }
-}
-
-private struct DriveDebriefSummary: View {
-    let debrief: PracticeDriveDebrief
-
-    var body: some View {
-        HStack(alignment: .top, spacing: 10) {
-            Image(systemName: "checkmark.seal")
-                .foregroundStyle(AppDesign.positive)
-                .frame(width: 30, height: 30)
-                .background(AppDesign.positive.opacity(0.12), in: Circle())
-            VStack(alignment: .leading, spacing: 2) {
-                Text(debrief.headline).font(.subheadline.weight(.semibold))
-                Text(debrief.summary).font(.footnote).foregroundStyle(.secondary)
-            }
-        }
-        .premiumCard()
-    }
-}
-
-private struct ReplayMomentRow: View {
-    let moment: DriveReplayMoment
-    let isSelected: Bool
-
-    var body: some View {
-        HStack(alignment: .top, spacing: 12) {
-            Image(systemName: moment.kind.symbol)
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(isSelected ? AppDesign.accent : AppDesign.safety)
-                .frame(width: 34, height: 34)
-                .background((isSelected ? AppDesign.accent : AppDesign.safety).opacity(0.12), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-            VStack(alignment: .leading, spacing: 3) {
-                Text(moment.kind.title).font(.subheadline.weight(.semibold))
-                Text(relativeTime(moment.elapsedSinceDriveStart))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            Spacer(minLength: 8)
-            VStack(alignment: .trailing, spacing: 3) {
-                if let speed = moment.nearestSpeedMetersPerSecond {
-                    Text("\(Int((speed * 2.23694).rounded())) mph")
-                        .font(.caption.weight(.medium).monospacedDigit())
-                }
-                Text(moment.locationAvailable ? "On route" : "Location unavailable")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-            }
-            Image(systemName: isSelected ? "checkmark.circle.fill" : "chevron.right")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(isSelected ? AppDesign.accent : Color(.tertiaryLabel))
-        }
-        .padding(10)
-        .background(isSelected ? AppDesign.accent.opacity(0.08) : Color.clear, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .stroke(isSelected ? AppDesign.accent.opacity(0.22) : .clear, lineWidth: 1)
-        }
-        .accessibilityElement(children: .combine)
-    }
-
-    private func relativeTime(_ elapsed: TimeInterval) -> String {
-        let totalSeconds = max(0, Int(elapsed.rounded()))
-        return String(format: "%d:%02d into drive", totalSeconds / 60, totalSeconds % 60)
-    }
-}
-
-private struct ReplayMomentDetail: View {
-    let moment: DriveReplayMoment
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(moment.kind.title).font(.subheadline.weight(.semibold))
-            Text("Detected from \(moment.source.rawValue). This is a coaching signal, not a determination of unsafe driving.")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-            if let progress = moment.routeProgress {
-                Text("Measured route progress: \(Int((progress * 100).rounded()))%")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            } else {
-                Text("This event is saved, but it could not be placed on a continuous GPS segment.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .accessibilityElement(children: .combine)
-    }
-}
-
-private struct DriveScoreCard: View {
-    let score: DrivingScore
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            HStack(alignment: .firstTextBaseline) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Last drive").font(.headline)
-                    Text(score.grade).font(.footnote.weight(.semibold)).foregroundStyle(score.dataQuality.confidence == .low ? .orange : (score.score >= 78 ? .green : .orange))
-                }
-                Spacer()
-                Text("\(score.score)")
-                    .font(.system(size: 42, weight: .bold, design: .rounded))
-                Text("/100").font(.caption).foregroundStyle(.secondary)
-            }
-
-            HStack {
-                Text("\(String(format: "%.1f", score.distanceMiles)) mi")
-                Spacer()
-                Text(score.formattedDuration)
-                Spacer()
-                Text("Top \(score.topSpeedMPH) mph")
-            }
-            .font(.footnote.weight(.medium))
-            .foregroundStyle(.secondary)
-
-            if !score.events.isEmpty {
-                Divider()
-                ForEach(DrivingEventKind.allCases.filter { score.count(for: $0) > 0 }) { event in
-                    HStack {
-                        Image(systemName: event.symbol).frame(width: 22).foregroundStyle(.orange)
-                        Text(event.title)
-                        Text(eventSource(for: event))
-                            .font(.caption2)
-                            .foregroundStyle(.tertiary)
-                        Spacer()
-                        Text("\(score.count(for: event))").monospacedDigit().foregroundStyle(.secondary)
-                    }
-                    .font(.subheadline)
-                }
-            }
-
-            Text(score.summary).font(.footnote).foregroundStyle(.secondary)
-            Label(score.dataQuality.summary, systemImage: "checkmark.shield")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-            if let placement = score.dataQuality.placementQuality {
-                Label(placementText(placement), systemImage: placementSymbol(placement))
-                    .font(.footnote)
-                    .foregroundStyle(placement == .needsAdjustment ? AppDesign.safety : .secondary)
-            }
-        }
-        .premiumCard()
-    }
-
-    private func eventSource(for kind: DrivingEventKind) -> String {
-        // Counts are grouped by event kind; source provenance is surfaced in the
-        // score summary rather than pretending every occurrence had one source.
-        kind == .phoneMovement ? "motion" : "GPS / motion"
-    }
-
-    private func placementText(_ placement: PhonePlacementAssessment) -> String {
-        switch placement {
-        case .stable:
-            return "Sensor placement stayed stable during the measured first minute."
-        case .needsAdjustment:
-            return "Sensor placement may be unstable. Secure the phone when it is safe."
-        case .inconclusive:
-            return "Sensor placement did not have enough measured driving time to assess."
-        case .unavailable:
-            return "Sensor placement could not be assessed because motion data was unavailable."
-        }
-    }
-
-    private func placementSymbol(_ placement: PhonePlacementAssessment) -> String {
-        switch placement {
-        case .stable: return "checkmark.circle"
-        case .needsAdjustment: return "iphone.gen3.radiowaves.left.and.right"
-        case .inconclusive: return "questionmark.circle"
-        case .unavailable: return "sensor.tag.radiowaves.forward"
-        }
-    }
-}
-
-private struct FlipClock: View {
-    enum Style: Equatable {
-        case preview
-        case active
-
-        var digitWidth: CGFloat { self == .active ? 68 : 56 }
-        var digitHeight: CGFloat { self == .active ? 96 : 76 }
-        var digitFontSize: CGFloat { self == .active ? 56 : 48 }
-        var colonFontSize: CGFloat { self == .active ? 38 : 30 }
-        var spacing: CGFloat { self == .active ? 6 : 5 }
-    }
-
-    let elapsed: TimeInterval
-    let style: Style
-
-    private var digits: [String] {
-        let minutes = Int(elapsed) / 60
-        let seconds = Int(elapsed) % 60
-        return Array(String(format: "%02d%02d", minutes, seconds)).map(String.init)
-    }
-
-    var body: some View {
-        HStack(spacing: style.spacing) {
-            ForEach(Array(digits.enumerated()), id: \.offset) { index, digit in
-                if index == 2 {
-                    Text(":")
-                        .font(.system(size: style.colonFontSize, weight: .bold, design: .rounded))
-                        .foregroundStyle(.secondary)
-                        .padding(.horizontal, 1)
-                }
-                FlipClockDigit(digit: digit, style: style)
-            }
-        }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Drive time \(Int(elapsed) / 60) minutes, \(Int(elapsed) % 60) seconds")
-    }
-}
-
-private struct FlipClockDigit: View {
-    let digit: String
-    let style: FlipClock.Style
-
-    var body: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .fill(Color.black)
-            Text(digit)
-                .font(.system(size: style.digitFontSize, weight: .semibold, design: .rounded))
-                .monospacedDigit()
-                .foregroundStyle(Color.white.opacity(0.92))
-            Rectangle()
-                .fill(Color.white.opacity(0.18))
-                .frame(height: 1)
-        }
-        .frame(width: style.digitWidth, height: style.digitHeight)
-    }
-}
-
-private struct DriveHelpSheet: View {
-    @Environment(\.dismiss) private var dismiss
-    @Environment(\.openURL) private var openURL
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            Image(systemName: "lifepreserver.fill")
-                .font(.system(size: 30))
-                .foregroundStyle(.red)
-            Text("Get help safely").font(.title2.weight(.bold))
-            Text("If you feel unsafe, pull over in a safe place before using your phone. Roam cannot contact emergency services or monitor a crash.")
-                .foregroundStyle(.secondary)
-            Button("Call emergency services") {
-                if let number = URL(string: "tel://911") { openURL(number) }
-            }
-            .buttonStyle(.borderedProminent)
-            .tint(.red)
-            Button("Close") { dismiss() }
-                .buttonStyle(.bordered)
-        }
-        .padding(24)
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
 }
 
 #Preview {

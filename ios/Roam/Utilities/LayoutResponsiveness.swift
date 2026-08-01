@@ -16,6 +16,10 @@ enum LayoutResponsiveness {
         usesLargeText || availableWidth < stackedControlThreshold
     }
 
+    static func usesCompactRoutePlanningTitle(usesLargeText: Bool) -> Bool {
+        usesLargeText
+    }
+
     static func loadingSceneWidth(availableWidth: CGFloat, horizontalPadding: CGFloat) -> CGFloat {
         min(maximumLoadingSceneWidth, max(0, availableWidth - (horizontalPadding * 2)))
     }

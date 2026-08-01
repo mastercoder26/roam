@@ -8,6 +8,8 @@ enum AppDesign {
     }
 
     static var accent: Color { palette.accent.color }
+    /// Adaptive black/white foreground for accent-filled controls.
+    static var accentForeground: Color { palette.accentForeground.color }
     static var safety: Color { palette.safety.color }
     static var positive: Color { palette.positive.color }
 
@@ -20,6 +22,8 @@ enum AppDesign {
     static var cardStroke: Color { palette.cardStroke.color }
     static var cardStrokeStrong: Color { palette.cardStrokeStrong.color }
     static var cardShadow: Color { palette.cardShadow.color }
+    /// Adaptive black/white foreground for controls filled with primary ink.
+    static var primarySurfaceForeground: Color { palette.primarySurfaceForeground.color }
 
     static let space4: CGFloat = 4
     static let space8: CGFloat = 8
@@ -110,24 +114,36 @@ struct BrandWordmark: View {
     // Observe the shared manager directly. safeAreaInset content does not always
     // inherit EnvironmentObject from the modified ancestor, which crashed launch.
     @ObservedObject private var themeManager = ThemeManager.shared
+    var compact = false
 
     var body: some View {
         Text("Roam")
-            .font(.custom("Baskerville-SemiBoldItalic", size: 36))
-            .tracking(-0.4)
+            .font(wordmarkFont)
+            // The compact wordmark lives inside a fully-labelled color-scheme
+            // control. Keep decorative chrome at a stable optical size so an
+            // accessibility text setting reserves its space for route inputs.
+            .dynamicTypeSize(compact ? .large : .accessibility5)
+            .tracking(compact ? -0.25 : -0.4)
             .foregroundStyle(wordmarkColor)
-            .frame(maxWidth: .infinity)
             .contentShape(Rectangle())
             .accessibilityLabel("Roam")
             .accessibilityAddTraits(.isHeader)
             .accessibilityHint("Opens color scheme options")
-            // Re-evaluate when the palette changes so ink stays readable on canvas.
-            .id(themeManager.currentID)
     }
 
     /// High-contrast brand ink for the current canvas (never uses a stale palette).
     private var wordmarkColor: Color {
         themeManager.palette.inkPrimary.color.opacity(0.92)
+    }
+
+    private var wordmarkFont: Font {
+        // A wordmark is decorative inside the labelled color-scheme button.
+        // Keep its compact form fixed so accessibility text enlarges the task
+        // controls, not a persistent brand bar that would push them away.
+        if compact {
+            return .custom("Baskerville-SemiBoldItalic", size: 23)
+        }
+        return .custom("Baskerville-SemiBoldItalic", size: 36, relativeTo: .largeTitle)
     }
 }
 
@@ -157,7 +173,7 @@ struct PrimaryActionButton: View {
             HStack(spacing: 10) {
                 if isLoading {
                     ProgressView()
-                        .tint(.white)
+                        .tint(isEnabled ? AppDesign.accentForeground : AppDesign.Ink.tertiary)
                         .transition(.opacity)
                 }
                 Text(isLoading ? "Analyzing…" : title)
@@ -166,7 +182,7 @@ struct PrimaryActionButton: View {
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 16)
-            .foregroundStyle(.white)
+            .foregroundStyle(isEnabled ? AppDesign.accentForeground : AppDesign.Ink.tertiary)
             .background(
                 RoundedRectangle(cornerRadius: AppDesign.cornerRadius, style: .continuous)
                     .fill(isEnabled ? AppDesign.accent : Color(.systemGray3))

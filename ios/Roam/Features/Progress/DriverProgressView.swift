@@ -1,15 +1,18 @@
 import Charts
 import SwiftUI
 
-/// A quiet summary of evidence measured locally by Roam. It intentionally
-/// avoids grades, streaks, and rankings: the values describe coverage, not a
-/// driver's worth or permission to drive.
+/// A private view of measured driving evidence and a route-adjusted coaching
+/// score. It is never a safety guarantee, driving permission, or ranking.
 struct DriverProgressView: View {
     @EnvironmentObject private var session: DriveSessionManager
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var summary: DriverProgressSummary {
         DriverProgressEngine.makeSummary(from: session.recordedDrives)
+    }
+
+    private var performance: DriverPerformanceSummary {
+        DriverPerformanceEngine.makeSummary(from: session.recordedDrives)
     }
 
     /// Saved drives can be high-quality yet still fall short of the minimum
@@ -27,6 +30,7 @@ struct DriverProgressView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: AppDesign.sectionSpacing) {
                     header
+                    overallScoreCard
 
                     if summary.hasRecordedEvidence {
                         evidenceSummary
@@ -64,6 +68,92 @@ struct DriverProgressView: View {
         }
     }
 
+    private var overallScoreCard: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(alignment: .top, spacing: 12) {
+                Image(systemName: "steeringwheel.and.heat.waves")
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(AppDesign.accent)
+                    .frame(width: 42, height: 42)
+                    .background(AppDesign.accent.opacity(0.14), in: RoundedRectangle(cornerRadius: 13, style: .continuous))
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Overall driving score")
+                        .font(.headline)
+                    Text(performance.evidence.title)
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(AppDesign.accent)
+                }
+                Spacer(minLength: 8)
+
+                if let score = performance.score {
+                    HStack(alignment: .firstTextBaseline, spacing: 2) {
+                        Text("\(score)")
+                            .font(.system(size: 40, weight: .bold, design: .rounded))
+                            .tracking(-1)
+                            .monospacedDigit()
+                        Text("/100")
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(.secondary)
+                    }
+                    .accessibilityLabel("Overall driving score \(score) out of 100")
+                }
+            }
+
+            if let score = performance.score {
+                ProgressView(value: Double(score), total: 100)
+                    .tint(score >= 78 ? AppDesign.positive : AppDesign.safety)
+                    .accessibilityHidden(true)
+
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 10) {
+                        performanceSignals
+                    }
+                    VStack(alignment: .leading, spacing: 8) {
+                        performanceSignals
+                    }
+                }
+            }
+
+            Text(performance.detail)
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(AppDesign.cardPadding)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            LinearGradient(
+                colors: [AppDesign.accent.opacity(0.16), AppDesign.cardSurface],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            ),
+            in: RoundedRectangle(cornerRadius: AppDesign.cornerRadiusLarge, style: .continuous)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: AppDesign.cornerRadiusLarge, style: .continuous)
+                .stroke(AppDesign.accent.opacity(0.24), lineWidth: 1)
+        }
+    }
+
+    @ViewBuilder
+    private var performanceSignals: some View {
+        ProgressScoreSignal(
+            value: "\(performance.includedDriveCount)",
+            label: performance.includedDriveCount == 1 ? "analyzed drive" : "analyzed drives"
+        )
+        ProgressScoreSignal(
+            value: String(format: "%.1f mi", performance.measuredMiles),
+            label: "measured evidence"
+        )
+        if let difficulty = performance.averageDifficulty {
+            ProgressScoreSignal(
+                value: String(format: "%.1f / 10", difficulty),
+                label: "avg. route difficulty"
+            )
+        }
+    }
+
     private var emptyEvidenceState: some View {
         VStack(alignment: .leading, spacing: 14) {
             Image(systemName: "chart.line.uptrend.xyaxis")
@@ -74,7 +164,7 @@ struct DriverProgressView: View {
 
             Text("No recorded evidence yet")
                 .font(.headline)
-            Text("Complete a few manual drives with usable GPS and motion. Short or preliminary recordings stay in drive history, but do not add to these totals.")
+            Text("Complete a drive with usable GPS and motion. It stays in history while Roam automatically analyzes its start-to-destination route difficulty.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -241,6 +331,26 @@ private struct ProgressMetric: View {
                 .lineLimit(2)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .combine)
+    }
+}
+
+private struct ProgressScoreSignal: View {
+    let value: String
+    let label: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(value)
+                .font(.caption.weight(.bold).monospacedDigit())
+            Text(label)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background(Color.primary.opacity(0.055), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
         .accessibilityElement(children: .combine)
     }
 }

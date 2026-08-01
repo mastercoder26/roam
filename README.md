@@ -12,9 +12,9 @@ has three focused modes:
   sharp corners, and abrupt phone movement. While a drive is active, its
   elapsed time and measured stats are available in a Live Activity on the Lock
   Screen and Dynamic Island.
-- **Progress** shows measured local evidence such as validated miles,
-  after-dark miles, 45+ mph miles, continuous-trace coverage, and an
-  eight-week chart.
+- **Progress** shows an evidence-weighted, route-adjusted coaching score plus
+  measured local evidence such as validated miles, after-dark miles, 45+ mph
+  miles, continuous-trace coverage, and an eight-week chart.
 
 This is a prototype, not a safety system or an emergency service. A drive score
 is coaching feedback, not a guarantee that a person or route is safe.
@@ -47,8 +47,15 @@ When a route is queued or active for practice, its address and planned polyline
 stay in memory only. The saved planned-route context retains only stable demand
 IDs, numeric coverage, goal status, and local timestamps. The local drive
 record separately retains its GPS trace and coaching events for private replay.
-A post-drive debrief distinguishes verified practice, partial coverage, missing
-GPS coverage, and a drive that remains preliminary.
+After a completed drive with a continuous trace, Roam automatically sends
+only its measured start and end coordinates to the configured route-analysis
+service to calculate route difficulty. It stores the resulting compact
+difficulty snapshot locally, never the sent endpoint text or returned route
+geometry. Analysis uses conditions available after the drive ends, so it does
+not reconstruct historical traffic or weather. A failed analysis never removes
+the drive or its local coaching score. A post-drive debrief distinguishes
+verified practice, partial coverage, missing GPS coverage, and a drive that
+remains preliminary.
 
 The first minute of a manual drive can show a non-blocking sensor-placement
 advisory only after fresh GPS shows the car moving and the existing
@@ -65,8 +72,10 @@ useful for UI only.
 On first manual drive, iOS asks for location and motion permissions. Roam
 uses them only while the user has explicitly started a drive. Recorded drives,
 route overlap, replay moments, readiness comparisons, and progress totals are
-stored locally on the device. No account, cloud sync, or driving-history upload
-is part of this prototype.
+stored locally on the device. No account or cloud sync is part of this
+prototype. Automatic post-drive difficulty analysis sends only the drive's
+start and destination coordinates to the configured route-analysis service;
+the full recorded history and GPS trace are not uploaded.
 
 For a physical iPhone, copy `ios/Roam/Config/Debug.local.example.xcconfig`
 to `Debug.local.xcconfig` and replace `YOUR_MAC_LAN_IP` with your Mac’s current
@@ -120,8 +129,15 @@ npm test
 Run the deterministic manual-drive checks with:
 
 ```bash
-swiftc ios/Roam/Models/RouteDifficultyModels.swift ios/Roam/Models/PhonePlacementAnalyzer.swift ios/Roam/Models/DriveScoringEngine.swift ios/Roam/Models/DrivingScore.swift ios/Roam/Models/DriveExperienceEngine.swift ios/Roam/Models/DriverReadinessEngine.swift ios/Roam/Models/PracticePlanEngine.swift ios/tests/DriveScoringEngineChecks.swift -o /tmp/roam-drive-checks
+swiftc ios/Roam/Models/RouteDifficultyModels.swift ios/Roam/Models/PhonePlacementAnalyzer.swift ios/Roam/Models/DriveScoringEngine.swift ios/Roam/Models/DrivingScore.swift ios/Roam/Models/DriveExperienceEngine.swift ios/Roam/Models/DriverReadinessModels.swift ios/Roam/Models/DriverReadinessSupport.swift ios/Roam/Models/DriverReadinessConfiguration.swift ios/Roam/Models/DriverReadinessProfileBuilder.swift ios/Roam/Models/DriverReadinessRouteMatcher.swift ios/Roam/Models/DriverReadinessEngine.swift ios/Roam/Models/PracticePlanEngine.swift ios/Roam/Models/DriverPerformanceEngine.swift ios/tests/DriveScoringEngineChecks.swift -o /tmp/roam-drive-checks
 /tmp/roam-drive-checks
+```
+
+Run the overall driver-performance checks with:
+
+```bash
+swiftc ios/Roam/Models/RouteDifficultyModels.swift ios/Roam/Models/PhonePlacementAnalyzer.swift ios/Roam/Models/DriveScoringEngine.swift ios/Roam/Models/DrivingScore.swift ios/Roam/Models/DriveExperienceEngine.swift ios/Roam/Models/DriverReadinessModels.swift ios/Roam/Models/DriverReadinessSupport.swift ios/Roam/Models/DriverReadinessConfiguration.swift ios/Roam/Models/DriverReadinessProfileBuilder.swift ios/Roam/Models/DriverReadinessRouteMatcher.swift ios/Roam/Models/DriverReadinessEngine.swift ios/Roam/Models/PracticePlanEngine.swift ios/Roam/Models/DriverPerformanceEngine.swift ios/tests/DriverPerformanceEngineChecks.swift -o /tmp/roam-performance-checks
+/tmp/roam-performance-checks
 ```
 
 Run the drive-history policy checks with:

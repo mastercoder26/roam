@@ -48,14 +48,48 @@ struct APIClient {
         includeAlternates: Bool = true,
         continuousDriveMinutes: Double? = nil
     ) async throws -> RouteDifficultyResponse {
+        try await analyzeRoute(
+            origin: .address(origin.trimmingCharacters(in: .whitespacesAndNewlines)),
+            destination: .address(destination.trimmingCharacters(in: .whitespacesAndNewlines)),
+            departureTime: departureTime,
+            includeAlternates: includeAlternates,
+            continuousDriveMinutes: continuousDriveMinutes
+        )
+    }
+
+    /// Uses the measured endpoints of a completed local drive. The server
+    /// receives coordinates as native route waypoints, never as display text.
+    func analyzeRoute(
+        origin: RouteCoordinateEndpoint,
+        destination: RouteCoordinateEndpoint,
+        departureTime: Date,
+        includeAlternates: Bool = false,
+        continuousDriveMinutes: Double? = nil
+    ) async throws -> RouteDifficultyResponse {
+        try await analyzeRoute(
+            origin: .coordinate(origin),
+            destination: .coordinate(destination),
+            departureTime: departureTime,
+            includeAlternates: includeAlternates,
+            continuousDriveMinutes: continuousDriveMinutes
+        )
+    }
+
+    private func analyzeRoute(
+        origin: RouteRequestEndpoint,
+        destination: RouteRequestEndpoint,
+        departureTime: Date,
+        includeAlternates: Bool,
+        continuousDriveMinutes: Double?
+    ) async throws -> RouteDifficultyResponse {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime]
         let localTime = Calendar.autoupdatingCurrent.dateComponents([.hour, .minute], from: departureTime)
         let departureLocalMinutes = (localTime.hour ?? 0) * 60 + (localTime.minute ?? 0)
 
         let body = RouteDifficultyRequest(
-            origin: origin.trimmingCharacters(in: .whitespacesAndNewlines),
-            destination: destination.trimmingCharacters(in: .whitespacesAndNewlines),
+            origin: origin,
+            destination: destination,
             departureTime: formatter.string(from: departureTime),
             departureLocalMinutes: departureLocalMinutes,
             includeAlternates: includeAlternates,

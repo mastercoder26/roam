@@ -6,9 +6,14 @@ struct ThemePickerSheet: View {
     @EnvironmentObject private var driveSession: DriveSessionManager
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     private var canChangeTheme: Bool {
         !driveSession.isRecording
+    }
+
+    private var usesAccessibilityText: Bool {
+        dynamicTypeSize.isAccessibilitySize
     }
 
     var body: some View {
@@ -62,25 +67,7 @@ struct ThemePickerSheet: View {
                 themeManager.select(themeID)
             }
         } label: {
-            HStack(spacing: 14) {
-                themeSwatch(palette)
-
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(themeID.title)
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(AppDesign.Ink.primary)
-                    Text(themeID.subtitle)
-                        .font(.caption)
-                        .foregroundStyle(AppDesign.Ink.secondary)
-                        .multilineTextAlignment(.leading)
-                }
-
-                Spacer(minLength: 8)
-
-                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                    .font(.title3)
-                    .foregroundStyle(isSelected ? AppDesign.accent : AppDesign.Ink.tertiary)
-            }
+            themeRowContent(themeID, palette: palette, isSelected: isSelected)
             .padding(14)
             .background(
                 RoundedRectangle(cornerRadius: AppDesign.cornerRadius, style: .continuous)
@@ -100,6 +87,52 @@ struct ThemePickerSheet: View {
         .accessibilityLabel(themeID.title)
         .accessibilityValue(isSelected ? "Selected" : "Not selected")
         .accessibilityHint(canChangeTheme ? themeID.subtitle : "Unavailable while a drive is in progress")
+    }
+
+    @ViewBuilder
+    private func themeRowContent(
+        _ themeID: ThemeID,
+        palette: ThemePalette,
+        isSelected: Bool
+    ) -> some View {
+        if usesAccessibilityText {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(alignment: .top, spacing: 14) {
+                    themeSwatch(palette)
+                    themeCopy(themeID)
+                }
+
+                Label(
+                    isSelected ? "Selected" : "Select this color scheme",
+                    systemImage: isSelected ? "checkmark.circle.fill" : "circle"
+                )
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(isSelected ? AppDesign.accent : AppDesign.Ink.secondary)
+            }
+        } else {
+            HStack(spacing: 14) {
+                themeSwatch(palette)
+                themeCopy(themeID)
+                Spacer(minLength: 8)
+                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                    .font(.title3)
+                    .foregroundStyle(isSelected ? AppDesign.accent : AppDesign.Ink.tertiary)
+            }
+        }
+    }
+
+    private func themeCopy(_ themeID: ThemeID) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(themeID.title)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(AppDesign.Ink.primary)
+            Text(themeID.subtitle)
+                .font(.caption)
+                .foregroundStyle(AppDesign.Ink.secondary)
+                .multilineTextAlignment(.leading)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func themeSwatch(_ palette: ThemePalette) -> some View {

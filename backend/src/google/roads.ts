@@ -155,21 +155,35 @@ export function buildStepSpeedMap(route: ParsedRoute): Map<number, number> {
   return map;
 }
 
+export interface SpeedLimitEnrichment {
+  stepSpeedsMph: Map<number, number>;
+  /**
+   * Distance-weighted share of route steps with at least one positioned posted
+   * speed limit. Inferred speeds do not contribute to this provenance value.
+   */
+  postedSpeedLimitCoverage: number;
+  source: "posted" | "mixed" | "implied";
+}
+
 /**
  * Merge posted limits only into the step that contains each sampled route point.
  * This avoids incorrectly applying a route-wide average (for example, a freeway
  * speed limit) to residential approach streets.
  */
-export function applySpeedLimitsToSteps(
+export function enrichStepSpeeds(
   route: ParsedRoute,
   speedLimits: SpeedLimitPoint[]
-): Map<number, number> {
+): SpeedLimitEnrichment {
   const stepSpeeds = buildStepSpeedMap(route);
 
-  if (speedLimits.length === 0) return stepSpeeds;
+  if (speedLimits.length === 0) {
+    return { stepSpeedsMph: stepSpeeds, postedSpeedLimitCoverage: 0, source: "implied" };
+  }
 
   const totalDistance = route.steps.reduce((sum, step) => sum + Math.max(0, step.distanceMeters), 0);
-  if (totalDistance <= 0) return stepSpeeds;
+  if (totalDistance <= 0) {
+    return { stepSpeedsMph: stepSpeeds, postedSpeedLimitCoverage: 0, source: "implied" };
+  }
 
   const limitsByStep = new Map<number, number[]>();
   for (const limit of speedLimits) {
@@ -195,19 +209,44 @@ export function applySpeedLimitsToSteps(
     stepSpeeds.set(index, implied > 0 ? postedAverage * 0.8 + implied * 0.2 : postedAverage);
   }
 
-  return stepSpeeds;
+  const coveredDistance = [...limitsByStep.keys()].reduce(
+    (sum, index) => sum + Math.max(0, route.steps[index]?.distanceMeters ?? 0),
+    0
+  );
+  const postedSpeedLimitCoverage = Math.max(0, Math.min(1, coveredDistance / totalDistance));
+
+  return {
+    stepSpeedsMph: stepSpeeds,
+    postedSpeedLimitCoverage,
+    source: postedSpeedLimitCoverage >= 0.999
+      ? "posted"
+      : postedSpeedLimitCoverage > 0
+        ? "mixed"
+        : "implied",
+  };
+}
+
+/**
+ * Compatibility helper for scoring callers that only need blended speeds.
+ * New pipeline code should use `enrichStepSpeeds` so it cannot lose provenance.
+ */
+export function applySpeedLimitsToSteps(
+  route: ParsedRoute,
+  speedLimits: SpeedLimitPoint[]
+): Map<number, number> {
+  return enrichStepSpeeds(route, speedLimits).stepSpeedsMph;
 }
 
 export async function enrichRouteWithSpeedLimits(
   route: ParsedRoute,
   apiKey: string
-): Promise<Map<number, number>> {
+): Promise<SpeedLimitEnrichment> {
   try {
     const limits = await getSpeedLimitsForRoute(route, apiKey);
-    return applySpeedLimitsToSteps(route, limits);
+    return enrichStepSpeeds(route, limits);
   } catch (error) {
     if (error instanceof RoadsAccessError) {
-      return buildStepSpeedMap(route);
+      return enrichStepSpeeds(route, []);
     }
     throw error;
   }

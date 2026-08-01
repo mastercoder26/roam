@@ -28,7 +28,7 @@ struct AlternateRouteCard: View {
             HStack(spacing: 14) {
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(spacing: 8) {
-                        Text(route.formattedScoreWithUncertainty)
+                        Text(route.formattedScore)
                             .font(.title3.weight(.bold).monospacedDigit())
                             .foregroundStyle(accentColor)
                             .contentTransition(.numericText())
@@ -83,30 +83,30 @@ struct AlternateRouteCard: View {
                         .foregroundStyle(delta >= 0 ? .orange : .green)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
-                        .background(Color(.tertiarySystemFill))
+                        .background(AppDesign.cardSurfaceElevated)
                         .clipShape(Capsule())
                 }
 
                 Image(systemName: isSelected ? "checkmark.circle.fill" : "chevron.right")
                     .font(.body.weight(.medium))
-                    .foregroundStyle(isSelected ? Color.accentColor : Color(.tertiaryLabel))
+                    .foregroundStyle(isSelected ? AppDesign.accent : AppDesign.Ink.tertiary)
                     .animation(AppAnimation.quick, value: isSelected)
             }
             .padding(AppDesign.cardPadding)
             .background(
                 isSelected
-                    ? Color.accentColor.opacity(0.08)
-                    : Color(.secondarySystemGroupedBackground)
+                    ? AppDesign.accent.opacity(0.08)
+                    : AppDesign.cardSurface
             )
             .clipShape(RoundedRectangle(cornerRadius: AppDesign.cornerRadius, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: AppDesign.cornerRadius, style: .continuous)
-                    .strokeBorder(isSelected ? Color.accentColor.opacity(0.5) : Color(.separator).opacity(0.2), lineWidth: isSelected ? 1.5 : 0.5)
+                    .strokeBorder(isSelected ? AppDesign.accent.opacity(0.5) : AppDesign.cardStroke, lineWidth: isSelected ? 1.5 : 0.5)
             )
         }
         .buttonStyle(PressableScaleStyle())
         .animation(reduceMotion ? .easeOut(duration: 0.16) : AppAnimation.selection, value: isSelected)
-        .accessibilityLabel("Route, score \(route.formattedScoreWithUncertainty), \(route.label.rawValue)\(readinessHeadline.map { ", \($0)" } ?? "")")
+        .accessibilityLabel("Route, score \(route.formattedScore), \(route.label.rawValue)\(readinessHeadline.map { ", \($0)" } ?? "")")
     }
 
     private func deltaText(_ delta: Double) -> String {
@@ -128,7 +128,7 @@ struct AlternateRouteCard: View {
                 highway: 0.3, maneuvers: 0.6, navDensity: 0.4, effort: 0.3
             ),
             contributions: nil,
-            uncertainty: ScoreUncertainty(low: 4.5, high: 5.7, confidence: 0.7, spread: 1.2),
+            uncertainty: ScoreUncertainty(low: 4.5, high: 5.7, confidence: 0.7, spread: 1.2, evidence: nil),
             hotspots: nil,
             conditions: nil,
             modelVersion: nil,

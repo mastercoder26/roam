@@ -52,6 +52,16 @@
 		A10000000000000000000030 /* ThemeManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000030 /* ThemeManager.swift */; };
 		A10000000000000000000031 /* ThemePickerSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000031 /* ThemePickerSheet.swift */; };
 		A10000000000000000000032 /* LayoutResponsiveness.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000032 /* LayoutResponsiveness.swift */; };
+		A10000000000000000000033 /* DriverPerformanceEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000033 /* DriverPerformanceEngine.swift */; };
+		A10000000000000000000034 /* RouteEvidenceCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000034 /* RouteEvidenceCard.swift */; };
+		A10000000000000000000035 /* DriveDetailViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000035 /* DriveDetailViews.swift */; };
+		A10000000000000000000036 /* ResultsSupportingViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000036 /* ResultsSupportingViews.swift */; };
+		A10000000000000000000037 /* DriverReadinessModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000037 /* DriverReadinessModels.swift */; };
+		A10000000000000000000038 /* DriverReadinessSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000038 /* DriverReadinessSupport.swift */; };
+		A10000000000000000000039 /* DriverReadinessConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000039 /* DriverReadinessConfiguration.swift */; };
+		A10000000000000000000040 /* DriverReadinessProfileBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000040 /* DriverReadinessProfileBuilder.swift */; };
+		A10000000000000000000041 /* DriverReadinessRouteMatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000041 /* DriverReadinessRouteMatcher.swift */; };
+		A10000000000000000000042 /* DrivePlanningSupportingViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000042 /* DrivePlanningSupportingViews.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -128,6 +138,16 @@
 		A20000000000000000000030 /* ThemeManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThemeManager.swift; sourceTree = "<group>"; };
 		A20000000000000000000031 /* ThemePickerSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThemePickerSheet.swift; sourceTree = "<group>"; };
 		A20000000000000000000032 /* LayoutResponsiveness.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LayoutResponsiveness.swift; sourceTree = "<group>"; };
+		A20000000000000000000033 /* DriverPerformanceEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriverPerformanceEngine.swift; sourceTree = "<group>"; };
+		A20000000000000000000034 /* RouteEvidenceCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RouteEvidenceCard.swift; sourceTree = "<group>"; };
+		A20000000000000000000035 /* DriveDetailViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriveDetailViews.swift; sourceTree = "<group>"; };
+		A20000000000000000000036 /* ResultsSupportingViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResultsSupportingViews.swift; sourceTree = "<group>"; };
+		A20000000000000000000037 /* DriverReadinessModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriverReadinessModels.swift; sourceTree = "<group>"; };
+		A20000000000000000000038 /* DriverReadinessSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriverReadinessSupport.swift; sourceTree = "<group>"; };
+		A20000000000000000000039 /* DriverReadinessConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriverReadinessConfiguration.swift; sourceTree = "<group>"; };
+		A20000000000000000000040 /* DriverReadinessProfileBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriverReadinessProfileBuilder.swift; sourceTree = "<group>"; };
+		A20000000000000000000041 /* DriverReadinessRouteMatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriverReadinessRouteMatcher.swift; sourceTree = "<group>"; };
+		A20000000000000000000042 /* DrivePlanningSupportingViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DrivePlanningSupportingViews.swift; sourceTree = "<group>"; };
 		A20000000000000000000027 /* SharedRouteImport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedRouteImport.swift; sourceTree = "<group>"; };
 		A20000000000000000000028 /* RoutePlanningFormModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoutePlanningFormModel.swift; sourceTree = "<group>"; };
 		A20000000000000000000029 /* SharedRouteImportCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedRouteImportCoordinator.swift; sourceTree = "<group>"; };
@@ -225,8 +245,14 @@
 					A2000000000000000000001C /* PracticePlanEngine.swift */,
 					A2000000000000000000001D /* DriveReplayEngine.swift */,
 					A2000000000000000000001E /* DriverProgressEngine.swift */,
+					A20000000000000000000033 /* DriverPerformanceEngine.swift */,
 					A2000000000000000000001F /* PhonePlacementAnalyzer.swift */,
 				A20000000000000000000019 /* DriverReadinessEngine.swift */,
+				A20000000000000000000037 /* DriverReadinessModels.swift */,
+				A20000000000000000000038 /* DriverReadinessSupport.swift */,
+				A20000000000000000000039 /* DriverReadinessConfiguration.swift */,
+				A20000000000000000000040 /* DriverReadinessProfileBuilder.swift */,
+				A20000000000000000000041 /* DriverReadinessRouteMatcher.swift */,
 				A20000000000000000000018 /* RoutePlanningLocationCoordinator.swift */,
 				A20000000000000000000021 /* DriveActivityAttributes.swift */,
 				A20000000000000000000026 /* DrivePresentationEngine.swift */,
@@ -257,6 +283,7 @@
 				A20000000000000000000009 /* RouteMapView.swift */,
 				A2000000000000000000000A /* AlternateRouteCard.swift */,
 				A2000000000000000000000B /* AddressSearchField.swift */,
+				A20000000000000000000034 /* RouteEvidenceCard.swift */,
 				A20000000000000000000017 /* RouteAnalysisLoadingView.swift */,
 			);
 			path = Components;
@@ -284,6 +311,7 @@
 			isa = PBXGroup;
 			children = (
 				A20000000000000000000003 /* ResultsView.swift */,
+				A20000000000000000000036 /* ResultsSupportingViews.swift */,
 			);
 			path = Results;
 			sourceTree = "<group>";
@@ -311,6 +339,8 @@
 			isa = PBXGroup;
 			children = (
 				A20000000000000000000013 /* DriveView.swift */,
+				A20000000000000000000035 /* DriveDetailViews.swift */,
+				A20000000000000000000042 /* DrivePlanningSupportingViews.swift */,
 			);
 			path = Drive;
 			sourceTree = "<group>";
@@ -515,6 +545,16 @@
 				A10000000000000000000030 /* ThemeManager.swift in Sources */,
 				A10000000000000000000031 /* ThemePickerSheet.swift in Sources */,
 				A10000000000000000000032 /* LayoutResponsiveness.swift in Sources */,
+				A10000000000000000000033 /* DriverPerformanceEngine.swift in Sources */,
+				A10000000000000000000034 /* RouteEvidenceCard.swift in Sources */,
+				A10000000000000000000035 /* DriveDetailViews.swift in Sources */,
+				A10000000000000000000036 /* ResultsSupportingViews.swift in Sources */,
+				A10000000000000000000037 /* DriverReadinessModels.swift in Sources */,
+				A10000000000000000000038 /* DriverReadinessSupport.swift in Sources */,
+				A10000000000000000000039 /* DriverReadinessConfiguration.swift in Sources */,
+				A10000000000000000000040 /* DriverReadinessProfileBuilder.swift in Sources */,
+				A10000000000000000000041 /* DriverReadinessRouteMatcher.swift in Sources */,
+				A10000000000000000000042 /* DrivePlanningSupportingViews.swift in Sources */,
 				A10000000000000000000028 /* SharedRouteImport.swift in Sources */,
 				A10000000000000000000029 /* RoutePlanningFormModel.swift in Sources */,
 				A1000000000000000000002A /* SharedRouteImportCoordinator.swift in Sources */,

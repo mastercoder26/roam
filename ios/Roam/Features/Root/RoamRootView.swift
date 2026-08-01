@@ -38,33 +38,21 @@ struct RoamRootView: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
-        Group {
-            switch selectedTab {
-            case .routes: HomeView(form: routeForm)
-            case .drive: DriveView()
-            case .progress: DriverProgressView()
+        VStack(spacing: 0) {
+            topBrandBar
+
+            Group {
+                switch selectedTab {
+                case .routes: HomeView(form: routeForm)
+                case .drive: DriveView()
+                case .progress: DriverProgressView()
+                }
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .id(themeManager.currentID)
         .environmentObject(driveSession)
         .environmentObject(themeManager)
         .preferredColorScheme(themeManager.preferredColorScheme)
-        // Persistent brand mark across every primary tab and nested screen.
-        .safeAreaInset(edge: .top, spacing: 0) {
-            Button {
-                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                showingThemePicker = true
-            } label: {
-                BrandWordmark()
-            }
-            .buttonStyle(PressableScaleStyle())
-            .padding(.horizontal, 20)
-            .padding(.top, 6)
-            .padding(.bottom, 12)
-            .frame(maxWidth: .infinity)
-            .background(themeManager.palette.canvas.color)
-            .accessibilityHint("Opens color scheme options")
-        }
         // This reserves the tab bar's measured height for every tab. Unlike a
         // fixed invisible spacer, it remains correct when Dynamic Type grows
         // the selected tab label and keeps End Drive unobstructed.
@@ -103,6 +91,35 @@ struct RoamRootView: View {
         .onChange(of: sharedRouteImport.state) { _, state in
             applySharedRouteStateIfSafe(state)
         }
+    }
+
+    /// A compact, ordinary layout element rather than an overlay. That makes
+    /// its occupied height explicit to every tab and prevents the active
+    /// screen's title from disappearing behind a safe-area inset.
+    private var topBrandBar: some View {
+        Button {
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            showingThemePicker = true
+        } label: {
+            HStack(spacing: 10) {
+                BrandWordmark(compact: true)
+                Spacer(minLength: 8)
+                Image(systemName: "paintpalette.fill")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(AppDesign.Ink.secondary)
+                    .frame(width: 36, height: 36)
+                    .background(AppDesign.cardSurface, in: Circle())
+                    .accessibilityHidden(true)
+            }
+            .frame(minHeight: 44)
+        }
+        .buttonStyle(PressableScaleStyle())
+        .padding(.horizontal, 20)
+        .padding(.vertical, 4)
+        .frame(maxWidth: .infinity)
+        .background(themeManager.palette.canvas.color)
+        .accessibilityLabel("Roam color schemes")
+        .accessibilityHint("Opens color scheme options without changing this screen")
     }
 
     private func refreshSharedRouteIfSafe() {

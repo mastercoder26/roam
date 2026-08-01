@@ -13,6 +13,23 @@ import { scoreRoutes } from "../../scoring/index.js";
 import { urbanRoute } from "../../scoring/__tests__/fixtures/urban-route.js";
 
 describe("difficulty request validation", () => {
+  it("accepts bounded GPS endpoints for an automatically analyzed drive", () => {
+    const origin = { latitude: 30.2672, longitude: -97.7431 };
+    const destination = { latitude: 30.3072, longitude: -97.7031 };
+
+    expect(validateDifficultyRequest({ origin, destination })).toMatchObject({
+      origin,
+      destination,
+    });
+  });
+
+  it("rejects invalid GPS endpoints before route work begins", () => {
+    expect(() => validateDifficultyRequest({
+      origin: { latitude: 91, longitude: -97.7431 },
+      destination: { latitude: 30.3072, longitude: -97.7031 },
+    })).toThrow();
+  });
+
   it("accepts a client-local departure clock", () => {
     expect(
       validateDifficultyRequest({
@@ -229,7 +246,11 @@ function makeDependencies(
 ): RouteAnalysisDependencies {
   return {
     computeRoutes,
-    enrichRouteWithSpeedLimits: async () => new Map(),
+    enrichRouteWithSpeedLimits: async () => ({
+      stepSpeedsMph: new Map(),
+      postedSpeedLimitCoverage: 0,
+      source: "implied" as const,
+    }),
     enrichRoute: async () => neutralConditions(),
     neutralConditions,
     scoreRoutes,

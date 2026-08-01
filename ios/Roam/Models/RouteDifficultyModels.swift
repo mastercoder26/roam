@@ -3,9 +3,29 @@ import CoreLocation
 
 // MARK: - Request
 
+struct RouteCoordinateEndpoint: Codable, Hashable {
+    let latitude: Double
+    let longitude: Double
+}
+
+enum RouteRequestEndpoint: Encodable {
+    case address(String)
+    case coordinate(RouteCoordinateEndpoint)
+
+    func encode(to encoder: Encoder) throws {
+        switch self {
+        case .address(let address):
+            var container = encoder.singleValueContainer()
+            try container.encode(address)
+        case .coordinate(let coordinate):
+            try coordinate.encode(to: encoder)
+        }
+    }
+}
+
 struct RouteDifficultyRequest: Encodable {
-    let origin: String
-    let destination: String
+    let origin: RouteRequestEndpoint
+    let destination: RouteRequestEndpoint
     let departureTime: String
     /// The driver's selected local clock time, independent from server timezone.
     let departureLocalMinutes: Int
@@ -317,11 +337,69 @@ struct FactorContribution: Decodable, Identifiable {
     let share: Double
 }
 
+enum ScoreEvidenceLevel: String, Decodable {
+    case limited
+    case partial
+    case wellSupported
+
+    var title: String {
+        switch self {
+        case .limited: "Limited evidence"
+        case .partial: "Partial evidence"
+        case .wellSupported: "Well-supported inputs"
+        }
+    }
+}
+
+enum ScoreEvidenceSignal: String, Decodable, CaseIterable {
+    case routeGeometry
+    case trafficTiming
+    case speedLimits
+    case weather
+    case roadMetadata
+    case turnControls
+
+    var title: String {
+        switch self {
+        case .routeGeometry: "route geometry"
+        case .trafficTiming: "traffic timing"
+        case .speedLimits: "posted speed limits"
+        case .weather: "weather"
+        case .roadMetadata: "road details"
+        case .turnControls: "turn controls"
+        }
+    }
+}
+
+enum PredictiveValidationStatus: String, Decodable {
+    case notValidated
+}
+
+/// Input provenance for a route score. This is deliberately not a probability,
+/// personal readiness assessment, or prediction of safety.
+struct ScoreEvidence: Decodable {
+    let schemaVersion: String
+    let inputCoverage: Double
+    let level: ScoreEvidenceLevel
+    let predictiveValidation: PredictiveValidationStatus
+    let signalCoverage: [ScoreEvidenceSignal: Double]
+    let verifiedSignals: [ScoreEvidenceSignal]
+    let missingSignals: [ScoreEvidenceSignal]
+
+    var verifiedInputCount: Int { verifiedSignals.count }
+    var totalInputCount: Int { ScoreEvidenceSignal.allCases.count }
+    var unavailableInputTitles: String {
+        missingSignals.map(\.title).joined(separator: ", ")
+    }
+}
+
 struct ScoreUncertainty: Decodable {
     let low: Double
     let high: Double
+    /// Legacy backend compatibility only. It is not rendered as a probability.
     let confidence: Double
     let spread: Double
+    let evidence: ScoreEvidence?
 
     var formattedBand: String {
         String(format: "%.1f – %.1f", low, high)
@@ -479,7 +557,7 @@ struct Coordinate: Decodable {
     }
 }
 
-enum DifficultyLabel: String, Decodable, CaseIterable {
+enum DifficultyLabel: String, Codable, CaseIterable {
     case veryEasy = "Very Easy"
     case easy = "Easy"
     case moderate = "Moderate"
@@ -528,12 +606,10 @@ extension ScoredRoute {
         return "+\(Self.formatDuration(seconds: trafficDelaySeconds))"
     }
 
-    var formattedScoreWithUncertainty: String {
-        guard let uncertainty else {
-            return String(format: "%.1f", score)
-        }
-        let half = uncertainty.spread / 2
-        return String(format: "%.1f ± %.1f", score, half)
+    /// A route demand score is shown without a pseudo-precision interval. The
+    /// evidence card explains exactly which inputs were available instead.
+    var formattedScore: String {
+        String(format: "%.1f", score)
     }
 
     static func formatDuration(seconds: Int) -> String {

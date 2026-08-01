@@ -1,5 +1,5 @@
 import type { RouteFeatures } from "./features.js";
-import type { ScoreUncertainty } from "../types.js";
+import type { ScoreEvidence, ScoreUncertainty } from "../types.js";
 
 /** Hermite smoothstep: x² × (3 - 2x), clamped to [0, 1]. */
 export function smoothstep(x: number): number {
@@ -31,6 +31,7 @@ export function computeSustainedEffortFromHours(durationHours: number): {
 
 export function estimateUncertainty(
   features: RouteFeatures,
+  evidence: ScoreEvidence,
   residualMagnitude = 0
 ): ScoreUncertainty {
   let spread = 0.35;
@@ -40,7 +41,7 @@ export function estimateUncertainty(
   if (features.exponentialSpacing > 2) spread += 0.1;
   spread += Math.min(0.5, residualMagnitude * 0.2);
   const confidence = Math.max(0.35, Math.min(0.95, 1 - spread / 2));
-  return { low: 0, high: 0, confidence, spread };
+  return { low: 0, high: 0, confidence, spread, evidence };
 }
 
 export function applyUncertaintyBand(

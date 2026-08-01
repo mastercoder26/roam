@@ -39,8 +39,30 @@ describe("Google Routes payload validation", () => {
       distanceMeters: 100,
       durationSeconds: 60,
       staticDurationSeconds: 50,
+      trafficTimingAvailable: true,
       polyline: "??_ibE?",
     }]);
+  });
+
+  it("sends recorded GPS endpoints as native Google location waypoints", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      routes: [validRoute],
+    }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await computeRoutes({
+      ...params,
+      origin: { latitude: 30.2672, longitude: -97.7431 },
+      destination: { latitude: 30.3072, longitude: -97.7031 },
+    });
+
+    const request = JSON.parse(String(fetchMock.mock.calls[0][1]?.body));
+    expect(request.origin).toEqual({
+      location: { latLng: { latitude: 30.2672, longitude: -97.7431 } },
+    });
+    expect(request.destination).toEqual({
+      location: { latLng: { latitude: 30.3072, longitude: -97.7031 } },
+    });
   });
 
   it("accepts zero-length provider steps when another step is usable", async () => {

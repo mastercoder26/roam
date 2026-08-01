@@ -22,6 +22,8 @@ export interface ParsedRoute {
   distanceMeters: number;
   durationSeconds: number;
   staticDurationSeconds: number;
+  /** True only when this route was requested through a traffic-aware provider mode. */
+  trafficTimingAvailable?: boolean;
   polyline: string;
   bounds: Bounds;
   steps: RouteStep[];
@@ -72,11 +74,43 @@ export interface SegmentHotspot {
   label?: string;
 }
 
+export const SCORE_EVIDENCE_SIGNALS = [
+  "routeGeometry",
+  "trafficTiming",
+  "speedLimits",
+  "weather",
+  "roadMetadata",
+  "turnControls",
+] as const;
+
+export type ScoreEvidenceSignal = (typeof SCORE_EVIDENCE_SIGNALS)[number];
+export type ScoreEvidenceLevel = "limited" | "partial" | "wellSupported";
+
+/**
+ * Data provenance for one route estimate. `inputCoverage` is not a probability
+ * and is deliberately separate from any future, statistically validated
+ * prediction interval.
+ */
+export interface ScoreEvidence {
+  schemaVersion: "evidence-v1";
+  inputCoverage: number;
+  level: ScoreEvidenceLevel;
+  predictiveValidation: "notValidated";
+  signalCoverage: Record<ScoreEvidenceSignal, number>;
+  verifiedSignals: ScoreEvidenceSignal[];
+  missingSignals: ScoreEvidenceSignal[];
+}
+
 export interface ScoreUncertainty {
   low: number;
   high: number;
+  /**
+   * Deprecated compatibility field. It is a heuristic and must not be shown as
+   * a probability, score validation, or safety claim.
+   */
   confidence: number;
   spread: number;
+  evidence: ScoreEvidence;
 }
 
 /** The stable identifiers used by clients to compare route demands with local experience. */
@@ -171,14 +205,23 @@ export interface DifficultyResponse {
 }
 
 export interface DifficultyRequest {
-  origin: string;
-  destination: string;
+  origin: RouteEndpoint;
+  destination: RouteEndpoint;
   departureTime?: string;
   /** Local clock minutes at departure (0 = midnight, 1439 = 11:59 PM). */
   departureLocalMinutes?: number;
   includeAlternates?: boolean;
   continuousDriveMinutes?: number;
 }
+
+/** A bounded coordinate endpoint from an on-device drive recording. */
+export interface CoordinateEndpoint {
+  latitude: number;
+  longitude: number;
+}
+
+/** Planned routes use an address; automatic drive analysis uses GPS endpoints. */
+export type RouteEndpoint = string | CoordinateEndpoint;
 
 /** One requested departure window for a server-side route comparison. */
 export interface DepartureComparisonCandidate {
@@ -233,6 +276,10 @@ export interface DriverContext {
 
 export interface ScoringOptions {
   stepSpeedsMph?: Map<number, number>;
+  /** Distance-weighted fraction backed by posted, rather than inferred, speeds. */
+  speedLimitCoverage?: number;
+  /** Allows offline callers to pass an already assessed evidence record. */
+  evidence?: ScoreEvidence;
   departureTime?: string;
   /** Client-local clock minutes, kept separate from the absolute departure timestamp. */
   departureLocalMinutes?: number;

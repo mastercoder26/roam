@@ -19,7 +19,7 @@ struct ScoreGaugeView: View {
     var body: some View {
         ZStack {
             Circle()
-                .stroke(Color(.systemGray5), lineWidth: 12)
+                .stroke(AppDesign.cardStrokeStrong, lineWidth: 12)
 
             Circle()
                 .trim(from: 0, to: animatedProgress)

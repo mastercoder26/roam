@@ -6,11 +6,16 @@ struct RouteMapView: UIViewRepresentable {
     let bounds: RouteBounds
     var routeColor: UIColor = .systemBlue
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.colorScheme) private var colorScheme
+
+    private var interfaceStyle: UIUserInterfaceStyle {
+        colorScheme == .dark ? .dark : .light
+    }
 
     func makeUIView(context: Context) -> MKMapView {
         let mapView = MKMapView()
         mapView.delegate = context.coordinator
-        mapView.overrideUserInterfaceStyle = .dark
+        mapView.overrideUserInterfaceStyle = interfaceStyle
         mapView.isRotateEnabled = false
         mapView.pointOfInterestFilter = .excludingAll
         mapView.showsCompass = false
@@ -18,6 +23,7 @@ struct RouteMapView: UIViewRepresentable {
     }
 
     func updateUIView(_ mapView: MKMapView, context: Context) {
+        mapView.overrideUserInterfaceStyle = interfaceStyle
         context.coordinator.routeColor = routeColor
         context.coordinator.reduceMotion = reduceMotion
         context.coordinator.update(mapView: mapView, polyline: polyline, bounds: bounds)
@@ -202,11 +208,16 @@ struct RecordedDriveMapView: UIViewRepresentable {
     var selectedEventID: UUID?
     var onSelectMoment: (DriveReplayMoment) -> Void
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.colorScheme) private var colorScheme
+
+    private var interfaceStyle: UIUserInterfaceStyle {
+        colorScheme == .dark ? .dark : .light
+    }
 
     func makeUIView(context: Context) -> MKMapView {
         let map = MKMapView()
         map.delegate = context.coordinator
-        map.overrideUserInterfaceStyle = .dark
+        map.overrideUserInterfaceStyle = interfaceStyle
         map.isRotateEnabled = false
         map.showsCompass = false
         map.pointOfInterestFilter = .excludingAll
@@ -214,6 +225,7 @@ struct RecordedDriveMapView: UIViewRepresentable {
     }
 
     func updateUIView(_ map: MKMapView, context: Context) {
+        map.overrideUserInterfaceStyle = interfaceStyle
         context.coordinator.onSelectMoment = onSelectMoment
         context.coordinator.reduceMotion = reduceMotion
         context.coordinator.update(
@@ -408,12 +420,17 @@ struct RoutePlanningMapPreview: UIViewRepresentable {
     let showsCurrentLocation: Bool
     @Binding var summary: RoutePlanningMapSummary?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.colorScheme) private var colorScheme
+
+    private var interfaceStyle: UIUserInterfaceStyle {
+        colorScheme == .dark ? .dark : .light
+    }
 
     func makeUIView(context: Context) -> MKMapView {
         let map = MKMapView()
         map.delegate = context.coordinator
         map.mapType = .standard
-        map.overrideUserInterfaceStyle = .dark
+        map.overrideUserInterfaceStyle = interfaceStyle
         map.showsUserLocation = false
         map.showsCompass = false
         map.showsScale = false
@@ -425,6 +442,7 @@ struct RoutePlanningMapPreview: UIViewRepresentable {
     }
 
     func updateUIView(_ map: MKMapView, context: Context) {
+        map.overrideUserInterfaceStyle = interfaceStyle
         context.coordinator.reduceMotion = reduceMotion
         let summaryBinding = $summary
         context.coordinator.onSummaryChange = { value in
@@ -487,7 +505,7 @@ struct RoutePlanningMapPreview: UIViewRepresentable {
             onSummaryChange(nil)
 
             switch request.previewStage {
-            case .overview:
+            case .locationPrompt:
                 return
             case .startingPoint where request.usesCurrentLocation:
                 // MKMapView already renders the user's Apple Maps location dot.
