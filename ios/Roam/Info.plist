@@ -33,12 +33,14 @@
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
-	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Roam uses your location during a manually started drive to measure distance, speed changes, and turning events.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
 	<string>When you choose to continue a manual drive with your screen locked, Roam uses location to finish that drive’s on-device score.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Roam uses your location during a manually started drive to measure distance, speed changes, and turning events.</string>
 	<key>NSMotionUsageDescription</key>
 	<string>Roam uses motion sensors during a manually started drive to measure driving events and sensor placement quality.</string>
+	<key>NSSupportsLiveActivities</key>
+	<true/>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
@@ -58,8 +60,6 @@
 			</array>
 		</dict>
 	</dict>
-	<key>NSSupportsLiveActivities</key>
-	<true/>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>location</string>
