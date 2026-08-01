@@ -51,16 +51,16 @@ app.post("/api/route/departure-comparison", (req, res) => {
 });
 
 const server = app.listen(port, () => {
-  console.log(`Swerve API listening on http://localhost:${port}`);
+  console.log(`Roam API listening on http://localhost:${port}`);
 });
 
 server.on("error", (error: NodeJS.ErrnoException) => {
   if (error.code === "EADDRINUSE") {
     console.error(
-      `Port ${port} is already in use. Stop the existing Swerve API, or start this one with PORT=3001 npm run dev.`,
+      `Port ${port} is already in use. Stop the existing Roam API, or start this one with PORT=3001 npm run dev.`,
     );
   } else {
-    console.error("Swerve API failed to start:", error);
+    console.error("Roam API failed to start:", error);
   }
 
   process.exitCode = 1;
