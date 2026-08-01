@@ -32,7 +32,10 @@ enum RoutePlanningStage: Equatable {
 /// follows the same endpoint validation as the form so the map never invents
 /// a route before the user has supplied both endpoints.
 enum RoutePlanningMapPreviewStage: Equatable {
-    case overview
+    /// A neutral invitation shown until a real origin exists. MapKit is not
+    /// mounted in this state, so a fresh plan never opens on an irrelevant
+    /// continental overview.
+    case locationPrompt
     case startingPoint
     case route
 
@@ -45,9 +48,34 @@ enum RoutePlanningMapPreviewStage: Equatable {
         } else if hasOrigin {
             self = .startingPoint
         } else {
-            self = .overview
+            self = .locationPrompt
         }
     }
+}
+
+/// Pure presentation decisions for the first route screen. The form remains
+/// useful when people enter a destination first, but the next action stays
+/// explicit: select or type the origin before analysis can begin.
+struct RoutePlanningFormPresentation: Equatable {
+    let stage: RoutePlanningStage
+    let mapPreviewStage: RoutePlanningMapPreviewStage
+
+    init(origin: String, destination: String, usesCurrentLocation: Bool) {
+        stage = RoutePlanningStage(origin: origin, destination: destination)
+        mapPreviewStage = RoutePlanningMapPreviewStage(
+            origin: origin,
+            destination: destination,
+            usesCurrentLocation: usesCurrentLocation
+        )
+    }
+
+    /// Keep both endpoints in view from the first frame. This avoids making a
+    /// route look like a one-field task and helps people who know their
+    /// destination before deciding where to start.
+    var showsDestination: Bool { true }
+
+    /// Location permission is requested only from a deliberate, labelled tap.
+    var showsCurrentLocationAction: Bool { stage == .chooseOrigin }
 }
 
 struct RouteImportNotice: Equatable {
