@@ -185,7 +185,7 @@ export async function analyzeDifficultyRequest(
     apiKey,
   });
 
-  const [optionsList, conditionsList] = await Promise.all([
+  const [speedEnrichments, conditionsList] = await Promise.all([
     Promise.all(routes.map((route) => dependencies.enrichRouteWithSpeedLimits(route, apiKey))),
     Promise.all(
       routes.map((route, index) =>
@@ -197,7 +197,8 @@ export async function analyzeDifficultyRequest(
   ]);
 
   const scoreOptions = routes.map((_route, index) => ({
-    stepSpeedsMph: optionsList[index],
+    stepSpeedsMph: speedEnrichments[index].stepSpeedsMph,
+    speedLimitCoverage: speedEnrichments[index].postedSpeedLimitCoverage,
     departureTime: request.departureTime,
     departureLocalMinutes: request.departureLocalMinutes,
     continuousDriveMinutes: request.continuousDriveMinutes,

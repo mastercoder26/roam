@@ -129,14 +129,14 @@ npm test
 Run the deterministic manual-drive checks with:
 
 ```bash
-swiftc ios/Swerve/Models/RouteDifficultyModels.swift ios/Swerve/Models/PhonePlacementAnalyzer.swift ios/Swerve/Models/DriveScoringEngine.swift ios/Swerve/Models/DrivingScore.swift ios/Swerve/Models/DriveExperienceEngine.swift ios/Swerve/Models/DriverReadinessEngine.swift ios/Swerve/Models/PracticePlanEngine.swift ios/Swerve/Models/DriverPerformanceEngine.swift ios/tests/DriveScoringEngineChecks.swift -o /tmp/swerve-drive-checks
+swiftc ios/Swerve/Models/RouteDifficultyModels.swift ios/Swerve/Models/PhonePlacementAnalyzer.swift ios/Swerve/Models/DriveScoringEngine.swift ios/Swerve/Models/DrivingScore.swift ios/Swerve/Models/DriveExperienceEngine.swift ios/Swerve/Models/DriverReadinessModels.swift ios/Swerve/Models/DriverReadinessSupport.swift ios/Swerve/Models/DriverReadinessConfiguration.swift ios/Swerve/Models/DriverReadinessProfileBuilder.swift ios/Swerve/Models/DriverReadinessRouteMatcher.swift ios/Swerve/Models/DriverReadinessEngine.swift ios/Swerve/Models/PracticePlanEngine.swift ios/Swerve/Models/DriverPerformanceEngine.swift ios/tests/DriveScoringEngineChecks.swift -o /tmp/swerve-drive-checks
 /tmp/swerve-drive-checks
 ```
 
 Run the overall driver-performance checks with:
 
 ```bash
-swiftc ios/Swerve/Models/RouteDifficultyModels.swift ios/Swerve/Models/PhonePlacementAnalyzer.swift ios/Swerve/Models/DriveScoringEngine.swift ios/Swerve/Models/DrivingScore.swift ios/Swerve/Models/DriveExperienceEngine.swift ios/Swerve/Models/DriverReadinessEngine.swift ios/Swerve/Models/PracticePlanEngine.swift ios/Swerve/Models/DriverPerformanceEngine.swift ios/tests/DriverPerformanceEngineChecks.swift -o /tmp/swerve-performance-checks
+swiftc ios/Swerve/Models/RouteDifficultyModels.swift ios/Swerve/Models/PhonePlacementAnalyzer.swift ios/Swerve/Models/DriveScoringEngine.swift ios/Swerve/Models/DrivingScore.swift ios/Swerve/Models/DriveExperienceEngine.swift ios/Swerve/Models/DriverReadinessModels.swift ios/Swerve/Models/DriverReadinessSupport.swift ios/Swerve/Models/DriverReadinessConfiguration.swift ios/Swerve/Models/DriverReadinessProfileBuilder.swift ios/Swerve/Models/DriverReadinessRouteMatcher.swift ios/Swerve/Models/DriverReadinessEngine.swift ios/Swerve/Models/PracticePlanEngine.swift ios/Swerve/Models/DriverPerformanceEngine.swift ios/tests/DriverPerformanceEngineChecks.swift -o /tmp/swerve-performance-checks
 /tmp/swerve-performance-checks
 ```
 

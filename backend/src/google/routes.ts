@@ -115,6 +115,9 @@ function parseRoute(route: GoogleRoute): ParsedRoute {
     distanceMeters: route.distanceMeters,
     durationSeconds: parseDurationSeconds(route.duration),
     staticDurationSeconds: parseDurationSeconds(route.staticDuration),
+    // computeRoutes always requests TRAFFIC_AWARE_OPTIMAL. Persist that fact
+    // instead of later inferring live timing coverage from two durations.
+    trafficTimingAvailable: true,
     polyline: route.polyline.encodedPolyline,
     bounds: parseBounds(route),
     steps: parseSteps(route),

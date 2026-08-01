@@ -12,6 +12,7 @@ struct HomeView: View {
     @StateObject private var locationCoordinator = RoutePlanningLocationCoordinator()
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     private let apiClient = APIClient()
 
@@ -19,24 +20,25 @@ struct HomeView: View {
         RoutePlanningStage(origin: form.origin, destination: form.destination)
     }
 
-    private var canEnterDestination: Bool {
-        planningStage != .chooseOrigin
+    private var presentation: RoutePlanningFormPresentation {
+        RoutePlanningFormPresentation(
+            origin: form.origin,
+            destination: form.destination,
+            usesCurrentLocation: form.usesCurrentLocation
+        )
     }
 
-    /// Current-location selection is already a deliberate choice, even while
-    /// MapKit is still resolving its human-readable address. Reveal the next
-    /// field at that moment, but keep Analyze disabled until the origin is
-    /// actually confirmed.
-    private var destinationIsRevealed: Bool {
-        guard !canEnterDestination else { return true }
-        if !form.destination.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            return true
-        }
-        guard form.usesCurrentLocation else { return false }
-        if case .locating = locationCoordinator.state {
-            return true
-        }
-        return false
+    private var usesAccessibilityText: Bool {
+        dynamicTypeSize.isAccessibilitySize
+    }
+
+    private var routeTitleFont: Font {
+        LayoutResponsiveness.usesCompactRoutePlanningTitle(usesLargeText: usesAccessibilityText)
+            // At accessibility sizes, a compact semantic heading keeps the route
+            // task and both fields reachable before a long scroll. The form
+            // controls themselves continue to use the person's text size.
+            ? .system(.headline, design: .rounded, weight: .bold)
+            : AppDesign.Typography.heroTitle
     }
 
     private var canAnalyze: Bool {
@@ -129,37 +131,32 @@ struct HomeView: View {
     }
 
     private var headerSection: some View {
-        HStack(alignment: .center, spacing: 16) {
-            Text("Plan your route")
-                .font(AppDesign.Typography.heroTitle)
-                .tracking(-0.8)
-                .foregroundStyle(AppDesign.Ink.primary)
-                .fixedSize(horizontal: false, vertical: true)
-
-            Spacer(minLength: 8)
-
-            Image(systemName: "location.north.circle.fill")
-                .font(.system(size: 34, weight: .medium))
-                .foregroundStyle(AppDesign.Ink.primary.opacity(0.9))
-                .frame(width: 48, height: 48)
-                .background(AppDesign.Ink.primary.opacity(0.10), in: Circle())
-                .accessibilityHidden(true)
-        }
+        Text("Plan your route")
+            .font(routeTitleFont)
+            .tracking(-0.8)
+            .foregroundStyle(AppDesign.Ink.primary)
+            .fixedSize(horizontal: false, vertical: true)
     }
 
     private var routeCard: some View {
         VStack(spacing: 0) {
             originRow
 
-            if destinationIsRevealed {
+            if presentation.showsCurrentLocationAction {
                 Divider()
                     .overlay(AppDesign.Ink.tertiary.opacity(0.55))
                     .padding(.leading, 68)
                     .transition(.opacity)
 
-                destinationRow
+                currentLocationAction
                     .transition(progressiveReveal)
             }
+
+            Divider()
+                .overlay(AppDesign.Ink.tertiary.opacity(0.55))
+                .padding(.leading, 68)
+
+            destinationRow
         }
         .padding(.vertical, 6)
         .background(routeSurface, in: RoundedRectangle(cornerRadius: AppDesign.cornerRadiusLarge, style: .continuous))
@@ -168,7 +165,7 @@ struct HomeView: View {
                 .stroke(AppDesign.cardStroke, lineWidth: 1)
         }
         .shadow(color: .black.opacity(0.32), radius: 14, y: 8)
-        .animation(reduceMotion ? .easeOut(duration: 0.18) : AppAnimation.selection, value: destinationIsRevealed)
+        .animation(reduceMotion ? .easeOut(duration: 0.18) : AppAnimation.selection, value: presentation.showsCurrentLocationAction)
     }
 
     @ViewBuilder
@@ -236,20 +233,35 @@ struct HomeView: View {
                     }
                 }
 
-                Button(action: chooseCurrentLocation) {
-                    Image(systemName: "location.fill")
-                        .font(.subheadline.weight(.bold))
-                        .foregroundStyle(AppDesign.Ink.primary.opacity(0.88))
-                        .frame(width: 36, height: 36)
-                        .background(AppDesign.Ink.primary.opacity(0.14), in: Circle())
-                }
-                .buttonStyle(PressableScaleStyle())
-                .padding(.top, 8)
-                .accessibilityLabel("Use current location")
             }
             .padding(.horizontal, 18)
             .padding(.vertical, 15)
         }
+    }
+
+    private var currentLocationAction: some View {
+        Button(action: chooseCurrentLocation) {
+            HStack(spacing: 10) {
+                Image(systemName: "location.fill")
+                    .accessibilityHidden(true)
+                Text("Use current location")
+            }
+                .font(.subheadline.weight(.semibold))
+                .lineLimit(usesAccessibilityText ? 2 : 1)
+                .minimumScaleFactor(usesAccessibilityText ? 0.78 : 1)
+                .multilineTextAlignment(.center)
+                .foregroundStyle(AppDesign.accent)
+                .frame(maxWidth: .infinity)
+                .frame(minHeight: 44)
+                .background(
+                    AppDesign.accent.opacity(0.11),
+                    in: RoundedRectangle(cornerRadius: AppDesign.cornerRadiusSmall, style: .continuous)
+                )
+        }
+        .buttonStyle(PressableScaleStyle())
+        .padding(.horizontal, 18)
+        .padding(.vertical, 10)
+        .accessibilityHint("Asks for location permission only after you activate this control")
     }
 
     private var destinationRow: some View {
@@ -308,33 +320,67 @@ struct HomeView: View {
     }
 
     private var mapPreviewSection: some View {
-        ZStack(alignment: .bottomLeading) {
-            RoutePlanningMapPreview(
-                origin: form.origin,
-                destination: form.destination,
-                usesCurrentLocation: form.usesCurrentLocation,
-                showsCurrentLocation: shouldShowCurrentLocationOnMap,
-                summary: $mapPreview
-            )
-            .allowsHitTesting(false)
+        Group {
+            switch presentation.mapPreviewStage {
+            case .locationPrompt:
+                locationPromptCard
+                    .frame(height: usesAccessibilityText ? 174 : 146)
+                    .accessibilityLabel("Route preview. Add a starting point to preview your route.")
 
-            LinearGradient(
-                colors: [.clear, AppDesign.canvas.opacity(0.72)],
-                startPoint: .center,
-                endPoint: .bottom
-            )
-            .allowsHitTesting(false)
+            case .startingPoint, .route:
+                ZStack(alignment: .bottomLeading) {
+                    RoutePlanningMapPreview(
+                        origin: form.origin,
+                        destination: form.destination,
+                        usesCurrentLocation: form.usesCurrentLocation,
+                        showsCurrentLocation: shouldShowCurrentLocationOnMap,
+                        summary: $mapPreview
+                    )
+                    .allowsHitTesting(false)
+
+                    LinearGradient(
+                        colors: [.clear, AppDesign.canvas.opacity(0.72)],
+                        startPoint: .center,
+                        endPoint: .bottom
+                    )
+                    .allowsHitTesting(false)
+                }
+                .frame(height: usesAccessibilityText ? 196 : 216)
+                .accessibilityLabel(mapPreview?.accessibilityLabel ?? "Route map preview")
+            }
         }
-        .frame(height: 248)
         .background(AppDesign.cardSurfaceElevated)
         .clipShape(RoundedRectangle(cornerRadius: AppDesign.cornerRadiusLarge, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: AppDesign.cornerRadiusLarge, style: .continuous)
                 .stroke(AppDesign.cardStrokeStrong, lineWidth: 1)
         }
-        .shadow(color: AppDesign.accent.opacity(0.12), radius: 16, y: 8)
-        .shadow(color: .black.opacity(0.35), radius: 18, y: 10)
-        .accessibilityLabel(mapPreview?.accessibilityLabel ?? "Route map")
+        .shadow(color: AppDesign.accent.opacity(0.10), radius: 12, y: 6)
+        .animation(reduceMotion ? .easeOut(duration: 0.18) : AppAnimation.content, value: presentation.mapPreviewStage)
+    }
+
+    private var locationPromptCard: some View {
+        HStack(alignment: .center, spacing: 14) {
+            Image(systemName: "point.topleft.down.curvedto.point.bottomright.up")
+                .font(.title3.weight(.semibold))
+                .foregroundStyle(AppDesign.accent)
+                .frame(width: 44, height: 44)
+                .background(AppDesign.accent.opacity(0.12), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .accessibilityHidden(true)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Your route starts here")
+                    .font(.headline)
+                    .foregroundStyle(AppDesign.Ink.primary)
+                Text("Add a starting point and destination to preview the route.")
+                    .font(.footnote)
+                    .foregroundStyle(AppDesign.Ink.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Spacer(minLength: 0)
+        }
+        .padding(AppDesign.cardPadding)
     }
 
     private var departureSection: some View {
@@ -394,7 +440,7 @@ struct HomeView: View {
             HStack(spacing: 10) {
                 if isLoading {
                     ProgressView()
-                        .tint(canAnalyze ? Color(red: 0.07, green: 0.07, blue: 0.07) : AppDesign.Ink.tertiary)
+                        .tint(canAnalyze ? AppDesign.primarySurfaceForeground : AppDesign.Ink.tertiary)
                 } else {
                     Image(systemName: "sparkles")
                 }
@@ -403,7 +449,7 @@ struct HomeView: View {
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 17)
-            .foregroundStyle(canAnalyze ? Color(red: 0.07, green: 0.07, blue: 0.07) : AppDesign.Ink.tertiary)
+            .foregroundStyle(canAnalyze ? AppDesign.primarySurfaceForeground : AppDesign.Ink.tertiary)
             .background(
                 canAnalyze ? AppDesign.Ink.primary : AppDesign.Ink.primary.opacity(0.10),
                 in: RoundedRectangle(cornerRadius: AppDesign.cornerRadiusLarge, style: .continuous)
@@ -419,7 +465,7 @@ struct HomeView: View {
     private var analyzeButtonTitle: String {
         switch planningStage {
         case .chooseOrigin:
-            "Choose a starting point"
+            "Add a starting point"
         case .chooseDestination:
             "Choose a destination"
         case .readyToAnalyze:

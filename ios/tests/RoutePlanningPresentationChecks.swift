@@ -3,7 +3,7 @@ import Foundation
 @main
 struct RoutePlanningPresentationChecks {
     static func main() {
-        destinationStaysHiddenUntilAUsableOriginExists()
+        destinationIsVisibleBeforeAnOriginIsResolved()
         analyzeBecomesAvailableOnlyAfterBothEndpointsExist()
         mapPreviewProgressesFromStartPinToRouteLine()
         freshPlansUseACompactLocationPromptInsteadOfAWorldMap()
@@ -12,18 +12,18 @@ struct RoutePlanningPresentationChecks {
         print("Route planning presentation checks passed")
     }
 
-    private static func destinationStaysHiddenUntilAUsableOriginExists() {
+    private static func destinationIsVisibleBeforeAnOriginIsResolved() {
         expect(
             RoutePlanningStage(origin: "", destination: "") == .chooseOrigin,
             "a new route plan should begin by asking for the starting location"
         )
         expect(
-            RoutePlanningStage(origin: "   ", destination: "Austin, TX") == .chooseOrigin,
-            "whitespace must not reveal the destination field"
+            RoutePlanningFormPresentation(origin: "", destination: "", usesCurrentLocation: false).showsDestination,
+            "both endpoints should be visible before a starting location is resolved"
         )
         expect(
-            RoutePlanningStage(origin: "Austin, TX", destination: "") == .chooseDestination,
-            "the destination should appear once the start is resolved"
+            RoutePlanningFormPresentation(origin: "   ", destination: "Austin, TX", usesCurrentLocation: false).showsCurrentLocationAction,
+            "an empty start should keep the explicit current-location action available"
         )
     }
 
@@ -60,8 +60,8 @@ struct RoutePlanningPresentationChecks {
                 origin: "",
                 destination: "Dallas, TX",
                 usesCurrentLocation: false
-            ) == .overview,
-            "a destination alone must not invent a starting location"
+            ) == .locationPrompt,
+            "a destination alone must not invent a starting location or a world map"
         )
     }
 

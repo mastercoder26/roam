@@ -64,6 +64,61 @@ struct RGBA: Equatable, Codable {
     static func black(opacity: Double) -> RGBA {
         RGBA(red: 0, green: 0, blue: 0, alpha: opacity)
     }
+
+    /// WCAG contrast after compositing translucent foregrounds over a surface.
+    /// Keeping this in the platform-independent theme model lets every color
+    /// scheme be checked from a command-line test as well as in SwiftUI.
+    func contrastRatio(over background: RGBA) -> Double {
+        let opaqueBackground = background.composited(over: .white(opacity: 1))
+        let opaqueForeground = composited(over: opaqueBackground)
+        let lighter = max(opaqueForeground.relativeLuminance, opaqueBackground.relativeLuminance)
+        let darker = min(opaqueForeground.relativeLuminance, opaqueBackground.relativeLuminance)
+        return (lighter + 0.05) / (darker + 0.05)
+    }
+
+    private func composited(over background: RGBA) -> RGBA {
+        let foregroundAlpha = alpha.clampedToUnit
+        let backgroundAlpha = background.alpha.clampedToUnit
+        let outputAlpha = foregroundAlpha + backgroundAlpha * (1 - foregroundAlpha)
+        guard outputAlpha > 0 else { return .rgb(0, 0, 0, alpha: 0) }
+
+        func channel(_ foreground: Double, _ background: Double) -> Double {
+            (foreground.clampedToUnit * foregroundAlpha
+                + background.clampedToUnit * backgroundAlpha * (1 - foregroundAlpha)) / outputAlpha
+        }
+
+        return .rgb(
+            channel(red, background.red),
+            channel(green, background.green),
+            channel(blue, background.blue),
+            alpha: outputAlpha
+        )
+    }
+
+    private var relativeLuminance: Double {
+        func linearized(_ channel: Double) -> Double {
+            let value = channel.clampedToUnit
+            return value <= 0.04045
+                ? value / 12.92
+                : pow((value + 0.055) / 1.055, 2.4)
+        }
+
+        return 0.2126 * linearized(red)
+            + 0.7152 * linearized(green)
+            + 0.0722 * linearized(blue)
+    }
+
+    static func readableForeground(over background: RGBA) -> RGBA {
+        let light = RGBA.white(opacity: 1)
+        let dark = RGBA.black(opacity: 1)
+        return light.contrastRatio(over: background) >= dark.contrastRatio(over: background)
+            ? light
+            : dark
+    }
+}
+
+private extension Double {
+    var clampedToUnit: Double { max(0, min(1, self)) }
 }
 
 struct ThemePalette: Equatable {
@@ -81,6 +136,14 @@ struct ThemePalette: Equatable {
     let inkLabel: RGBA
     let cardShadow: RGBA
     let appearance: ThemeAppearance
+
+    /// Foreground chosen from black and white for the selected accent. This
+    /// prevents a warm or bright theme from inheriting illegible white CTA text.
+    var accentForeground: RGBA { .readableForeground(over: accent) }
+
+    /// Foreground for primary actions that intentionally use the theme's
+    /// primary ink as their filled surface.
+    var primarySurfaceForeground: RGBA { .readableForeground(over: inkPrimary) }
 }
 
 enum ThemeCatalog {

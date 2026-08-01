@@ -39,6 +39,7 @@ describe("Google Routes payload validation", () => {
       distanceMeters: 100,
       durationSeconds: 60,
       staticDurationSeconds: 50,
+      trafficTimingAvailable: true,
       polyline: "??_ibE?",
     }]);
   });

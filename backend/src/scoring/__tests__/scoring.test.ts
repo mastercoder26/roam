@@ -67,6 +67,22 @@ describe("highway route scoring", () => {
   });
 });
 
+describe("score evidence provenance", () => {
+  it("reports traffic timing only when the route provider tagged it as traffic-aware", () => {
+    const withoutTrafficTiming = scoreRoute({
+      ...highwayRoute,
+      trafficTimingAvailable: false,
+    });
+    const withTrafficTiming = scoreRoute({
+      ...highwayRoute,
+      trafficTimingAvailable: true,
+    });
+
+    expect(withoutTrafficTiming.uncertainty.evidence.signalCoverage.trafficTiming).toBe(0);
+    expect(withTrafficTiming.uncertainty.evidence.signalCoverage.trafficTiming).toBe(1);
+  });
+});
+
 describe("after-dark timing", () => {
   const chicagoCorridor = {
     ...highwayRoute,

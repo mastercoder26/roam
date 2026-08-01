@@ -22,6 +22,8 @@ export interface ParsedRoute {
   distanceMeters: number;
   durationSeconds: number;
   staticDurationSeconds: number;
+  /** True only when this route was requested through a traffic-aware provider mode. */
+  trafficTimingAvailable?: boolean;
   polyline: string;
   bounds: Bounds;
   steps: RouteStep[];

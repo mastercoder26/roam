@@ -6,6 +6,7 @@ struct LayoutResponsivenessChecks {
     static func main() {
         tabBarUsesItsCompactFormBeforeLabelsCanCollide()
         inlineControlsStackForNarrowOrLargeTextLayouts()
+        routePlanningTitleUsesItsCompactTextStyleAtAccessibilitySizes()
         loadingSceneNeverOutgrowsTheAvailableWidth()
 
         print("Layout responsiveness checks passed")
@@ -38,6 +39,17 @@ struct LayoutResponsivenessChecks {
         expect(
             LayoutResponsiveness.stacksInlineControls(availableWidth: 360, usesLargeText: true),
             "large Dynamic Type must use the vertical control arrangement"
+        )
+    }
+
+    private static func routePlanningTitleUsesItsCompactTextStyleAtAccessibilitySizes() {
+        expect(
+            !LayoutResponsiveness.usesCompactRoutePlanningTitle(usesLargeText: false),
+            "the normal route title should retain its high-emphasis style"
+        )
+        expect(
+            LayoutResponsiveness.usesCompactRoutePlanningTitle(usesLargeText: true),
+            "accessibility text should reserve vertical space for form controls rather than an oversized title"
         )
     }
 

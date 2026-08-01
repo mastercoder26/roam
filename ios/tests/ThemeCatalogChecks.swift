@@ -42,6 +42,22 @@ struct ThemeCatalogChecks {
             expect(!id.subtitle.isEmpty, "\(id.rawValue) needs a subtitle")
             expect(palette.accent.alpha > 0, "\(id.rawValue) accent must be visible")
             expect(palette.canvas.alpha > 0, "\(id.rawValue) canvas must be opaque")
+            expect(
+                palette.inkPrimary.contrastRatio(over: palette.canvas) >= 4.5,
+                "\(id.rawValue) primary text must meet the AA contrast threshold"
+            )
+            expect(
+                palette.inkSecondary.contrastRatio(over: palette.canvas) >= 4.5,
+                "\(id.rawValue) secondary text must meet the AA contrast threshold"
+            )
+            expect(
+                palette.accentForeground.contrastRatio(over: palette.accent) >= 4.5,
+                "\(id.rawValue) accent actions must choose a readable foreground"
+            )
+            expect(
+                palette.primarySurfaceForeground.contrastRatio(over: palette.inkPrimary) >= 4.5,
+                "\(id.rawValue) primary-ink actions must choose a readable foreground"
+            )
         }
 
         print("ThemeCatalog checks passed")

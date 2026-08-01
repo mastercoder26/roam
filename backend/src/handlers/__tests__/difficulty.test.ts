@@ -246,7 +246,11 @@ function makeDependencies(
 ): RouteAnalysisDependencies {
   return {
     computeRoutes,
-    enrichRouteWithSpeedLimits: async () => new Map(),
+    enrichRouteWithSpeedLimits: async () => ({
+      stepSpeedsMph: new Map(),
+      postedSpeedLimitCoverage: 0,
+      source: "implied" as const,
+    }),
     enrichRoute: async () => neutralConditions(),
     neutralConditions,
     scoreRoutes,

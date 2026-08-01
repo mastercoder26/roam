@@ -17,6 +17,7 @@ export default defineConfig({
         "src/handlers/difficulty.ts",
         "src/google/routes.ts",
         "src/enrichment/turnProtection.ts",
+        "src/scoring/certainty.ts",
       ],
       thresholds: {
         lines: 80,

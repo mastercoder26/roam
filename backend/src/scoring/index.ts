@@ -23,6 +23,31 @@ import {
   estimateUncertainty,
   scoreToLabel,
 } from "./helpers.js";
+import { assessScoreEvidence } from "./certainty.js";
+
+function hasValidatedRouteGeometry(route: ParsedRoute): boolean {
+  return (
+    route.polyline.trim().length > 0 &&
+    Number.isFinite(route.distanceMeters) &&
+    route.distanceMeters > 0 &&
+    route.steps.length > 0 &&
+    route.steps.some((step) => step.distanceMeters > 0)
+  );
+}
+
+function evidenceForRoute(route: ParsedRoute, options: ScoringOptions) {
+  return options.evidence ?? assessScoreEvidence({
+    hasValidatedGeometry: hasValidatedRouteGeometry(route),
+    trafficTimingAvailable:
+      route.trafficTimingAvailable === true &&
+      Number.isFinite(route.durationSeconds) && route.durationSeconds > 0 &&
+      Number.isFinite(route.staticDurationSeconds) && route.staticDurationSeconds > 0,
+    speedLimitCoverage: options.speedLimitCoverage ?? 0,
+    weatherAvailable: options.conditions?.weather.available === true,
+    roadAvailable: options.conditions?.road.available === true,
+    turnControlsAvailable: options.conditions?.turns.available === true,
+  });
+}
 
 export function scoreRoute(
   route: ParsedRoute,
@@ -70,7 +95,8 @@ export function scoreRoute(
     breakdown,
   };
 
-  const baseUncertainty = estimateUncertainty(features, 0);
+  const evidence = evidenceForRoute(route, options);
+  const baseUncertainty = estimateUncertainty(features, evidence, 0);
   const uncertainty = applyUncertaintyBand(score, baseUncertainty);
 
   const reasons = generateReasons(ctx, features, base, fatigue);
