@@ -31,11 +31,29 @@ struct RoamRootView: View {
     @EnvironmentObject private var themeManager: ThemeManager
     @StateObject private var routeForm = RoutePlanningFormModel()
     @StateObject private var sharedRouteImport = SharedRouteImportCoordinator()
+    @StateObject private var scrollCollapse = ScrollCollapseTracker()
     @Namespace private var tabAnimation
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
+    private enum LiquidTabBarMetrics {
+        static let expandedHeight: CGFloat = 76
+        static let collapsedDiameter: CGFloat = 60
+    }
+
+    private var shouldCollapseTabBar: Bool {
+        // Reduced Motion changes how this state transition is animated; it
+        // must not disable the navigation behavior itself.
+        scrollCollapse.isCollapsed
+    }
+
+    private var tabBarFootprintHeight: CGFloat {
+        shouldCollapseTabBar
+            ? LiquidTabBarMetrics.collapsedDiameter
+            : LiquidTabBarMetrics.expandedHeight
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -52,15 +70,20 @@ struct RoamRootView: View {
         }
         .environmentObject(driveSession)
         .environmentObject(themeManager)
+        .environmentObject(scrollCollapse)
         .preferredColorScheme(themeManager.preferredColorScheme)
-        // This reserves the tab bar's measured height for every tab. Unlike a
-        // fixed invisible spacer, it remains correct when Dynamic Type grows
-        // the selected tab label and keeps End Drive unobstructed.
+        // The inset follows the glass surface as it changes size, so a
+        // collapsed circle both looks and behaves like a smaller control.
         .safeAreaInset(edge: .bottom, spacing: 0) {
             liquidTabBar
-                .padding(.horizontal, 28)
+                .frame(height: tabBarFootprintHeight, alignment: .bottomLeading)
+                .padding(.horizontal, shouldCollapseTabBar ? 20 : 24)
                 .padding(.top, 8)
                 .padding(.bottom, 10)
+                .animation(
+                    reduceMotion ? .easeOut(duration: 0.16) : AppAnimation.liquidMorph,
+                    value: shouldCollapseTabBar
+                )
         }
         .sheet(isPresented: $showingThemePicker) {
             ThemePickerSheet(themeManager: themeManager)
@@ -90,6 +113,9 @@ struct RoamRootView: View {
         }
         .onChange(of: sharedRouteImport.state) { _, state in
             applySharedRouteStateIfSafe(state)
+        }
+        .onChange(of: selectedTab) { _, _ in
+            scrollCollapse.reset()
         }
     }
 
@@ -154,81 +180,147 @@ struct RoamRootView: View {
         dynamicTypeSize.isAccessibilitySize || dynamicTypeSize >= .xxLarge
     }
 
+    /// One continuous material surface: a full labelled navigation bar at rest
+    /// that reshapes into the active tab's circular icon while the content is
+    /// moving away. Keeping both states in the same hierarchy prevents the
+    /// abrupt swap that made the previous version feel disconnected.
     private var liquidTabBar: some View {
         GeometryReader { geometry in
+            let isCollapsed = shouldCollapseTabBar
+            let barHeight = isCollapsed
+                ? LiquidTabBarMetrics.collapsedDiameter
+                : LiquidTabBarMetrics.expandedHeight
+            let barWidth = isCollapsed
+                ? LiquidTabBarMetrics.collapsedDiameter
+                : geometry.size.width
+            let cornerRadius = barHeight / 2
             let showsCompactTabs = LayoutResponsiveness.usesCompactTabBar(
                 availableWidth: geometry.size.width,
                 usesLargeText: usesLargeText
             )
+            let glassShape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
 
-            tabBarContent(showsCompactTabs: showsCompactTabs)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            ZStack {
+                glassShape
+                    .fill(
+                        reduceTransparency
+                            ? AnyShapeStyle(Color(.systemBackground))
+                            : AnyShapeStyle(.ultraThinMaterial)
+                    )
+                    .overlay {
+                        glassShape
+                            .stroke(.white.opacity(themeManager.palette.appearance == .light ? 0.52 : 0.20), lineWidth: 1)
+                    }
+                    .overlay {
+                        glassShape
+                            .stroke(AppDesign.cardStrokeStrong.opacity(0.72), lineWidth: 0.8)
+                    }
+                    .shadow(
+                        color: AppDesign.cardShadow.opacity(isCollapsed ? 0.72 : 0.9),
+                        radius: isCollapsed ? 11 : 18,
+                        y: isCollapsed ? 6 : 9
+                    )
+
+                tabBarButtons(showsCompactTabs: showsCompactTabs)
+                    .opacity(isCollapsed ? 0 : 1)
+                    .scaleEffect(isCollapsed ? 0.94 : 1)
+                    .allowsHitTesting(!isCollapsed)
+
+                collapsedTabIndicator
+                    .opacity(isCollapsed ? 1 : 0)
+                    .scaleEffect(isCollapsed ? 1 : 0.72)
+                    .allowsHitTesting(isCollapsed)
+            }
+            .frame(width: barWidth, height: barHeight)
+            .clipShape(glassShape)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
+            .animation(
+                reduceMotion ? .easeOut(duration: 0.16) : AppAnimation.liquidMorph,
+                value: isCollapsed
+            )
         }
-        .frame(height: 60)
     }
 
-    private func tabBarContent(showsCompactTabs: Bool) -> some View {
-        HStack(spacing: 6) {
+    private func tabBarButtons(showsCompactTabs: Bool) -> some View {
+        HStack(spacing: 0) {
             ForEach(Tab.allCases) { tab in
                 Button {
                     guard selectedTab != tab else { return }
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
                     selectedTab = tab
                 } label: {
-                    HStack(spacing: showsCompactTabs ? 0 : 7) {
+                    VStack(spacing: 5) {
                         Image(systemName: tab.symbol)
-                            .font(.body.weight(.semibold))
-                        if selectedTab == tab, !showsCompactTabs {
-                            Text(tab.title)
-                                .font(.subheadline.weight(.semibold))
-                                .lineLimit(1)
-                                .transition(.opacity)
-                        }
+                            .font(.system(size: showsCompactTabs ? 18 : 20, weight: .semibold))
+                            .frame(height: 24)
+                        Text(tab.title)
+                            .font(.system(size: showsCompactTabs ? 10 : 11, weight: .semibold))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.85)
                     }
-                    .foregroundStyle(selectedTab == tab ? AppDesign.accent : Color.secondary)
-                    .frame(minWidth: showsCompactTabs ? 44 : nil)
-                    .padding(.horizontal, showsCompactTabs ? 10 : (selectedTab == tab ? 16 : 14))
-                    .padding(.vertical, 12)
+                    .foregroundStyle(selectedTab == tab ? AppDesign.accent : AppDesign.Ink.secondary)
+                    // Apple tab bars make the entire equal-width segment the
+                    // target, not only the visible symbol and label.
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .contentShape(Rectangle())
                     .background {
                         if selectedTab == tab {
                             if reduceMotion {
-                                selectedCapsule
+                                selectedPill
+                                    .padding(.horizontal, 4)
+                                    .padding(.vertical, 5)
                             } else {
-                                selectedCapsule
+                                selectedPill
+                                    .padding(.horizontal, 4)
+                                    .padding(.vertical, 5)
                                     .matchedGeometryEffect(id: "liquid-selection", in: tabAnimation)
                             }
                         }
                     }
                 }
                 .buttonStyle(PressableScaleStyle())
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .contentShape(Rectangle())
                 .accessibilityLabel(tab.title)
                 .accessibilityAddTraits(selectedTab == tab ? .isSelected : [])
             }
         }
-        .padding(6)
-        .background {
-            Capsule(style: .continuous)
-                .fill(
-                    reduceTransparency
-                        ? AnyShapeStyle(Color(.systemBackground))
-                        : AnyShapeStyle(.ultraThinMaterial)
-                )
-        }
-        .overlay(
-            Capsule(style: .continuous)
-                .stroke(AppDesign.cardStrokeStrong.opacity(themeManager.palette.appearance == .light ? 1 : 0.9), lineWidth: 0.8)
-        )
-        .shadow(color: .black.opacity(0.12), radius: 16, y: 8)
         .accessibilityElement(children: .contain)
     }
 
-    private var selectedCapsule: some View {
-        Capsule(style: .continuous)
-            .fill(AppDesign.accent.opacity(0.12))
-            .overlay(
-                Capsule(style: .continuous)
-                    .stroke(AppDesign.accent.opacity(0.12), lineWidth: 0.8)
-            )
+    /// The collapsed state's only content: the current tab's icon, centered
+    /// in the shrunken glass circle. Tapping it re-expands the full bar
+    /// immediately, so scrolling down never strands someone without labels.
+    private var collapsedTabIndicator: some View {
+        Button {
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            withAnimation(reduceMotion ? .easeOut(duration: 0.16) : AppAnimation.liquidMorph) {
+                scrollCollapse.expand()
+            }
+        } label: {
+            Image(systemName: selectedTab.symbol)
+                .font(.system(size: 20, weight: .semibold))
+                .foregroundStyle(AppDesign.accent)
+                .contentTransition(.symbolEffect(.replace))
+                .frame(width: LiquidTabBarMetrics.collapsedDiameter, height: LiquidTabBarMetrics.collapsedDiameter)
+        }
+        .buttonStyle(PressableScaleStyle())
+        .accessibilityLabel("\(selectedTab.title), tab bar collapsed")
+        .accessibilityHint("Double tap to expand the navigation bar")
+    }
+
+    private var selectedPill: some View {
+        let radius = LiquidTabBarMetrics.expandedHeight / 2
+        let shape = RoundedRectangle(cornerRadius: radius, style: .continuous)
+
+        return shape
+            .fill(AppDesign.accent.opacity(0.14))
+            .overlay {
+                shape.stroke(
+                    .white.opacity(themeManager.palette.appearance == .light ? 0.38 : 0.14),
+                    lineWidth: 0.8
+                )
+            }
     }
 }
 

@@ -37,4 +37,9 @@ enum AppAnimation {
 
     /// Stagger between hero elements only (score → map)
     static let heroStagger: Double = 0.08
+
+    /// The floating tab bar's liquid-glass morph between its full bar and
+    /// its collapsed, icon-only indicator. A touch of bounce reads as fluid
+    /// rather than mechanical without overshooting into playful territory.
+    static let liquidMorph = Animation.spring(response: 0.42, dampingFraction: 0.88)
 }

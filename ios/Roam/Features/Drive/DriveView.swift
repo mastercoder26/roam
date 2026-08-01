@@ -17,6 +17,7 @@ struct DriveView: View {
     @State private var pendingDeletionID: UUID?
     @State private var breakPlanningControlsWidth: CGFloat = 0
     @StateObject private var routeLocationCoordinator = RoutePlanningLocationCoordinator()
+    @EnvironmentObject private var scrollCollapse: ScrollCollapseTracker
     private let apiClient = APIClient()
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
@@ -62,7 +63,9 @@ struct DriveView: View {
                 .padding(.top, isFocusedCanvas ? 0 : 8)
                 .padding(.bottom, isFocusedCanvas ? 0 : 20)
                 .frame(maxWidth: .infinity, alignment: .leading)
+                .trackingScrollCollapse(scrollCollapse)
             }
+            .coordinateSpace(name: RoamScrollSpace.name)
             .scrollDisabled(isTransitioningDriveSurface)
             // Avoid wrapping ScrollView in GeometryReader — that ignores the
             // top wordmark safe-area inset and clips the start-drive card.
@@ -672,4 +675,5 @@ struct DriveView: View {
 #Preview {
     DriveView()
         .environmentObject(DriveSessionManager())
+        .environmentObject(ScrollCollapseTracker())
 }
