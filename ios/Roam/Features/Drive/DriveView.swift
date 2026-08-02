@@ -18,6 +18,7 @@ struct DriveView: View {
     @State private var breakPlanningControlsWidth: CGFloat = 0
     @StateObject private var routeLocationCoordinator = RoutePlanningLocationCoordinator()
     private let apiClient = APIClient()
+    @EnvironmentObject private var scrollCollapse: ScrollCollapseTracker
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 

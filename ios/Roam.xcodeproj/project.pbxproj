@@ -62,6 +62,7 @@
 		A10000000000000000000040 /* DriverReadinessProfileBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000040 /* DriverReadinessProfileBuilder.swift */; };
 		A10000000000000000000041 /* DriverReadinessRouteMatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000041 /* DriverReadinessRouteMatcher.swift */; };
 		A10000000000000000000042 /* DrivePlanningSupportingViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000042 /* DrivePlanningSupportingViews.swift */; };
+		A10000000000000000000043 /* ScrollCollapseTracker.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000043 /* ScrollCollapseTracker.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */

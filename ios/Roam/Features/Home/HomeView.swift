@@ -10,6 +10,7 @@ struct HomeView: View {
     @State private var navigationPath = NavigationPath()
     @State private var mapPreview: RoutePlanningMapSummary?
     @StateObject private var locationCoordinator = RoutePlanningLocationCoordinator()
+    @EnvironmentObject private var scrollCollapse: ScrollCollapseTracker
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 

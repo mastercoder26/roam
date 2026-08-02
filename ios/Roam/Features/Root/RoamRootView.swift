@@ -31,6 +31,7 @@ struct RoamRootView: View {
     @EnvironmentObject private var themeManager: ThemeManager
     @StateObject private var routeForm = RoutePlanningFormModel()
     @StateObject private var sharedRouteImport = SharedRouteImportCoordinator()
+    @StateObject private var scrollCollapse = ScrollCollapseTracker()
     @Namespace private var tabAnimation
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
