@@ -37,4 +37,9 @@ enum AppAnimation {
 
     /// Stagger between hero elements only (score → map)
     static let heroStagger: Double = 0.08
+
+    /// Liquid tab bar morphing between expanded pill and collapsed circle.
+    /// A slight overshoot (damping 0.80) gives the shape change its
+    /// "liquid" quality without feeling springy on repeated taps.
+    static let liquidMorph = Animation.spring(response: 0.42, dampingFraction: 0.80)
 }
