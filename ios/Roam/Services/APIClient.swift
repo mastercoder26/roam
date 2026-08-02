@@ -27,17 +27,15 @@ enum APIError: LocalizedError {
 }
 
 struct APIClient {
-    let baseURL: URL
-    private let fallbackBaseURL: URL?
+    /// Tried in order until one responds. See AppConfiguration.candidateBaseURLs.
+    private let candidateBaseURLs: [URL]
     private let session: URLSession
 
     init(
-        baseURL: URL? = nil,
-        fallbackBaseURL: URL? = AppConfiguration.fallbackAPIBaseURL,
+        candidateBaseURLs: [URL] = AppConfiguration.candidateBaseURLs,
         session: URLSession = .shared
     ) {
-        self.baseURL = baseURL ?? AppConfiguration.apiBaseURL
-        self.fallbackBaseURL = fallbackBaseURL
+        self.candidateBaseURLs = candidateBaseURLs
         self.session = session
     }
 
@@ -98,16 +96,11 @@ struct APIClient {
 
         let requestBody = try JSONEncoder().encode(body)
 
-        do {
-            return try await sendRouteRequest(to: baseURL, body: requestBody)
-        } catch APIError.networkError(let networkError) {
-            // A physical phone cannot reach the Mac through `localhost`, so try
-            // the current development machine's LAN address after that fails.
-            guard let fallbackBaseURL, fallbackBaseURL != baseURL else {
-                throw APIError.networkError(networkError)
-            }
-            return try await sendRouteRequest(to: fallbackBaseURL, body: requestBody)
-        }
+        return try await sendWithFallback(
+            path: "api/route/difficulty",
+            body: requestBody,
+            responseType: RouteDifficultyResponse.self
+        )
     }
 
     /// Compares only route conditions for a small set of departure windows.
@@ -143,33 +136,32 @@ struct APIClient {
         )
         let requestBody = try JSONEncoder().encode(body)
 
-        do {
-            return try await sendRequest(
-                to: baseURL,
-                path: "api/route/departure-comparison",
-                body: requestBody,
-                responseType: DepartureComparisonResponse.self
-            )
-        } catch APIError.networkError(let networkError) {
-            guard let fallbackBaseURL, fallbackBaseURL != baseURL else {
-                throw APIError.networkError(networkError)
-            }
-            return try await sendRequest(
-                to: fallbackBaseURL,
-                path: "api/route/departure-comparison",
-                body: requestBody,
-                responseType: DepartureComparisonResponse.self
-            )
-        }
+        return try await sendWithFallback(
+            path: "api/route/departure-comparison",
+            body: requestBody,
+            responseType: DepartureComparisonResponse.self
+        )
     }
 
-    private func sendRouteRequest(to baseURL: URL, body: Data) async throws -> RouteDifficultyResponse {
-        try await sendRequest(
-            to: baseURL,
-            path: "api/route/difficulty",
-            body: body,
-            responseType: RouteDifficultyResponse.self
-        )
+    /// Tries each candidate base URL in order, only moving to the next one on
+    /// a network failure (an HTTP error or bad response means that host is
+    /// reachable, so it's the final answer, not a reason to try another).
+    private func sendWithFallback<Response: Decodable>(
+        path: String,
+        body: Data,
+        responseType: Response.Type
+    ) async throws -> Response {
+        var lastNetworkError: Error = URLError(.cannotConnectToHost)
+
+        for baseURL in candidateBaseURLs {
+            do {
+                return try await sendRequest(to: baseURL, path: path, body: body, responseType: responseType)
+            } catch APIError.networkError(let error) {
+                lastNetworkError = error
+            }
+        }
+
+        throw APIError.networkError(lastNetworkError)
     }
 
     private func sendRequest<Response: Decodable>(
@@ -225,13 +217,28 @@ struct APIClient {
 }
 
 enum AppConfiguration {
-    static var fallbackAPIBaseURL: URL? {
-        configuredURL(forInfoDictionaryKey: "API_FALLBACK_BASE_URL")
+    private static let localhostBaseURL = URL(string: "http://localhost:3000")!
+
+    /// The deployed backend (if configured), then localhost, then a
+    /// developer's Mac on the LAN (if configured) — in that order, with
+    /// duplicates removed. A fresh checkout with no local config still works
+    /// against a locally running backend; a physical iPhone with the
+    /// deployed URL configured never needs the Mac to be reachable at all.
+    static var candidateBaseURLs: [URL] {
+        var candidates: [URL] = []
+        for url in [configuredAPIBaseURL, localhostBaseURL, configuredFallbackBaseURL] {
+            guard let url, !candidates.contains(url) else { continue }
+            candidates.append(url)
+        }
+        return candidates
     }
 
-    static var apiBaseURL: URL {
+    private static var configuredAPIBaseURL: URL? {
         configuredURL(forInfoDictionaryKey: "API_BASE_URL")
-            ?? URL(string: "http://localhost:3000")!
+    }
+
+    private static var configuredFallbackBaseURL: URL? {
+        configuredURL(forInfoDictionaryKey: "API_FALLBACK_BASE_URL")
     }
 
     private static func configuredURL(forInfoDictionaryKey key: String) -> URL? {

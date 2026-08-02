@@ -1,4 +1,6 @@
-// Debug configuration
-API_BASE_URL = http:/$()/localhost:3000
+// Debug configuration.
+// The app itself always falls back to localhost:3000 if nothing here is set,
+// so no default is needed below. See Debug.local.example.xcconfig.
+API_BASE_URL =
 API_FALLBACK_BASE_URL =
 #include? "Debug.local.xcconfig"
