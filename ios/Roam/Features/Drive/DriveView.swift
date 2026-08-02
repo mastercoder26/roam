@@ -23,7 +23,6 @@ struct DriveView: View {
     /// carrying them between positions.
     @Namespace private var driveTransition
     private let apiClient = APIClient()
-    @EnvironmentObject private var scrollCollapse: ScrollCollapseTracker
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
@@ -69,7 +68,6 @@ struct DriveView: View {
                 .padding(.bottom, isFocusedCanvas ? 0 : 20)
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .trackingScrollCollapse(scrollCollapse)
             .scrollDisabled(isTransitioningDriveSurface)
             // Avoid wrapping ScrollView in GeometryReader — that ignores the
             // top wordmark safe-area inset and clips the start-drive card.
@@ -696,5 +694,4 @@ struct DriveView: View {
 #Preview {
     DriveView()
         .environmentObject(DriveSessionManager())
-        .environmentObject(ScrollCollapseTracker())
 }

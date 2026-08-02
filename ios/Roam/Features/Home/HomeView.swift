@@ -10,7 +10,6 @@ struct HomeView: View {
     @State private var navigationPath = NavigationPath()
     @State private var mapPreview: RoutePlanningMapSummary?
     @StateObject private var locationCoordinator = RoutePlanningLocationCoordinator()
-    @EnvironmentObject private var scrollCollapse: ScrollCollapseTracker
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
@@ -95,8 +94,6 @@ struct HomeView: View {
                     // Extra clearance so "What Roam checks" clears the floating tab bar.
                     .padding(.bottom, 36)
                 }
-                .trackingScrollCollapse(scrollCollapse)
-
                 if isLoading {
                     RouteAnalysisLoadingView(isFinishing: isCompletingLoading) { completeLoading() }
                         .transition(.opacity)
@@ -606,5 +603,4 @@ struct RouteAnalysisResult: Hashable {
 
 #Preview {
     HomeView(form: RoutePlanningFormModel())
-        .environmentObject(ScrollCollapseTracker())
 }

@@ -4,13 +4,8 @@ import CoreGraphics
 /// horizontal controls. Keeping the decisions here makes compact-phone and
 /// large-text behavior deterministic and straightforward to regression-test.
 enum LayoutResponsiveness {
-    private static let compactTabBarThreshold: CGFloat = 300
     private static let stackedControlThreshold: CGFloat = 320
     private static let maximumLoadingSceneWidth: CGFloat = 320
-
-    static func usesCompactTabBar(availableWidth: CGFloat, usesLargeText: Bool) -> Bool {
-        usesLargeText || availableWidth < compactTabBarThreshold
-    }
 
     static func stacksInlineControls(availableWidth: CGFloat, usesLargeText: Bool) -> Bool {
         usesLargeText || availableWidth < stackedControlThreshold

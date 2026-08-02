@@ -62,7 +62,6 @@
 		A10000000000000000000040 /* DriverReadinessProfileBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000040 /* DriverReadinessProfileBuilder.swift */; };
 		A10000000000000000000041 /* DriverReadinessRouteMatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000041 /* DriverReadinessRouteMatcher.swift */; };
 		A10000000000000000000042 /* DrivePlanningSupportingViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000042 /* DrivePlanningSupportingViews.swift */; };
-		A10000000000000000000043 /* ScrollCollapseTracker.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000043 /* ScrollCollapseTracker.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -156,7 +155,6 @@
 		A20000000000000000000040 /* DriverReadinessProfileBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriverReadinessProfileBuilder.swift; sourceTree = "<group>"; };
 		A20000000000000000000041 /* DriverReadinessRouteMatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriverReadinessRouteMatcher.swift; sourceTree = "<group>"; };
 		A20000000000000000000042 /* DrivePlanningSupportingViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DrivePlanningSupportingViews.swift; sourceTree = "<group>"; };
-		A20000000000000000000043 /* ScrollCollapseTracker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScrollCollapseTracker.swift; sourceTree = "<group>"; };
 		A30000000000000000000001 /* Roam.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Roam.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A30000000000000000000002 /* RoamDriveActivityExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = RoamDriveActivityExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		A30000000000000000000003 /* RoamRouteShareExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = RoamRouteShareExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -326,7 +324,6 @@
 				A20000000000000000000010 /* AnimationConstants.swift */,
 				A20000000000000000000011 /* DesignSystem.swift */,
 				A20000000000000000000032 /* LayoutResponsiveness.swift */,
-				A20000000000000000000043 /* ScrollCollapseTracker.swift */,
 			);
 			path = Utilities;
 			sourceTree = "<group>";
@@ -560,7 +557,6 @@
 				A10000000000000000000040 /* DriverReadinessProfileBuilder.swift in Sources */,
 				A10000000000000000000041 /* DriverReadinessRouteMatcher.swift in Sources */,
 				A10000000000000000000042 /* DrivePlanningSupportingViews.swift in Sources */,
-				A10000000000000000000043 /* ScrollCollapseTracker.swift in Sources */,
 				A10000000000000000000028 /* SharedRouteImport.swift in Sources */,
 				A10000000000000000000029 /* RoutePlanningFormModel.swift in Sources */,
 				A1000000000000000000002A /* SharedRouteImportCoordinator.swift in Sources */,

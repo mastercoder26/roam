@@ -5,7 +5,6 @@ import SwiftUI
 /// score. It is never a safety guarantee, driving permission, or ranking.
 struct DriverProgressView: View {
     @EnvironmentObject private var session: DriveSessionManager
-    @EnvironmentObject private var scrollCollapse: ScrollCollapseTracker
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var summary: DriverProgressSummary {
@@ -52,7 +51,6 @@ struct DriverProgressView: View {
                 .padding(.horizontal, AppDesign.contentPadding)
                 .padding(.vertical, 12)
             }
-            .trackingScrollCollapse(scrollCollapse)
             .background(AppDesign.canvas)
             .navigationTitle("Progress")
             .navigationBarTitleDisplayMode(.large)
@@ -386,5 +384,4 @@ private struct ProgressCoverageRow: View {
 #Preview {
     DriverProgressView()
         .environmentObject(DriveSessionManager())
-        .environmentObject(ScrollCollapseTracker())
 }
