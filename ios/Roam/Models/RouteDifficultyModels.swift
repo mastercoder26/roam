@@ -386,6 +386,50 @@ struct ScoreEvidence: Decodable {
     let verifiedSignals: [ScoreEvidenceSignal]
     let missingSignals: [ScoreEvidenceSignal]
 
+    private enum CodingKeys: String, CodingKey {
+        case schemaVersion, inputCoverage, level, predictiveValidation
+        case signalCoverage, verifiedSignals, missingSignals
+    }
+
+    init(
+        schemaVersion: String,
+        inputCoverage: Double,
+        level: ScoreEvidenceLevel,
+        predictiveValidation: PredictiveValidationStatus,
+        signalCoverage: [ScoreEvidenceSignal: Double],
+        verifiedSignals: [ScoreEvidenceSignal],
+        missingSignals: [ScoreEvidenceSignal]
+    ) {
+        self.schemaVersion = schemaVersion
+        self.inputCoverage = inputCoverage
+        self.level = level
+        self.predictiveValidation = predictiveValidation
+        self.signalCoverage = signalCoverage
+        self.verifiedSignals = verifiedSignals
+        self.missingSignals = missingSignals
+    }
+
+    // `Dictionary`'s synthesized `Decodable` conformance only reads a JSON
+    // object for `String`/`Int` keys; a `RawRepresentable` enum key like
+    // `ScoreEvidenceSignal` otherwise expects a flat `[key, value, ...]`
+    // array and fails to decode the server's keyed object. Unknown keys
+    // (a newer signal type from the server) are dropped rather than
+    // failing the whole response.
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        schemaVersion = try container.decode(String.self, forKey: .schemaVersion)
+        inputCoverage = try container.decode(Double.self, forKey: .inputCoverage)
+        level = try container.decode(ScoreEvidenceLevel.self, forKey: .level)
+        predictiveValidation = try container.decode(PredictiveValidationStatus.self, forKey: .predictiveValidation)
+        let rawSignalCoverage = try container.decode([String: Double].self, forKey: .signalCoverage)
+        signalCoverage = rawSignalCoverage.reduce(into: [:]) { result, entry in
+            guard let signal = ScoreEvidenceSignal(rawValue: entry.key) else { return }
+            result[signal] = entry.value
+        }
+        verifiedSignals = try container.decode([ScoreEvidenceSignal].self, forKey: .verifiedSignals)
+        missingSignals = try container.decode([ScoreEvidenceSignal].self, forKey: .missingSignals)
+    }
+
     var verifiedInputCount: Int { verifiedSignals.count }
     var totalInputCount: Int { ScoreEvidenceSignal.allCases.count }
     var unavailableInputTitles: String {

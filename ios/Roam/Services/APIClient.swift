@@ -240,9 +240,13 @@ enum AppConfiguration {
         }
         let trimmed = urlString.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty,
-              !trimmed.contains("$") else {
+              !trimmed.contains("$"),
+              let url = URL(string: trimmed),
+              let scheme = url.scheme?.lowercased(),
+              ["http", "https"].contains(scheme),
+              url.host != nil else {
             return nil
         }
-        return URL(string: trimmed)
+        return url
     }
 }
