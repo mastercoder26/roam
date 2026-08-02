@@ -17,6 +17,11 @@ struct DriveView: View {
     @State private var pendingDeletionID: UUID?
     @State private var breakPlanningControlsWidth: CGFloat = 0
     @StateObject private var routeLocationCoordinator = RoutePlanningLocationCoordinator()
+    /// Ties the clock and the primary action across the compact and expanded
+    /// branches below. Those are two separate `if`/`else` hierarchies, so
+    /// without this SwiftUI destroys and rebuilds both controls instead of
+    /// carrying them between positions.
+    @Namespace private var driveTransition
     private let apiClient = APIClient()
     @EnvironmentObject private var scrollCollapse: ScrollCollapseTracker
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -63,9 +68,8 @@ struct DriveView: View {
                 .padding(.top, isFocusedCanvas ? 0 : 8)
                 .padding(.bottom, isFocusedCanvas ? 0 : 20)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .trackingScrollCollapse(scrollCollapse)
             }
-            .coordinateSpace(name: RoamScrollSpace.name)
+            .trackingScrollCollapse(scrollCollapse)
             .scrollDisabled(isTransitioningDriveSurface)
             // Avoid wrapping ScrollView in GeometryReader — that ignores the
             // top wordmark safe-area inset and clips the start-drive card.
@@ -460,6 +464,7 @@ struct DriveView: View {
 
                 VStack(spacing: 24) {
                     FlipClock(elapsed: session.elapsed, style: .active)
+                        .matchedGeometryEffect(id: DriveTransitionID.clock, in: driveTransition)
 
                     activeSpeed
 
@@ -472,12 +477,15 @@ struct DriveView: View {
                 Spacer(minLength: 16)
 
                 driveActionButton(showsEnd: actionShowsEnd)
+                    .matchedGeometryEffect(id: DriveTransitionID.action, in: driveTransition)
                     .padding(.horizontal, AppDesign.contentPadding)
                     .padding(.bottom, CGFloat(DrivePresentationEngine.activeButtonBottomInset))
             } else {
                 FlipClock(elapsed: session.elapsed, style: .preview)
+                    .matchedGeometryEffect(id: DriveTransitionID.clock, in: driveTransition)
 
                 driveActionButton(showsEnd: actionShowsEnd)
+                    .matchedGeometryEffect(id: DriveTransitionID.action, in: driveTransition)
                     .padding(.horizontal, keepsFocusedCanvas ? AppDesign.contentPadding : 0)
 
                 if !keepsFocusedCanvas {
@@ -506,6 +514,13 @@ struct DriveView: View {
         .accessibilityLabel(actionShowsEnd ? "Drive in progress" : "Manual drive")
     }
 
+    /// Shared identities for the controls that travel between the compact and
+    /// expanded drive layouts.
+    private enum DriveTransitionID {
+        static let clock = "drive.clock"
+        static let action = "drive.action"
+    }
+
     private func driveActionButton(showsEnd: Bool) -> some View {
         Button {
             if showsEnd {
@@ -516,7 +531,11 @@ struct DriveView: View {
         } label: {
             HStack(spacing: 10) {
                 Image(systemName: showsEnd ? "stop.fill" : "record.circle")
+                    // The glyph morphs between record and stop instead of
+                    // popping, which reads as one control changing role.
+                    .contentTransition(.symbolEffect(.replace))
                 Text(showsEnd ? "End drive" : "Start drive")
+                    .contentTransition(.interpolate)
             }
             .font(.headline)
             .frame(maxWidth: .infinity)
@@ -526,9 +545,11 @@ struct DriveView: View {
                 RoundedRectangle(cornerRadius: AppDesign.cornerRadius, style: .continuous)
                     .fill(showsEnd ? Color.red : AppDesign.accent)
             )
+            // The fill is animated here rather than inherited so the accent →
+            // red crossfade tracks the same spring as the travel downward.
+            .animation(driveModeAnimation, value: showsEnd)
         }
         .buttonStyle(PressableScaleStyle())
-        .contentTransition(.opacity)
         .accessibilityLabel(showsEnd ? "End drive" : "Start drive")
     }
 

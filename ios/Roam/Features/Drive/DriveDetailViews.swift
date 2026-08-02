@@ -466,16 +466,45 @@ private struct FlipClockDigit: View {
     let digit: String
     let style: FlipClock.Style
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    private var tile: RoundedRectangle {
+        RoundedRectangle(cornerRadius: AppDesign.cornerRadiusTiny, style: .continuous)
+    }
+
     var body: some View {
         ZStack {
-            RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Color.black)
+            tile.fill(Color.black)
+
+            // Keying on the value makes each tick an insertion plus a removal,
+            // which is what gives the flap something to animate. Without the
+            // id, SwiftUI reuses one Text and the glyph simply swaps.
             Text(digit)
                 .font(.system(size: style.digitFontSize, weight: .semibold, design: .rounded))
                 .monospacedDigit()
                 .foregroundStyle(Color.white.opacity(0.92))
+                .id(digit)
+                .transition(flapTransition)
+
+            // The hinge line sits above the glyph so a dropping flap passes
+            // behind it, the way a real split-flap board reads.
             Rectangle().fill(Color.white.opacity(0.18)).frame(height: 1)
         }
         .frame(width: style.digitWidth, height: style.digitHeight)
+        // Clipping to the tile is what turns a vertical move into a flap:
+        // the outgoing glyph falls out of the card, the incoming one drops in.
+        .clipShape(tile)
+        .animation(reduceMotion ? nil : AppAnimation.flip, value: digit)
+    }
+
+    /// Reduced Motion keeps the digit legible and still — a timer must stay
+    /// readable, so this degrades to a plain cross-fade rather than nothing.
+    private var flapTransition: AnyTransition {
+        guard !reduceMotion else { return .opacity }
+        return .asymmetric(
+            insertion: .move(edge: .top).combined(with: .opacity),
+            removal: .move(edge: .bottom).combined(with: .opacity)
+        )
     }
 }
 

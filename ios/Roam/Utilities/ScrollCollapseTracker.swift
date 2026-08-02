@@ -1,87 +1,81 @@
 import SwiftUI
 
-/// Coordinate space shared by every tab's primary `ScrollView` so scroll
-/// position can be reported to `ScrollCollapseTracker` without each screen
-/// hard-coding its own string literal.
-enum RoamScrollSpace {
-    static let name = "roamPrimaryScroll"
-}
-
 /// Tracks vertical movement of the active tab's scroll content and exposes a
-/// single "should collapse" flag for the floating liquid tab bar. Small,
-/// noisy deltas (a shaky drag, momentum settling) are ignored so the bar
-/// doesn't flicker between its expanded and collapsed states.
+/// single "should collapse" flag for the floating liquid tab bar.
+///
+/// Collapsing is deliberately eager: a small downward movement hides the bar,
+/// because the bar's whole purpose when reading is to get out of the way. The
+/// guards below exist only to stop the two things that make an eager rule feel
+/// broken — rubber-band bounce at the top, and momentum settling at the end of
+/// a fling.
 final class ScrollCollapseTracker: ObservableObject {
     @Published private(set) var isCollapsed = false
 
     private var lastOffset: CGFloat?
-    /// Signed travel in the current direction. Reset whenever the finger
-    /// reverses, so only sustained movement counts toward a state change.
+    /// Signed travel since the last direction change, so only movement that
+    /// keeps going the same way counts toward a state change.
     private var travelInDirection: CGFloat = 0
 
-    /// Ignores sub-pixel layout jitter without swallowing real drags.
-    private let noiseFloor: CGFloat = 1.0
-    /// Sustained downward travel before the bar collapses.
-    private let collapseThreshold: CGFloat = 36
-    /// Upward travel before it returns. Smaller than `collapseThreshold` so
-    /// reaching for navigation feels immediate while idle jitter does not
-    /// bounce the bar open.
-    private let expandThreshold: CGFloat = 18
+    /// Ignores sub-pixel layout jitter without swallowing a real drag.
+    private let noiseFloor: CGFloat = 0.5
+    /// Downward travel before the bar hides. Small on purpose.
+    private let collapseThreshold: CGFloat = 10
+    /// Upward travel before it returns — smaller still, so reaching for
+    /// navigation always feels immediate.
+    private let expandThreshold: CGFloat = 8
     /// Content within this distance of the top always shows the full bar.
-    /// Without it, rubber-band overscroll at rest reads as a downward drag
-    /// and collapses the bar while the user is sitting still at the top.
-    private let topRestZone: CGFloat = 24
+    /// Overscroll bounce here otherwise reads as a downward drag and hides
+    /// the bar while the user is sitting still at the top of the list.
+    private let topRestZone: CGFloat = 12
 
-    /// Reports the scroll content's top edge relative to its `ScrollView`:
-    /// `0` at rest, increasingly negative as the user scrolls down.
-    func update(offset: CGFloat) {
-        defer { lastOffset = offset }
+    /// Distance the content has been scrolled down from the top: `0` at rest,
+    /// growing positive as the user moves down the page.
+    func update(scrollDistance: CGFloat) {
+        defer { lastOffset = scrollDistance }
 
-        // Near the top there is nothing worth hiding chrome for, and bounce
-        // here is the single biggest source of spurious toggles.
-        if offset > -topRestZone {
+        if scrollDistance < topRestZone {
             travelInDirection = 0
             setCollapsed(false)
             return
         }
 
         guard let lastOffset else { return }
-        let delta = offset - lastOffset
+        let delta = scrollDistance - lastOffset
         guard abs(delta) > noiseFloor else { return }
 
-        // A direction change restarts the count, so momentum settling cannot
-        // accumulate its way past a threshold.
-        if (delta < 0) != (travelInDirection < 0) {
+        // A direction change restarts the count, so deceleration wobble cannot
+        // accumulate its way past a threshold and flicker the bar.
+        if (delta > 0) != (travelInDirection > 0) {
             travelInDirection = 0
         }
         travelInDirection += delta
 
-        if travelInDirection <= -collapseThreshold {
+        if travelInDirection >= collapseThreshold {
             setCollapsed(true)
             travelInDirection = 0
-        } else if travelInDirection >= expandThreshold {
+        } else if travelInDirection <= -expandThreshold {
             setCollapsed(false)
             travelInDirection = 0
         }
     }
 
-    /// Restores the full bar immediately, e.g. after switching tabs or
-    /// tapping the collapsed glass indicator.
+    /// Restores the full bar immediately — after a tab switch, or when the
+    /// collapsed puck is tapped.
     func expand() {
         lastOffset = nil
         travelInDirection = 0
         setCollapsed(false)
     }
 
-    /// Clears tracked scroll history without forcing a visible state
-    /// change; used when a fresh tab's scroll view is about to report in.
+    /// Clears tracked scroll history without forcing a visible state change;
+    /// used when a fresh tab's scroll view is about to report in.
     func reset() {
         expand()
     }
 
     /// Animating here rather than at each call site guarantees every path into
-    /// the state — scrolling, tab switches, the collapsed indicator — morphs
-    /// with the same curve instead of some snapping instantly.
+    /// the state — scrolling, tab switches, tapping the puck — morphs with the
+    /// same curve instead of some snapping instantly.
     private func setCollapsed(_ value: Bool) {
         guard isCollapsed != value else { return }
         withAnimation(AppAnimation.liquidMorph) {
@@ -90,37 +84,21 @@ final class ScrollCollapseTracker: ObservableObject {
     }
 }
 
-private struct ScrollOffsetPreferenceKey: PreferenceKey {
-    static var defaultValue: CGFloat = 0
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
-        value = nextValue()
-    }
-}
-
-private struct ScrollCollapseReader: ViewModifier {
-    @ObservedObject var tracker: ScrollCollapseTracker
-
-    func body(content: Content) -> some View {
-        content
-            .background(
-                GeometryReader { proxy in
-                    Color.clear
-                        .preference(
-                            key: ScrollOffsetPreferenceKey.self,
-                            value: proxy.frame(in: .named(RoamScrollSpace.name)).minY
-                        )
-                }
-            )
-            .onPreferenceChange(ScrollOffsetPreferenceKey.self) { tracker.update(offset: $0) }
-    }
-}
-
 extension View {
-    /// Reports this view's position within the shared `RoamScrollSpace`
-    /// coordinate space to a `ScrollCollapseTracker`. Apply to the first
-    /// child inside a tab's primary `ScrollView`, and apply
-    /// `.coordinateSpace(name: RoamScrollSpace.name)` to that `ScrollView`.
+    /// Reports scrolling to a `ScrollCollapseTracker`. Apply directly to a
+    /// tab's primary `ScrollView`.
+    ///
+    /// This reads the scroll view's real content offset rather than measuring a
+    /// child's frame through a `GeometryReader` preference. The measurement
+    /// approach this replaced only published while SwiftUI happened to re-run
+    /// layout on the observed child, so it missed most of a fling and reported
+    /// nothing at all during momentum — which is why the bar appeared never to
+    /// collapse.
     func trackingScrollCollapse(_ tracker: ScrollCollapseTracker) -> some View {
-        modifier(ScrollCollapseReader(tracker: tracker))
+        onScrollGeometryChange(for: CGFloat.self) { geometry in
+            geometry.contentOffset.y + geometry.contentInsets.top
+        } action: { _, distance in
+            tracker.update(scrollDistance: distance)
+        }
     }
 }

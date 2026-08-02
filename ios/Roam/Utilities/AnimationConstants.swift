@@ -42,4 +42,9 @@ enum AppAnimation {
     /// A slight overshoot (damping 0.80) gives the shape change its
     /// "liquid" quality without feeling springy on repeated taps.
     static let liquidMorph = Animation.spring(response: 0.42, dampingFraction: 0.80)
+
+    /// A single split-flap card dropping. Short and slightly underdamped so the
+    /// flap lands with a little weight instead of gliding, and always finishes
+    /// well inside the one-second tick that triggers the next one.
+    static let flip = Animation.spring(response: 0.26, dampingFraction: 0.72)
 }

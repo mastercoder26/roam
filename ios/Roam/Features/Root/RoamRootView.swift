@@ -27,6 +27,11 @@ struct RoamRootView: View {
 
     @State private var selectedTab: Tab = .routes
     @State private var showingThemePicker = false
+    /// True while a press is held on the bar. Apple's Liquid Glass controls
+    /// lift and clarify under a sustained touch before they accept a drag.
+    @State private var isBarLifted = false
+    /// Index the finger is currently over while sliding across the bar.
+    @State private var dragTabIndex: Int?
     @EnvironmentObject private var driveSession: DriveSessionManager
     @EnvironmentObject private var themeManager: ThemeManager
     @StateObject private var routeForm = RoutePlanningFormModel()
@@ -41,6 +46,12 @@ struct RoamRootView: View {
     private enum LiquidTabBarMetrics {
         static let expandedHeight: CGFloat = 76
         static let collapsedDiameter: CGFloat = 60
+    }
+
+    /// Identity for the tab bar's glass shape, so the expanded bar and the
+    /// collapsed puck morph into one another instead of swapping.
+    private enum GlassID {
+        static let tabBar = "roam.tabbar.glass"
     }
 
     private var shouldCollapseTabBar: Bool {
@@ -76,7 +87,7 @@ struct RoamRootView: View {
         // collapsed circle both looks and behaves like a smaller control.
         .safeAreaInset(edge: .bottom, spacing: 0) {
             liquidTabBar
-                .frame(height: tabBarFootprintHeight, alignment: .bottomTrailing)
+                .frame(height: tabBarFootprintHeight, alignment: .bottomLeading)
                 .padding(.horizontal, shouldCollapseTabBar ? 20 : 24)
                 .padding(.top, 8)
                 .padding(.bottom, 10)
@@ -200,28 +211,45 @@ struct RoamRootView: View {
             )
             let glassShape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
 
-            ZStack {
-                tabBarSurface(shape: glassShape)
+            // The container is what lets the full bar and the collapsed puck
+            // read as one piece of glass reshaping, rather than two surfaces
+            // cross-fading. `glassEffectID` names the shape across both states.
+            GlassEffectContainer(spacing: 0) {
+                ZStack {
+                    tabBarSurface(shape: glassShape)
+                        .glassEffectID(GlassID.tabBar, in: tabAnimation)
 
-                tabBarButtons(showsCompactTabs: showsCompactTabs)
-                    .opacity(isCollapsed ? 0 : 1)
-                    .scaleEffect(isCollapsed ? 0.94 : 1)
-                    .allowsHitTesting(!isCollapsed)
+                    tabBarButtons(showsCompactTabs: showsCompactTabs)
+                        .opacity(isCollapsed ? 0 : 1)
+                        .scaleEffect(isCollapsed ? 0.94 : 1)
+                        .allowsHitTesting(!isCollapsed)
 
-                collapsedTabIndicator
-                    .opacity(isCollapsed ? 1 : 0)
-                    .scaleEffect(isCollapsed ? 1 : 0.72)
-                    .allowsHitTesting(isCollapsed)
+                    collapsedTabIndicator
+                        .opacity(isCollapsed ? 1 : 0)
+                        .scaleEffect(isCollapsed ? 1 : 0.72)
+                        .allowsHitTesting(isCollapsed)
+                }
+                .frame(width: barWidth, height: barHeight)
             }
-            .frame(width: barWidth, height: barHeight)
             .clipShape(glassShape)
-            .elevation(isCollapsed ? AppDesign.Elevation.medium : AppDesign.Elevation.high)
-            // The collapsed puck settles into the thumb's natural corner
-            // rather than the far side of the screen.
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+            // A lifted surface rises off the canvas and casts further, which is
+            // what sells "floating" more than the scale change alone.
+            .scaleEffect(isBarLifted && !reduceMotion ? 1.04 : 1, anchor: .bottom)
+            .elevation(
+                isBarLifted
+                    ? AppDesign.Elevation.high
+                    : (isCollapsed ? AppDesign.Elevation.medium : AppDesign.Elevation.high)
+            )
+            .offset(y: isBarLifted && !reduceMotion ? -6 : 0)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
+            .gesture(tabScrubGesture(barWidth: geometry.size.width))
             .animation(
                 reduceMotion ? .easeOut(duration: 0.16) : AppAnimation.liquidMorph,
                 value: isCollapsed
+            )
+            .animation(
+                reduceMotion ? .easeOut(duration: 0.16) : AppAnimation.liquidMorph,
+                value: isBarLifted
             )
         }
     }
@@ -232,19 +260,64 @@ struct RoamRootView: View {
     @ViewBuilder
     private func tabBarSurface(shape: RoundedRectangle) -> some View {
         if reduceTransparency {
+            // Accessibility opt-out, not a version fallback: someone who has
+            // asked the system to reduce transparency gets an opaque surface.
             shape
                 .fill(AppDesign.cardSurfaceElevated)
                 .overlay { shape.stroke(AppDesign.cardStrokeStrong, lineWidth: 1) }
-        } else if #available(iOS 26.0, *) {
+        } else {
+            // `.interactive()` is what gives Apple's lift-and-clarify response
+            // to a sustained press; the system drives the highlight and the
+            // lensing, so nothing here hand-animates the material.
             shape
                 .fill(.clear)
-                .glassEffect(.regular, in: shape)
-        } else {
-            shape
-                .fill(.ultraThinMaterial)
-                .overlay { shape.stroke(AppDesign.glassHighlight, lineWidth: 1) }
-                .overlay { shape.stroke(AppDesign.cardStrokeStrong.opacity(0.72), lineWidth: 0.8) }
+                .glassEffect(
+                    isBarLifted ? .clear.interactive() : .regular.interactive(),
+                    in: shape
+                )
         }
+    }
+
+    /// Hold-then-slide across the bar, matching how Liquid Glass tab bars
+    /// behave system-wide: the surface lifts under a sustained press, then the
+    /// selection follows the finger until it lifts off.
+    private func tabScrubGesture(barWidth: CGFloat) -> some Gesture {
+        LongPressGesture(minimumDuration: 0.18)
+            .onEnded { _ in
+                guard !shouldCollapseTabBar else { return }
+                UIImpactFeedbackGenerator(style: .rigid).impactOccurred()
+                withAnimation(AppAnimation.liquidMorph) { isBarLifted = true }
+            }
+            .sequenced(before: DragGesture(minimumDistance: 0))
+            .onChanged { value in
+                guard case .second(true, let drag?) = value, isBarLifted else { return }
+                updateScrub(at: drag.location.x, barWidth: barWidth)
+            }
+            .onEnded { _ in
+                commitScrub()
+            }
+    }
+
+    /// Tabs are equal-width segments, so the segment under the finger is a
+    /// division rather than a per-button frame lookup.
+    private func updateScrub(at x: CGFloat, barWidth: CGFloat) {
+        guard barWidth > 0 else { return }
+        let segment = barWidth / CGFloat(Tab.allCases.count)
+        let index = min(Tab.allCases.count - 1, max(0, Int(x / segment)))
+        guard index != dragTabIndex else { return }
+
+        dragTabIndex = index
+        // Each crossing gets its own tick, the way a system slider marks
+        // passing a detent.
+        UISelectionFeedbackGenerator().selectionChanged()
+        withAnimation(AppAnimation.liquidMorph) {
+            selectedTab = Tab.allCases[index]
+        }
+    }
+
+    private func commitScrub() {
+        dragTabIndex = nil
+        withAnimation(AppAnimation.liquidMorph) { isBarLifted = false }
     }
 
     private func tabBarButtons(showsCompactTabs: Bool) -> some View {
@@ -305,8 +378,8 @@ struct RoamRootView: View {
             }
         } label: {
             Image(systemName: selectedTab.symbol)
-                .font(.system(size: 20, weight: .semibold))
-                .foregroundStyle(AppDesign.accent)
+                .font(.system(size: 22, weight: .semibold))
+                .foregroundStyle(AppDesign.Ink.primary)
                 .contentTransition(.symbolEffect(.replace))
                 .frame(width: LiquidTabBarMetrics.collapsedDiameter, height: LiquidTabBarMetrics.collapsedDiameter)
         }

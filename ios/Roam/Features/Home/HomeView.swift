@@ -94,9 +94,8 @@ struct HomeView: View {
                     .padding(.top, 10)
                     // Extra clearance so "What Roam checks" clears the floating tab bar.
                     .padding(.bottom, 36)
-                    .trackingScrollCollapse(scrollCollapse)
                 }
-                .coordinateSpace(name: RoamScrollSpace.name)
+                .trackingScrollCollapse(scrollCollapse)
 
                 if isLoading {
                     RouteAnalysisLoadingView(isFinishing: isCompletingLoading) { completeLoading() }

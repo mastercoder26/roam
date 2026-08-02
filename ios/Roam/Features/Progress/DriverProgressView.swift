@@ -51,9 +51,8 @@ struct DriverProgressView: View {
                 }
                 .padding(.horizontal, AppDesign.contentPadding)
                 .padding(.vertical, 12)
-                .trackingScrollCollapse(scrollCollapse)
             }
-            .coordinateSpace(name: RoamScrollSpace.name)
+            .trackingScrollCollapse(scrollCollapse)
             .background(AppDesign.canvas)
             .navigationTitle("Progress")
             .navigationBarTitleDisplayMode(.large)
