@@ -19,6 +19,7 @@ xcshareddata/WorkspaceSettings.xcsettings
 
 # Machine-local xcconfig (contains your dev-machine LAN IP, etc.)
 Roam/Config/Debug.local.xcconfig
+Roam/Config/Release.local.xcconfig
 
 # macOS
 .DS_Store
