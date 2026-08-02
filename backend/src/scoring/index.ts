@@ -156,11 +156,4 @@ export function scoreRoutes(
   return { primary, alternates };
 }
 
-export {
-  buildFeaturesFromRoute,
-  computeBaseScore,
-  computeFatigue,
-  aggregateSegmentScores,
-  generateReasons,
-  scoreToLabel,
-};
+export { aggregateSegmentScores, scoreToLabel };
