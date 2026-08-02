@@ -78,7 +78,7 @@ struct DriverProgressView: View {
                     .font(.title3.weight(.semibold))
                     .foregroundStyle(AppDesign.accent)
                     .frame(width: 42, height: 42)
-                    .background(AppDesign.accent.opacity(0.14), in: RoundedRectangle(cornerRadius: 13, style: .continuous))
+                    .background(AppDesign.accent.opacity(0.14), in: RoundedRectangle(cornerRadius: AppDesign.cornerRadiusSmall, style: .continuous))
 
                 VStack(alignment: .leading, spacing: 3) {
                     Text("Overall driving score")
@@ -353,7 +353,7 @@ private struct ProgressScoreSignal: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
-        .background(Color.primary.opacity(0.055), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .background(Color.primary.opacity(0.055), in: RoundedRectangle(cornerRadius: AppDesign.cornerRadiusTiny, style: .continuous))
         .accessibilityElement(children: .combine)
     }
 }
@@ -370,7 +370,7 @@ private struct ProgressCoverageRow: View {
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(AppDesign.positive)
                 .frame(width: 34, height: 34)
-                .background(AppDesign.positive.opacity(0.12), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .background(AppDesign.positive.opacity(0.12), in: RoundedRectangle(cornerRadius: AppDesign.cornerRadiusTiny, style: .continuous))
             VStack(alignment: .leading, spacing: 2) {
                 Text(title).font(.subheadline.weight(.semibold))
                 Text(detail).font(.caption).foregroundStyle(.secondary)

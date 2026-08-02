@@ -213,7 +213,7 @@ struct DriveView: View {
             )
             .padding(.horizontal, 14)
             .padding(.vertical, 8)
-            .background(Color(.systemBackground), in: RoundedRectangle(cornerRadius: AppDesign.cornerRadiusSmall, style: .continuous))
+            .background(AppDesign.cardSurfaceElevated, in: RoundedRectangle(cornerRadius: AppDesign.cornerRadiusSmall, style: .continuous))
             .overlay {
                 RoundedRectangle(cornerRadius: AppDesign.cornerRadiusSmall, style: .continuous)
                     .stroke(Color.primary.opacity(0.14), lineWidth: 1)
@@ -286,7 +286,7 @@ struct DriveView: View {
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 13)
                 .foregroundStyle(canPlanBreaks ? AppDesign.accentForeground : AppDesign.Ink.tertiary)
-                .background(RoundedRectangle(cornerRadius: AppDesign.cornerRadiusSmall, style: .continuous).fill(canPlanBreaks ? AppDesign.accent : Color(.systemGray3)))
+                .background(RoundedRectangle(cornerRadius: AppDesign.cornerRadiusSmall, style: .continuous).fill(canPlanBreaks ? AppDesign.accent : AppDesign.disabledSurface))
             }
             .buttonStyle(PressableScaleStyle())
             .disabled(!canPlanBreaks)

@@ -137,7 +137,7 @@ struct ThemePickerSheet: View {
 
     private func themeSwatch(_ palette: ThemePalette) -> some View {
         ZStack {
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
+            RoundedRectangle(cornerRadius: AppDesign.cornerRadiusTiny, style: .continuous)
                 .fill(palette.canvas.color)
             Circle()
                 .fill(palette.accent.color)
@@ -151,7 +151,7 @@ struct ThemePickerSheet: View {
         }
         .frame(width: 44, height: 44)
         .overlay {
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
+            RoundedRectangle(cornerRadius: AppDesign.cornerRadiusTiny, style: .continuous)
                 .stroke(palette.cardStrokeStrong.color, lineWidth: 1)
         }
         .accessibilityHidden(true)

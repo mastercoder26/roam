@@ -170,7 +170,7 @@ struct HomeView: View {
             RoundedRectangle(cornerRadius: AppDesign.cornerRadiusLarge, style: .continuous)
                 .stroke(AppDesign.cardStroke, lineWidth: 1)
         }
-        .shadow(color: .black.opacity(0.32), radius: 14, y: 8)
+        .elevation(AppDesign.Elevation.medium)
         .animation(reduceMotion ? .easeOut(duration: 0.18) : AppAnimation.selection, value: destinationIsRevealed)
     }
 
@@ -336,7 +336,7 @@ struct HomeView: View {
                 .stroke(AppDesign.cardStrokeStrong, lineWidth: 1)
         }
         .shadow(color: AppDesign.accent.opacity(0.12), radius: 16, y: 8)
-        .shadow(color: .black.opacity(0.35), radius: 18, y: 10)
+        .elevation(AppDesign.Elevation.high)
         .accessibilityLabel(mapPreview?.accessibilityLabel ?? "Route map")
     }
 

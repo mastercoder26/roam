@@ -277,7 +277,7 @@ private struct ReplayMomentRow: View {
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(isSelected ? AppDesign.accent : AppDesign.safety)
                 .frame(width: 34, height: 34)
-                .background((isSelected ? AppDesign.accent : AppDesign.safety).opacity(0.12), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .background((isSelected ? AppDesign.accent : AppDesign.safety).opacity(0.12), in: RoundedRectangle(cornerRadius: AppDesign.cornerRadiusTiny, style: .continuous))
             VStack(alignment: .leading, spacing: 3) {
                 Text(moment.kind.title).font(.subheadline.weight(.semibold))
                 Text(relativeTime(moment.elapsedSinceDriveStart)).font(.caption).foregroundStyle(.secondary)

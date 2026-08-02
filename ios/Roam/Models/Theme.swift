@@ -135,6 +135,13 @@ struct ThemePalette: Equatable {
     let inkTertiary: RGBA
     let inkLabel: RGBA
     let cardShadow: RGBA
+    /// Fill for controls that are present but unavailable. Replaces
+    /// `Color(.systemGray3)`, which only tracks light/dark and so ignored
+    /// every theme beyond Dark and Light.
+    let disabledSurface: RGBA
+    /// Top-edge sheen on translucent glass surfaces. A light scheme needs a
+    /// stronger highlight than a dark one to read as a lit edge.
+    let glassHighlight: RGBA
     let appearance: ThemeAppearance
 
     /// Foreground chosen from black and white for the selected accent. This
@@ -182,6 +189,8 @@ enum ThemeCatalog {
         inkTertiary: .white(opacity: 0.38),
         inkLabel: .white(opacity: 0.64),
         cardShadow: .black(opacity: 0.28),
+        disabledSurface: .white(opacity: 0.14),
+        glassHighlight: .white(opacity: 0.20),
         appearance: .dark
     )
 
@@ -199,6 +208,8 @@ enum ThemeCatalog {
         inkTertiary: .black(opacity: 0.55),
         inkLabel: .black(opacity: 0.56),
         cardShadow: .black(opacity: 0.10),
+        disabledSurface: .black(opacity: 0.12),
+        glassHighlight: .white(opacity: 0.52),
         appearance: .light
     )
 
@@ -216,6 +227,8 @@ enum ThemeCatalog {
         inkTertiary: .rgb(0.42, 0.24, 0.10, alpha: 0.70),
         inkLabel: .rgb(0.42, 0.24, 0.10, alpha: 0.74),
         cardShadow: .rgb(0.70, 0.35, 0.10, alpha: 0.14),
+        disabledSurface: .rgb(0.42, 0.24, 0.10, alpha: 0.16),
+        glassHighlight: .white(opacity: 0.58),
         appearance: .light
     )
 
@@ -233,6 +246,8 @@ enum ThemeCatalog {
         inkTertiary: .white(opacity: 0.40),
         inkLabel: .white(opacity: 0.66),
         cardShadow: .black(opacity: 0.34),
+        disabledSurface: .white(opacity: 0.14),
+        glassHighlight: .white(opacity: 0.22),
         appearance: .dark
     )
 
@@ -250,6 +265,8 @@ enum ThemeCatalog {
         inkTertiary: .white(opacity: 0.38),
         inkLabel: .white(opacity: 0.64),
         cardShadow: .black(opacity: 0.32),
+        disabledSurface: .white(opacity: 0.14),
+        glassHighlight: .white(opacity: 0.20),
         appearance: .dark
     )
 
@@ -267,6 +284,8 @@ enum ThemeCatalog {
         inkTertiary: .white(opacity: 0.38),
         inkLabel: .white(opacity: 0.64),
         cardShadow: .black(opacity: 0.30),
+        disabledSurface: .white(opacity: 0.14),
+        glassHighlight: .white(opacity: 0.20),
         appearance: .dark
     )
 }

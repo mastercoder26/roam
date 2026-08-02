@@ -235,7 +235,7 @@ struct RouteDemandRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .top, spacing: 12) {
-                Image(systemName: symbol).font(.subheadline.weight(.semibold)).foregroundStyle(color).frame(width: 36, height: 36).background(color.opacity(0.12), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                Image(systemName: symbol).font(.subheadline.weight(.semibold)).foregroundStyle(color).frame(width: 36, height: 36).background(color.opacity(0.12), in: RoundedRectangle(cornerRadius: AppDesign.cornerRadiusTiny, style: .continuous))
                 VStack(alignment: .leading, spacing: 3) {
                     HStack(spacing: 8) {
                         Text(demand.title).font(.subheadline.weight(.semibold))

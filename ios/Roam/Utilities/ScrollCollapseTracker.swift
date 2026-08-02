@@ -15,22 +15,53 @@ final class ScrollCollapseTracker: ObservableObject {
     @Published private(set) var isCollapsed = false
 
     private var lastOffset: CGFloat?
-    private let directionNoiseFloor: CGFloat = 0.35
+    /// Signed travel in the current direction. Reset whenever the finger
+    /// reverses, so only sustained movement counts toward a state change.
+    private var travelInDirection: CGFloat = 0
+
+    /// Ignores sub-pixel layout jitter without swallowing real drags.
+    private let noiseFloor: CGFloat = 1.0
+    /// Sustained downward travel before the bar collapses.
+    private let collapseThreshold: CGFloat = 36
+    /// Upward travel before it returns. Smaller than `collapseThreshold` so
+    /// reaching for navigation feels immediate while idle jitter does not
+    /// bounce the bar open.
+    private let expandThreshold: CGFloat = 18
+    /// Content within this distance of the top always shows the full bar.
+    /// Without it, rubber-band overscroll at rest reads as a downward drag
+    /// and collapses the bar while the user is sitting still at the top.
+    private let topRestZone: CGFloat = 24
 
     /// Reports the scroll content's top edge relative to its `ScrollView`:
     /// `0` at rest, increasingly negative as the user scrolls down.
     func update(offset: CGFloat) {
         defer { lastOffset = offset }
-        guard let lastOffset else { return }
 
-        let delta = offset - lastOffset
-        // Collapse on the first real downward movement and expand on the first
-        // real upward movement. The tiny floor filters only layout jitter; this
-        // interaction intentionally has no distance or top-position threshold.
-        if delta < -directionNoiseFloor {
-            setCollapsed(true)
-        } else if delta > directionNoiseFloor {
+        // Near the top there is nothing worth hiding chrome for, and bounce
+        // here is the single biggest source of spurious toggles.
+        if offset > -topRestZone {
+            travelInDirection = 0
             setCollapsed(false)
+            return
+        }
+
+        guard let lastOffset else { return }
+        let delta = offset - lastOffset
+        guard abs(delta) > noiseFloor else { return }
+
+        // A direction change restarts the count, so momentum settling cannot
+        // accumulate its way past a threshold.
+        if (delta < 0) != (travelInDirection < 0) {
+            travelInDirection = 0
+        }
+        travelInDirection += delta
+
+        if travelInDirection <= -collapseThreshold {
+            setCollapsed(true)
+            travelInDirection = 0
+        } else if travelInDirection >= expandThreshold {
+            setCollapsed(false)
+            travelInDirection = 0
         }
     }
 
@@ -38,6 +69,7 @@ final class ScrollCollapseTracker: ObservableObject {
     /// tapping the collapsed glass indicator.
     func expand() {
         lastOffset = nil
+        travelInDirection = 0
         setCollapsed(false)
     }
 
@@ -47,11 +79,14 @@ final class ScrollCollapseTracker: ObservableObject {
         expand()
     }
 
-
-
+    /// Animating here rather than at each call site guarantees every path into
+    /// the state — scrolling, tab switches, the collapsed indicator — morphs
+    /// with the same curve instead of some snapping instantly.
     private func setCollapsed(_ value: Bool) {
         guard isCollapsed != value else { return }
-        isCollapsed = value
+        withAnimation(AppAnimation.liquidMorph) {
+            isCollapsed = value
+        }
     }
 }
 

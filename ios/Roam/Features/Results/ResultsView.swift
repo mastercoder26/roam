@@ -180,7 +180,7 @@ struct ResultsView: View {
                     .font(.title3.weight(.semibold))
                     .foregroundStyle(readinessColor)
                     .frame(width: 42, height: 42)
-                    .background(readinessColor.opacity(0.12), in: RoundedRectangle(cornerRadius: 13, style: .continuous))
+                    .background(readinessColor.opacity(0.12), in: RoundedRectangle(cornerRadius: AppDesign.cornerRadiusSmall, style: .continuous))
 
                 VStack(alignment: .leading, spacing: 3) {
                     Text(readiness.headline)
@@ -475,7 +475,7 @@ struct ResultsView: View {
         )
         .frame(height: 220)
         .clipShape(RoundedRectangle(cornerRadius: AppDesign.cornerRadius, style: .continuous))
-        .shadow(color: .black.opacity(0.06), radius: 12, y: 6)
+        .elevation(AppDesign.Elevation.low)
         .animation(reduceMotion ? .easeOut(duration: 0.16) : AppAnimation.selection, value: selectedRoute.polyline)
     }
 

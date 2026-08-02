@@ -76,7 +76,7 @@ struct RoamRootView: View {
         // collapsed circle both looks and behaves like a smaller control.
         .safeAreaInset(edge: .bottom, spacing: 0) {
             liquidTabBar
-                .frame(height: tabBarFootprintHeight, alignment: .bottomLeading)
+                .frame(height: tabBarFootprintHeight, alignment: .bottomTrailing)
                 .padding(.horizontal, shouldCollapseTabBar ? 20 : 24)
                 .padding(.top, 8)
                 .padding(.bottom, 10)
@@ -201,25 +201,7 @@ struct RoamRootView: View {
             let glassShape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
 
             ZStack {
-                glassShape
-                    .fill(
-                        reduceTransparency
-                            ? AnyShapeStyle(Color(.systemBackground))
-                            : AnyShapeStyle(.ultraThinMaterial)
-                    )
-                    .overlay {
-                        glassShape
-                            .stroke(.white.opacity(themeManager.palette.appearance == .light ? 0.52 : 0.20), lineWidth: 1)
-                    }
-                    .overlay {
-                        glassShape
-                            .stroke(AppDesign.cardStrokeStrong.opacity(0.72), lineWidth: 0.8)
-                    }
-                    .shadow(
-                        color: AppDesign.cardShadow.opacity(isCollapsed ? 0.72 : 0.9),
-                        radius: isCollapsed ? 11 : 18,
-                        y: isCollapsed ? 6 : 9
-                    )
+                tabBarSurface(shape: glassShape)
 
                 tabBarButtons(showsCompactTabs: showsCompactTabs)
                     .opacity(isCollapsed ? 0 : 1)
@@ -233,11 +215,35 @@ struct RoamRootView: View {
             }
             .frame(width: barWidth, height: barHeight)
             .clipShape(glassShape)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
+            .elevation(isCollapsed ? AppDesign.Elevation.medium : AppDesign.Elevation.high)
+            // The collapsed puck settles into the thumb's natural corner
+            // rather than the far side of the screen.
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
             .animation(
                 reduceMotion ? .easeOut(duration: 0.16) : AppAnimation.liquidMorph,
                 value: isCollapsed
             )
+        }
+    }
+
+    /// The bar's material. iOS 26 renders genuine Liquid Glass, which already
+    /// carries its own lensing and lit edge, so the hand-drawn highlight is
+    /// applied only on the older material path that has to fake it.
+    @ViewBuilder
+    private func tabBarSurface(shape: RoundedRectangle) -> some View {
+        if reduceTransparency {
+            shape
+                .fill(AppDesign.cardSurfaceElevated)
+                .overlay { shape.stroke(AppDesign.cardStrokeStrong, lineWidth: 1) }
+        } else if #available(iOS 26.0, *) {
+            shape
+                .fill(.clear)
+                .glassEffect(.regular, in: shape)
+        } else {
+            shape
+                .fill(.ultraThinMaterial)
+                .overlay { shape.stroke(AppDesign.glassHighlight, lineWidth: 1) }
+                .overlay { shape.stroke(AppDesign.cardStrokeStrong.opacity(0.72), lineWidth: 0.8) }
         }
     }
 
@@ -316,10 +322,7 @@ struct RoamRootView: View {
         return shape
             .fill(AppDesign.accent.opacity(0.14))
             .overlay {
-                shape.stroke(
-                    .white.opacity(themeManager.palette.appearance == .light ? 0.38 : 0.14),
-                    lineWidth: 0.8
-                )
+                shape.stroke(AppDesign.glassHighlight.opacity(0.72), lineWidth: 0.8)
             }
     }
 }

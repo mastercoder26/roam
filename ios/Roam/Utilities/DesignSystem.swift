@@ -22,6 +22,10 @@ enum AppDesign {
     static var cardStroke: Color { palette.cardStroke.color }
     static var cardStrokeStrong: Color { palette.cardStrokeStrong.color }
     static var cardShadow: Color { palette.cardShadow.color }
+    /// Fill for present-but-unavailable controls. Theme-aware, unlike the
+    /// `Color(.systemGray3)` it replaces.
+    static var disabledSurface: Color { palette.disabledSurface.color }
+    static var glassHighlight: Color { palette.glassHighlight.color }
     /// Adaptive black/white foreground for controls filled with primary ink.
     static var primarySurfaceForeground: Color { palette.primarySurfaceForeground.color }
 
@@ -34,6 +38,20 @@ enum AppDesign {
     static let cornerRadius: CGFloat = 16
     static let cornerRadiusSmall: CGFloat = 12
     static let cornerRadiusLarge: CGFloat = 20
+    /// Icon tiles and other sub-32pt chips, which read as over-rounded on the
+    /// 12pt step. A real rung on the ladder, not an ad-hoc literal.
+    static let cornerRadiusTiny: CGFloat = 10
+
+    /// Elevation tiers. Every shadow derives from the theme's own shadow color,
+    /// so a dark scheme is never given a light scheme's near-invisible shadow.
+    enum Elevation {
+        /// Inline chips and rows sitting directly on a card.
+        static let low = (radius: CGFloat(12), y: CGFloat(6), opacity: 0.7)
+        /// Primary cards lifted off the canvas.
+        static let medium = (radius: CGFloat(14), y: CGFloat(8), opacity: 1.0)
+        /// Floating chrome — the tab bar and map panels.
+        static let high = (radius: CGFloat(18), y: CGFloat(9), opacity: 1.0)
+    }
     static let cardPadding: CGFloat = 16
     static let sectionSpacing: CGFloat = 20
     static let contentPadding: CGFloat = 16
@@ -80,13 +98,24 @@ struct PremiumCardModifier: ViewModifier {
                 RoundedRectangle(cornerRadius: AppDesign.cornerRadius, style: .continuous)
                     .stroke(AppDesign.cardStroke, lineWidth: 1)
             }
-            .shadow(color: AppDesign.cardShadow, radius: 12, y: 6)
+            .elevation(AppDesign.Elevation.medium)
     }
 }
 
 extension View {
     func premiumCard() -> some View {
         modifier(PremiumCardModifier())
+    }
+
+    /// Applies a themed elevation tier. Use instead of a literal
+    /// `.shadow(color: .black.opacity(…))`, which cannot adapt to the
+    /// active theme and disappears entirely on dark schemes.
+    func elevation(_ tier: (radius: CGFloat, y: CGFloat, opacity: Double)) -> some View {
+        shadow(
+            color: AppDesign.cardShadow.opacity(tier.opacity),
+            radius: tier.radius,
+            y: tier.y
+        )
     }
 }
 
@@ -185,7 +214,7 @@ struct PrimaryActionButton: View {
             .foregroundStyle(isEnabled ? AppDesign.accentForeground : AppDesign.Ink.tertiary)
             .background(
                 RoundedRectangle(cornerRadius: AppDesign.cornerRadius, style: .continuous)
-                    .fill(isEnabled ? AppDesign.accent : Color(.systemGray3))
+                    .fill(isEnabled ? AppDesign.accent : AppDesign.disabledSurface)
             )
         }
         .buttonStyle(PressableScaleStyle())
@@ -203,7 +232,7 @@ struct IconTile: View {
             .font(.subheadline.weight(.semibold))
             .foregroundStyle(color)
             .frame(width: 34, height: 34)
-            .background(color.opacity(0.14), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .background(color.opacity(0.14), in: RoundedRectangle(cornerRadius: AppDesign.cornerRadiusTiny, style: .continuous))
     }
 }
 
