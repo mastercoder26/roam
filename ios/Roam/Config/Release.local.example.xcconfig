@@ -1,12 +1,5 @@
-// Copy this file to Release.local.xcconfig (it is gitignored) and fill in
-// the values below. Never put real values in this tracked template.
-//
-// The app always tries, in order: this deployed backend URL, then
-// localhost:3000, then the Mac LAN address below. Leave a line blank (or
-// delete it) to skip that tier.
+
 API_BASE_URL = https:/$()/YOUR_CLOUD_RUN_URL.a.run.app
 
-// Optional. Replace YOUR_MAC_LAN_IP with your Mac's current Wi-Fi IP address
-// (System Settings → Wi-Fi → Details) so a physical iPhone can reach a
-// backend running locally on your Mac.
+
 API_FALLBACK_BASE_URL = http:/$()/YOUR_MAC_LAN_IP:3000
