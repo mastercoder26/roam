@@ -1,4 +1,5 @@
 .derivedData/
+build/
 *.xcuserstate
 xcuserdata/
 Roam/Config/Debug.local.xcconfig
