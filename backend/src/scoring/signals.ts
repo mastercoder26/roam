@@ -1,5 +1,5 @@
 import type { RouteStep } from "../types.js";
-import { smoothstep } from "./helpers.js";
+import { METERS_PER_MILE, smoothstep } from "./helpers.js";
 
 // --- Highway ---
 
@@ -130,7 +130,7 @@ export function computeManeuverComplexity(
     weightedCount += maneuverWeight(maneuver);
   }
 
-  const distanceMiles = distanceMeters / 1609.34;
+  const distanceMiles = distanceMeters / METERS_PER_MILE;
   // Floor distance so tiny hops don't look like dense urban grids
   const rateMiles = Math.max(distanceMiles, 10);
   const maneuversPer10Mi =
@@ -243,7 +243,7 @@ export function computeMergeBurden(
   const mergeClusterCount = countMergeClusters(events);
   const exponentialSpacing = mergeExponentialSpacingSum(events, MERGE_TAU_METERS);
 
-  const distanceMiles = distanceMeters / 1609.34;
+  const distanceMiles = distanceMeters / METERS_PER_MILE;
   const rampDensity = distanceMiles > 0 ? (mergeCount + rampCount) / distanceMiles : 0;
   const interchangeDensity = rampDensity;
   const weaveScore = smoothstep(weaveCount / 4);
@@ -410,7 +410,7 @@ function computePeakDecisionsPerMile(steps: RouteStep[]): number {
       if (events[j].distanceMeters <= windowEnd) decisions++;
       else break;
     }
-    const miles = windowMeters / 1609.34;
+    const miles = windowMeters / METERS_PER_MILE;
     maxDensity = Math.max(maxDensity, decisions / miles);
   }
 
@@ -429,7 +429,7 @@ export function computeTurnClustering(
   const peakDecisionsPerMile = computePeakDecisionsPerMile(steps);
   const sharpTurnCount = events.filter((e) => e.isSharp).length;
 
-  const distanceMiles = distanceMeters / 1609.34;
+  const distanceMiles = distanceMeters / METERS_PER_MILE;
   const turnDensity = distanceMiles > 0 ? turnCount / distanceMiles : 0;
 
   const turnSpacingPressure = smoothstep(

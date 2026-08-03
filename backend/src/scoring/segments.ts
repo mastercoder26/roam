@@ -1,4 +1,5 @@
 import type { ParsedRoute, RouteStep } from "../types.js";
+import { METERS_PER_MILE } from "./helpers.js";
 import { isHighwayStep } from "./signals.js";
 
 export interface RouteSegment {
@@ -58,7 +59,7 @@ function finalizeSegment(
   index: number
 ): RouteSegment {
   const hours = partial.durationSeconds / 3600;
-  const miles = partial.distanceMeters / 1609.34;
+  const miles = partial.distanceMeters / METERS_PER_MILE;
   const impliedSpeedMph =
     hours > 0 ? miles / hours : partial.isHighway ? 65 : 25;
 
@@ -184,7 +185,7 @@ export function segmentRoute(
 }
 
 export function scoreSegmentLocal(segment: RouteSegment): number {
-  const miles = segment.distanceMeters / 1609.34;
+  const miles = segment.distanceMeters / METERS_PER_MILE;
   const maneuverDensity =
     miles > 0 ? segment.maneuvers.length / miles : segment.maneuvers.length;
 

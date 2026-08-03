@@ -7,6 +7,7 @@ import type {
   RouteStep,
 } from "../types.js";
 import type { RouteConditions } from "../enrichment/types.js";
+import { METERS_PER_MILE } from "./helpers.js";
 import { impliedStepSpeedMph } from "./signals.js";
 import {
   buildPolylineGeometry,
@@ -14,8 +15,12 @@ import {
   type PolylineGeometry,
 } from "../utils/polyline.js";
 import {
+  estimateSolarWindow,
+  isNightLocalMinute,
   resolveDepartureLocalMinutes,
+  secondsUntilSolarBoundary,
   type RouteFeatures,
+  type SolarWindow,
 } from "./features.js";
 
 interface DemandDetails {
@@ -333,26 +338,21 @@ function longestContiguousMeters(
   return longest;
 }
 
-function isNightLocalMinute(localMinutes: number): boolean {
-  const hour = Math.floor(localMinutes / 60) % 24;
-  return hour >= 20 || hour < 6;
-}
-
-function secondsUntilNightBoundary(localMinutes: number): number {
-  const normalized = ((localMinutes % (24 * 60)) + 24 * 60) % (24 * 60);
-  if (normalized < 6 * 60) return (6 * 60 - normalized) * 60;
-  if (normalized < 20 * 60) return (20 * 60 - normalized) * 60;
-  return (24 * 60 - normalized) * 60;
-}
-
 /**
- * Translate the locally scheduled 8 PM–6 AM window into validated overview
+ * Translate the locally scheduled after-dark window into validated overview
  * polyline fractions. Within a provider step we assume uniform progress; no
  * geometry or unsupported road attribution is invented.
+ *
+ * The window must be the *same* `SolarWindow` that produced
+ * `features.nighttimeShare`. This used to be a hard-coded 8 PM–6 AM clock
+ * check while the intensity beside it came from estimated sunrise/sunset, so
+ * a summer evening drive could report 0% after-dark next to highlighted
+ * after-dark geometry on the map.
  */
 function afterDarkCoverageRanges(
   spans: RouteStepSpan[],
-  departureLocalMinutes: number
+  departureLocalMinutes: number,
+  solar: SolarWindow
 ): RouteDemandCoverageRange[] | undefined {
   if (!hasVerifiedCoverage(spans)) return undefined;
   const ranges: RouteDemandCoverageRange[] = [];
@@ -368,12 +368,11 @@ function afterDarkCoverageRanges(
       const localMinutes =
         departureLocalMinutes + (span.startSeconds + elapsedInSpan) / 60;
       const remaining = span.durationSeconds - elapsedInSpan;
-      const untilBoundary = Math.max(
-        0.001,
-        secondsUntilNightBoundary(localMinutes)
+      const intervalSeconds = Math.min(
+        remaining,
+        secondsUntilSolarBoundary(localMinutes, solar)
       );
-      const intervalSeconds = Math.min(remaining, untilBoundary);
-      if (isNightLocalMinute(localMinutes)) {
+      if (isNightLocalMinute(localMinutes, solar)) {
         const distanceFraction = coverage.endFraction - coverage.startFraction;
         ranges.push({
           startFraction:
@@ -442,12 +441,19 @@ function afterDarkDemand(
     );
   }
 
+  // Same window the scored `nighttimeShare` was measured against, so the
+  // number, the metrics, and the highlighted geometry cannot disagree.
+  const solar = estimateSolarWindow(
+    route.bounds,
+    departureTime,
+    localMinutes
+  );
   const intensity = features.nighttimeShare;
   const expectedDurationSeconds =
     route.durationSeconds > 0
       ? route.durationSeconds
       : route.staticDurationSeconds;
-  const coverageRanges = afterDarkCoverageRanges(spans, localMinutes);
+  const coverageRanges = afterDarkCoverageRanges(spans, localMinutes, solar);
   const metrics: RouteDemandMetrics = {
     departureLocalMinutes: localMinutes,
     nighttimeShare: intensity,
@@ -455,6 +461,8 @@ function afterDarkDemand(
     nightMiles: features.distanceMiles * intensity,
     expectedDurationSeconds,
     nighttimeCoverageFraction: intensity,
+    sunriseLocalMinutes: solar.sunriseLocalMinutes,
+    sunsetLocalMinutes: solar.sunsetLocalMinutes,
     ...(coverageRanges && coverage
       ? {
           overviewGeometryMeters: coverage.overview.totalMeters,
@@ -462,27 +470,50 @@ function afterDarkDemand(
         }
       : {}),
   };
-  const startHour = Math.floor(localMinutes / 60);
+
+  const window = describeDarkWindow(solar);
   if (intensity <= 0.01) {
     return demand(
       "afterDark",
       "After-dark driving",
       intensity,
-      `The ${startHour === 0 ? "midnight" : "scheduled"} departure keeps this drive outside the 8 PM–6 AM window.`,
+      `The scheduled departure keeps this drive outside ${window}.`,
       true,
       { metrics, coverageRanges }
     );
   }
 
-  const period = intensity >= 0.99 ? "The full drive" : `About ${percent(intensity)} of the drive`;
+  const period =
+    intensity >= 0.99
+      ? "The full drive"
+      : `About ${percent(intensity)} of the drive`;
   return demand(
     "afterDark",
     "After-dark driving",
     intensity,
-    `${period} falls in the 8 PM–6 AM window.`,
+    `${period} falls ${window}.`,
     true,
     { metrics, coverageRanges }
   );
+}
+
+function formatLocalClock(localMinutes: number): string {
+  const totalMinutes = Math.round(localMinutes) % (24 * 60);
+  const hour24 = Math.floor(totalMinutes / 60);
+  const minute = totalMinutes % 60;
+  const hour12 = hour24 % 12 === 0 ? 12 : hour24 % 12;
+  return `${hour12}:${String(minute).padStart(2, "0")} ${hour24 < 12 ? "AM" : "PM"}`;
+}
+
+/**
+ * Name the window honestly. When solar position could not be estimated the
+ * demand must not imply a computed sunset it never had.
+ */
+function describeDarkWindow(solar: SolarWindow): string {
+  if (solar.usesClockFallback) {
+    return "in the 8 PM–6 AM window used when sunset cannot be estimated";
+  }
+  return `after dark (about ${formatLocalClock(solar.sunsetLocalMinutes)} to ${formatLocalClock(solar.sunriseLocalMinutes)} locally)`;
 }
 
 function fastRoadsDemand(
@@ -520,10 +551,10 @@ function fastRoadsDemand(
     .filter((span) => span.speedMph >= 65)
     .reduce((sum, span) => sum + span.step.distanceMeters, 0);
   const metrics: RouteDemandMetrics = {
-    estimatedMilesAt45: estimated45PlusDistanceMeters / 1_609.344,
-    estimatedMilesAt55: estimated55PlusDistanceMeters / 1_609.344,
-    estimatedMilesAt60: estimated60PlusDistanceMeters / 1_609.344,
-    estimatedMilesAt65: estimated65PlusDistanceMeters / 1_609.344,
+    estimatedMilesAt45: estimated45PlusDistanceMeters / METERS_PER_MILE,
+    estimatedMilesAt55: estimated55PlusDistanceMeters / METERS_PER_MILE,
+    estimatedMilesAt60: estimated60PlusDistanceMeters / METERS_PER_MILE,
+    estimatedMilesAt65: estimated65PlusDistanceMeters / METERS_PER_MILE,
     estimated45PlusDistanceMeters,
     estimated55PlusDistanceMeters,
     estimated60PlusDistanceMeters,

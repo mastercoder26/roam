@@ -1,17 +1,46 @@
 import type { RouteFeatures } from "./features.js";
 import type { ScoreEvidence, ScoreUncertainty } from "../types.js";
 
+/**
+ * Coerce a possibly-dirty number to a usable one.
+ *
+ * Every scoring input ultimately comes from a third-party routing or weather
+ * payload. A single `NaN` or `Infinity` slipping into an arithmetic chain
+ * silently poisons the final score — `Math.max(0, Math.min(10, NaN))` is `NaN`,
+ * not a clamped value — so non-finite inputs are neutralized at the boundary
+ * rather than allowed to surface as a `NaN` difficulty on the client.
+ */
+export function finiteOr(value: number, fallback = 0): number {
+  return Number.isFinite(value) ? value : fallback;
+}
+
+/**
+ * Exact statute mile. The scoring modules previously carried three separate
+ * copies of this (1609.34 twice, 1_609.344 once), so distance-derived metrics
+ * disagreed in the fifth significant figure depending on which file produced
+ * them. One definition keeps miles comparable across features and demands.
+ */
+export const METERS_PER_MILE = 1_609.344;
+
 /** Hermite smoothstep: x² × (3 - 2x), clamped to [0, 1]. */
 export function smoothstep(x: number): number {
-  const t = Math.max(0, Math.min(1, x));
+  const t = Math.max(0, Math.min(1, finiteOr(x)));
   return t * t * (3 - 2 * t);
 }
 
+/** Clamp an arbitrary number onto the product's 0–10 difficulty scale. */
+export function clampScore(score: number): number {
+  return Math.max(0, Math.min(10, finiteOr(score)));
+}
+
 export function scoreToLabel(score: number): string {
-  if (score < 2) return "Very Easy";
-  if (score < 4) return "Easy";
-  if (score < 6) return "Moderate";
-  if (score < 8) return "Hard";
+  // A non-finite score must not fall through to "Very Hard": every `<`
+  // comparison against NaN is false, so guard before the ladder.
+  const value = clampScore(score);
+  if (value < 2) return "Very Easy";
+  if (value < 4) return "Easy";
+  if (value < 6) return "Moderate";
+  if (value < 8) return "Hard";
   return "Very Hard";
 }
 
@@ -22,25 +51,74 @@ export function computeSustainedEffortFromHours(durationHours: number): {
   durationHours: number;
   subscore: number;
 } {
-  const effectiveHours = Math.max(0, durationHours - GRACE_HOURS);
+  const hours = Math.max(0, finiteOr(durationHours));
+  const effectiveHours = Math.max(0, hours - GRACE_HOURS);
   return {
-    durationHours,
+    durationHours: hours,
     subscore: smoothstep(effectiveHours / MAX_EFFORT_HOURS),
   };
 }
+
+/**
+ * Width of the displayed band, in score points.
+ *
+ * These are deliberately coarse: the band communicates *how thin the inputs
+ * are*, not a validated prediction interval (see `assessScoreEvidence`). Each
+ * widening marks a route shape whose heuristic inputs are known to be less
+ * stable, not a measured error rate.
+ */
+const UNCERTAINTY_SPREAD = {
+  /** Baseline width applied to every route. */
+  base: 0.35,
+  /** Clustered interchanges make segment aggregation more sensitive to sampling. */
+  mergeClusters: 0.15,
+  /** Long trips accumulate more unmodelled condition drift. */
+  longDrive: 0.1,
+  /** A handful of steps gives the segment model very little to average over. */
+  sparseSteps: 0.2,
+  /** Tightly spaced merges amplify small geometry differences. */
+  tightMergeSpacing: 0.1,
+  /** Ceiling on the residual-driven term so one outlier cannot dominate. */
+  maxResidual: 0.5,
+} as const;
+
+const UNCERTAINTY_THRESHOLDS = {
+  mergeClusterCount: 2,
+  durationHours: 3,
+  stepCount: 5,
+  exponentialSpacing: 2,
+} as const;
+
+/** Confidence is a monotone restatement of spread, floored/capped for display. */
+const CONFIDENCE_BOUNDS = { min: 0.35, max: 0.95 } as const;
 
 export function estimateUncertainty(
   features: RouteFeatures,
   evidence: ScoreEvidence,
   residualMagnitude = 0
 ): ScoreUncertainty {
-  let spread = 0.35;
-  if (features.mergeClusterCount >= 2) spread += 0.15;
-  if (features.durationHours >= 3) spread += 0.1;
-  if (features.stepCount < 5) spread += 0.2;
-  if (features.exponentialSpacing > 2) spread += 0.1;
-  spread += Math.min(0.5, residualMagnitude * 0.2);
-  const confidence = Math.max(0.35, Math.min(0.95, 1 - spread / 2));
+  let spread = UNCERTAINTY_SPREAD.base;
+  if (features.mergeClusterCount >= UNCERTAINTY_THRESHOLDS.mergeClusterCount) {
+    spread += UNCERTAINTY_SPREAD.mergeClusters;
+  }
+  if (features.durationHours >= UNCERTAINTY_THRESHOLDS.durationHours) {
+    spread += UNCERTAINTY_SPREAD.longDrive;
+  }
+  if (features.stepCount < UNCERTAINTY_THRESHOLDS.stepCount) {
+    spread += UNCERTAINTY_SPREAD.sparseSteps;
+  }
+  if (features.exponentialSpacing > UNCERTAINTY_THRESHOLDS.exponentialSpacing) {
+    spread += UNCERTAINTY_SPREAD.tightMergeSpacing;
+  }
+  spread += Math.min(
+    UNCERTAINTY_SPREAD.maxResidual,
+    Math.max(0, finiteOr(residualMagnitude) * 0.2)
+  );
+
+  const confidence = Math.max(
+    CONFIDENCE_BOUNDS.min,
+    Math.min(CONFIDENCE_BOUNDS.max, 1 - spread / 2)
+  );
   return { low: 0, high: 0, confidence, spread, evidence };
 }
 
@@ -48,11 +126,14 @@ export function applyUncertaintyBand(
   score: number,
   uncertainty: ScoreUncertainty
 ): ScoreUncertainty {
-  const half = uncertainty.spread / 2;
+  const centre = clampScore(score);
+  const half = Math.max(0, finiteOr(uncertainty.spread)) / 2;
+  // Clamping each edge to the 0–10 scale can pull an edge past the score
+  // itself only if the score were out of range, which `clampScore` prevents.
   return {
     ...uncertainty,
-    low: Math.max(0, Math.round((score - half) * 10) / 10),
-    high: Math.min(10, Math.round((score + half) * 10) / 10),
+    low: Math.max(0, Math.round((centre - half) * 10) / 10),
+    high: Math.min(10, Math.round((centre + half) * 10) / 10),
   };
 }
 
@@ -76,19 +157,25 @@ const CALIBRATION_KNOTS = [
  * reserving 8–10 for routes with several severe, corroborated burdens.
  */
 export function calibrateScore(score: number): number {
-  const x = Math.max(0, Math.min(10, score));
   const knots = CALIBRATION_KNOTS;
-  if (x <= knots[0].x) return knots[0].y;
-  if (x >= knots[knots.length - 1].x) return knots[knots.length - 1].y;
+  const first = knots[0];
+  const last = knots[knots.length - 1];
+  // `clampScore` also neutralizes a non-finite workload; without it the loop
+  // below would match no interval and leak NaN straight to the client.
+  const x = clampScore(score);
+  if (x <= first.x) return first.y;
+  if (x >= last.x) return last.y;
+
   for (let i = 0; i < knots.length - 1; i++) {
     const a = knots[i];
     const b = knots[i + 1];
-    if (x >= a.x && x <= b.x) {
-      const t = b.x === a.x ? 0 : (x - a.x) / (b.x - a.x);
-      return a.y + t * (b.y - a.y);
-    }
+    if (x > b.x) continue;
+    const t = (x - a.x) / (b.x - a.x);
+    return a.y + t * (b.y - a.y);
   }
-  return x;
+
+  // Unreachable: the clamp above guarantees x lies inside the knot span.
+  return last.y;
 }
 
 export function getCalibrator(): {
