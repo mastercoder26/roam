@@ -67,7 +67,11 @@ final class DriverProfileStore: ObservableObject {
 
     @Published var displayName: String {
         didSet {
-            let sanitized = Self.sanitizeName(displayName)
+            // Only the keystroke-safe rules run here. Collapsing whitespace
+            // on every mutation would delete the space the moment it is
+            // typed, since the bound TextField writes back the sanitized
+            // value, making a two word name impossible to enter.
+            let sanitized = Self.sanitizeWhileEditing(displayName)
             guard sanitized == displayName else {
                 // Re-entrant assignment: this fires didSet again with the
                 // sanitized value, which then falls through to persist().
@@ -76,6 +80,15 @@ final class DriverProfileStore: ObservableObject {
             }
             persist()
         }
+    }
+
+    /// Applies the rules that are only safe once the driver has finished
+    /// typing: collapsing interior whitespace runs and trimming the ends.
+    /// The UI calls this when editing is committed.
+    func commitDisplayNameEdit() {
+        let finalized = Self.sanitizeName(displayName)
+        guard finalized != displayName else { return }
+        displayName = finalized
     }
 
     @Published var stage: DriverProfile.Stage {
@@ -142,23 +155,39 @@ final class DriverProfileStore: ObservableObject {
     /// and deliberately permissive of apostrophes and hyphens since those
     /// are legitimate parts of real names.
     private static func sanitizeName(_ raw: String) -> String {
+        // The length cap is applied before the collapse so the function is a
+        // true fixed point. Capping afterwards could reintroduce a trailing
+        // space by truncating mid-gap, leaving a value that is not equal to
+        // its own sanitization and forcing another didSet pass.
+        let collapsed = sanitizeWhileEditing(raw)
+            .split(separator: " ", omittingEmptySubsequences: true)
+            .joined(separator: " ")
+
+        return collapsed
+    }
+
+    /// The subset of sanitization that is safe to apply on every keystroke.
+    /// It strips characters that must never be stored, and caps the length,
+    /// but leaves spacing alone so the driver can actually type a space
+    /// between a first and last name.
+    private static func sanitizeWhileEditing(_ raw: String) -> String {
         var normalized: [Unicode.Scalar] = []
         normalized.reserveCapacity(raw.unicodeScalars.count)
 
         for scalar in raw.unicodeScalars {
             if CharacterSet.newlines.contains(scalar) || scalar == "\t" {
                 normalized.append(" ")
-            } else if CharacterSet.controlCharacters.contains(scalar) {
+            } else if scalar.properties.generalCategory == .control {
+                // Deliberately Cc only. Foundation's controlCharacters set is
+                // Cc plus Cf, and Cf includes the zero width joiner and non
+                // joiner that Persian and Devanagari names depend on, so
+                // using it here silently rewrote real names into other words.
                 continue
             } else {
                 normalized.append(scalar)
             }
         }
 
-        let collapsed = String(String.UnicodeScalarView(normalized))
-            .split(separator: " ", omittingEmptySubsequences: true)
-            .joined(separator: " ")
-
-        return String(collapsed.prefix(maxNameLength))
+        return String(String(String.UnicodeScalarView(normalized)).prefix(maxNameLength))
     }
 }

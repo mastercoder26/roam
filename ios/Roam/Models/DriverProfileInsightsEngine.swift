@@ -80,9 +80,11 @@ enum DriverProfileInsightsEngine {
         // means there is no distinct "previous" week yet.
         let previousWeekMiles = weeks.count >= 2 ? weeks[weeks.count - 2].measuredMiles : 0
 
-        let lastDriveDate = drives
-            .filter { $0.startedAt <= referenceDate }
-            .map(\.startedAt)
+        // Drawn from qualifying drives only. Sourcing this from every saved
+        // drive let a twenty second junk recording report "last drive: today"
+        // beside a screen stating there is no measured evidence yet.
+        let lastDriveDate = qualifyingDrives
+            .map(\.drive.startedAt)
             .max()
 
         let smoothDriveStreak = smoothStreak(among: qualifyingDrives)
@@ -129,7 +131,12 @@ enum DriverProfileInsightsEngine {
     /// coaching events, stopping at the first drive that logged one. An
     /// empty history has no streak to report.
     private static func smoothStreak(among qualifyingDrives: [HistoryDrive]) -> Int {
-        let chronological = qualifyingDrives.sorted { $0.drive.startedAt > $1.drive.startedAt }
+        // Swift's sort is not stable, and a drive recovered after termination
+        // can share a start instant with its original. Breaking the tie on id
+        // keeps the streak from flipping between runs over identical data.
+        let chronological = qualifyingDrives.sorted {
+            ($0.drive.startedAt, $0.drive.id.uuidString) > ($1.drive.startedAt, $1.drive.id.uuidString)
+        }
         var streak = 0
         for history in chronological {
             guard history.drive.score.events.isEmpty else { break }

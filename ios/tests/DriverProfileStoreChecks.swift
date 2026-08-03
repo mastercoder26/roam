@@ -113,8 +113,25 @@ struct DriverProfileStoreChecks {
         store.displayName = "O'Brien-Smith"
         expect(store.displayName == "O'Brien-Smith", "apostrophes and hyphens are legitimate name characters and must survive sanitization")
 
+        // Whitespace is deliberately left alone while typing, otherwise the
+        // space between a first and last name is deleted the instant it is
+        // typed and a two word name cannot be entered at all. Collapsing is
+        // applied when the edit is committed.
         store.displayName = "José  María"
-        expect(store.displayName == "José María", "diacritics must survive sanitization and runaway whitespace should collapse")
+        expect(store.displayName == "José  María", "spacing must survive while the driver is still typing")
+        store.commitDisplayNameEdit()
+        expect(store.displayName == "José María", "diacritics must survive and runaway whitespace collapses on commit")
+
+        store.displayName = "Jane "
+        expect(store.displayName == "Jane ", "a trailing space must survive so the next word can be typed")
+        store.commitDisplayNameEdit()
+        expect(store.displayName == "Jane", "a trailing space is trimmed once the edit is committed")
+
+        // Zero width joiners carry meaning in Persian and Devanagari names,
+        // so they must not be treated as strippable control characters.
+        let zwnjName = "\u{0645}\u{06CC}\u{200C}\u{0631}"
+        store.displayName = zwnjName
+        expect(store.displayName == zwnjName, "zero width non joiners must survive sanitization")
     }
 
     // MARK: - Stage backward compatibility

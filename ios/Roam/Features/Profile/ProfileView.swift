@@ -106,7 +106,10 @@ struct ProfileView: View {
                             .foregroundStyle(AppDesign.Ink.primary)
                             .textInputAutocapitalization(.words)
                             .submitLabel(.done)
-                            .onSubmit { isEditingIdentity = false }
+                            .onSubmit {
+                                profile.commitDisplayNameEdit()
+                                isEditingIdentity = false
+                            }
                     } else {
                         Text(profile.resolvedDisplayName)
                             .font(.title3.weight(.semibold))
@@ -121,6 +124,9 @@ struct ProfileView: View {
                 Spacer(minLength: 8)
 
                 Button {
+                    if isEditingIdentity {
+                        profile.commitDisplayNameEdit()
+                    }
                     withAnimation(AppAnimation.quick) { isEditingIdentity.toggle() }
                 } label: {
                     Image(systemName: isEditingIdentity ? "checkmark" : "pencil")
