@@ -4,6 +4,8 @@ import type { Bounds, LatLng, ParsedRoute, RouteEndpoint, RouteStep } from "../t
 import { buildPolylineGeometry, parseDurationSeconds } from "../utils/polyline.js";
 
 const ROUTES_URL = "https://routes.googleapis.com/directions/v2:computeRoutes";
+/** Bounds the primary route call so a slow or hung upstream fails fast instead of stalling the request. */
+const FETCH_TIMEOUT_MS = 10_000;
 
 const FIELD_MASK = [
   "routes.duration",
@@ -142,6 +144,9 @@ export async function computeRoutes(
     body.departureTime = params.departureTime;
   }
 
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+
   let response: Response;
   try {
     response = await fetch(ROUTES_URL, {
@@ -152,10 +157,15 @@ export async function computeRoutes(
         "X-Goog-FieldMask": FIELD_MASK,
       },
       body: JSON.stringify(body),
+      signal: controller.signal,
     });
   } catch {
+    // Covers network failures and the abort fired by the timeout above.
+    clearTimeout(timer);
     throw new RouteProviderError();
   }
+
+  clearTimeout(timer);
 
   if (!response.ok) {
     throw new RouteProviderError(response.status);

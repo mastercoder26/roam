@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-export type PublicErrorCode = "INVALID_REQUEST" | "ROUTE_UNAVAILABLE";
+export type PublicErrorCode = "INVALID_REQUEST" | "ROUTE_UNAVAILABLE" | "RATE_LIMITED";
 
 export class RequestValidationError extends Error {
   constructor(message: string) {
@@ -38,6 +38,17 @@ export function logRouteFailure(
       provider: providerError.provider,
       providerStatus: providerError.providerStatus ?? null,
     } : {}),
+  }));
+}
+
+export function logRateLimited(
+  requestId: string,
+  context: { endpoint: string }
+): void {
+  console.error(JSON.stringify({
+    event: "rate_limited",
+    requestId,
+    endpoint: context.endpoint,
   }));
 }
 

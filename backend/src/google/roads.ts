@@ -1,3 +1,4 @@
+import { z } from "zod";
 import type { ParsedRoute, SpeedLimitPoint } from "../types.js";
 import { samplePolylinePoints } from "../utils/polyline.js";
 import { impliedStepSpeedMph, speedLimitToMph } from "../scoring/signals.js";
@@ -8,28 +9,39 @@ const SPEED_LIMITS_URL = "https://roads.googleapis.com/v1/speedLimits";
 const CHUNK_SIZE = 100;
 const CHUNK_OVERLAP = 10;
 const TARGET_SAMPLE_COUNT = 80;
+/** Bounds a single Roads API call so a slow upstream cannot hang the request. */
+const FETCH_TIMEOUT_MS = 8000;
 
-interface SnappedPoint {
-  placeId: string;
-  location: { latitude: number; longitude: number };
-  originalIndex?: number;
-}
+// Never trust the shape of an upstream response. A malformed `speedLimit`
+// (for example a string instead of a number) must not silently poison
+// scoring with NaN arithmetic — it is safer to drop the batch and degrade to
+// implied speeds than to accept unvalidated data.
+const errorEnvelope = z.object({
+  message: z.string().optional(),
+  code: z.number().optional(),
+}).partial().optional();
 
-interface SnapResponse {
-  snappedPoints?: SnappedPoint[];
-  error?: { message?: string; code?: number };
-}
+const snapResponseSchema = z.object({
+  snappedPoints: z.array(z.object({
+    placeId: z.string(),
+    originalIndex: z.number().int().nonnegative().optional(),
+  }).passthrough()).optional(),
+  error: errorEnvelope,
+}).passthrough();
 
-interface SpeedLimitEntry {
-  placeId: string;
-  speedLimit?: number;
-  units?: string;
-}
+const speedLimitsResponseSchema = z.object({
+  speedLimits: z.array(z.object({
+    placeId: z.string(),
+    speedLimit: z.number().finite().positive().optional(),
+    units: z.string().optional(),
+  }).passthrough()).optional(),
+  error: errorEnvelope,
+}).passthrough();
 
-interface SpeedLimitsResponse {
-  speedLimits?: SpeedLimitEntry[];
-  error?: { message?: string; code?: number };
-}
+type SnappedPoint = z.infer<typeof snapResponseSchema>["snappedPoints"] extends
+  (infer T)[] | undefined ? T : never;
+type SpeedLimitEntry = z.infer<typeof speedLimitsResponseSchema>["speedLimits"] extends
+  (infer T)[] | undefined ? T : never;
 
 interface PointChunk<T> {
   points: T[];
@@ -52,6 +64,55 @@ function chunkPoints<T>(points: T[], size: number, overlap: number): PointChunk<
   return chunks;
 }
 
+/**
+ * Runs one Roads API call under a bounded timeout, validating the response
+ * shape before any field is trusted. Every failure mode — network error,
+ * timeout, non-2xx status, unparsable body, or a payload that doesn't match
+ * the expected schema — normalizes to `RoadsAccessError` so callers have a
+ * single, gracefully-degradable failure path instead of a raw exception.
+ */
+async function fetchRoadsApi<T extends z.ZodTypeAny>(
+  url: string,
+  schema: T,
+  label: string
+): Promise<z.infer<T>> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+
+  try {
+    const response = await fetch(url, { signal: controller.signal });
+
+    let raw: unknown;
+    try {
+      raw = await response.json();
+    } catch {
+      throw new RoadsAccessError(`${label} returned a non-JSON response`);
+    }
+
+    const parsed = schema.safeParse(raw);
+
+    if (!response.ok) {
+      const message = parsed.success
+        ? (parsed.data as { error?: { message?: string } }).error?.message
+        : undefined;
+      throw new RoadsAccessError(message ?? `${label} error: ${response.status}`);
+    }
+
+    if (!parsed.success) {
+      throw new RoadsAccessError(`${label} returned an unexpected payload`);
+    }
+
+    return parsed.data;
+  } catch (error) {
+    if (error instanceof RoadsAccessError) throw error;
+    // Never surface the raw error (it may echo request details); a fetch
+    // failure or abort is enough information for the graceful-degradation path.
+    throw new RoadsAccessError(`${label} request failed`);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function snapToRoads(
   points: { lat: number; lng: number }[],
   apiKey: string
@@ -59,15 +120,7 @@ async function snapToRoads(
   const path = points.map((p) => `${p.lat},${p.lng}`).join("|");
   const url = `${SNAP_URL}?interpolate=true&path=${encodeURIComponent(path)}&key=${apiKey}`;
 
-  const response = await fetch(url);
-  const data = (await response.json()) as SnapResponse;
-
-  if (!response.ok) {
-    throw new RoadsAccessError(
-      data.error?.message ?? `snapToRoads error: ${response.status}`
-    );
-  }
-
+  const data = await fetchRoadsApi(url, snapResponseSchema, "snapToRoads");
   return data.snappedPoints ?? [];
 }
 
@@ -82,15 +135,7 @@ async function fetchSpeedLimits(
     const params = batch.map((id) => `placeId=${encodeURIComponent(id)}`).join("&");
     const url = `${SPEED_LIMITS_URL}?${params}&key=${apiKey}`;
 
-    const response = await fetch(url);
-    const data = (await response.json()) as SpeedLimitsResponse;
-
-    if (!response.ok) {
-      throw new RoadsAccessError(
-        data.error?.message ?? `speedLimits error: ${response.status}`
-      );
-    }
-
+    const data = await fetchRoadsApi(url, speedLimitsResponseSchema, "speedLimits");
     results.push(...(data.speedLimits ?? []));
   }
 
