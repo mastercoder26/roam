@@ -4,7 +4,7 @@ import SwiftUI
 /// the controls that belong to the person rather than to a single route or
 /// drive.
 ///
-/// Everything measured here is derived from locally recorded drives — this tab
+/// Everything measured here is derived from locally recorded drives: this tab
 /// introduces no network calls and stores no new measurement. The only things
 /// it persists are the display name and licensing stage, both user-declared
 /// and deliberately excluded from every score.
@@ -12,15 +12,40 @@ struct ProfileView: View {
     @ObservedObject private var theme = ThemeManager.shared
     @EnvironmentObject private var driveSession: DriveSessionManager
     @StateObject private var profile = DriverProfileStore()
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     @State private var showingThemePicker = false
     @State private var isEditingIdentity = false
+    @State private var insights = DriverProfileInsightsEngine.makeInsights(from: [], stage: .permit)
 
-    private var progress: DriverProgressSummary {
-        DriverProgressEngine.makeSummary(from: driveSession.recordedDrives)
-    }
-
-    private var performance: DriverPerformanceSummary {
-        DriverPerformanceEngine.makeSummary(from: driveSession.recordedDrives)
+    /// A cheap fingerprint of everything that can change the aggregated
+    /// insights: drive count, the most recent drive's identity, each drive's
+    /// route analysis status, and the declared stage.
+    /// `DriverProfileInsightsEngine.makeInsights` walks the full drive
+    /// history, so gating the recompute on this instead of running it as a
+    /// computed property keeps typing a name or switching themes from
+    /// re-running that aggregation on every body evaluation.
+    ///
+    /// Combining each drive's `routeAnalysis?.status` (not just whether it is
+    /// non-nil) matters: a drive's analysis starts as a non-nil `.pending`
+    /// value, and the Drive tab's background retry later flips that same
+    /// non-nil value to `.available` or `.unavailable`. A presence check
+    /// alone would miss that transition, since the field never becomes nil
+    /// either before or after it resolves, leaving `performanceScore`,
+    /// `averageDifficulty`, `analyzedDriveCount`, and `pendingAnalysisCount`
+    /// stale on the Profile tab until some unrelated state change forced a
+    /// refresh. This still stays O(n) over already-loaded values, never a
+    /// second heavy aggregation.
+    private var insightsSignature: Int {
+        var hasher = Hasher()
+        hasher.combine(driveSession.recordedDrives.count)
+        hasher.combine(driveSession.recordedDrives.last?.id)
+        hasher.combine(driveSession.recordedDrives.last?.startedAt)
+        for drive in driveSession.recordedDrives {
+            hasher.combine(drive.routeAnalysis?.status)
+        }
+        hasher.combine(profile.stage)
+        return hasher.finalize()
     }
 
     var body: some View {
@@ -28,8 +53,17 @@ struct ProfileView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: AppDesign.sectionSpacing) {
                     identityCard
+
+                    if driveSession.isRecording {
+                        LiveDriveBanner(driveSession: driveSession)
+                    }
+
+                    HeadlineMeasurementCard(insights: insights)
+                    MilestonesSection(milestones: insights.milestones)
+                    ExperienceBreakdownSection(insights: insights)
+                    BehaviorSignalsSection(insights: insights)
+                    WeeklyTrendSection(insights: insights, reduceMotion: reduceMotion)
                     stageCard
-                    recordCard
                     appearanceCard
                 }
                 .padding(AppDesign.contentPadding)
@@ -37,64 +71,98 @@ struct ProfileView: View {
             .background(AppDesign.canvas.ignoresSafeArea())
             .navigationTitle("Profile")
         }
+        .onChange(of: insightsSignature, initial: true) { _, _ in
+            refreshInsights()
+        }
         .sheet(isPresented: $showingThemePicker) {
-            ThemePickerSheet(themeManager: ThemeManager.shared)
+            ThemePickerSheet(themeManager: theme)
                 .environmentObject(driveSession)
         }
+    }
+
+    private func refreshInsights() {
+        insights = DriverProfileInsightsEngine.makeInsights(
+            from: driveSession.recordedDrives,
+            stage: profile.stage
+        )
     }
 
     // MARK: - Identity
 
     private var identityCard: some View {
-        HStack(spacing: AppDesign.space12) {
-            monogram
+        VStack(alignment: .leading, spacing: AppDesign.space8) {
+            HStack(spacing: AppDesign.space12) {
+                monogram
 
-            VStack(alignment: .leading, spacing: 2) {
-                if isEditingIdentity {
-                    TextField("Your name", text: $profile.displayName)
-                        .font(AppDesign.Typography.bodyEmphasized)
-                        .foregroundStyle(AppDesign.Ink.primary)
-                        .textInputAutocapitalization(.words)
-                        .submitLabel(.done)
-                        .onSubmit { isEditingIdentity = false }
-                } else {
-                    Text(profile.resolvedDisplayName)
-                        .font(.title3.weight(.semibold))
-                        .foregroundStyle(AppDesign.Ink.primary)
+                VStack(alignment: .leading, spacing: 2) {
+                    if isEditingIdentity {
+                        TextField("Your name", text: $profile.displayName)
+                            .font(AppDesign.Typography.bodyEmphasized)
+                            .foregroundStyle(AppDesign.Ink.primary)
+                            .textInputAutocapitalization(.words)
+                            .submitLabel(.done)
+                            .onSubmit { isEditingIdentity = false }
+                    } else {
+                        Text(profile.resolvedDisplayName)
+                            .font(.title3.weight(.semibold))
+                            .foregroundStyle(AppDesign.Ink.primary)
+                    }
+
+                    Text(profile.stage.title)
+                        .font(.footnote)
+                        .foregroundStyle(AppDesign.Ink.secondary)
                 }
 
-                Text(profile.stage.title)
-                    .font(.footnote)
-                    .foregroundStyle(AppDesign.Ink.secondary)
+                Spacer(minLength: 8)
+
+                Button {
+                    withAnimation(AppAnimation.quick) { isEditingIdentity.toggle() }
+                } label: {
+                    Image(systemName: isEditingIdentity ? "checkmark" : "pencil")
+                        .font(.subheadline.weight(.semibold))
+                        .contentTransition(.symbolEffect(.replace))
+                        .foregroundStyle(AppDesign.Ink.primary.opacity(0.88))
+                        .frame(width: 36, height: 36)
+                        .background(AppDesign.Ink.primary.opacity(0.10), in: Circle())
+                        .frame(minWidth: 44, minHeight: 44)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(PressableScaleStyle())
+                .accessibilityLabel(isEditingIdentity ? "Save name" : "Edit name")
             }
 
-            Spacer(minLength: 8)
-
-            Button {
-                withAnimation(AppAnimation.quick) { isEditingIdentity.toggle() }
-            } label: {
-                Image(systemName: isEditingIdentity ? "checkmark" : "pencil")
-                    .font(.subheadline.weight(.semibold))
-                    .contentTransition(.symbolEffect(.replace))
-                    .foregroundStyle(AppDesign.Ink.primary.opacity(0.88))
-                    .frame(width: 36, height: 36)
-                    .background(AppDesign.Ink.primary.opacity(0.10), in: Circle())
-                    .frame(minWidth: 44, minHeight: 44)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(PressableScaleStyle())
-            .accessibilityLabel(isEditingIdentity ? "Save name" : "Edit name")
+            persistenceErrorNote
         }
         .premiumCard()
     }
 
     private var monogram: some View {
-        Text(profile.monogram)
-            .font(.title2.weight(.bold))
-            .foregroundStyle(AppDesign.accentForeground)
-            .frame(width: 52, height: 52)
-            .background(AppDesign.accent, in: Circle())
-            .accessibilityHidden(true)
+        Group {
+            if profile.monogram.isEmpty {
+                Image(systemName: "person.fill")
+                    .font(.title3.weight(.semibold))
+            } else {
+                Text(profile.monogram)
+                    .font(.title2.weight(.bold))
+            }
+        }
+        .foregroundStyle(AppDesign.accentForeground)
+        .frame(width: 52, height: 52)
+        .background(AppDesign.accent, in: Circle())
+        .accessibilityHidden(true)
+    }
+
+    /// Surfaces a failed save quietly: a small tertiary-ink caption, never an
+    /// alert or a blocking banner. This is a display preference, not
+    /// critical data, so it should never nag.
+    @ViewBuilder
+    private var persistenceErrorNote: some View {
+        if let message = profile.lastPersistenceError {
+            Label("Not saved on this device: \(message)", systemImage: "exclamationmark.circle")
+                .font(.caption2)
+                .foregroundStyle(AppDesign.Ink.tertiary)
+                .accessibilityLabel("Your profile changes could not be saved. \(message)")
+        }
     }
 
     // MARK: - Stage
@@ -134,54 +202,13 @@ struct ProfileView: View {
                 .buttonStyle(PressableScaleStyle())
                 .accessibilityValue(profile.stage == stage ? "Selected" : "Not selected")
             }
-        }
-        .premiumCard()
-    }
 
-    // MARK: - Record
+            Divider()
 
-    private var recordCard: some View {
-        VStack(alignment: .leading, spacing: AppDesign.space12) {
-            SectionHeader(
-                title: "Your record",
-                subtitle: "Measured from drives recorded on this device."
-            )
-
-            if progress.hasRecordedEvidence {
-                StatRow(
-                    title: "Measured miles",
-                    value: String(format: "%.1f mi", progress.validatedMiles),
-                    symbol: "road.lanes"
-                )
-                StatRow(
-                    title: "Qualifying drives",
-                    value: "\(progress.qualifyingDriveCount)",
-                    symbol: "checkmark.seal"
-                )
-                StatRow(
-                    title: "Days driven",
-                    value: "\(progress.qualifyingDriveDayCount)",
-                    symbol: "calendar"
-                )
-                StatRow(
-                    title: "After dark",
-                    value: String(format: "%.1f mi", progress.afterDarkMiles),
-                    symbol: "moon.stars"
-                )
-
-                if let score = performance.score {
-                    StatRow(
-                        title: "Driving score",
-                        value: "\(score)/100",
-                        symbol: "gauge.with.dots.needle.50percent"
-                    )
-                }
-            } else {
-                Text("No qualifying drives yet. Record a drive from the Drive tab and your measured experience appears here.")
-                    .font(.footnote)
-                    .foregroundStyle(AppDesign.Ink.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
+            Label(profile.stage.supervisionNote, systemImage: "info.circle")
+                .font(.caption)
+                .foregroundStyle(AppDesign.Ink.secondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
         .premiumCard()
     }
