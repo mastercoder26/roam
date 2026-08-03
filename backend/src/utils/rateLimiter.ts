@@ -26,8 +26,14 @@ export interface RateLimiter {
 
 /**
  * Creates a rate limiter keyed by an arbitrary string (typically client IP).
- * Uses a sliding window log per key; old timestamps are pruned lazily on
- * each check so idle keys don't need a separate cleanup timer.
+ * Uses a sliding window log per key.
+ *
+ * Pruning a key's own timestamps on its own check is not enough: a key that
+ * is never seen again keeps its entry forever, so a stream of distinct client
+ * addresses would grow the map without bound. A sweep runs at most once per
+ * window and drops every key whose hits have all expired, keeping memory
+ * proportional to the active caller count rather than to the number of
+ * addresses ever seen.
  */
 export function createRateLimiter(options: RateLimiterOptions): RateLimiter {
   if (options.windowMs <= 0 || options.maxRequests <= 0) {
@@ -35,8 +41,22 @@ export function createRateLimiter(options: RateLimiterOptions): RateLimiter {
   }
 
   const hitsByKey = new Map<string, number[]>();
+  let lastSweptAt = Number.NEGATIVE_INFINITY;
+
+  function sweepExpiredKeys(now: number): void {
+    if (now - lastSweptAt < options.windowMs) return;
+    lastSweptAt = now;
+
+    for (const [key, timestamps] of hitsByKey) {
+      const newest = timestamps[timestamps.length - 1];
+      if (newest === undefined || now - newest >= options.windowMs) {
+        hitsByKey.delete(key);
+      }
+    }
+  }
 
   function check(key: string, now: number = Date.now()): RateLimitResult {
+    sweepExpiredKeys(now);
     const recent = (hitsByKey.get(key) ?? []).filter(
       (timestamp) => now - timestamp < options.windowMs
     );

@@ -42,3 +42,20 @@ describe("createRateLimiter", () => {
     expect(() => createRateLimiter({ windowMs: 1_000, maxRequests: 0 })).toThrow();
   });
 });
+
+describe("rate limiter memory", () => {
+  it("drops keys whose hits have all expired instead of retaining them", () => {
+    const limiter = createRateLimiter({ windowMs: 1_000, maxRequests: 2 });
+
+    // A burst of one-shot callers that are never seen again.
+    for (let i = 0; i < 100; i += 1) {
+      limiter.check(`caller-${i}`, 0);
+    }
+
+    // A later check past the window must sweep them, so an address reused
+    // after the window starts from a clean budget rather than a stale log.
+    limiter.check("caller-0", 5_000);
+    expect(limiter.check("caller-0", 5_000).allowed).toBe(true);
+    expect(limiter.check("caller-0", 5_000).allowed).toBe(false);
+  });
+});
