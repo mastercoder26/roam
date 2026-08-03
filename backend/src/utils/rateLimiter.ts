@@ -1,0 +1,59 @@
+/**
+ * Minimal in-memory sliding-window rate limiter for the public route-analysis
+ * endpoints. Each endpoint proxies to metered Google APIs (Routes, Roads),
+ * so an unthrottled client can both run up billing and starve other callers.
+ *
+ * This is intentionally dependency-free (no `express-rate-limit`) since it
+ * only needs to bound a single Node process; it is not shared across
+ * instances. A multi-instance deployment would need a shared store (for
+ * example Redis) instead — see the handoff notes for that follow-up.
+ */
+
+export interface RateLimiterOptions {
+  windowMs: number;
+  maxRequests: number;
+}
+
+export interface RateLimitResult {
+  allowed: boolean;
+  /** Seconds the caller should wait before retrying. 0 when allowed. */
+  retryAfterSeconds: number;
+}
+
+export interface RateLimiter {
+  check(key: string, now?: number): RateLimitResult;
+}
+
+/**
+ * Creates a rate limiter keyed by an arbitrary string (typically client IP).
+ * Uses a sliding window log per key; old timestamps are pruned lazily on
+ * each check so idle keys don't need a separate cleanup timer.
+ */
+export function createRateLimiter(options: RateLimiterOptions): RateLimiter {
+  if (options.windowMs <= 0 || options.maxRequests <= 0) {
+    throw new Error("Rate limiter windowMs and maxRequests must be positive");
+  }
+
+  const hitsByKey = new Map<string, number[]>();
+
+  function check(key: string, now: number = Date.now()): RateLimitResult {
+    const recent = (hitsByKey.get(key) ?? []).filter(
+      (timestamp) => now - timestamp < options.windowMs
+    );
+
+    if (recent.length >= options.maxRequests) {
+      hitsByKey.set(key, recent);
+      const retryAfterMs = options.windowMs - (now - recent[0]);
+      return {
+        allowed: false,
+        retryAfterSeconds: Math.max(1, Math.ceil(retryAfterMs / 1000)),
+      };
+    }
+
+    recent.push(now);
+    hitsByKey.set(key, recent);
+    return { allowed: true, retryAfterSeconds: 0 };
+  }
+
+  return { check };
+}
