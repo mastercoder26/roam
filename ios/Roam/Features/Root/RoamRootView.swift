@@ -70,7 +70,7 @@ struct RoamRootView: View {
                 .environmentObject(driveSession)
         }
         .transition(.opacity)
-        .animation(.easeOut(duration: reduceMotion ? 0.12 : 0.18), value: selectedTab)
+        .animation(reduceMotion ? AppAnimation.tabSwitchReduced : AppAnimation.tabSwitch, value: selectedTab)
         .animation(reduceMotion ? .easeOut(duration: 0.16) : AppAnimation.content, value: themeManager.currentID)
         .onChange(of: driveSession.practiceRoutePresentationRequest) { _, request in
             // The manager emits this only when a Results-screen action queues a
