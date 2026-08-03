@@ -426,8 +426,14 @@ enum DriverReadinessRouteMatcher {
 
     private static func evenlySampled<Element>(_ values: [Element], limit: Int) -> [Element] {
         guard values.count > limit else { return values }
+        // A limit of 1 makes the divisor zero, so `step` becomes infinite and
+        // `Int(_:)` traps rather than returning a clamped index. Callers pass
+        // a constant today, but the trap is one careless caller away.
+        guard limit > 1 else { return Array(values.prefix(max(0, limit))) }
+
         let step = Double(values.count - 1) / Double(limit - 1)
-        return (0..<limit).map { values[Int((Double($0) * step).rounded())] }
+        let lastIndex = values.count - 1
+        return (0..<limit).map { values[min(lastIndex, Int((Double($0) * step).rounded()))] }
     }
 
     private static func coordinateDistanceMeters(
