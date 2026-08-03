@@ -66,10 +66,15 @@ struct ProfileView: View {
                     stageCard
                     appearanceCard
                 }
-                .padding(AppDesign.contentPadding)
+                .padding(.horizontal, AppDesign.contentPadding)
+                .padding(.vertical, 12)
             }
             .background(AppDesign.canvas.ignoresSafeArea())
             .navigationTitle("Profile")
+            // Matches every other tab. Left at the default, the title mode can
+            // resolve differently after a tab switch than it does on first
+            // appearance, so it is stated explicitly here.
+            .navigationBarTitleDisplayMode(.large)
         }
         .onChange(of: insightsSignature, initial: true) { _, _ in
             refreshInsights()
