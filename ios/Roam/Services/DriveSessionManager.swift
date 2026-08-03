@@ -3,6 +3,24 @@ import CoreMotion
 import Combine
 import Foundation
 
+/// Everything needed to reconstruct a `RecordedDrive` if the app is
+/// terminated mid-drive. Deliberately mirrors only measured quantities —
+/// recovery never fabricates data the way a live session's normal end-of-drive
+/// summarization would not.
+private struct InProgressDriveSnapshot: Codable {
+    let startedAt: Date
+    let recordingTimeZoneIdentifier: String?
+    let route: [DriveRoutePoint]
+    let events: [DrivingEvent]
+    let motionSamples: Int
+    let acceptedLocationSamples: Int
+    let rejectedLocationSamples: Int
+    let distanceMeters: CLLocationDistance
+    let topSpeedMetersPerSecond: CLLocationSpeed
+    let plannedRouteContext: PlannedRouteContext?
+    let lastUpdatedAt: Date
+}
+
 @MainActor
 final class DriveSessionManager: NSObject, ObservableObject {
     /// The app, CarPlay scene, and Live Activity all reflect this one manual
@@ -49,6 +67,14 @@ final class DriveSessionManager: NSObject, ObservableObject {
     private var queuedPracticeRoutePolyline: String?
     private var activePracticeRoutePolyline: String?
     private let historyKey = "recorded-drives-v1"
+    /// A throttled, incremental snapshot of the drive in progress. Without
+    /// this, a background termination (low memory, force quit, or a crash)
+    /// mid-drive would lose every sample the driver has already produced —
+    /// the worst failure mode for this feature. `endDrive()` removes this key
+    /// on a normal finish; only an interrupted session leaves it behind for
+    /// `recoverInterruptedDriveIfNeeded()` to find on the next launch.
+    private let inProgressDriveKey = "in-progress-drive-v1"
+    private var lastProgressPersistAt: Date?
     private var routeAnalysisTasks: [UUID: Task<Void, Never>] = [:]
 
     var currentDistanceMiles: Double { distanceMeters / 1_609.344 }
@@ -69,6 +95,7 @@ final class DriveSessionManager: NSObject, ObservableObject {
         locationManager.distanceFilter = 5
         locationManager.pausesLocationUpdatesAutomatically = false
         loadRecordedDrives()
+        recoverInterruptedDriveIfNeeded()
         resumeRouteAnalysesIfNeeded()
     }
 
@@ -82,6 +109,11 @@ final class DriveSessionManager: NSObject, ObservableObject {
         activePracticeRoutePolyline = queuedPracticeRoutePolyline
         queuedPracticeRoute = nil
         queuedPracticeRoutePolyline = nil
+        // Defensive: a snapshot should never survive to a new drive (endDrive
+        // clears it, and startup recovery clears it too), but never let a
+        // stale one leak into this drive's saved history if it somehow did.
+        UserDefaults.standard.removeObject(forKey: inProgressDriveKey)
+        lastProgressPersistAt = nil
         resetCurrentDrive()
         let driveStart = Date()
         recordingTimeZoneIdentifier = TimeZone.autoupdatingCurrent.identifier
@@ -131,6 +163,11 @@ final class DriveSessionManager: NSObject, ObservableObject {
         locationManager.stopUpdatingLocation()
         locationManager.allowsBackgroundLocationUpdates = false
         currentSpeedMetersPerSecond = 0
+        // A normal end-of-drive path always produces a definitive outcome
+        // (saved or discarded) below, so the interrupted-drive snapshot must
+        // not stick around to be "recovered" as a duplicate next launch.
+        UserDefaults.standard.removeObject(forKey: inProgressDriveKey)
+        lastProgressPersistAt = nil
 
         defer {
             activePracticeRoute = nil
@@ -302,6 +339,11 @@ final class DriveSessionManager: NSObject, ObservableObject {
             lastCompletedDrive = nil
             lastScore = nil
         }
+        // Deleting a drive whose route analysis is still in flight should not
+        // leave a network request running only to be discarded by
+        // `replaceSavedDrive`'s existence guard when it completes.
+        routeAnalysisTasks[id]?.cancel()
+        routeAnalysisTasks[id] = nil
     }
 
     /// Analyzes only the start and destination of a completed drive after its
@@ -561,6 +603,7 @@ final class DriveSessionManager: NSObject, ObservableObject {
         latestCoordinate = routePoint.coordinate
         latestAcceptedLocationAt = location.timestamp
         publishLiveDriveSnapshot()
+        persistInProgressSnapshot()
     }
 
     private func appendRoutePoint(_ point: DriveRoutePoint) {
@@ -580,6 +623,9 @@ final class DriveSessionManager: NSObject, ObservableObject {
         lastEventAt[kind] = timestamp
         events.append(DrivingEvent(kind: kind, timestamp: timestamp, source: source, coordinate: coordinate))
         publishLiveDriveSnapshot(force: true)
+        // Force past the normal throttle so a coaching event is never the
+        // thing lost if the app is killed a moment later.
+        persistInProgressSnapshot(force: true)
     }
 
     private func publishLiveDriveSnapshot(force: Bool = false) {
@@ -624,6 +670,105 @@ final class DriveSessionManager: NSObject, ObservableObject {
     private func saveRecordedDrives() {
         guard let data = try? JSONEncoder().encode(recordedDrives) else { return }
         UserDefaults.standard.set(data, forKey: historyKey)
+    }
+
+    /// Writes a throttled, incremental snapshot of the drive in progress so a
+    /// background termination loses at most a few seconds of the newest
+    /// samples instead of the entire session. Silent encoding failure is
+    /// intentional here — a snapshot write is a best-effort safety net, not a
+    /// requirement for `endDrive()`'s own, authoritative save path.
+    private func persistInProgressSnapshot(force: Bool = false) {
+        guard isRecording, let startDate else { return }
+        let now = Date()
+        if !force, let last = lastProgressPersistAt, now.timeIntervalSince(last) < 10 {
+            return
+        }
+        lastProgressPersistAt = now
+
+        let snapshot = InProgressDriveSnapshot(
+            startedAt: startDate,
+            recordingTimeZoneIdentifier: recordingTimeZoneIdentifier,
+            route: routePoints,
+            events: events,
+            motionSamples: motionSamples,
+            acceptedLocationSamples: acceptedLocationSamples,
+            rejectedLocationSamples: rejectedLocationSamples,
+            distanceMeters: distanceMeters,
+            topSpeedMetersPerSecond: topSpeed,
+            plannedRouteContext: activePracticeRoute,
+            lastUpdatedAt: now
+        )
+        guard let data = try? JSONEncoder().encode(snapshot) else { return }
+        UserDefaults.standard.set(data, forKey: inProgressDriveKey)
+    }
+
+    /// Recovers a drive that never reached `endDrive()` because the app was
+    /// terminated while recording. This is the difference between silently
+    /// losing an entire drive and saving everything measured up to the last
+    /// persisted snapshot. Recovery reuses the same scoring and summarization
+    /// path as a normal end-of-drive save; it never fabricates a duration or
+    /// distance beyond what was actually recorded, and a placement assessment
+    /// is not available because the drive never reached a normal `finish`.
+    private func recoverInterruptedDriveIfNeeded() {
+        guard let data = UserDefaults.standard.data(forKey: inProgressDriveKey) else { return }
+        UserDefaults.standard.removeObject(forKey: inProgressDriveKey)
+        guard let snapshot = try? JSONDecoder().decode(InProgressDriveSnapshot.self, from: data) else { return }
+
+        let duration = snapshot.lastUpdatedAt.timeIntervalSince(snapshot.startedAt)
+        guard duration > 0, DriveHistoryPolicy.shouldSave(duration: duration) else { return }
+
+        let result = DriveScoringEngine.score(
+            duration: duration,
+            distanceMeters: snapshot.distanceMeters,
+            events: snapshot.events,
+            acceptedLocationSamples: snapshot.acceptedLocationSamples,
+            rejectedLocationSamples: snapshot.rejectedLocationSamples,
+            motionSamples: snapshot.motionSamples
+        )
+        let dataQuality = DriveDataQuality(
+            acceptedLocationSamples: result.quality.acceptedLocationSamples,
+            rejectedLocationSamples: result.quality.rejectedLocationSamples,
+            motionSamples: result.quality.motionSamples,
+            confidence: result.quality.confidence,
+            placementQuality: nil
+        )
+        let score = DrivingScore(
+            score: result.score,
+            duration: duration,
+            distanceMeters: snapshot.distanceMeters,
+            topSpeedMetersPerSecond: snapshot.topSpeedMetersPerSecond,
+            events: snapshot.events,
+            motionSamples: snapshot.motionSamples,
+            dataQuality: dataQuality
+        )
+        let unsummarizedDrive = RecordedDrive(
+            startedAt: snapshot.startedAt,
+            score: score,
+            route: snapshot.route,
+            recordingTimeZoneIdentifier: snapshot.recordingTimeZoneIdentifier,
+            plannedRouteContext: snapshot.plannedRouteContext
+        )
+        let initialRouteAnalysis: DriveRouteAnalysis = DriveRouteAnalysisEngine.endpoints(for: unsummarizedDrive) == nil
+            ? .unavailable("Route difficulty needs a longer continuous GPS trace from start to destination.")
+            : .pending
+        let recoveredDrive = RecordedDrive(
+            id: unsummarizedDrive.id,
+            startedAt: snapshot.startedAt,
+            score: score,
+            route: snapshot.route,
+            recordingTimeZoneIdentifier: snapshot.recordingTimeZoneIdentifier,
+            experienceSummary: DriveExperienceEngine.summarize(drive: unsummarizedDrive),
+            plannedRouteContext: snapshot.plannedRouteContext,
+            routeAnalysis: initialRouteAnalysis
+        )
+        recordedDrives = Array(([recoveredDrive] + recordedDrives).prefix(50))
+        saveRecordedDrives()
+        lastCompletedDrive = recoveredDrive
+        lastScore = score
+        statusMessage = "Recovered a drive that was interrupted before it could finish saving normally."
+        if initialRouteAnalysis.status == .pending {
+            beginAutomaticRouteAnalysis(for: recoveredDrive)
+        }
     }
 }
 
