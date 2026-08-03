@@ -1,5 +1,5 @@
 import type { FactorContribution, ScoringBreakdown, ScoringContext, SegmentHotspot } from "../types.js";
-import type { BaseScoreComponents } from "./baseScore.js";
+import { BASE_SCORE_WEIGHTS, type BaseScoreComponents } from "./baseScore.js";
 import type { FatigueResult } from "./fatigue.js";
 import { durationBurden, fatigueSubscore } from "./fatigue.js";
 import type { RouteFeatures } from "./features.js";
@@ -26,8 +26,18 @@ const FACTOR_LABELS: Record<string, string> = {
   unprotectedLefts: "Unprotected left turns",
 };
 
-/** Interpretive weights aligned with BASE_SCORE_WEIGHTS + live overlays. */
-const FACTOR_WEIGHTS: Record<
+/**
+ * Interpretive weights: the five structural factors are derived from
+ * BASE_SCORE_WEIGHTS rather than restated, because these weights rank the
+ * factors shown to the user and a copy drifts. `traffic` had drifted to 0.20
+ * against a real weight of 0.14, over-ranking it by ~43% and letting the
+ * stated top reason disagree with what actually drove the score.
+ *
+ * The remaining three have no base counterpart — they are live overlays
+ * applied as additive points in computeRawScore, so their interpretive
+ * weight is a presentation choice, not a mirror of a scoring constant.
+ */
+export const FACTOR_WEIGHTS: Record<
   keyof Pick<
     ScoringBreakdown,
     | "speed"
@@ -41,11 +51,11 @@ const FACTOR_WEIGHTS: Record<
   >,
   number
 > = {
-  speed: 0.24,
-  merges: 0.26,
-  turns: 0.22,
-  traffic: 0.2,
-  length: 0.14,
+  speed: BASE_SCORE_WEIGHTS.S,
+  merges: BASE_SCORE_WEIGHTS.M,
+  turns: BASE_SCORE_WEIGHTS.T,
+  traffic: BASE_SCORE_WEIGHTS.C,
+  length: BASE_SCORE_WEIGHTS.L,
   fatigue: 0.1,
   weather: 0.18,
   road: 0.1,

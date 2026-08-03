@@ -27,6 +27,8 @@ import { computeTurnClustering, computeHighwayShare, computeManeuverComplexity }
 import { smoothstep } from "../helpers.js";
 import { aggregateMeanOnly, scoreSegmentLocal, segmentRoute } from "../segments.js";
 import { buildFeaturesFromRoute } from "../features.js";
+import { FACTOR_WEIGHTS } from "../explain.js";
+import { BASE_SCORE_WEIGHTS } from "../baseScore.js";
 
 describe("smoothstep", () => {
   it("clamps below 0 and above 1", () => {
@@ -390,5 +392,17 @@ describe("duration separation", () => {
     expect(long.score).toBeGreaterThan(medium.score);
     expect(medium.score).toBeGreaterThan(short.score);
     expect(long.score).toBeLessThan(7.5);
+  });
+});
+
+describe("explanation weights", () => {
+  it("keeps the structural factor weights identical to the scoring weights", () => {
+    // These weights rank the reasons shown to the user. A copy drifts: this
+    // caught `traffic` sitting at 0.20 against a real weight of 0.14.
+    expect(FACTOR_WEIGHTS.speed).toBe(BASE_SCORE_WEIGHTS.S);
+    expect(FACTOR_WEIGHTS.merges).toBe(BASE_SCORE_WEIGHTS.M);
+    expect(FACTOR_WEIGHTS.turns).toBe(BASE_SCORE_WEIGHTS.T);
+    expect(FACTOR_WEIGHTS.traffic).toBe(BASE_SCORE_WEIGHTS.C);
+    expect(FACTOR_WEIGHTS.length).toBe(BASE_SCORE_WEIGHTS.L);
   });
 });
