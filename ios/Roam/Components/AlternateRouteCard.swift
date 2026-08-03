@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct AlternateRouteCard: View {
+    @ObservedObject private var theme = ThemeManager.shared
     let route: ScoredRoute
     let isSelected: Bool
     var readinessHeadline: String? = nil
@@ -35,13 +36,13 @@ struct AlternateRouteCard: View {
 
                         Text(route.label.rawValue)
                             .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(AppDesign.Ink.secondary)
                     }
 
                     if let topReason = route.reasons.first {
                         Text(topReason)
                             .font(.subheadline)
-                            .foregroundStyle(.primary)
+                            .foregroundStyle(AppDesign.Ink.primary)
                             .lineLimit(2)
                             .fixedSize(horizontal: false, vertical: true)
                     }
@@ -58,7 +59,7 @@ struct AlternateRouteCard: View {
                         Label(route.formattedDistance, systemImage: "arrow.left.and.right")
                     }
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(AppDesign.Ink.secondary)
 
                     if !badges.isEmpty {
                         FlowLayout(spacing: 6) {
@@ -80,7 +81,7 @@ struct AlternateRouteCard: View {
                 if let delta = route.scoreDelta {
                     Text(deltaText(delta))
                         .font(.caption.weight(.semibold))
-                        .foregroundStyle(delta >= 0 ? .orange : .green)
+                        .foregroundStyle(delta >= 0 ? AppDesign.safety : AppDesign.positive)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
                         .background(AppDesign.cardSurfaceElevated)

@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct ScoreGaugeView: View {
+    @ObservedObject private var theme = ThemeManager.shared
     let score: Double
     let label: DifficultyLabel
 
@@ -34,13 +35,13 @@ struct ScoreGaugeView: View {
                     .font(.system(size: 56, weight: .bold, design: .rounded))
                     .tracking(-1)
                     .monospacedDigit()
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(AppDesign.Ink.primary)
                     .contentTransition(.numericText())
                     .animation(AppAnimation.spring, value: score)
 
                 Text("/ 10")
                     .font(.caption.weight(.medium))
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(AppDesign.Ink.tertiary)
             }
             .scaleEffect(hasAppeared ? 1 : 0.95)
             .opacity(hasAppeared ? 1 : 0)

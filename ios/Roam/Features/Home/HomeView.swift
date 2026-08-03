@@ -2,6 +2,7 @@ import SwiftUI
 import UIKit
 
 struct HomeView: View {
+    @ObservedObject private var theme = ThemeManager.shared
     @ObservedObject var form: RoutePlanningFormModel
     @State private var isLoading = false
     @State private var isCompletingLoading = false
@@ -393,7 +394,7 @@ struct HomeView: View {
             HStack(spacing: 10) {
                 if isLoading {
                     ProgressView()
-                        .tint(canAnalyze ? Color(red: 0.07, green: 0.07, blue: 0.07) : AppDesign.Ink.tertiary)
+                        .tint(canAnalyze ? AppDesign.primarySurfaceForeground : AppDesign.Ink.tertiary)
                 } else {
                     Image(systemName: "sparkles")
                 }
@@ -402,7 +403,7 @@ struct HomeView: View {
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 17)
-            .foregroundStyle(canAnalyze ? Color(red: 0.07, green: 0.07, blue: 0.07) : AppDesign.Ink.tertiary)
+            .foregroundStyle(canAnalyze ? AppDesign.primarySurfaceForeground : AppDesign.Ink.tertiary)
             .background(
                 canAnalyze ? AppDesign.Ink.primary : AppDesign.Ink.primary.opacity(0.10),
                 in: RoundedRectangle(cornerRadius: AppDesign.cornerRadiusLarge, style: .continuous)
@@ -571,6 +572,7 @@ private struct RoutePlanningFieldIcon: View {
 }
 
 private struct RouteCheckPill: View {
+    @ObservedObject private var theme = ThemeManager.shared
     let symbol: String
     let title: String
 

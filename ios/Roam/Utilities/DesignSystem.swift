@@ -1,5 +1,20 @@
 import SwiftUI
 
+// MARK: - Theme subscription
+//
+// `AppDesign` tokens are *static* reads off a cached palette, so SwiftUI
+// records no dependency on them. A view that paints with a token therefore
+// keeps its old colors after a theme switch unless it observes the manager
+// itself — that was the cause of half-recolored screens.
+//
+// Every view, view modifier, and button style that reads an `AppDesign` token
+// must declare:
+//
+//     @ObservedObject private var theme = ThemeManager.shared
+//
+// The property is deliberately unread in most bodies; it exists purely to
+// register the invalidation dependency. Do not delete it as "unused".
+
 // MARK: - Design tokens
 
 enum AppDesign {
@@ -11,6 +26,10 @@ enum AppDesign {
     /// Adaptive black/white foreground for accent-filled controls.
     static var accentForeground: Color { palette.accentForeground.color }
     static var safety: Color { palette.safety.color }
+    /// Destructive actions — ending a drive, deleting history.
+    static var danger: Color { palette.danger.color }
+    /// Adaptive black/white foreground for danger-filled controls.
+    static var dangerForeground: Color { palette.dangerForeground.color }
     static var positive: Color { palette.positive.color }
 
     /// Soft canvas — theme-aware background for primary surfaces.
@@ -25,9 +44,21 @@ enum AppDesign {
     /// Fill for present-but-unavailable controls. Theme-aware, unlike the
     /// `Color(.systemGray3)` it replaces.
     static var disabledSurface: Color { palette.disabledSurface.color }
+    /// Unfilled portion of progress bars and meters, and inline chip fills that
+    /// sit directly on a card. Replaces `Color.primary.opacity(…)`, which
+    /// tracked only light/dark and so ignored every theme's own surfaces.
+    static var trackSurface: Color { palette.cardStroke.color }
     static var glassHighlight: Color { palette.glassHighlight.color }
     /// Adaptive black/white foreground for controls filled with primary ink.
     static var primarySurfaceForeground: Color { palette.primarySurfaceForeground.color }
+
+    /// UIKit bridges for MapKit overlays and annotations, which cannot take a
+    /// SwiftUI `Color`.
+    enum UIKitColor {
+        static var accent: UIColor { AppDesign.palette.accent.uiColor }
+        static var safety: UIColor { AppDesign.palette.safety.uiColor }
+        static var cardSurface: UIColor { AppDesign.palette.cardSurface.uiColor }
+    }
 
     static let space4: CGFloat = 4
     static let space8: CGFloat = 8
@@ -79,15 +110,28 @@ enum AppDesign {
 // MARK: - Difficulty color helper
 
 extension DifficultyLabel {
+    private var step: DifficultyStep {
+        switch self {
+        case .veryEasy: .veryEasy
+        case .easy: .easy
+        case .moderate: .moderate
+        case .hard: .hard
+        case .veryHard: .veryHard
+        }
+    }
+
+    /// Theme-aware demand color. The old implementation used one fixed ramp,
+    /// which put a near-white yellow on the light and Goldfish canvases.
     var color: Color {
-        let rgb = systemColor
-        return Color(red: rgb.red, green: rgb.green, blue: rgb.blue)
+        ThemeManager.cachedPalette.difficultyColor(step).color
     }
 }
 
 // MARK: - Card surface
 
 struct PremiumCardModifier: ViewModifier {
+    @ObservedObject private var theme = ThemeManager.shared
+
     func body(content: Content) -> some View {
         content
             .padding(AppDesign.cardPadding)
@@ -122,6 +166,7 @@ extension View {
 // MARK: - Section header
 
 struct SectionHeader: View {
+    @ObservedObject private var theme = ThemeManager.shared
     let title: String
     var subtitle: String?
 
@@ -196,6 +241,7 @@ struct PrimaryActionButton: View {
     let isLoading: Bool
     let isEnabled: Bool
     let action: () -> Void
+    @ObservedObject private var theme = ThemeManager.shared
 
     var body: some View {
         Button(action: action) {
@@ -225,14 +271,20 @@ struct PrimaryActionButton: View {
 
 struct IconTile: View {
     let symbol: String
-    var color: Color = AppDesign.accent
+    /// `nil` means "follow the theme accent", resolved at render time. A
+    /// default argument would freeze the accent at construction and survive a
+    /// theme switch.
+    var color: Color?
+    @ObservedObject private var theme = ThemeManager.shared
+
+    private var resolvedColor: Color { color ?? AppDesign.accent }
 
     var body: some View {
         Image(systemName: symbol)
             .font(.subheadline.weight(.semibold))
-            .foregroundStyle(color)
+            .foregroundStyle(resolvedColor)
             .frame(width: 34, height: 34)
-            .background(color.opacity(0.14), in: RoundedRectangle(cornerRadius: AppDesign.cornerRadiusTiny, style: .continuous))
+            .background(resolvedColor.opacity(0.14), in: RoundedRectangle(cornerRadius: AppDesign.cornerRadiusTiny, style: .continuous))
     }
 }
 
@@ -240,6 +292,7 @@ struct StatRow: View {
     let title: String
     let value: String
     let symbol: String
+    @ObservedObject private var theme = ThemeManager.shared
 
     var body: some View {
         HStack(spacing: AppDesign.space12) {

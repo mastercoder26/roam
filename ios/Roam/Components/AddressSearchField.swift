@@ -2,6 +2,7 @@ import MapKit
 import SwiftUI
 
 struct AddressSearchField: View {
+    @ObservedObject private var theme = ThemeManager.shared
     let title: String
     let placeholder: String
     let systemImage: String
@@ -54,11 +55,11 @@ struct AddressSearchField: View {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(suggestion.title)
                                 .font(.body)
-                                .foregroundStyle(.primary)
+                                .foregroundStyle(AppDesign.Ink.primary)
                             if !suggestion.subtitle.isEmpty {
                                 Text(suggestion.subtitle)
                                     .font(.caption)
-                                    .foregroundStyle(.secondary)
+                                    .foregroundStyle(AppDesign.Ink.secondary)
                             }
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)

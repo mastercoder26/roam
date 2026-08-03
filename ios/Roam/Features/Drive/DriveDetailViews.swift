@@ -5,6 +5,7 @@ import UIKit
 /// recording state, history navigation, and replay affordances can evolve
 /// independently.
 struct DriveDetailView: View {
+    @ObservedObject private var theme = ThemeManager.shared
     let drive: RecordedDrive
     @EnvironmentObject private var session: DriveSessionManager
     @State private var selectedMomentID: UUID?
@@ -37,7 +38,7 @@ struct DriveDetailView: View {
                     Text("Drive details").font(AppDesign.Typography.heroTitle)
                     Text(drive.startedAt.formatted(date: .complete, time: .shortened))
                         .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(AppDesign.Ink.secondary)
                 }
 
                 if hasUsableRoute {
@@ -106,7 +107,7 @@ struct DriveDetailView: View {
             if replayMoments.isEmpty {
                 Label("No coaching events were detected on this drive.", systemImage: "checkmark.circle.fill")
                     .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(AppDesign.Ink.secondary)
             } else {
                 ForEach(replayMoments) { moment in
                     Button { select(moment) } label: {
@@ -136,6 +137,7 @@ struct DriveDetailView: View {
 }
 
 private struct DriveDebriefSummary: View {
+    @ObservedObject private var theme = ThemeManager.shared
     let debrief: PracticeDriveDebrief
 
     var body: some View {
@@ -146,7 +148,7 @@ private struct DriveDebriefSummary: View {
                 .background(AppDesign.positive.opacity(0.12), in: Circle())
             VStack(alignment: .leading, spacing: 2) {
                 Text(debrief.headline).font(.subheadline.weight(.semibold))
-                Text(debrief.summary).font(.footnote).foregroundStyle(.secondary)
+                Text(debrief.summary).font(.footnote).foregroundStyle(AppDesign.Ink.secondary)
             }
         }
         .premiumCard()
@@ -154,6 +156,7 @@ private struct DriveDebriefSummary: View {
 }
 
 struct DriveRouteAnalysisBadge: View {
+    @ObservedObject private var theme = ThemeManager.shared
     let analysis: DriveRouteAnalysis?
 
     var body: some View {
@@ -185,12 +188,13 @@ struct DriveRouteAnalysisBadge: View {
     }
 
     private var badgeColor: Color {
-        guard let label = analysis?.label, analysis?.status == .available else { return .secondary }
+        guard let label = analysis?.label, analysis?.status == .available else { return AppDesign.Ink.secondary }
         return label.color
     }
 }
 
 private struct DriveRouteDifficultyCard: View {
+    @ObservedObject private var theme = ThemeManager.shared
     let analysis: DriveRouteAnalysis?
 
     var body: some View {
@@ -212,7 +216,7 @@ private struct DriveRouteDifficultyCard: View {
                     Text("Route difficulty").font(.headline)
                     Text("Analyzed automatically from this drive’s start to destination.")
                         .font(.footnote)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(AppDesign.Ink.secondary)
                 }
                 Spacer(minLength: 8)
                 VStack(alignment: .trailing, spacing: 1) {
@@ -226,16 +230,16 @@ private struct DriveRouteDifficultyCard: View {
             }
             if let highlights = analysis?.highlights, !highlights.isEmpty {
                 VStack(alignment: .leading, spacing: 7) {
-                    Text("What added demand").font(.caption.weight(.bold)).foregroundStyle(.secondary)
+                    Text("What added demand").font(.caption.weight(.bold)).foregroundStyle(AppDesign.Ink.secondary)
                     ForEach(highlights, id: \.self) { highlight in
                         Label(highlight, systemImage: "plus.circle.fill")
                             .font(.footnote)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(AppDesign.Ink.secondary)
                     }
                 }
             }
             if let detail = analysis?.detail {
-                Text(detail).font(.caption).foregroundStyle(.secondary)
+                Text(detail).font(.caption).foregroundStyle(AppDesign.Ink.secondary)
             }
         }
     }
@@ -247,7 +251,7 @@ private struct DriveRouteDifficultyCard: View {
                 Text("Analyzing route difficulty").font(.headline)
                 Text("Roam saved this drive already and is analyzing the measured start and destination in the background.")
                     .font(.footnote)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(AppDesign.Ink.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
@@ -260,7 +264,7 @@ private struct DriveRouteDifficultyCard: View {
                 Text("Route difficulty unavailable").font(.headline)
                 Text(analysis?.detail ?? "This saved drive did not have enough continuous GPS data to analyze a route from start to destination.")
                     .font(.footnote)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(AppDesign.Ink.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
@@ -268,6 +272,7 @@ private struct DriveRouteDifficultyCard: View {
 }
 
 private struct ReplayMomentRow: View {
+    @ObservedObject private var theme = ThemeManager.shared
     let moment: DriveReplayMoment
     let isSelected: Bool
 
@@ -280,7 +285,7 @@ private struct ReplayMomentRow: View {
                 .background((isSelected ? AppDesign.accent : AppDesign.safety).opacity(0.12), in: RoundedRectangle(cornerRadius: AppDesign.cornerRadiusTiny, style: .continuous))
             VStack(alignment: .leading, spacing: 3) {
                 Text(moment.kind.title).font(.subheadline.weight(.semibold))
-                Text(relativeTime(moment.elapsedSinceDriveStart)).font(.caption).foregroundStyle(.secondary)
+                Text(relativeTime(moment.elapsedSinceDriveStart)).font(.caption).foregroundStyle(AppDesign.Ink.secondary)
             }
             Spacer(minLength: 8)
             VStack(alignment: .trailing, spacing: 3) {
@@ -290,11 +295,11 @@ private struct ReplayMomentRow: View {
                 }
                 Text(moment.locationAvailable ? "On route" : "Location unavailable")
                     .font(.caption2)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(AppDesign.Ink.secondary)
             }
             Image(systemName: isSelected ? "checkmark.circle.fill" : "chevron.right")
                 .font(.caption.weight(.semibold))
-                .foregroundStyle(isSelected ? AppDesign.accent : Color(.tertiaryLabel))
+                .foregroundStyle(isSelected ? AppDesign.accent : AppDesign.Ink.tertiary)
         }
         .padding(10)
         .background(isSelected ? AppDesign.accent.opacity(0.08) : Color.clear, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
@@ -312,6 +317,7 @@ private struct ReplayMomentRow: View {
 }
 
 private struct ReplayMomentDetail: View {
+    @ObservedObject private var theme = ThemeManager.shared
     let moment: DriveReplayMoment
 
     var body: some View {
@@ -319,15 +325,15 @@ private struct ReplayMomentDetail: View {
             Text(moment.kind.title).font(.subheadline.weight(.semibold))
             Text("Detected from \(moment.source.rawValue). This is a coaching signal, not a determination of unsafe driving.")
                 .font(.footnote)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(AppDesign.Ink.secondary)
             if let progress = moment.routeProgress {
                 Text("Measured route progress: \(Int((progress * 100).rounded()))%")
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(AppDesign.Ink.secondary)
             } else {
                 Text("This event is saved, but it could not be placed on a continuous GPS segment.")
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(AppDesign.Ink.secondary)
             }
         }
         .accessibilityElement(children: .combine)
@@ -335,6 +341,7 @@ private struct ReplayMomentDetail: View {
 }
 
 struct DriveScoreCard: View {
+    @ObservedObject private var theme = ThemeManager.shared
     let score: DrivingScore
     let title: String
 
@@ -350,11 +357,11 @@ struct DriveScoreCard: View {
                     Text(title).font(.headline)
                     Text(score.grade)
                         .font(.footnote.weight(.semibold))
-                        .foregroundStyle(score.dataQuality.confidence == .low ? .orange : (score.score >= 78 ? .green : .orange))
+                        .foregroundStyle(score.dataQuality.confidence == .low ? AppDesign.safety : (score.score >= 78 ? AppDesign.positive : AppDesign.safety))
                 }
                 Spacer()
                 Text("\(score.score)").font(.system(size: 42, weight: .bold, design: .rounded))
-                Text("/100").font(.caption).foregroundStyle(.secondary)
+                Text("/100").font(.caption).foregroundStyle(AppDesign.Ink.secondary)
             }
             HStack {
                 Text("\(String(format: "%.1f", score.distanceMiles)) mi")
@@ -364,24 +371,24 @@ struct DriveScoreCard: View {
                 Text("Top \(score.topSpeedMPH) mph")
             }
             .font(.footnote.weight(.medium))
-            .foregroundStyle(.secondary)
+            .foregroundStyle(AppDesign.Ink.secondary)
             if !score.events.isEmpty {
                 Divider()
                 ForEach(DrivingEventKind.allCases.filter { score.count(for: $0) > 0 }) { event in
                     HStack {
-                        Image(systemName: event.symbol).frame(width: 22).foregroundStyle(.orange)
+                        Image(systemName: event.symbol).frame(width: 22).foregroundStyle(AppDesign.safety)
                         Text(event.title)
-                        Text(eventSource(for: event)).font(.caption2).foregroundStyle(.tertiary)
+                        Text(eventSource(for: event)).font(.caption2).foregroundStyle(AppDesign.Ink.tertiary)
                         Spacer()
-                        Text("\(score.count(for: event))").monospacedDigit().foregroundStyle(.secondary)
+                        Text("\(score.count(for: event))").monospacedDigit().foregroundStyle(AppDesign.Ink.secondary)
                     }
                     .font(.subheadline)
                 }
             }
-            Text(score.summary).font(.footnote).foregroundStyle(.secondary)
+            Text(score.summary).font(.footnote).foregroundStyle(AppDesign.Ink.secondary)
             Label(score.dataQuality.summary, systemImage: "checkmark.shield")
                 .font(.footnote)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(AppDesign.Ink.secondary)
             if let placement = score.dataQuality.placementQuality {
                 Label(placementText(placement), systemImage: placementSymbol(placement))
                     .font(.footnote)
@@ -415,6 +422,7 @@ struct DriveScoreCard: View {
 }
 
 struct FlipClock: View {
+    @ObservedObject private var theme = ThemeManager.shared
     enum Style: Equatable {
         case preview
         case active
@@ -449,7 +457,7 @@ struct FlipClock: View {
                         if index == 2 {
                             Text(":")
                                 .font(.system(size: style.colonFontSize, weight: .bold, design: .rounded))
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(AppDesign.Ink.secondary)
                                 .padding(.horizontal, 1)
                         }
                         FlipClockDigit(digit: digit, style: style)
@@ -463,6 +471,7 @@ struct FlipClock: View {
 }
 
 private struct FlipClockDigit: View {
+    @ObservedObject private var theme = ThemeManager.shared
     let digit: String
     let style: FlipClock.Style
 
@@ -509,6 +518,7 @@ private struct FlipClockDigit: View {
 }
 
 struct DriveHelpSheet: View {
+    @ObservedObject private var theme = ThemeManager.shared
     @Environment(\.dismiss) private var dismiss
     @Environment(\.openURL) private var openURL
 
@@ -517,12 +527,12 @@ struct DriveHelpSheet: View {
             Image(systemName: "lifepreserver.fill").font(.system(size: 30)).foregroundStyle(.red)
             Text("Get help safely").font(.title2.weight(.bold))
             Text("If you feel unsafe, pull over in a safe place before using your phone. Roam cannot contact emergency services or monitor a crash.")
-                .foregroundStyle(.secondary)
+                .foregroundStyle(AppDesign.Ink.secondary)
             Button("Call emergency services") {
                 if let number = URL(string: "tel://911") { openURL(number) }
             }
             .buttonStyle(.borderedProminent)
-            .tint(.red)
+            .tint(AppDesign.danger)
             Button("Close") { dismiss() }.buttonStyle(.bordered)
         }
         .padding(24)

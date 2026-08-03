@@ -1,10 +1,24 @@
 import MapKit
 import SwiftUI
 
+/// MapKit caches the renderer and annotation view it created for an overlay,
+/// so a theme switch has to repaint them in place. Re-adding the overlay would
+/// re-run the directions request and refit the camera.
+extension MKMapView {
+    func repaintThemedOverlays(stroke: UIColor) {
+        for overlay in overlays {
+            guard let renderer = renderer(for: overlay) as? MKPolylineRenderer else { continue }
+            renderer.strokeColor = stroke
+            renderer.setNeedsDisplay()
+        }
+    }
+}
+
 struct RouteMapView: UIViewRepresentable {
+    @ObservedObject private var theme = ThemeManager.shared
     let polyline: String
     let bounds: RouteBounds
-    var routeColor: UIColor = .systemBlue
+    var routeColor: UIColor = AppDesign.UIKitColor.accent
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.colorScheme) private var colorScheme
 
@@ -24,6 +38,7 @@ struct RouteMapView: UIViewRepresentable {
 
     func updateUIView(_ mapView: MKMapView, context: Context) {
         mapView.overrideUserInterfaceStyle = interfaceStyle
+        mapView.repaintThemedOverlays(stroke: routeColor)
         context.coordinator.routeColor = routeColor
         context.coordinator.reduceMotion = reduceMotion
         context.coordinator.update(mapView: mapView, polyline: polyline, bounds: bounds)
@@ -35,7 +50,7 @@ struct RouteMapView: UIViewRepresentable {
 
     final class Coordinator: NSObject, MKMapViewDelegate {
         private var renderedKey: String?
-        var routeColor: UIColor = .systemBlue
+        var routeColor: UIColor = AppDesign.UIKitColor.accent
         var reduceMotion = false
 
         func update(mapView: MKMapView, polyline: String, bounds: RouteBounds) {
@@ -203,6 +218,7 @@ enum PolylineDecoder {
 /// A locally recorded route with replay annotations. A moment is shown only
 /// when its timestamp falls inside a verified continuous GPS segment.
 struct RecordedDriveMapView: UIViewRepresentable {
+    @ObservedObject private var theme = ThemeManager.shared
     let route: [DriveRoutePoint]
     let moments: [DriveReplayMoment]
     var selectedEventID: UUID?
@@ -228,6 +244,8 @@ struct RecordedDriveMapView: UIViewRepresentable {
         map.overrideUserInterfaceStyle = interfaceStyle
         context.coordinator.onSelectMoment = onSelectMoment
         context.coordinator.reduceMotion = reduceMotion
+        map.repaintThemedOverlays(stroke: AppDesign.UIKitColor.accent)
+        context.coordinator.repaintMarkers(in: map)
         context.coordinator.update(
             map: map,
             route: route,
@@ -287,6 +305,18 @@ struct RecordedDriveMapView: UIViewRepresentable {
             updateSelection(in: map)
         }
 
+        /// Repaints existing markers for the active theme. `updateSelection`
+        /// only runs when the selection itself changes.
+        func repaintMarkers(in map: MKMapView) {
+            for annotation in map.annotations {
+                guard let annotation = annotation as? DriveReplayAnnotation,
+                      let marker = map.view(for: annotation) as? MKMarkerAnnotationView else { continue }
+                marker.markerTintColor = annotation.moment.id == selectedEventID
+                    ? AppDesign.UIKitColor.accent
+                    : AppDesign.UIKitColor.safety
+            }
+        }
+
         /// Never draw a synthetic line across a gap in accepted GPS data. The
         /// same trace segmentation also powers replay interpolation.
         private func continuousPolylines(from route: [DriveRoutePoint]) -> [MKPolyline] {
@@ -318,8 +348,8 @@ struct RecordedDriveMapView: UIViewRepresentable {
                 guard let annotation = annotation as? DriveReplayAnnotation,
                       let marker = map.view(for: annotation) as? MKMarkerAnnotationView else { continue }
                 marker.markerTintColor = annotation.moment.id == selectedEventID
-                    ? .systemBlue
-                    : .systemOrange
+                    ? AppDesign.UIKitColor.accent
+                    : AppDesign.UIKitColor.safety
                 marker.displayPriority = annotation.moment.id == selectedEventID
                     ? .required
                     : .defaultHigh
@@ -344,7 +374,7 @@ struct RecordedDriveMapView: UIViewRepresentable {
         func mapView(_ mapView: MKMapView, rendererFor overlay: MKOverlay) -> MKOverlayRenderer {
             guard let polyline = overlay as? MKPolyline else { return MKOverlayRenderer(overlay: overlay) }
             let renderer = MKPolylineRenderer(polyline: polyline)
-            renderer.strokeColor = .systemBlue
+            renderer.strokeColor = AppDesign.UIKitColor.accent
             renderer.lineWidth = 5
             renderer.lineCap = .round
             renderer.lineJoin = .round
@@ -357,7 +387,7 @@ struct RecordedDriveMapView: UIViewRepresentable {
                 ?? MKMarkerAnnotationView(annotation: annotation, reuseIdentifier: "drive-event")
             view.annotation = annotation
             view.canShowCallout = true
-            view.markerTintColor = annotation.moment.id == selectedEventID ? .systemBlue : .systemOrange
+            view.markerTintColor = annotation.moment.id == selectedEventID ? AppDesign.UIKitColor.accent : AppDesign.UIKitColor.safety
             view.displayPriority = annotation.moment.id == selectedEventID ? .required : .defaultHigh
             view.glyphImage = UIImage(systemName: annotation.moment.kind.symbol)
             return view
@@ -414,6 +444,7 @@ struct RoutePlanningMapSummary: Equatable {
 }
 
 struct RoutePlanningMapPreview: UIViewRepresentable {
+    @ObservedObject private var theme = ThemeManager.shared
     let origin: String
     let destination: String
     let usesCurrentLocation: Bool
@@ -444,6 +475,8 @@ struct RoutePlanningMapPreview: UIViewRepresentable {
     func updateUIView(_ map: MKMapView, context: Context) {
         map.overrideUserInterfaceStyle = interfaceStyle
         context.coordinator.reduceMotion = reduceMotion
+        map.repaintThemedOverlays(stroke: AppDesign.UIKitColor.accent)
+        context.coordinator.repaintMarkers(in: map)
         let summaryBinding = $summary
         context.coordinator.onSummaryChange = { value in
             DispatchQueue.main.async {
@@ -582,7 +615,7 @@ struct RoutePlanningMapPreview: UIViewRepresentable {
                 return MKOverlayRenderer(overlay: overlay)
             }
             let renderer = MKPolylineRenderer(polyline: polyline)
-            renderer.strokeColor = .systemBlue
+            renderer.strokeColor = AppDesign.UIKitColor.accent
             renderer.lineWidth = 5
             renderer.lineCap = .round
             renderer.lineJoin = .round
@@ -596,10 +629,22 @@ struct RoutePlanningMapPreview: UIViewRepresentable {
                 ?? MKMarkerAnnotationView(annotation: annotation, reuseIdentifier: identifier)
             view.annotation = annotation
             view.canShowCallout = false
-            view.markerTintColor = annotation.kind == .origin ? .systemBlue : .white
+            view.markerTintColor = annotation.kind == .origin ? AppDesign.UIKitColor.accent : AppDesign.UIKitColor.cardSurface
             view.glyphImage = UIImage(systemName: annotation.kind == .origin ? "circle.inset.filled" : "mappin")
             view.displayPriority = .required
             return view
+        }
+
+        /// Repaints existing pins for the active theme without re-running the
+        /// directions request that placed them.
+        func repaintMarkers(in map: MKMapView) {
+            for annotation in map.annotations {
+                guard let annotation = annotation as? RoutePlanningAnnotation,
+                      let marker = map.view(for: annotation) as? MKMarkerAnnotationView else { continue }
+                marker.markerTintColor = annotation.kind == .origin
+                    ? AppDesign.UIKitColor.accent
+                    : AppDesign.UIKitColor.cardSurface
+            }
         }
 
         private static func mapItem(

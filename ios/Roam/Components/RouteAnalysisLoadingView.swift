@@ -3,6 +3,7 @@ import SwiftUI
 /// A short visual explanation of what Roam is doing: trace a route, assemble
 /// its signal points into a car, then send that car on its way to the results.
 struct RouteAnalysisLoadingView: View {
+    @ObservedObject private var theme = ThemeManager.shared
     let isFinishing: Bool
     let onDepartureComplete: () -> Void
 
@@ -38,16 +39,16 @@ struct RouteAnalysisLoadingView: View {
                     VStack(spacing: 8) {
                         Text(statusTitle)
                             .font(.title2.weight(.semibold))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(AppDesign.Ink.primary)
                         Text("Tracing the route, then checking the road signals that shape its difficulty.")
                             .font(.subheadline)
-                            .foregroundStyle(.white.opacity(0.64))
+                            .foregroundStyle(AppDesign.Ink.secondary)
                             .multilineTextAlignment(.center)
                             .frame(maxWidth: min(290, sceneWidth))
                     }
 
                     ProgressView()
-                        .tint(.orange)
+                        .tint(AppDesign.accent)
                 }
                 .padding(horizontalPadding)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -115,6 +116,7 @@ struct RouteAnalysisLoadingView: View {
 }
 
 private struct DotCarIllustration: View {
+    @ObservedObject private var theme = ThemeManager.shared
     let routeProgress: CGFloat
     let dotsAreFormed: Bool
     let isDrivingAway: Bool
@@ -153,7 +155,7 @@ private struct DotCarIllustration: View {
             AppDesign.safety,
             style: StrokeStyle(lineWidth: 12, lineCap: .round, lineJoin: .round)
         )
-        .shadow(color: .orange.opacity(0.35), radius: 12)
+        .shadow(color: AppDesign.safety.opacity(0.35), radius: 12)
     }
 
     private func dotCar(time: TimeInterval) -> some View {
@@ -225,6 +227,7 @@ private struct FloatingDot: View {
 }
 
 private struct DotWheel: View {
+    @ObservedObject private var theme = ThemeManager.shared
     let center: CGPoint
     let phase: Double
     let time: TimeInterval
@@ -235,14 +238,14 @@ private struct DotWheel: View {
     var body: some View {
         ZStack {
             Circle()
-                .stroke(.white.opacity(0.18), lineWidth: 2)
+                .stroke(AppDesign.cardStrokeStrong, lineWidth: 2)
                 .frame(width: 34, height: 34)
 
             ForEach(0..<8, id: \.self) { index in
                 let angle = Double(index) * .pi / 4
                 FloatingDot(
                     size: index.isMultiple(of: 2) ? 8 : 6,
-                    color: index.isMultiple(of: 2) ? .orange : .white.opacity(0.88),
+                    color: index.isMultiple(of: 2) ? AppDesign.safety : AppDesign.Ink.primary.opacity(0.88),
                     phase: phase + Double(index),
                     time: time,
                     isVisible: isVisible,
@@ -256,7 +259,7 @@ private struct DotWheel: View {
 
             FloatingDot(
                 size: 7,
-                color: .white,
+                color: AppDesign.Ink.primary,
                 phase: phase + 9,
                 time: time,
                 isVisible: isVisible,
@@ -304,15 +307,15 @@ private struct CarDot: Identifiable {
     var color: Color {
         switch detail {
         case .body:
-            return isAccent ? .orange : .white
+            return isAccent ? AppDesign.safety : AppDesign.Ink.primary
         case .glass:
-            return Color(red: 0.39, green: 0.76, blue: 1)
+            return AppDesign.accent
         case .trim:
-            return .white.opacity(0.64)
+            return AppDesign.Ink.secondary
         case .headlamp:
-            return Color(red: 1, green: 0.84, blue: 0.28)
+            return AppDesign.safety.opacity(0.85)
         case .tailLamp:
-            return Color(red: 1, green: 0.28, blue: 0.22)
+            return AppDesign.danger
         }
     }
 }

@@ -121,9 +121,22 @@ private extension Double {
     var clampedToUnit: Double { max(0, min(1, self)) }
 }
 
+/// The five demand steps, ordered easiest to hardest. Declared here so the
+/// difficulty ramp lives beside the palettes it has to stay legible against.
+enum DifficultyStep: Int, CaseIterable {
+    case veryEasy
+    case easy
+    case moderate
+    case hard
+    case veryHard
+}
+
 struct ThemePalette: Equatable {
     let accent: RGBA
     let safety: RGBA
+    /// Destructive actions — ending a drive, deleting history. Distinct from
+    /// `safety`, which warns without destroying anything.
+    let danger: RGBA
     let positive: RGBA
     let canvas: RGBA
     let cardSurface: RGBA
@@ -151,6 +164,19 @@ struct ThemePalette: Equatable {
     /// Foreground for primary actions that intentionally use the theme's
     /// primary ink as their filled surface.
     var primarySurfaceForeground: RGBA { .readableForeground(over: inkPrimary) }
+
+    /// Foreground for destructive filled controls.
+    var dangerForeground: RGBA { .readableForeground(over: danger) }
+
+    /// Fixed green-to-red demand ramp. The hues stay constant so the scale
+    /// remains learnable between themes, but a light canvas needs the darker
+    /// end of each hue — the old single ramp put near-white yellow on cream.
+    func difficultyColor(_ step: DifficultyStep) -> RGBA {
+        let ramp = appearance == .dark
+            ? ThemeCatalog.darkDifficultyRamp
+            : ThemeCatalog.lightDifficultyRamp
+        return ramp[step.rawValue]
+    }
 }
 
 enum ThemeCatalog {
@@ -175,9 +201,28 @@ enum ThemeCatalog {
         return id
     }
 
+    /// Bright ramp for dark canvases.
+    static let darkDifficultyRamp: [RGBA] = [
+        .rgb(0.30, 0.82, 0.45),
+        .rgb(0.48, 0.86, 0.42),
+        .rgb(0.97, 0.78, 0.22),
+        .rgb(1.00, 0.60, 0.25),
+        .rgb(1.00, 0.42, 0.32),
+    ]
+
+    /// Deepened ramp for light canvases, where the bright ramp washes out.
+    static let lightDifficultyRamp: [RGBA] = [
+        .rgb(0.08, 0.48, 0.22),
+        .rgb(0.16, 0.53, 0.20),
+        .rgb(0.62, 0.44, 0.02),
+        .rgb(0.76, 0.36, 0.04),
+        .rgb(0.76, 0.16, 0.12),
+    ]
+
     private static let dark = ThemePalette(
         accent: .rgb(0.02, 0.42, 0.92),
         safety: .rgb(1.0, 0.58, 0.0),
+        danger: .rgb(0.82, 0.18, 0.17),
         positive: .rgb(0.20, 0.78, 0.35),
         canvas: .rgb(18 / 255, 18 / 255, 18 / 255),
         cardSurface: .rgb(30 / 255, 30 / 255, 30 / 255),
@@ -197,6 +242,7 @@ enum ThemeCatalog {
     private static let light = ThemePalette(
         accent: .rgb(0.02, 0.42, 0.92),
         safety: .rgb(0.90, 0.45, 0.05),
+        danger: .rgb(0.78, 0.12, 0.12),
         positive: .rgb(0.12, 0.62, 0.30),
         canvas: .rgb(0.96, 0.96, 0.97),
         cardSurface: .rgb(1.0, 1.0, 1.0),
@@ -216,6 +262,7 @@ enum ThemeCatalog {
     private static let goldfish = ThemePalette(
         accent: .rgb(1.0, 0.45, 0.18),
         safety: .rgb(0.92, 0.28, 0.18),
+        danger: .rgb(0.74, 0.10, 0.10),
         positive: .rgb(0.18, 0.62, 0.42),
         canvas: .rgb(1.0, 0.96, 0.90),
         cardSurface: .rgb(1.0, 0.99, 0.96),
@@ -235,6 +282,7 @@ enum ThemeCatalog {
     private static let midnight = ThemePalette(
         accent: .rgb(0.20, 0.82, 0.92),
         safety: .rgb(1.0, 0.62, 0.28),
+        danger: .rgb(0.84, 0.20, 0.30),
         positive: .rgb(0.35, 0.86, 0.62),
         canvas: .rgb(0.05, 0.08, 0.16),
         cardSurface: .rgb(0.09, 0.13, 0.24),
@@ -254,6 +302,7 @@ enum ThemeCatalog {
     private static let ember = ThemePalette(
         accent: .rgb(0.98, 0.62, 0.18),
         safety: .rgb(1.0, 0.42, 0.18),
+        danger: .rgb(0.80, 0.16, 0.12),
         positive: .rgb(0.45, 0.82, 0.38),
         canvas: .rgb(0.10, 0.08, 0.07),
         cardSurface: .rgb(0.16, 0.12, 0.10),
@@ -273,6 +322,7 @@ enum ThemeCatalog {
     private static let sequoia = ThemePalette(
         accent: .rgb(0.35, 0.78, 0.58),
         safety: .rgb(0.95, 0.55, 0.20),
+        danger: .rgb(0.80, 0.19, 0.19),
         positive: .rgb(0.45, 0.86, 0.55),
         canvas: .rgb(0.07, 0.11, 0.09),
         cardSurface: .rgb(0.11, 0.16, 0.13),

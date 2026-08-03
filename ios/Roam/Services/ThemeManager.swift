@@ -1,10 +1,18 @@
 import Combine
 import Foundation
 import SwiftUI
+import UIKit
 
 extension RGBA {
     var color: Color {
         Color(red: red, green: green, blue: blue, opacity: alpha)
+    }
+
+    /// MapKit renderers and annotation views are UIKit, so they need a UIColor
+    /// rather than a SwiftUI Color. Without this the maps stayed system blue
+    /// no matter which theme was active.
+    var uiColor: UIColor {
+        UIColor(red: red, green: green, blue: blue, alpha: alpha)
     }
 }
 

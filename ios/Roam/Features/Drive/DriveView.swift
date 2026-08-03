@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct DriveView: View {
+    @ObservedObject private var theme = ThemeManager.shared
     @EnvironmentObject private var session: DriveSessionManager
     @State private var showingHelp = false
     @State private var presentationState = DrivePresentationState()
@@ -125,7 +126,7 @@ struct DriveView: View {
         VStack(spacing: 8) {
             Label("CURRENT SPEED", systemImage: "speedometer")
                 .font(.caption.weight(.bold))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(AppDesign.Ink.secondary)
             HStack(alignment: .firstTextBaseline, spacing: 6) {
                 Text("\(session.currentSpeedMilesPerHour)")
                     .font(.system(size: 62, weight: .semibold, design: .rounded))
@@ -133,7 +134,7 @@ struct DriveView: View {
                     .contentTransition(.numericText())
                 Text("mph")
                     .font(.title3.weight(.semibold))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(AppDesign.Ink.secondary)
             }
         }
         .frame(maxWidth: .infinity)
@@ -218,7 +219,7 @@ struct DriveView: View {
             .background(AppDesign.cardSurfaceElevated, in: RoundedRectangle(cornerRadius: AppDesign.cornerRadiusSmall, style: .continuous))
             .overlay {
                 RoundedRectangle(cornerRadius: AppDesign.cornerRadiusSmall, style: .continuous)
-                    .stroke(Color.primary.opacity(0.14), lineWidth: 1)
+                    .stroke(AppDesign.cardStrokeStrong, lineWidth: 1)
             }
 
             VStack(alignment: .leading, spacing: 10) {
@@ -233,7 +234,7 @@ struct DriveView: View {
                                 .foregroundStyle(AppDesign.accent)
                             Text(routeOrigin.isEmpty ? "Use current location" : routeOrigin)
                                 .font(.footnote.weight(.semibold))
-                                .foregroundStyle(.primary)
+                                .foregroundStyle(AppDesign.Ink.primary)
                                 .lineLimit(2)
                             Spacer()
                             if case .locating = routeLocationCoordinator.state {
@@ -402,7 +403,7 @@ struct DriveView: View {
                         .font(.subheadline.weight(.semibold))
                     Text("Roam only counts this as route practice when saved GPS overlaps the route.")
                         .font(.footnote)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(AppDesign.Ink.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
 
@@ -411,9 +412,9 @@ struct DriveView: View {
                 } label: {
                     Image(systemName: "xmark")
                         .font(.caption.weight(.bold))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(AppDesign.Ink.secondary)
                         .frame(width: 32, height: 32)
-                        .background(Color(.tertiarySystemFill), in: Circle())
+                        .background(AppDesign.trackSurface, in: Circle())
                 }
                 .buttonStyle(PressableScaleStyle())
                 .accessibilityLabel("Cancel practice route")
@@ -425,7 +426,7 @@ struct DriveView: View {
                 VStack(alignment: .leading, spacing: 7) {
                     Text("Practice goals")
                         .font(.caption.weight(.bold))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(AppDesign.Ink.secondary)
                     ForEach(plan.goals) { goal in
                         Label(goal.title, systemImage: goal.requiresAdultSupervision ? "figure.and.child.holdinghands" : "checkmark.circle")
                             .font(.footnote)
@@ -489,7 +490,7 @@ struct DriveView: View {
                 if !keepsFocusedCanvas {
                     Text(session.statusMessage)
                         .font(.footnote)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(AppDesign.Ink.secondary)
                         .multilineTextAlignment(.center)
                 }
             }
@@ -538,10 +539,10 @@ struct DriveView: View {
             .font(.headline)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 18)
-            .foregroundStyle(showsEnd ? Color.white : AppDesign.accentForeground)
+            .foregroundStyle(showsEnd ? AppDesign.dangerForeground : AppDesign.accentForeground)
             .background(
                 RoundedRectangle(cornerRadius: AppDesign.cornerRadius, style: .continuous)
-                    .fill(showsEnd ? Color.red : AppDesign.accent)
+                    .fill(showsEnd ? AppDesign.danger : AppDesign.accent)
             )
             // The fill is animated here rather than inherited so the accent →
             // red crossfade tracks the same spring as the travel downward.
@@ -636,7 +637,7 @@ struct DriveView: View {
             Label("A physical iPhone is required for meaningful sensor data.", systemImage: "iphone")
         }
         .font(.footnote)
-        .foregroundStyle(.secondary)
+        .foregroundStyle(AppDesign.Ink.secondary)
         .premiumCard()
     }
 
@@ -649,28 +650,28 @@ struct DriveView: View {
                 } label: {
                     HStack(spacing: 12) {
                         Image(systemName: "map.fill")
-                            .foregroundStyle(Color.accentColor)
+                            .foregroundStyle(AppDesign.accent)
                             .frame(width: 30, height: 30)
-                            .background(Color.accentColor.opacity(0.12))
+                            .background(AppDesign.accent.opacity(0.12))
                             .clipShape(Circle())
                         VStack(alignment: .leading, spacing: 3) {
                             Text(drive.startedAt.formatted(date: .abbreviated, time: .shortened))
                                 .font(.subheadline.weight(.semibold))
                             Text("\(String(format: "%.1f", drive.score.distanceMiles)) mi · \(drive.score.events.count) coaching events")
                                 .font(.caption)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(AppDesign.Ink.secondary)
                             DriveRouteAnalysisBadge(analysis: drive.routeAnalysis)
                         }
                         Spacer()
                         VStack(alignment: .trailing, spacing: 1) {
                             Text("\(drive.score.score)")
                                 .font(.headline.monospacedDigit())
-                                .foregroundStyle(drive.score.score >= 78 ? .green : .orange)
+                                .foregroundStyle(drive.score.score >= 78 ? AppDesign.positive : AppDesign.safety)
                             Text("drive score")
                                 .font(.caption2)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(AppDesign.Ink.secondary)
                         }
-                        Image(systemName: "chevron.right").font(.caption.weight(.bold)).foregroundStyle(.tertiary)
+                        Image(systemName: "chevron.right").font(.caption.weight(.bold)).foregroundStyle(AppDesign.Ink.tertiary)
                     }
                     .contentShape(Rectangle())
                 }

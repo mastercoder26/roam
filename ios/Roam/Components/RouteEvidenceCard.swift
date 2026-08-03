@@ -4,6 +4,7 @@ import SwiftUI
 /// avoids confidence percentages and score intervals until a versioned, held-out
 /// validation artifact exists for a declared prediction target.
 struct RouteEvidenceCard: View {
+    @ObservedObject private var theme = ThemeManager.shared
     let evidence: ScoreEvidence?
 
     var body: some View {

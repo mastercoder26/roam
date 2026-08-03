@@ -2,6 +2,7 @@ import SwiftUI
 import UIKit
 
 struct PracticePlanPreview: View {
+    @ObservedObject private var theme = ThemeManager.shared
     let plan: PracticePlan
 
     var body: some View {
@@ -10,7 +11,7 @@ struct PracticePlanPreview: View {
                 Image(systemName: "target").foregroundStyle(AppDesign.safety)
                 Text("Guided practice plan").font(.subheadline.weight(.semibold))
             }
-            Text(plan.summary).font(.footnote).foregroundStyle(.secondary)
+            Text(plan.summary).font(.footnote).foregroundStyle(AppDesign.Ink.secondary)
             ForEach(plan.goals) { goal in
                 HStack(alignment: .top, spacing: 9) {
                     Image(systemName: goal.requiresAdultSupervision ? "figure.and.child.holdinghands" : "checkmark.circle")
@@ -19,7 +20,7 @@ struct PracticePlanPreview: View {
                         .frame(width: 18)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(goal.title).font(.footnote.weight(.semibold))
-                        Text(goal.coachingText).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                        Text(goal.coachingText).font(.caption).foregroundStyle(AppDesign.Ink.secondary).fixedSize(horizontal: false, vertical: true)
                     }
                 }
             }
@@ -32,6 +33,7 @@ struct PracticePlanPreview: View {
 }
 
 struct DepartureComparisonRow: View {
+    @ObservedObject private var theme = ThemeManager.shared
     let candidate: DepartureComparisonCandidateResult
     let isCalmestAvailable: Bool
     let isCurrentDeparture: Bool
@@ -56,13 +58,13 @@ struct DepartureComparisonRow: View {
                             Text(departureLabel).font(.subheadline.weight(.semibold))
                             Text("Difficulty \(route.formattedScore) · \(route.formattedDuration) · \(route.formattedDistance)")
                                 .font(.caption)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(AppDesign.Ink.secondary)
                             if isCalmestAvailable {
                                 Text("Calmest available").font(.caption2.weight(.bold)).foregroundStyle(AppDesign.positive)
                             } else if isCurrentDeparture {
                                 Text("Current departure").font(.caption2.weight(.bold)).foregroundStyle(AppDesign.accent)
                             } else if !DepartureComparisonRanking.hasComparableConditions(candidate) {
-                                Text("Some comparison conditions are unavailable").font(.caption2).foregroundStyle(.secondary)
+                                Text("Some comparison conditions are unavailable").font(.caption2).foregroundStyle(AppDesign.Ink.secondary)
                             }
                         }
                         Spacer(minLength: 0)
@@ -82,12 +84,12 @@ struct DepartureComparisonRow: View {
                 .accessibilityHint(isCurrentDeparture ? "This is the time used for the current route result." : "Refreshes the full route analysis for this departure time.")
             } else {
                 HStack(alignment: .top, spacing: 12) {
-                    Image(systemName: "clock.badge.exclamationmark").foregroundStyle(.secondary).frame(width: 28, height: 28)
+                    Image(systemName: "clock.badge.exclamationmark").foregroundStyle(AppDesign.Ink.secondary).frame(width: 28, height: 28)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(departureLabel).font(.subheadline.weight(.semibold))
                         Text(candidate.error?.message ?? "This departure time was unavailable.")
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(AppDesign.Ink.secondary)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                 }
@@ -99,13 +101,14 @@ struct DepartureComparisonRow: View {
 }
 
 struct ReadinessHistorySummary: View {
+    @ObservedObject private var theme = ThemeManager.shared
     let profile: DriverReadinessProfile
 
     var body: some View {
         VStack(alignment: .leading, spacing: 7) {
             Label("Evidence from your saved drives", systemImage: "lock.shield.fill")
                 .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(AppDesign.Ink.secondary)
             Text("\(profile.qualifyingDriveCount) qualifying \(profile.qualifyingDriveCount == 1 ? "drive" : "drives") · \(String(format: "%.1f", profile.reliableTraceMiles)) mi of validated GPS trace · \(profile.qualifyingDriveDayCount) \(profile.qualifyingDriveDayCount == 1 ? "day" : "days")")
                 .font(.footnote.weight(.medium))
                 .monospacedDigit()
@@ -116,7 +119,7 @@ struct ReadinessHistorySummary: View {
             }
             Text("GPS, motion, and route overlap are analyzed on this iPhone only.")
                 .font(.caption2)
-                .foregroundStyle(.tertiary)
+                .foregroundStyle(AppDesign.Ink.tertiary)
         }
         .padding(12)
         .background(AppDesign.cardSurfaceElevated, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
@@ -128,9 +131,9 @@ struct ReadinessHistorySummary: View {
         VStack(alignment: .leading, spacing: 1) {
             HStack(spacing: 7) {
                 Image(systemName: symbol).font(.caption.weight(.semibold)).foregroundStyle(AppDesign.accent).frame(width: 15)
-                Text(title).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                Text(title).font(.caption).foregroundStyle(AppDesign.Ink.secondary).fixedSize(horizontal: false, vertical: true)
             }
-            Text(value).font(.caption.weight(.medium)).foregroundStyle(.primary).monospacedDigit().fixedSize(horizontal: false, vertical: true).padding(.leading, 22)
+            Text(value).font(.caption.weight(.medium)).foregroundStyle(AppDesign.Ink.primary).monospacedDigit().fixedSize(horizontal: false, vertical: true).padding(.leading, 22)
         }
     }
 
@@ -141,6 +144,7 @@ struct ReadinessHistorySummary: View {
 }
 
 struct ReadinessInsightRow: View {
+    @ObservedObject private var theme = ThemeManager.shared
     let insight: DriverReadinessInsight
 
     private var color: Color {
@@ -167,17 +171,17 @@ struct ReadinessInsightRow: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(insight.title).font(.subheadline.weight(.semibold)).fixedSize(horizontal: false, vertical: true)
                 Text(stateTitle).font(.caption2.weight(.bold)).foregroundStyle(color).textCase(.uppercase)
-                Text(insight.detail).font(.footnote).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                Text(insight.detail).font(.footnote).foregroundStyle(AppDesign.Ink.secondary).fixedSize(horizontal: false, vertical: true)
                 if let evidence = insight.evidence {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Saved: \(evidence.recordedValue)").font(.caption.weight(.medium)).foregroundStyle(.primary)
+                        Text("Saved: \(evidence.recordedValue)").font(.caption.weight(.medium)).foregroundStyle(AppDesign.Ink.primary)
                         if let target = evidence.comparisonTarget {
-                            Text("Compared with: \(target)").font(.caption).foregroundStyle(.secondary)
+                            Text("Compared with: \(target)").font(.caption).foregroundStyle(AppDesign.Ink.secondary)
                         }
                         if let collectionNote = evidence.collectionNote {
                             Label(collectionNote, systemImage: "info.circle")
                                 .font(.caption2)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(AppDesign.Ink.secondary)
                                 .fixedSize(horizontal: false, vertical: true)
                                 .padding(.top, 2)
                         }
@@ -201,6 +205,7 @@ struct ReadinessInsightRow: View {
 }
 
 struct RouteDemandRow: View {
+    @ObservedObject private var theme = ThemeManager.shared
     let demand: RouteDemand
 
     private var color: Color {
@@ -241,7 +246,7 @@ struct RouteDemandRow: View {
                         Text(demand.title).font(.subheadline.weight(.semibold))
                         Text(levelLabel).font(.caption2.weight(.bold)).foregroundStyle(color).padding(.horizontal, 7).padding(.vertical, 3).background(color.opacity(0.12), in: Capsule())
                     }
-                    Text(demand.evidence).font(.footnote).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                    Text(demand.evidence).font(.footnote).foregroundStyle(AppDesign.Ink.secondary).fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer(minLength: 0)
             }
@@ -260,6 +265,7 @@ struct RouteDemandRow: View {
 }
 
 struct BreakdownBarRow: View {
+    @ObservedObject private var theme = ThemeManager.shared
     let title: String
     let value: Double
     @State private var displayedValue: Double = 0
@@ -270,7 +276,7 @@ struct BreakdownBarRow: View {
             HStack {
                 Text(title).font(.subheadline)
                 Spacer()
-                Text(String(format: "%.0f%%", displayedValue * 100)).font(.subheadline.weight(.medium)).foregroundStyle(.secondary).monospacedDigit().contentTransition(.numericText())
+                Text(String(format: "%.0f%%", displayedValue * 100)).font(.subheadline.weight(.medium)).foregroundStyle(AppDesign.Ink.secondary).monospacedDigit().contentTransition(.numericText())
             }
             GeometryReader { geometry in
                 ZStack(alignment: .leading) {
@@ -289,18 +295,19 @@ struct BreakdownBarRow: View {
     private var barColor: Color {
         switch displayedValue {
         case 0..<0.35: .green
-        case 0.35..<0.65: .orange
+        case 0.35..<0.65: AppDesign.safety
         default: AppDesign.safety
         }
     }
 }
 
 struct ReasonChipView: View {
+    @ObservedObject private var theme = ThemeManager.shared
     let text: String
     var body: some View {
         Text(text)
             .font(.subheadline.weight(.medium))
-            .foregroundStyle(.primary)
+            .foregroundStyle(AppDesign.Ink.primary)
             .lineLimit(2)
             .fixedSize(horizontal: false, vertical: true)
             .padding(.horizontal, 12)
@@ -360,6 +367,7 @@ struct FlowLayout: Layout {
 }
 
 struct TripDetailsCard: View {
+    @ObservedObject private var theme = ThemeManager.shared
     let route: ScoredRoute
 
     var body: some View {
@@ -378,7 +386,7 @@ struct TripDetailsCard: View {
                         title: "Delay",
                         value: delay,
                         systemImage: "car.fill",
-                        valueColor: .orange
+                        valueColor: AppDesign.safety
                     )
                 }
 
@@ -391,10 +399,10 @@ struct TripDetailsCard: View {
 
             HStack(spacing: 6) {
                 Image(systemName: "gauge.with.dots.needle.33percent")
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(AppDesign.Ink.secondary)
                 Text("Normal drive: \(route.formattedStaticDuration)")
                     .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(AppDesign.Ink.secondary)
             }
         }
         .premiumCard()
@@ -402,6 +410,7 @@ struct TripDetailsCard: View {
 }
 
 private struct DetailTile: View {
+    @ObservedObject private var theme = ThemeManager.shared
     let title: String
     let value: String
     let systemImage: String
@@ -418,13 +427,14 @@ private struct DetailTile: View {
                 .monospacedDigit()
             Text(title)
                 .font(AppDesign.Typography.metricLabel)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(AppDesign.Ink.secondary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
 struct RouteConditionsCard: View {
+    @ObservedObject private var theme = ThemeManager.shared
     let conditions: RouteConditions
 
     var body: some View {
@@ -451,7 +461,7 @@ struct RouteConditionsCard: View {
                         }
                         Text(weatherDetailText(conditions.weather))
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(AppDesign.Ink.secondary)
                     }
                     Spacer()
                 }
@@ -472,7 +482,7 @@ struct RouteConditionsCard: View {
                             .font(.subheadline.weight(.semibold))
                         Text(roadDetailText(conditions.road))
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(AppDesign.Ink.secondary)
                     }
                     Spacer()
                 }
@@ -481,7 +491,7 @@ struct RouteConditionsCard: View {
             if conditions.road.constructionZones > 0 {
                 conditionRow(
                     systemImage: "cone.fill",
-                    color: .orange,
+                    color: AppDesign.safety,
                     text: conditions.road.constructionZones == 1
                         ? "1 construction zone along the route"
                         : "\(conditions.road.constructionZones) construction zones along the route"
@@ -505,7 +515,7 @@ struct RouteConditionsCard: View {
                     systemImage: "checkmark.seal"
                 )
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(AppDesign.Ink.secondary)
             }
         }
         .premiumCard()

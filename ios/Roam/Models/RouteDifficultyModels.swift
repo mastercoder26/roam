@@ -676,14 +676,4 @@ extension DifficultyLabel {
         case .veryHard: return "DifficultyVeryHard"
         }
     }
-
-    var systemColor: (red: Double, green: Double, blue: Double) {
-        switch self {
-        case .veryEasy: return (0.20, 0.78, 0.35)
-        case .easy: return (0.40, 0.85, 0.45)
-        case .moderate: return (1.00, 0.80, 0.00)
-        case .hard: return (1.00, 0.55, 0.20)
-        case .veryHard: return (1.00, 0.48, 0.12)
-        }
-    }
 }

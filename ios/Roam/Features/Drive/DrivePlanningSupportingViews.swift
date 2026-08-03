@@ -3,6 +3,7 @@ import SwiftUI
 /// Break timing and practice debrief UI are kept out of the recording surface
 /// so drive capture state is not coupled to follow-up coaching presentation.
 struct BreakRecommendationsView: View {
+    @ObservedObject private var theme = ThemeManager.shared
     let route: ScoredRoute
     let continuousMinutes: Double
 
@@ -19,7 +20,7 @@ struct BreakRecommendationsView: View {
                         .font(.subheadline.weight(.semibold))
                     Text(recommendation.detail)
                         .font(.footnote)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(AppDesign.Ink.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
@@ -37,7 +38,7 @@ struct BreakRecommendationsView: View {
                                 .frame(width: 3, height: 22)
                             Text(stop.reason)
                                 .font(.caption)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(AppDesign.Ink.secondary)
                             Spacer(minLength: 0)
                         }
                     }
@@ -119,6 +120,7 @@ private struct BreakRecommendation {
 }
 
 struct PracticeDebriefCard: View {
+    @ObservedObject private var theme = ThemeManager.shared
     let drive: RecordedDrive
 
     private var debrief: PracticeDriveDebrief? {
@@ -142,7 +144,7 @@ struct PracticeDebriefCard: View {
                         Text(debrief.headline).font(.headline)
                         Text(debrief.summary)
                             .font(.footnote)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(AppDesign.Ink.secondary)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                 }
@@ -152,7 +154,7 @@ struct PracticeDebriefCard: View {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Practice goals")
                             .font(.caption.weight(.bold))
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(AppDesign.Ink.secondary)
                         ForEach(debrief.goalCompletions) { completion in
                             let goal = planGoals.first(where: { $0.id == completion.goalID })
                             HStack(alignment: .top, spacing: 8) {
@@ -163,7 +165,7 @@ struct PracticeDebriefCard: View {
                                         .font(.footnote.weight(.semibold))
                                     Text(completion.status.title)
                                         .font(.caption)
-                                        .foregroundStyle(.secondary)
+                                        .foregroundStyle(AppDesign.Ink.secondary)
                                 }
                                 Spacer(minLength: 0)
                             }

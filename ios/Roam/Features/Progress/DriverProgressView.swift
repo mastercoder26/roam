@@ -4,6 +4,7 @@ import SwiftUI
 /// A private view of measured driving evidence and a route-adjusted coaching
 /// score. It is never a safety guarantee, driving permission, or ranking.
 struct DriverProgressView: View {
+    @ObservedObject private var theme = ThemeManager.shared
     @EnvironmentObject private var session: DriveSessionManager
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -64,7 +65,7 @@ struct DriverProgressView: View {
                 .tracking(-0.5)
             Text("Private measurement coverage from drives recorded on this iPhone.")
                 .font(.subheadline)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(AppDesign.Ink.secondary)
         }
     }
 
@@ -94,7 +95,7 @@ struct DriverProgressView: View {
                             .monospacedDigit()
                         Text("/100")
                             .font(.caption.weight(.medium))
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(AppDesign.Ink.secondary)
                     }
                     .accessibilityLabel("Overall driving score \(score) out of 100")
                 }
@@ -117,7 +118,7 @@ struct DriverProgressView: View {
 
             Text(performance.detail)
                 .font(.footnote)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(AppDesign.Ink.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
         .padding(AppDesign.cardPadding)
@@ -166,7 +167,7 @@ struct DriverProgressView: View {
                 .font(.headline)
             Text("Complete a drive with usable GPS and motion. It stays in history while Roam automatically analyzes its start-to-destination route difficulty.")
                 .font(.footnote)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(AppDesign.Ink.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
         .premiumCard()
@@ -201,7 +202,7 @@ struct DriverProgressView: View {
                 .foregroundStyle(AppDesign.accent)
             Text("Recorded evidence is still limited. These measurements describe what this iPhone has captured so far, not a recommendation about a future drive.")
                 .font(.footnote)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(AppDesign.Ink.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
         .padding(14)
@@ -223,7 +224,7 @@ struct DriverProgressView: View {
             .chartYAxis {
                 AxisMarks(position: .leading) { value in
                     AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5))
-                        .foregroundStyle(Color.secondary.opacity(0.18))
+                        .foregroundStyle(AppDesign.cardStroke)
                     AxisValueLabel {
                         if let miles = value.as(Double.self) {
                             Text(miles, format: .number.precision(.fractionLength(0)))
@@ -280,7 +281,7 @@ struct DriverProgressView: View {
             systemImage: "lock.shield.fill"
         )
         .font(.footnote)
-        .foregroundStyle(.secondary)
+        .foregroundStyle(AppDesign.Ink.secondary)
         .padding(.horizontal, 4)
     }
 
@@ -290,7 +291,7 @@ struct DriverProgressView: View {
                 .foregroundStyle(AppDesign.safety)
             Text("\(notYetQualifyingDriveCount) \(notYetQualifyingDriveCount == 1 ? "saved drive is" : "saved drives are") not yet qualifying for progress totals. They remain in your private history and need enough usable GPS, motion, distance, and continuous trace data before they count here.")
                 .font(.footnote)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(AppDesign.Ink.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
         .padding(14)
@@ -314,6 +315,7 @@ struct DriverProgressView: View {
 }
 
 private struct ProgressMetric: View {
+    @ObservedObject private var theme = ThemeManager.shared
     let value: String
     let label: String
     let symbol: String
@@ -327,7 +329,7 @@ private struct ProgressMetric: View {
                 .font(.title3.weight(.bold).monospacedDigit())
             Text(label)
                 .font(.caption2)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(AppDesign.Ink.secondary)
                 .lineLimit(2)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -336,6 +338,7 @@ private struct ProgressMetric: View {
 }
 
 private struct ProgressScoreSignal: View {
+    @ObservedObject private var theme = ThemeManager.shared
     let value: String
     let label: String
 
@@ -345,17 +348,18 @@ private struct ProgressScoreSignal: View {
                 .font(.caption.weight(.bold).monospacedDigit())
             Text(label)
                 .font(.caption2)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(AppDesign.Ink.secondary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
-        .background(Color.primary.opacity(0.055), in: RoundedRectangle(cornerRadius: AppDesign.cornerRadiusTiny, style: .continuous))
+        .background(AppDesign.cardSurfaceElevated, in: RoundedRectangle(cornerRadius: AppDesign.cornerRadiusTiny, style: .continuous))
         .accessibilityElement(children: .combine)
     }
 }
 
 private struct ProgressCoverageRow: View {
+    @ObservedObject private var theme = ThemeManager.shared
     let title: String
     let value: String
     let detail: String
@@ -370,7 +374,7 @@ private struct ProgressCoverageRow: View {
                 .background(AppDesign.positive.opacity(0.12), in: RoundedRectangle(cornerRadius: AppDesign.cornerRadiusTiny, style: .continuous))
             VStack(alignment: .leading, spacing: 2) {
                 Text(title).font(.subheadline.weight(.semibold))
-                Text(detail).font(.caption).foregroundStyle(.secondary)
+                Text(detail).font(.caption).foregroundStyle(AppDesign.Ink.secondary)
             }
             Spacer(minLength: 4)
             Text(value)

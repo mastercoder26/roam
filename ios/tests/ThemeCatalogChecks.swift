@@ -58,6 +58,41 @@ struct ThemeCatalogChecks {
                 palette.primarySurfaceForeground.contrastRatio(over: palette.inkPrimary) >= 4.5,
                 "\(id.rawValue) primary-ink actions must choose a readable foreground"
             )
+            expect(
+                palette.dangerForeground.contrastRatio(over: palette.danger) >= 4.5,
+                "\(id.rawValue) destructive actions must choose a readable foreground"
+            )
+            // Danger also appears as a bare tint and label, not only as a fill.
+            expect(
+                palette.danger.contrastRatio(over: palette.canvas) >= 3,
+                "\(id.rawValue) danger must stay visible against its own canvas"
+            )
+
+            // Every demand step is drawn as a gauge stroke and a bold numeral
+            // straight on the canvas. A single fixed ramp used to put a
+            // near-white yellow on the light and Goldfish schemes.
+            for step in DifficultyStep.allCases {
+                expect(
+                    palette.difficultyColor(step).contrastRatio(over: palette.canvas) >= 3,
+                    "\(id.rawValue) difficulty step \(step) must stay legible on its canvas"
+                )
+            }
+        }
+
+        // The ramp must stay readable as a scale: easiest is the greenest,
+        // hardest the reddest, in both appearances.
+        for id in [ThemeID.dark, .light] {
+            let palette = ThemeCatalog.palette(for: id)
+            let easiest = palette.difficultyColor(.veryEasy)
+            let hardest = palette.difficultyColor(.veryHard)
+            expect(
+                easiest.green > easiest.red,
+                "\(id.rawValue) easiest demand step should read green"
+            )
+            expect(
+                hardest.red > hardest.green,
+                "\(id.rawValue) hardest demand step should read red"
+            )
         }
 
         print("ThemeCatalog checks passed")

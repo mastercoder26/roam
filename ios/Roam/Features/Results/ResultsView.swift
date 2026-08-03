@@ -2,6 +2,7 @@ import SwiftUI
 import UIKit
 
 struct ResultsView: View {
+    @ObservedObject private var theme = ThemeManager.shared
     @State private var result: RouteAnalysisResult
 
     @Environment(\.openURL) private var openURL
@@ -185,10 +186,10 @@ struct ResultsView: View {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(readiness.headline)
                         .font(.headline)
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(AppDesign.Ink.primary)
                     Text(readiness.summary)
                         .font(.footnote)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(AppDesign.Ink.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
@@ -258,7 +259,7 @@ struct ResultsView: View {
                 systemImage: "checkmark.shield"
             )
             .font(.caption)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(AppDesign.Ink.secondary)
         }
         .premiumCard()
         .animation(reduceMotion ? .easeOut(duration: 0.16) : AppAnimation.content, value: selectedRoute.polyline)
@@ -279,7 +280,7 @@ struct ResultsView: View {
                         systemImage: "checkmark.circle.fill"
                     )
                     .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(AppDesign.Ink.secondary)
                 } else {
                     VStack(spacing: 0) {
                         ForEach(visibleRouteDemands) { demand in
@@ -297,7 +298,7 @@ struct ResultsView: View {
                         systemImage: "checkmark.shield.fill"
                     )
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(AppDesign.Ink.secondary)
                 }
             }
             .premiumCard()
@@ -497,7 +498,7 @@ struct ResultsView: View {
                         .padding(.vertical, 4)
                 }
                 .buttonStyle(.borderedProminent)
-                .tint(Color(red: 0.0, green: 0.48, blue: 1.0))
+                .tint(AppDesign.accent)
 
                 Button {
                     openInGoogleMaps()
@@ -547,7 +548,7 @@ struct ResultsView: View {
                             .font(.subheadline.weight(.medium))
                         Text(String(format: "Intensity %.0f%%", hotspot.difficulty * 100))
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(AppDesign.Ink.secondary)
                     }
                     Spacer()
                 }
@@ -588,7 +589,7 @@ struct ResultsView: View {
             if selectedRoute.reasons.isEmpty {
                 Text("No specific difficulty factors identified for this route.")
                     .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(AppDesign.Ink.secondary)
             } else {
                 ReasonChipFlowLayout(reasons: selectedRoute.reasons)
             }
@@ -609,7 +610,7 @@ struct ResultsView: View {
                     ProgressView().tint(AppDesign.accent)
                     Text("Comparing nearby departure times")
                         .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(AppDesign.Ink.secondary)
                 }
                 .padding(.vertical, 8)
             } else if let departureComparison {
@@ -630,11 +631,11 @@ struct ResultsView: View {
                     systemImage: "checkmark.shield"
                 )
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(AppDesign.Ink.secondary)
             } else if let departureComparisonError {
                 Label("Departure comparison is unavailable right now. \(departureComparisonError)", systemImage: "info.circle")
                     .font(.footnote)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(AppDesign.Ink.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
@@ -667,7 +668,7 @@ struct ResultsView: View {
                     ProgressView().tint(AppDesign.accent)
                     Text("Preparing route choices")
                         .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(AppDesign.Ink.secondary)
                 }
                 .padding(.vertical, 8)
             }

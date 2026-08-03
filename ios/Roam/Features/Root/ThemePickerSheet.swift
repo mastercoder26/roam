@@ -2,6 +2,7 @@ import SwiftUI
 import UIKit
 
 struct ThemePickerSheet: View {
+    @ObservedObject private var theme = ThemeManager.shared
     @ObservedObject var themeManager: ThemeManager
     @EnvironmentObject private var driveSession: DriveSessionManager
     @Environment(\.dismiss) private var dismiss

@@ -2,6 +2,7 @@ import SwiftUI
 import UIKit
 
 struct RoamRootView: View {
+    @ObservedObject private var theme = ThemeManager.shared
     private enum AppTab: String, CaseIterable, Identifiable {
         case routes
         case drive
@@ -58,6 +59,11 @@ struct RoamRootView: View {
         }
         .environmentObject(driveSession)
         .environmentObject(themeManager)
+        // System chrome — tab bar selection, toolbar buttons, text carets —
+        // reads the tint, not AppDesign. Without this the bar kept the stock
+        // blue selection on every theme.
+        .tint(AppDesign.accent)
+        .background(themeManager.palette.canvas.color.ignoresSafeArea())
         .preferredColorScheme(themeManager.preferredColorScheme)
         .sheet(isPresented: $showingThemePicker) {
             ThemePickerSheet(themeManager: themeManager)
