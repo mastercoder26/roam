@@ -165,6 +165,13 @@ swiftc ios/Roam/Models/RoutePlanningLocationCoordinator.swift ios/tests/RoutePla
 /tmp/roam-route-location-checks
 ```
 
+Run the launch intro choreography checks with:
+
+```bash
+swiftc ios/Roam/Models/LaunchIntroChoreography.swift ios/tests/LaunchIntroChoreographyChecks.swift -o /tmp/roam-intro-checks
+/tmp/roam-intro-checks
+```
+
 The route-readiness, practice, replay, placement, progress, departure-time,
 shared-route-import, and layout/presentation checks are standalone Swift
 command-line checks in `ios/tests/`. They cover the private local engines

@@ -1,0 +1,294 @@
+import SwiftUI
+
+/// Roam's launch sequence.
+///
+/// A road draws itself across the canvas with a lit head running along it,
+/// waypoints igniting as that head passes them. The headlight then sweeps off
+/// the end of the road and across the wordmark — the same light that drove the
+/// route is what switches the brand on. Everything is painted from the active
+/// theme, so the intro is a different piece of art on each of the six schemes.
+struct LaunchIntroView: View {
+    @ObservedObject private var theme = ThemeManager.shared
+    let onFinish: () -> Void
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var traceProgress: Double = 0
+    @State private var sweepProgress: Double = 0
+    @State private var isLockupVisible = false
+    @State private var hasHandedOff = false
+
+    private var choreography: LaunchIntroChoreography.Type { LaunchIntroChoreography.self }
+
+    var body: some View {
+        ZStack {
+            AppDesign.canvas.ignoresSafeArea()
+            atmosphere
+
+            GeometryReader { geometry in
+                let sceneWidth = min(geometry.size.width - 48, 340)
+                let scale = sceneWidth / choreography.canvasWidth
+
+                VStack(spacing: 26) {
+                    Spacer(minLength: 0)
+
+                    RoadTrace(
+                        traceProgress: traceProgress,
+                        showsHead: !reduceMotion && traceProgress > 0 && traceProgress < 1
+                    )
+                    .frame(width: choreography.canvasWidth, height: choreography.canvasHeight)
+                    .scaleEffect(scale)
+                    .frame(width: sceneWidth, height: choreography.canvasHeight * scale)
+
+                    lockup
+
+                    Spacer(minLength: 0)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+        }
+        // Nobody should be held hostage by a brand moment. A tap finishes it.
+        .contentShape(Rectangle())
+        .onTapGesture(perform: handOff)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Roam")
+        .accessibilityAddTraits(.isImage)
+        .onAppear(perform: play)
+    }
+
+    // MARK: - Layers
+
+    /// Two soft pools of theme light behind the road. They give the canvas
+    /// depth without becoming a recognizable shape that competes with the
+    /// wordmark.
+    private var atmosphere: some View {
+        ZStack {
+            glow(color: AppDesign.accent, offset: CGSize(width: -90, height: -140), size: 300)
+            glow(color: AppDesign.safety, offset: CGSize(width: 110, height: 170), size: 340)
+        }
+        .opacity(isLockupVisible ? 1 : 0.35)
+        .scaleEffect(isLockupVisible ? 1 : 0.9)
+        .animation(reduceMotion ? .easeOut(duration: 0.3) : AppAnimation.reveal, value: isLockupVisible)
+        .ignoresSafeArea()
+        .accessibilityHidden(true)
+    }
+
+    private func glow(color: Color, offset: CGSize, size: CGFloat) -> some View {
+        Circle()
+            .fill(
+                RadialGradient(
+                    colors: [color.opacity(0.28), color.opacity(0)],
+                    center: .center,
+                    startRadius: 0,
+                    endRadius: size / 2
+                )
+            )
+            .frame(width: size, height: size)
+            .offset(offset)
+            .blur(radius: 24)
+    }
+
+    private var lockup: some View {
+        VStack(spacing: 12) {
+            SweptWordmark(sweepProgress: sweepProgress, reduceMotion: reduceMotion)
+
+            Text("Know the road before you drive it.")
+                .font(.footnote.weight(.medium))
+                .foregroundStyle(AppDesign.Ink.secondary)
+                .multilineTextAlignment(.center)
+                .opacity(isLockupVisible ? 1 : 0)
+                .offset(y: isLockupVisible || reduceMotion ? 0 : 8)
+                .animation(
+                    reduceMotion
+                        ? .easeOut(duration: choreography.reducedFadeDuration)
+                        : AppAnimation.hero.delay(choreography.revealDelay + 0.24),
+                    value: isLockupVisible
+                )
+        }
+    }
+
+    // MARK: - Sequence
+
+    private func play() {
+        guard !reduceMotion else {
+            withAnimation(.easeOut(duration: choreography.reducedFadeDuration)) {
+                traceProgress = 1
+                sweepProgress = 1
+                isLockupVisible = true
+            }
+            scheduleHandOff(after: choreography.reducedTotalDuration)
+            return
+        }
+
+        withAnimation(.timingCurve(0.32, 0, 0.16, 1, duration: choreography.traceDuration)) {
+            traceProgress = 1
+        }
+        withAnimation(
+            .timingCurve(0.4, 0, 0.2, 1, duration: choreography.revealDuration)
+                .delay(choreography.revealDelay)
+        ) {
+            sweepProgress = 1
+        }
+        withAnimation(AppAnimation.reveal.delay(choreography.revealDelay)) {
+            isLockupVisible = true
+        }
+        scheduleHandOff(after: choreography.totalDuration)
+    }
+
+    private func scheduleHandOff(after delay: TimeInterval) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: handOff)
+    }
+
+    /// Idempotent: tap-to-skip and the scheduled finish can both arrive.
+    private func handOff() {
+        guard !hasHandedOff else { return }
+        hasHandedOff = true
+        onFinish()
+    }
+}
+
+// MARK: - Road
+
+private struct RoadTrace: View {
+    @ObservedObject private var theme = ThemeManager.shared
+    let traceProgress: Double
+    let showsHead: Bool
+
+    var body: some View {
+        ZStack {
+            // The unlit road, so the trace reads as light filling a route that
+            // was already there rather than a line being invented.
+            roadPath
+                .stroke(
+                    AppDesign.cardStroke,
+                    style: StrokeStyle(lineWidth: 8, lineCap: .round)
+                )
+
+            roadPath
+                .trim(from: 0, to: traceProgress)
+                .stroke(
+                    LinearGradient(
+                        colors: [AppDesign.accent, AppDesign.safety],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    ),
+                    style: StrokeStyle(lineWidth: 8, lineCap: .round)
+                )
+                .shadow(color: AppDesign.accent.opacity(0.45), radius: 12)
+
+            // Comet trail: a brighter, blurred segment just behind the head.
+            roadPath
+                .trim(from: LaunchIntroChoreography.trailStart(for: traceProgress), to: traceProgress)
+                .stroke(
+                    AppDesign.safety.opacity(showsHead ? 0.9 : 0),
+                    style: StrokeStyle(lineWidth: 12, lineCap: .round)
+                )
+                .blur(radius: 7)
+
+            milestones
+            head
+        }
+        .drawingGroup()
+    }
+
+    private var roadPath: Path {
+        Path { path in
+            path.move(to: cgPoint(LaunchIntroChoreography.start))
+            path.addCurve(
+                to: cgPoint(LaunchIntroChoreography.end),
+                control1: cgPoint(LaunchIntroChoreography.control1),
+                control2: cgPoint(LaunchIntroChoreography.control2)
+            )
+        }
+    }
+
+    private var milestones: some View {
+        ForEach(Array(LaunchIntroChoreography.milestones.enumerated()), id: \.offset) { _, fraction in
+            let isLit = LaunchIntroChoreography.isMilestoneLit(fraction, traceProgress: traceProgress)
+            let center = cgPoint(LaunchIntroChoreography.point(at: fraction))
+
+            Circle()
+                .fill(AppDesign.canvas)
+                .frame(width: 13, height: 13)
+                .overlay {
+                    Circle()
+                        .stroke(isLit ? AppDesign.safety : AppDesign.cardStrokeStrong, lineWidth: 3)
+                }
+                .scaleEffect(isLit ? 1 : 0.55)
+                .shadow(color: AppDesign.safety.opacity(isLit ? 0.6 : 0), radius: 8)
+                .position(center)
+                .animation(AppAnimation.selection, value: isLit)
+        }
+    }
+
+    /// The travelling light. Elongated along the direction of travel so it
+    /// reads as a vehicle's beam rather than a bouncing ball.
+    private var head: some View {
+        let position = cgPoint(LaunchIntroChoreography.point(at: traceProgress))
+        let heading = LaunchIntroChoreography.headingDegrees(at: traceProgress)
+
+        return Capsule()
+            .fill(AppDesign.Ink.primary)
+            .frame(width: 22, height: 10)
+            .rotationEffect(.degrees(heading))
+            .shadow(color: AppDesign.safety.opacity(0.8), radius: 10)
+            .position(position)
+            .opacity(showsHead ? 1 : 0)
+    }
+
+    private func cgPoint(_ point: IntroPoint) -> CGPoint {
+        CGPoint(x: point.x, y: point.y)
+    }
+}
+
+// MARK: - Wordmark
+
+/// The wordmark sits dim until a band of theme light crosses it. Behind the
+/// band it stays lit, so the sweep switches the brand on rather than merely
+/// passing over it.
+private struct SweptWordmark: View {
+    @ObservedObject private var theme = ThemeManager.shared
+    let sweepProgress: Double
+    let reduceMotion: Bool
+
+    var body: some View {
+        ZStack {
+            BrandWordmark()
+                .opacity(0.16)
+
+            BrandWordmark()
+                .overlay {
+                    LinearGradient(
+                        colors: [AppDesign.accent, AppDesign.safety],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                    .blendMode(.overlay)
+                    .allowsHitTesting(false)
+                }
+                .mask(alignment: .center) { litMask }
+        }
+        .scaleEffect(reduceMotion ? 1 : 0.98 + 0.02 * sweepProgress)
+    }
+
+    /// Opaque behind the band, transparent ahead of it, with a soft edge
+    /// between. `sweepEdges` keeps the stops ordered and inside 0...1.
+    private var litMask: some View {
+        let edges = LaunchIntroChoreography.sweepEdges(progress: sweepProgress)
+
+        return LinearGradient(
+            stops: [
+                .init(color: .black, location: edges.trailing),
+                .init(color: .black.opacity(0.35), location: (edges.trailing + edges.leading) / 2),
+                .init(color: .clear, location: edges.leading),
+                .init(color: .clear, location: 1)
+            ],
+            startPoint: .leading,
+            endPoint: .trailing
+        )
+    }
+}
+
+#Preview {
+    LaunchIntroView(onFinish: {})
+        .environmentObject(ThemeManager.shared)
+}
