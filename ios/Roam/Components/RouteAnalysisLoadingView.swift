@@ -14,7 +14,7 @@ struct RouteAnalysisLoadingView: View {
 
     var body: some View {
         ZStack {
-            Color.black.ignoresSafeArea()
+            AppDesign.canvas.ignoresSafeArea()
 
             GeometryReader { geometry in
                 let horizontalPadding: CGFloat = 28
@@ -150,7 +150,7 @@ private struct DotCarIllustration: View {
         }
         .trim(from: 0, to: routeProgress)
         .stroke(
-            Color.orange,
+            AppDesign.safety,
             style: StrokeStyle(lineWidth: 12, lineCap: .round, lineJoin: .round)
         )
         .shadow(color: .orange.opacity(0.35), radius: 12)

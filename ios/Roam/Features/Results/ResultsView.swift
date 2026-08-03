@@ -537,9 +537,9 @@ struct ResultsView: View {
                 HStack(spacing: 10) {
                     Text("#\(hotspot.segmentIndex + 1)")
                         .font(.caption.weight(.bold))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(AppDesign.accentForeground)
                         .frame(width: 28, height: 28)
-                        .background(Color.orange.gradient)
+                        .background(AppDesign.safety)
                         .clipShape(Circle())
 
                     VStack(alignment: .leading, spacing: 2) {

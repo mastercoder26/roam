@@ -474,7 +474,7 @@ private struct FlipClockDigit: View {
 
     var body: some View {
         ZStack {
-            tile.fill(Color.black)
+            tile.fill(AppDesign.cardSurface)
 
             // Keying on the value makes each tick an insertion plus a removal,
             // which is what gives the flap something to animate. Without the
@@ -482,13 +482,13 @@ private struct FlipClockDigit: View {
             Text(digit)
                 .font(.system(size: style.digitFontSize, weight: .semibold, design: .rounded))
                 .monospacedDigit()
-                .foregroundStyle(Color.white.opacity(0.92))
+                .foregroundStyle(AppDesign.Ink.primary)
                 .id(digit)
                 .transition(flapTransition)
 
             // The hinge line sits above the glyph so a dropping flap passes
             // behind it, the way a real split-flap board reads.
-            Rectangle().fill(Color.white.opacity(0.18)).frame(height: 1)
+            Rectangle().fill(AppDesign.cardStroke).frame(height: 1)
         }
         .frame(width: style.digitWidth, height: style.digitHeight)
         // Clipping to the tile is what turns a vertical move into a flap:
