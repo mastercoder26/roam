@@ -1,0 +1,116 @@
+name: Backend
+
+# The service ran a single hand-deployed revision for four weeks while twelve
+# commits accumulated behind it, including a request timeout and a rate
+# limiter. Deploying from CI on merge is what stops that drift recurring.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "backend/**"
+      - ".github/workflows/backend-deploy.yml"
+  pull_request:
+    paths:
+      - "backend/**"
+      - ".github/workflows/backend-deploy.yml"
+  # Lets a deploy be re-run without an empty commit, for example after
+  # changing an environment variable on the service.
+  workflow_dispatch:
+
+concurrency:
+  # A newer merge should win rather than race an in-flight deploy, but a
+  # deploy already in progress is never cancelled midway.
+  group: backend-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  SERVICE: roam-backend
+  REGION: us-central1
+
+jobs:
+  verify:
+    name: Test and typecheck
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - run: npm ci
+
+      - name: Typecheck
+        run: npm run build
+
+      - name: Test
+        run: npm test
+
+  deploy:
+    name: Deploy to Cloud Run
+    # Never deploy an unreviewed pull request, and never deploy something that
+    # has not passed its own tests. The project check makes the job skip
+    # cleanly until scripts/setup-gcp-deploy.sh has been run, rather than
+    # failing every push with a credential error.
+    if: github.event_name != 'pull_request' && vars.GCP_PROJECT_ID != ''
+    needs: verify
+    runs-on: ubuntu-latest
+    environment: production
+
+    permissions:
+      contents: read
+      # Required for Workload Identity Federation. The repository holds no
+      # service account key, so there is no long-lived credential to leak.
+      id-token: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          project_id: ${{ vars.GCP_PROJECT_ID }}
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOY_SERVICE_ACCOUNT }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Deploy
+        id: deploy
+        # `--set-env-vars` is deliberately absent: the service's runtime
+        # configuration (ALLOWED_ORIGINS, GOOGLE_MAPS_API_KEY) is owned by the
+        # service, and naming it here would let a workflow edit silently wipe
+        # a production secret. Unspecified variables are preserved.
+        run: |
+          gcloud run deploy "$SERVICE" \
+            --source backend \
+            --region "$REGION" \
+            --project "${{ vars.GCP_PROJECT_ID }}" \
+            --labels "commit=${GITHUB_SHA::7}" \
+            --quiet
+          echo "url=$(gcloud run services describe "$SERVICE" \
+            --region "$REGION" \
+            --project "${{ vars.GCP_PROJECT_ID }}" \
+            --format='value(status.url)')" >> "$GITHUB_OUTPUT"
+
+      - name: Verify the new revision is serving
+        # A green deploy only means the revision started. This asserts the
+        # deployed code actually answers, so a broken release fails the run
+        # instead of sitting unnoticed until the app reports it.
+        run: |
+          url="${{ steps.deploy.outputs.url }}"
+          status=$(curl -sS -o /tmp/body.json -w '%{http_code}' \
+            -X POST "$url/api/route/difficulty" \
+            -H 'Content-Type: application/json' \
+            -d '{}')
+          echo "status=$status body=$(cat /tmp/body.json)"
+          if [ "$status" != "400" ]; then
+            echo "Expected 400 INVALID_REQUEST from an empty body, got $status" >&2
+            exit 1
+          fi
+          grep -q 'INVALID_REQUEST' /tmp/body.json

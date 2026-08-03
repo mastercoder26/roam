@@ -177,6 +177,41 @@ shared-route-import, and layout/presentation checks are standalone Swift
 command-line checks in `ios/tests/`. They cover the private local engines
 separately from the iOS app target.
 
+## Deploy the backend
+
+The backend runs on Cloud Run as the service `roam-backend` in `us-central1`.
+Merging to `main` is what deploys it. The workflow in
+`.github/workflows/backend-deploy.yml` typechecks and tests the backend, then
+builds `backend/Dockerfile` and rolls out a new revision, and finally asserts
+the new revision actually answers before the run is allowed to pass.
+
+The workflow authenticates with Workload Identity Federation, so no service
+account key exists in the repository or in GitHub. One person has to run the
+bootstrap once:
+
+```bash
+./scripts/setup-gcp-deploy.sh
+```
+
+It prints three `gh variable set` commands. Run those, and merges deploy from
+then on. Until the variables are set the deploy job skips and only the tests
+run.
+
+Runtime configuration (`ALLOWED_ORIGINS`, `GOOGLE_MAPS_API_KEY`) belongs to
+the Cloud Run service, not to the workflow, so a workflow edit cannot wipe a
+production secret. Change it with:
+
+```bash
+gcloud run services update roam-backend --region us-central1 \
+  --update-env-vars ALLOWED_ORIGINS=https://example.com
+```
+
+To deploy by hand, for example before the bootstrap is done:
+
+```bash
+gcloud run deploy roam-backend --source backend --region us-central1
+```
+
 ## Open source and attribution
 
 Roam is available under the [MIT License](LICENSE).
