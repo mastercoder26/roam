@@ -180,36 +180,37 @@ separately from the iOS app target.
 ## Deploy the backend
 
 The backend runs on Cloud Run as the service `roam-backend` in `us-central1`.
-Merging to `main` is what deploys it. The workflow in
-`.github/workflows/backend-deploy.yml` typechecks and tests the backend, then
-builds `backend/Dockerfile` and rolls out a new revision, and finally asserts
-the new revision actually answers before the run is allowed to pass.
-
-The workflow authenticates with Workload Identity Federation, so no service
-account key exists in the repository or in GitHub. One person has to run the
-bootstrap once:
+Deploy it from the repository root, not from `backend/`, since the path is
+resolved relative to the working directory:
 
 ```bash
-./scripts/setup-gcp-deploy.sh
+gcloud run deploy roam-backend --source backend --region us-central1
 ```
 
-It prints three `gh variable set` commands. Run those, and merges deploy from
-then on. Until the variables are set the deploy job skips and only the tests
-run.
+Pushing to GitHub does not deploy anything on its own. Continuous deployment
+is configured on the existing service in the Cloud Run console, under Set up
+continuous deployment, rather than in this repository.
+
+Before deploying, run the tests: a build succeeding only means the container
+starts, which is not the same as the code being correct.
+
+```bash
+npm test --prefix backend
+```
 
 Runtime configuration (`ALLOWED_ORIGINS`, `GOOGLE_MAPS_API_KEY`) belongs to
-the Cloud Run service, not to the workflow, so a workflow edit cannot wipe a
-production secret. Change it with:
+the Cloud Run service and is not stored in this repository. Change it with:
 
 ```bash
 gcloud run services update roam-backend --region us-central1 \
   --update-env-vars ALLOWED_ORIGINS=https://example.com
 ```
 
-To deploy by hand, for example before the bootstrap is done:
+Check what is actually live, and when it was last deployed:
 
 ```bash
-gcloud run deploy roam-backend --source backend --region us-central1
+gcloud run services describe roam-backend --region us-central1 \
+  --format='value(status.latestReadyRevisionName)'
 ```
 
 ## Open source and attribution
