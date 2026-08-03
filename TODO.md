@@ -44,40 +44,36 @@ Two ways to close it:
   the build before it reaches Cloud Run. This is the durable fix, since it
   does not depend on anyone remembering.
 
-### The trigger fires on any file change
+### ~~The trigger fires on any file change~~ — done, 3 August 2026
 
-It has no `includedFiles` filter, so an iOS-only commit rebuilds and redeploys
-the backend as well. Not dangerous, since it ships identical code, but it
-wastes build minutes and fills the revision history with rollouts that changed
-nothing.
-
-Fix by setting the trigger's included files filter to `backend/**`.
-
-## Google Cloud cleanup
-
-The abandoned Workload Identity bootstrap left real resources behind. It
-failed partway through on a propagation race, after creating the pool, the
-provider, the service account, and one IAM binding. `roam-deployer` currently
-holds deploy permission on the project and nothing uses it, which is exactly
-the kind of unused standing credential worth removing.
+It had no `includedFiles` filter, so an iOS-only commit rebuilt and redeployed
+the backend as well. Fixed by exporting the trigger, adding
+`includedFiles: [backend/**]`, and importing it back with
+`gcloud alpha builds triggers import` (`update-github` and `export` are not in
+the stable track). Confirmed with:
 
 ```bash
-gcloud projects remove-iam-policy-binding project-22e1ead8-00a3-4990-ba3 \
-  --member="serviceAccount:roam-deployer@project-22e1ead8-00a3-4990-ba3.iam.gserviceaccount.com" \
-  --role="roles/run.developer" --condition=None --quiet
-
-gcloud iam service-accounts delete \
-  roam-deployer@project-22e1ead8-00a3-4990-ba3.iam.gserviceaccount.com --quiet
-
-gcloud iam workload-identity-pools providers delete github \
-  --location=global --workload-identity-pool=github-actions --quiet
-
-gcloud iam workload-identity-pools delete github-actions --location=global --quiet
+gcloud builds triggers describe rmgpgab-roam-backend-us-central1-mastercoder26-roam--macdq \
+  --format="value(includedFiles)"
+# backend/**
 ```
 
-Leave the APIs the script enabled (Cloud Build, Artifact Registry, IAM
-Credentials) switched on. They are harmless, and Cloud Build's continuous
-deployment needs them.
+## Google Cloud cleanup — done, 3 August 2026
+
+The abandoned Workload Identity bootstrap was believed to have left the
+`roam-deployer` service account holding deploy permission on the project.
+Checked directly instead of re-running the deletes blind:
+
+- `roam-deployer@...iam.gserviceaccount.com` — does not exist. Not in
+  `gcloud iam service-accounts list`, and no project IAM binding references it.
+- `roles/run.developer` binding for that account — not found; already gone.
+- Workload identity pool `github-actions` — state `DELETED` (soft-deleted).
+- Its `github` provider — `NOT_FOUND`.
+
+Nothing to remove. Google's IAM propagation appears to have caught up after
+the original bootstrap failure. The APIs the script enabled (Cloud Build,
+Artifact Registry, IAM Credentials) are left switched on, since Cloud Build's
+continuous deployment needs them and they carry no standing credential risk.
 
 ## iOS
 
