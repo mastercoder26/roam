@@ -203,6 +203,10 @@ struct HomeView: View {
                         .foregroundStyle(AppDesign.Ink.primary.opacity(0.88))
                         .frame(width: 36, height: 36)
                         .background(AppDesign.Ink.primary.opacity(0.14), in: Circle())
+                        // Keeps the visible chip at its designed 36pt while
+                        // still meeting the 44pt minimum tap target.
+                        .frame(minWidth: 44, minHeight: 44)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(PressableScaleStyle())
                 .accessibilityLabel("Enter a different starting location")
@@ -242,6 +246,8 @@ struct HomeView: View {
                         .foregroundStyle(AppDesign.Ink.primary.opacity(0.88))
                         .frame(width: 36, height: 36)
                         .background(AppDesign.Ink.primary.opacity(0.14), in: Circle())
+                        .frame(minWidth: 44, minHeight: 44)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(PressableScaleStyle())
                 .padding(.top, 8)

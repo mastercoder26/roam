@@ -157,7 +157,7 @@ struct DriveView: View {
     }
 
     private var actionSwapAnimation: Animation {
-        reduceMotion ? .easeOut(duration: 0.12) : .easeInOut(duration: 0.12)
+        reduceMotion ? AppAnimation.tabSwitchReduced : AppAnimation.actionSwap
     }
 
     /// Settling windows used when chaining start/stop phases. Slightly longer
@@ -197,6 +197,8 @@ struct DriveView: View {
                     .foregroundStyle(AppDesign.Ink.primary.opacity(0.88))
                     .frame(width: 36, height: 36)
                     .background(AppDesign.Ink.primary.opacity(0.10), in: Circle())
+                    .frame(minWidth: 44, minHeight: 44)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(PressableScaleStyle())
             .accessibilityLabel("Get help")
@@ -415,6 +417,8 @@ struct DriveView: View {
                         .foregroundStyle(AppDesign.Ink.secondary)
                         .frame(width: 32, height: 32)
                         .background(AppDesign.trackSurface, in: Circle())
+                        .frame(minWidth: 44, minHeight: 44)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(PressableScaleStyle())
                 .accessibilityLabel("Cancel practice route")

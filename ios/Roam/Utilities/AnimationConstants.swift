@@ -42,4 +42,21 @@ enum AppAnimation {
     /// flap lands with a little weight instead of gliding, and always finishes
     /// well inside the one-second tick that triggers the next one.
     static let flip = Animation.spring(response: 0.26, dampingFraction: 0.72)
+
+    /// Root tab switch — a plain crossfade, deliberately not a spring since the
+    /// destination view is a whole screen swap rather than an in-place element.
+    static let tabSwitch = Animation.easeOut(duration: 0.18)
+    static let tabSwitchReduced = Animation.easeOut(duration: 0.12)
+
+    /// The loading illustration's route tracing stroke and its exit "drive
+    /// away" beat. Kept separate from `map`/`content` because both are tied to
+    /// the hand-authored dot-car choreography, not general UI transitions.
+    static let routeTrace = Animation.linear(duration: 0.64)
+    static let departure = Animation.easeOut(duration: 0.30)
+    static let departureReduced = Animation.easeOut(duration: 0.20)
+
+    /// Swapping the drive surface's primary action label/icon in place —
+    /// quicker and flatter than `quick` since it must not compete with the
+    /// surrounding `driveMode` layout spring.
+    static let actionSwap = Animation.easeInOut(duration: 0.12)
 }

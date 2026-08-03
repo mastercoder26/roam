@@ -76,7 +76,7 @@ struct RouteAnalysisLoadingView: View {
             return
         }
 
-        withAnimation(.linear(duration: 0.64)) {
+        withAnimation(AppAnimation.routeTrace) {
             routeProgress = 1
         }
 
@@ -108,7 +108,7 @@ struct RouteAnalysisLoadingView: View {
             return
         }
 
-        withAnimation(.easeOut(duration: 0.30)) {
+        withAnimation(AppAnimation.departure) {
             isDrivingAway = true
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.34, execute: onDepartureComplete)
@@ -134,7 +134,7 @@ private struct DotCarIllustration: View {
                 dotCar(time: context.date.timeIntervalSinceReferenceDate)
                     .offset(x: isDrivingAway ? -390 : 0)
                     .opacity(isDrivingAway ? 0.85 : 1)
-                    .animation(.easeOut(duration: 0.30), value: isDrivingAway)
+                    .animation(reduceMotion ? AppAnimation.departureReduced : AppAnimation.departure, value: isDrivingAway)
             }
         }
         .frame(width: canvasSize.width, height: canvasSize.height)
@@ -235,6 +235,8 @@ private struct DotWheel: View {
     let isBobbing: Bool
     let isSpinning: Bool
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     var body: some View {
         ZStack {
             Circle()
@@ -267,8 +269,8 @@ private struct DotWheel: View {
             )
         }
         .frame(width: 42, height: 42)
-        .rotationEffect(.degrees(isSpinning ? -720 : 0))
-        .animation(.easeOut(duration: 0.30), value: isSpinning)
+        .rotationEffect(.degrees(isSpinning && !reduceMotion ? -720 : 0))
+        .animation(reduceMotion ? AppAnimation.departureReduced : AppAnimation.departure, value: isSpinning)
         .position(x: isVisible ? center.x : center.x * 0.92 + 12, y: isVisible ? center.y : 145)
         .animation(
             AppAnimation.content.delay(phase * 0.028),
