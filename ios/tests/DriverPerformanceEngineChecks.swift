@@ -112,6 +112,38 @@ struct DriverPerformanceEngineChecks {
             "completed route difficulty must persist with its saved drive"
         )
 
+        // A drive with a corrupt, centuries-old `startedAt` underflows the
+        // recency weight (`pow(0.5, ageDays / halfLife)`) all the way to
+        // 0.0. If it were the only qualifying drive, the old code divided by
+        // a zero total weight, producing NaN, and `Int(NaN.rounded())` traps
+        // at runtime. This must degrade to "no score" instead of crashing.
+        let corruptDateDrive = drive(
+            startedAt: .distantPast,
+            score: 90,
+            difficulty: 3
+        )
+        let corruptSummary = DriverPerformanceEngine.makeSummary(
+            from: [corruptDateDrive], referenceDate: reference, calendar: calendar
+        )
+        expect(
+            corruptSummary.score == nil,
+            "a drive whose recency weight underflows to zero must not produce a score instead of crashing"
+        )
+        expect(
+            corruptSummary.includedDriveCount == 0,
+            "a drive that contributes no usable weight should not be counted as included"
+        )
+
+        // The same drive alongside a normal, currently-weighted one must
+        // still score normally — only the fully-zero-weight case degrades.
+        let mixedSummary = DriverPerformanceEngine.makeSummary(
+            from: [corruptDateDrive, recentStrong], referenceDate: reference, calendar: calendar
+        )
+        expect(
+            mixedSummary.score != nil,
+            "one corrupted-date drive should not prevent a score when another drive carries real weight"
+        )
+
         print("DriverPerformanceEngine checks passed")
     }
 

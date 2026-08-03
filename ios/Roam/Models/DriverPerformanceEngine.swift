@@ -308,7 +308,13 @@ enum DriverPerformanceEngine {
             )
         }
 
-        guard !qualifying.isEmpty else {
+        let totalWeight = qualifying.reduce(0) { $0 + $1.weight }
+        // An empty qualifying set, or one whose weights all underflowed to
+        // zero (e.g. a corrupt `startedAt` many centuries old collapses the
+        // recency weight to 0 via `pow`), must fall back to the same
+        // no-score result. Dividing by a zero or non-finite total below would
+        // otherwise produce NaN and `Int(NaN.rounded())` traps at runtime.
+        guard !qualifying.isEmpty, totalWeight.isFinite, totalWeight > 0 else {
             return DriverPerformanceSummary(
                 score: nil,
                 evidence: .building,
@@ -323,7 +329,6 @@ enum DriverPerformanceEngine {
             )
         }
 
-        let totalWeight = qualifying.reduce(0) { $0 + $1.weight }
         let weightedScore = qualifying.reduce(0) { $0 + $1.adjustedScore * $1.weight } / totalWeight
         let totalMiles = qualifying.reduce(0) { $0 + $1.measuredMiles }
         let averageDifficulty = qualifying.reduce(0) { $0 + $1.difficulty * $1.weight } / totalWeight
