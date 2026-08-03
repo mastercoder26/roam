@@ -123,18 +123,31 @@ export function resolveDepartureLocalMinutes(
   );
 }
 
-interface SolarWindow {
+export interface SolarWindow {
   sunriseLocalMinutes: number;
   sunsetLocalMinutes: number;
+  /**
+   * True when sunrise/sunset could not be estimated and the conservative
+   * fixed clock window is standing in. Callers that describe the result to a
+   * user must say which basis they used rather than implying a real sunset.
+   */
+  usesClockFallback: boolean;
 }
 
+/** Conservative 8 PM–6 AM stand-in when solar position cannot be estimated. */
 const FALLBACK_SOLAR_WINDOW: SolarWindow = {
   sunriseLocalMinutes: 6 * 60,
   sunsetLocalMinutes: 20 * 60,
+  usesClockFallback: true,
 };
 
+const MINUTES_PER_DAY = 24 * 60;
+
+/** Every IANA UTC offset is a whole multiple of 15 minutes. */
+const UTC_OFFSET_GRANULARITY_MINUTES = 15;
+
 function normalizeDayMinutes(value: number): number {
-  return ((value % (24 * 60)) + 24 * 60) % (24 * 60);
+  return ((value % MINUTES_PER_DAY) + MINUTES_PER_DAY) % MINUTES_PER_DAY;
 }
 
 /**
@@ -143,7 +156,7 @@ function normalizeDayMinutes(value: number): number {
  * both an absolute timestamp and local clock time, which lets us infer the
  * route's UTC offset without relying on the server's timezone.
  */
-function estimateSolarWindow(
+export function estimateSolarWindow(
   bounds: Bounds,
   departureTime?: string,
   departureLocalMinutes?: number
@@ -169,9 +182,14 @@ function estimateSolarWindow(
   const startOfYearUtc = Date.UTC(date.getUTCFullYear(), 0, 0);
   const dayOfYear = Math.floor((date.getTime() - startOfYearUtc) / 86_400_000);
   const utcMinutes = date.getUTCHours() * 60 + date.getUTCMinutes();
-  let utcOffsetMinutes = departureLocalMinutes - utcMinutes;
-  if (utcOffsetMinutes > 12 * 60) utcOffsetMinutes -= 24 * 60;
-  if (utcOffsetMinutes < -12 * 60) utcOffsetMinutes += 24 * 60;
+  // Every real UTC offset is a multiple of 15 minutes. Snapping absorbs minor
+  // client clock skew between the timestamp and the local clock, which would
+  // otherwise shift the estimated sunset by up to half an hour.
+  let utcOffsetMinutes =
+    Math.round((departureLocalMinutes - utcMinutes) / UTC_OFFSET_GRANULARITY_MINUTES) *
+    UTC_OFFSET_GRANULARITY_MINUTES;
+  if (utcOffsetMinutes > 12 * 60) utcOffsetMinutes -= MINUTES_PER_DAY;
+  if (utcOffsetMinutes < -12 * 60) utcOffsetMinutes += MINUTES_PER_DAY;
 
   // `departureLocalMinutes` is authoritative for scoring, even if an older
   // client sent an unrelated or stale timestamp. Solar timing needs a real
@@ -216,13 +234,42 @@ function estimateSolarWindow(
     sunsetLocalMinutes: normalizeDayMinutes(
       solarNoonUtcMinutes + 4 * hourAngleDegrees + utcOffsetMinutes
     ),
+    usesClockFallback: false,
   };
 }
 
-function isNightLocalMinute(localMinutes: number, solar: SolarWindow): boolean {
+export function isNightLocalMinute(
+  localMinutes: number,
+  solar: SolarWindow
+): boolean {
   const minute = normalizeDayMinutes(localMinutes);
   return minute >= solar.sunsetLocalMinutes || minute < solar.sunriseLocalMinutes;
 }
+
+/**
+ * Seconds from `localMinutes` until the next light/dark transition.
+ *
+ * Always strictly positive, so callers can walk a drive interval boundary by
+ * boundary without risking a zero-length step that never terminates.
+ */
+export function secondsUntilSolarBoundary(
+  localMinutes: number,
+  solar: SolarWindow
+): number {
+  const minute = normalizeDayMinutes(localMinutes);
+  const boundaryMinutes = isNightLocalMinute(minute, solar)
+    ? minute < solar.sunriseLocalMinutes
+      ? solar.sunriseLocalMinutes
+      : MINUTES_PER_DAY + solar.sunriseLocalMinutes
+    : solar.sunsetLocalMinutes;
+  return Math.max(MIN_BOUNDARY_STEP_SECONDS, (boundaryMinutes - minute) * 60);
+}
+
+/**
+ * Floor on a boundary step. A degenerate solar window (sunrise == sunset)
+ * could otherwise yield a zero-second step and spin the walking loops below.
+ */
+const MIN_BOUNDARY_STEP_SECONDS = 0.001;
 
 /** Exact overlap with the repeating local solar-night window. */
 function nighttimeSecondsInInterval(
@@ -230,23 +277,20 @@ function nighttimeSecondsInInterval(
   durationSeconds: number,
   solar: SolarWindow
 ): number {
-  let remainingSeconds = Math.max(0, durationSeconds);
-  let cursorMinutes = startLocalMinutes % (24 * 60);
+  let remainingSeconds = Math.max(0, finiteOr(durationSeconds));
+  let cursorMinutes = normalizeDayMinutes(startLocalMinutes);
   let nighttimeSeconds = 0;
 
-  while (remainingSeconds > 0.001) {
-    const nighttime = isNightLocalMinute(cursorMinutes, solar);
-    const boundaryMinutes = nighttime
-      ? cursorMinutes < solar.sunriseLocalMinutes
-        ? solar.sunriseLocalMinutes
-        : 24 * 60 + solar.sunriseLocalMinutes
-      : solar.sunsetLocalMinutes;
-    const secondsUntilBoundary = Math.max(0.001, (boundaryMinutes - cursorMinutes) * 60);
-    const spanSeconds = Math.min(remainingSeconds, secondsUntilBoundary);
-
-    if (nighttime) nighttimeSeconds += spanSeconds;
+  while (remainingSeconds > MIN_BOUNDARY_STEP_SECONDS) {
+    const spanSeconds = Math.min(
+      remainingSeconds,
+      secondsUntilSolarBoundary(cursorMinutes, solar)
+    );
+    if (isNightLocalMinute(cursorMinutes, solar)) {
+      nighttimeSeconds += spanSeconds;
+    }
     remainingSeconds -= spanSeconds;
-    cursorMinutes = (cursorMinutes + spanSeconds / 60) % (24 * 60);
+    cursorMinutes = normalizeDayMinutes(cursorMinutes + spanSeconds / 60);
   }
 
   return nighttimeSeconds;
