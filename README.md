@@ -1,9 +1,9 @@
 # Roam
 
 Roam helps families plan for a drive and practise safer driving. The iOS app
-has three focused modes:
+has four tabs:
 
-- **Routes** scores a planned route’s driving difficulty, compares returned
+- **Routes** scores a planned route's driving difficulty, compares returned
   choices with private recorded experience, offers guided practice plans, and
   compares nearby departure times when the underlying conditions are
   available.
@@ -15,6 +15,10 @@ has three focused modes:
 - **Progress** shows an evidence-weighted, route-adjusted coaching score plus
   measured local evidence such as validated miles, after-dark miles, 45+ mph
   miles, continuous-trace coverage, and an eight-week chart.
+- **Profile** shows the driver's name, licensing stage, and lifetime record
+  derived from locally recorded drives, plus the app's appearance controls. It
+  introduces no network calls and stores only the display name and licensing
+  stage, both user-declared and excluded from every score.
 
 This is a prototype, not a safety system or an emergency service. A drive score
 is coaching feedback, not a guarantee that a person or route is safe.
@@ -161,9 +165,10 @@ swiftc ios/Roam/Models/RoutePlanningLocationCoordinator.swift ios/tests/RoutePla
 /tmp/roam-route-location-checks
 ```
 
-The route-readiness, practice, replay, placement, progress, and departure-time
-checks are standalone Swift command-line checks in `ios/tests/`. They cover the
-private local engines separately from the iOS app target.
+The route-readiness, practice, replay, placement, progress, departure-time,
+shared-route-import, and layout/presentation checks are standalone Swift
+command-line checks in `ios/tests/`. They cover the private local engines
+separately from the iOS app target.
 
 ## Open source and attribution
 
