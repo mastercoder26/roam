@@ -7,6 +7,7 @@ struct RoamRootView: View {
         case routes
         case drive
         case progress
+        case profile
 
         var id: String { rawValue }
         var title: String {
@@ -14,6 +15,7 @@ struct RoamRootView: View {
             case .routes: "Routes"
             case .drive: "Drive"
             case .progress: "Progress"
+            case .profile: "Profile"
             }
         }
 
@@ -22,6 +24,7 @@ struct RoamRootView: View {
             case .routes: "map.fill"
             case .drive: "steeringwheel"
             case .progress: "chart.line.uptrend.xyaxis"
+            case .profile: "person.crop.circle"
             }
         }
     }
@@ -54,8 +57,11 @@ struct RoamRootView: View {
                 Tab(AppTab.progress.title, systemImage: AppTab.progress.symbol, value: AppTab.progress) {
                     DriverProgressView()
                 }
+                Tab(AppTab.profile.title, systemImage: AppTab.profile.symbol, value: AppTab.profile) {
+                    ProfileView()
+                }
             }
-            .tabBarMinimizeBehavior(.onScrollDown)
+            .tabBarMinimizeBehavior(.automatic)
         }
         .environmentObject(driveSession)
         .environmentObject(themeManager)
