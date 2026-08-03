@@ -308,23 +308,14 @@ struct HomeView: View {
     }
 
     private var mapPreviewSection: some View {
-        ZStack(alignment: .bottomLeading) {
-            RoutePlanningMapPreview(
-                origin: form.origin,
-                destination: form.destination,
-                usesCurrentLocation: form.usesCurrentLocation,
-                showsCurrentLocation: shouldShowCurrentLocationOnMap,
-                summary: $mapPreview
-            )
-            .allowsHitTesting(false)
-
-            LinearGradient(
-                colors: [.clear, AppDesign.canvas.opacity(0.72)],
-                startPoint: .center,
-                endPoint: .bottom
-            )
-            .allowsHitTesting(false)
-        }
+        RoutePlanningMapPreview(
+            origin: form.origin,
+            destination: form.destination,
+            usesCurrentLocation: form.usesCurrentLocation,
+            showsCurrentLocation: shouldShowCurrentLocationOnMap,
+            summary: $mapPreview
+        )
+        .allowsHitTesting(false)
         .frame(height: 248)
         .background(AppDesign.cardSurfaceElevated)
         .clipShape(RoundedRectangle(cornerRadius: AppDesign.cornerRadiusLarge, style: .continuous))
