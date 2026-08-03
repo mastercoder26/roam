@@ -1,6 +1,6 @@
 import type { Bounds, ParsedRoute } from "../types.js";
 import type { RouteConditions } from "../enrichment/types.js";
-import { smoothstep } from "./helpers.js";
+import { METERS_PER_MILE, finiteOr, smoothstep } from "./helpers.js";
 import {
   computeHighwayShare,
   isHighwayStep,
@@ -10,6 +10,7 @@ import {
 } from "./signals.js";
 import {
   aggregateSegmentScores,
+  scoreSegmentLocal,
   segmentRoute,
   type RouteSegment,
   type SegmentAggregateResult,
@@ -80,6 +81,8 @@ export interface RouteFeatures {
 export interface BuildFeaturesInput {
   route: ParsedRoute;
   segments: RouteSegment[];
+  /** Pre-computed `scoreSegmentLocal` results, to avoid scoring twice. */
+  segmentScores?: number[];
   stepSpeedsMph?: Map<number, number>;
   departureTime?: string;
   /** Local clock minutes supplied by the client (0 = midnight). */
@@ -256,36 +259,62 @@ function computeSpeedStats(
   RouteFeatures,
   "meanSpeedMph" | "maxSpeedMph" | "fractionAbove45Mph" | "fractionAbove60Mph"
 > {
-  let totalMeters = 0;
+  let measuredMeters = 0;
   let weightedSpeed = 0;
   let maxSpeed = 0;
   let above45 = 0;
   let above60 = 0;
 
-  route.steps.forEach((step, i) => {
-    const dist = step.distanceMeters;
-    if (dist <= 0) return;
-    totalMeters += dist;
+  route.steps.forEach((step, index) => {
+    const distanceMeters = step.distanceMeters;
+    if (!Number.isFinite(distanceMeters) || distanceMeters <= 0) return;
 
-    let speed =
-      stepSpeedsMph?.get(i) ??
-      (step.staticDurationSeconds > 0
-        ? (dist / 1609.34) / (step.staticDurationSeconds / 3600)
-        : 0);
+    const speed = stepSpeedMph(step, stepSpeedsMph?.get(index));
+    // A step with neither a supplied speed nor a usable static duration has no
+    // speed evidence at all. Counting it as 0 mph used to drag the mean down
+    // and shrink the 45+/60+ shares, understating fast-road exposure on routes
+    // with partial provider timing; describe only the measured portion instead.
+    if (speed === undefined) return;
 
-    weightedSpeed += speed * dist;
+    measuredMeters += distanceMeters;
+    weightedSpeed += speed * distanceMeters;
     maxSpeed = Math.max(maxSpeed, speed);
-    if (speed >= 45) above45 += dist;
-    if (speed >= 60) above60 += dist;
+    if (speed >= 45) above45 += distanceMeters;
+    if (speed >= 60) above60 += distanceMeters;
   });
 
-  const meanSpeedMph = totalMeters > 0 ? weightedSpeed / totalMeters : 0;
+  if (measuredMeters <= 0) {
+    return {
+      meanSpeedMph: 0,
+      maxSpeedMph: 0,
+      fractionAbove45Mph: 0,
+      fractionAbove60Mph: 0,
+    };
+  }
+
   return {
-    meanSpeedMph,
+    meanSpeedMph: weightedSpeed / measuredMeters,
     maxSpeedMph: maxSpeed,
-    fractionAbove45Mph: totalMeters > 0 ? above45 / totalMeters : 0,
-    fractionAbove60Mph: totalMeters > 0 ? above60 / totalMeters : 0,
+    fractionAbove45Mph: above45 / measuredMeters,
+    fractionAbove60Mph: above60 / measuredMeters,
   };
+}
+
+/** Resolved step speed in mph, or `undefined` when nothing supports one. */
+function stepSpeedMph(
+  step: ParsedRoute["steps"][number],
+  suppliedSpeedMph: number | undefined
+): number | undefined {
+  if (suppliedSpeedMph !== undefined) {
+    // A malformed posted-speed lookup must not become a NaN mean speed.
+    return Number.isFinite(suppliedSpeedMph) && suppliedSpeedMph >= 0
+      ? suppliedSpeedMph
+      : undefined;
+  }
+  if (!Number.isFinite(step.staticDurationSeconds) || step.staticDurationSeconds <= 0) {
+    return undefined;
+  }
+  return step.distanceMeters / METERS_PER_MILE / (step.staticDurationSeconds / 3600);
 }
 
 function longestHighwayRunMiles(
@@ -296,7 +325,7 @@ function longestHighwayRunMiles(
   let current = 0;
   route.steps.forEach((step, i) => {
     if (isHighwayStep(step, stepSpeedsMph?.get(i))) {
-      current += step.distanceMeters / 1609.34;
+      current += step.distanceMeters / METERS_PER_MILE;
       longest = Math.max(longest, current);
     } else {
       current = 0;
@@ -347,7 +376,7 @@ function computeDecisionPointDensity(segments: RouteSegment[]): number {
       const segMid = other.cumulativeSecondsFromStart + other.durationSeconds / 2;
       if (segMid >= windowStart && segMid <= windowEnd) {
         decisions += other.maneuvers.length;
-        miles += other.distanceMeters / 1609.34;
+        miles += other.distanceMeters / METERS_PER_MILE;
       }
     }
     if (miles > 0) {
@@ -366,6 +395,41 @@ function computeMonotony(
   return Math.min(
     1,
     (longestHighwaySegmentMiles / 40) * 0.5 + (durationHours / 4) * 0.5
+  );
+}
+
+/** Reference cruising speed used to normalize per-segment pace. */
+const REFERENCE_SPEED_MPH = 55;
+
+/**
+ * Mean absolute deviation of per-segment pace, amplified by the route's
+ * overall delay: an uneven route in heavy traffic is harder than the same
+ * unevenness in free flow.
+ *
+ * The result is clamped to 0–1. Its consumers (`computeTrafficComponent`,
+ * `computeRawScore`) all feed it through `smoothstep`, which clamps anyway,
+ * but `trafficDemand` reports `trafficVariance * 0.65` directly — so letting
+ * the raw value exceed 1 made the published demand intensity depend on how
+ * far past saturation the amplifier had already pushed it.
+ */
+function computeTrafficVariance(
+  segments: RouteSegment[],
+  delayRatio: number
+): number {
+  if (segments.length === 0) return 0;
+
+  const speedRatios = segments.map(
+    (segment) => segment.impliedSpeedMph / REFERENCE_SPEED_MPH
+  );
+  const meanRatio =
+    speedRatios.reduce((sum, ratio) => sum + ratio, 0) / speedRatios.length;
+  const meanAbsoluteDeviation =
+    speedRatios.reduce((sum, ratio) => sum + Math.abs(ratio - meanRatio), 0) /
+    speedRatios.length;
+
+  return Math.max(
+    0,
+    Math.min(1, finiteOr(meanAbsoluteDeviation) * (1 + delayRatio))
   );
 }
 
@@ -400,11 +464,8 @@ interface ConditionFeatures {
 }
 
 function deriveConditionFeatures(
-  leftTurnCount: number,
   conditions?: RouteConditions
 ): ConditionFeatures {
-  const weather = conditions?.weather;
-  const road = conditions?.road;
   const turns = conditions?.turns;
 
   // Without intersection-control data, stay neutral (0) so missing OSM does
@@ -413,18 +474,25 @@ function deriveConditionFeatures(
   const unprotectedTurnShare = turns?.available ? turns.unprotectedTurnShare : 0;
 
   // A provider may return a partial/stale payload alongside `available: false`.
-  // Treat every road-derived field as unavailable in that case so missing data
-  // never turns into a difficulty penalty or an apparently factual reason.
-  const verifiedRoad = road?.available ? road : undefined;
+  // Treat every derived field as unavailable in that case so missing data never
+  // turns into a difficulty penalty or an apparently factual reason.
+  //
+  // The weather sub-risks previously bypassed this check: an unavailable
+  // payload carrying a stale `snowRisk` still produced a "Snow or ice expected"
+  // reason, which reads as a verified forecast the lookup never returned.
+  const verifiedWeather = conditions?.weather?.available
+    ? conditions.weather
+    : undefined;
+  const verifiedRoad = conditions?.road?.available ? conditions.road : undefined;
   const constructionZones = verifiedRoad?.constructionZones ?? 0;
 
   return {
-    weatherSeverity: weather?.available ? weather.severity : 0,
-    precipIntensity: weather?.precipIntensity ?? 0,
-    snowRisk: weather?.snowRisk ?? 0,
-    windSeverity: weather?.windSeverity ?? 0,
-    lowVisibilityRisk: weather?.lowVisibilityRisk ?? 0,
-    icyRisk: weather?.icyRisk ?? 0,
+    weatherSeverity: verifiedWeather?.severity ?? 0,
+    precipIntensity: verifiedWeather?.precipIntensity ?? 0,
+    snowRisk: verifiedWeather?.snowRisk ?? 0,
+    windSeverity: verifiedWeather?.windSeverity ?? 0,
+    lowVisibilityRisk: verifiedWeather?.lowVisibilityRisk ?? 0,
+    icyRisk: verifiedWeather?.icyRisk ?? 0,
     roadSizeScore: verifiedRoad?.roadSizeScore ?? 0,
     narrowRoadShare: verifiedRoad?.narrowRoadShare ?? 0,
     majorRoadShare: verifiedRoad?.majorRoadShare ?? 0,
@@ -446,17 +514,23 @@ export function buildFeatures(input: BuildFeaturesInput): RouteFeatures {
     departureLocalMinutes,
     conditions,
   } = input;
+  const distanceMeters = Math.max(0, finiteOr(route.distanceMeters));
+  const liveSeconds = Math.max(0, finiteOr(route.durationSeconds));
+  const staticSeconds = Math.max(0, finiteOr(route.staticDurationSeconds));
+
   const speedStats = computeSpeedStats(route, stepSpeedsMph);
   const { highwayShare } = computeHighwayShare(route.steps, stepSpeedsMph);
-  const maneuvers = computeManeuverComplexity(route.steps, route.distanceMeters);
-  const trafficRatio =
-    route.staticDurationSeconds > 0
-      ? route.durationSeconds / route.staticDurationSeconds
-      : 1;
+  const maneuvers = computeManeuverComplexity(route.steps, distanceMeters);
+  // Without a no-traffic baseline there is no measurable delay, so a ratio of
+  // exactly 1 (no delay) is the only defensible assumption.
+  const trafficRatio = staticSeconds > 0 ? liveSeconds / staticSeconds : 1;
   const delayRatio = Math.max(0, trafficRatio - 1);
-  const merge = computeMergeBurden(route.steps, route.distanceMeters, trafficRatio);
-  const turnCluster = computeTurnClustering(route.steps, route.distanceMeters);
-  const segmentAgg: SegmentAggregateResult = aggregateSegmentScores(segments);
+  const merge = computeMergeBurden(route.steps, distanceMeters, trafficRatio);
+  const turnCluster = computeTurnClustering(route.steps, distanceMeters);
+  const segmentAgg: SegmentAggregateResult =
+    input.segmentScores !== undefined
+      ? aggregateSegmentScores(input.segmentScores)
+      : aggregateSegmentScores(segments);
 
   let leftTurnCount = 0;
   for (const step of route.steps) {
@@ -464,26 +538,16 @@ export function buildFeatures(input: BuildFeaturesInput): RouteFeatures {
     if (m.includes("LEFT") && m.startsWith("TURN")) leftTurnCount++;
   }
 
-  const distanceMiles = route.distanceMeters / 1609.34;
+  const distanceMiles = distanceMeters / METERS_PER_MILE;
   // Prefer traffic-aware duration for length/effort; fall back to static.
-  const durationSeconds =
-    route.durationSeconds > 0 ? route.durationSeconds : route.staticDurationSeconds;
+  const durationSeconds = liveSeconds > 0 ? liveSeconds : staticSeconds;
   const durationHours = durationSeconds / 3600;
   const longestHighwaySegmentMiles = longestHighwayRunMiles(route, stepSpeedsMph);
   const urbanShare = 1 - highwayShare;
   const stepsPerMile = distanceMiles > 0 ? route.steps.length / distanceMiles : 0;
   const turnDensity = distanceMiles > 0 ? maneuvers.weightedCount / distanceMiles : 0;
 
-  const segmentSpeedRatios = segments.map((s) =>
-    s.durationSeconds > 0 ? s.impliedSpeedMph / 55 : 1
-  );
-  const meanSpeedRatio =
-    segmentSpeedRatios.reduce((a, b) => a + b, 0) / Math.max(1, segmentSpeedRatios.length);
-  const trafficVariance = Math.min(
-    1,
-    segmentSpeedRatios.reduce((acc, r) => acc + Math.abs(r - meanSpeedRatio), 0) /
-      Math.max(1, segmentSpeedRatios.length)
-  );
+  const trafficVariance = computeTrafficVariance(segments, delayRatio);
 
   return {
     ...speedStats,
@@ -502,7 +566,7 @@ export function buildFeatures(input: BuildFeaturesInput): RouteFeatures {
     weaveSectionScore: merge.weaveSectionScore,
     mergeBurdenSubscore: merge.subscore,
     trafficRatio,
-    trafficVariance: trafficVariance * (1 + delayRatio),
+    trafficVariance,
     nighttimeShare: computeNighttimeShare(
       segments,
       route.bounds,
@@ -527,7 +591,7 @@ export function buildFeatures(input: BuildFeaturesInput): RouteFeatures {
     maneuversPer10Mi: maneuvers.maneuversPer10Mi,
     stepsPerMile,
     delayRatio,
-    ...deriveConditionFeatures(leftTurnCount, conditions),
+    ...deriveConditionFeatures(conditions),
   };
 }
 
@@ -540,15 +604,21 @@ export function buildFeaturesFromRoute(
     departureLocalMinutes?: number;
     conditions?: RouteConditions;
   } = {}
-): { segments: RouteSegment[]; features: RouteFeatures } {
+): {
+  segments: RouteSegment[];
+  segmentScores: number[];
+  features: RouteFeatures;
+} {
   const segments = segmentRoute(route, options.stepSpeedsMph);
+  const segmentScores = segments.map(scoreSegmentLocal);
   const features = buildFeatures({
     route,
     segments,
+    segmentScores,
     stepSpeedsMph: options.stepSpeedsMph,
     departureTime: options.departureTime,
     departureLocalMinutes: options.departureLocalMinutes,
     conditions: options.conditions,
   });
-  return { segments, features };
+  return { segments, segmentScores, features };
 }

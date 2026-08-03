@@ -3,7 +3,11 @@ import type { BaseScoreComponents } from "./baseScore.js";
 import type { FatigueResult } from "./fatigue.js";
 import { durationBurden, fatigueSubscore } from "./fatigue.js";
 import type { RouteFeatures } from "./features.js";
-import { computeSustainedEffortFromHours, smoothstep } from "./helpers.js";
+import {
+  METERS_PER_MILE,
+  computeSustainedEffortFromHours,
+  smoothstep,
+} from "./helpers.js";
 import type { RouteSegment } from "./segments.js";
 
 const FACTOR_LABELS: Record<string, string> = {
@@ -196,7 +200,7 @@ export function buildHotspots(
 }
 
 function summarizeSegment(segment: RouteSegment): string {
-  const miles = (segment.distanceMeters / 1609.34).toFixed(1);
+  const miles = (segment.distanceMeters / METERS_PER_MILE).toFixed(1);
   const mergeLike = segment.maneuvers.filter(
     (m) => m === "MERGE" || m.startsWith("RAMP_")
   ).length;
@@ -217,7 +221,7 @@ function summarizeSegment(segment: RouteSegment): string {
     return `Lane-change section (~${miles} mi)`;
   }
   if (sharpTurns >= 2) return `Sharp turn cluster (~${miles} mi)`;
-  if (turnManeuvers.length >= 2 && segment.distanceMeters / 1609.34 < 0.3) {
+  if (turnManeuvers.length >= 2 && segment.distanceMeters / METERS_PER_MILE < 0.3) {
     return `Back-to-back turns (~${miles} mi)`;
   }
   if (segment.maneuvers.length >= 3) return `Multiple turns (~${miles} mi)`;

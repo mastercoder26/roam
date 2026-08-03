@@ -7,6 +7,7 @@ import type {
   RouteStep,
 } from "../types.js";
 import type { RouteConditions } from "../enrichment/types.js";
+import { METERS_PER_MILE } from "./helpers.js";
 import { impliedStepSpeedMph } from "./signals.js";
 import {
   buildPolylineGeometry,
@@ -520,10 +521,10 @@ function fastRoadsDemand(
     .filter((span) => span.speedMph >= 65)
     .reduce((sum, span) => sum + span.step.distanceMeters, 0);
   const metrics: RouteDemandMetrics = {
-    estimatedMilesAt45: estimated45PlusDistanceMeters / 1_609.344,
-    estimatedMilesAt55: estimated55PlusDistanceMeters / 1_609.344,
-    estimatedMilesAt60: estimated60PlusDistanceMeters / 1_609.344,
-    estimatedMilesAt65: estimated65PlusDistanceMeters / 1_609.344,
+    estimatedMilesAt45: estimated45PlusDistanceMeters / METERS_PER_MILE,
+    estimatedMilesAt55: estimated55PlusDistanceMeters / METERS_PER_MILE,
+    estimatedMilesAt60: estimated60PlusDistanceMeters / METERS_PER_MILE,
+    estimatedMilesAt65: estimated65PlusDistanceMeters / METERS_PER_MILE,
     estimated45PlusDistanceMeters,
     estimated55PlusDistanceMeters,
     estimated60PlusDistanceMeters,

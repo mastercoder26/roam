@@ -20,7 +20,9 @@ import {
 import {
   getCalibrator,
   applyUncertaintyBand,
+  clampScore,
   estimateUncertainty,
+  finiteOr,
   scoreToLabel,
 } from "./helpers.js";
 import { assessScoreEvidence } from "./certainty.js";
@@ -56,16 +58,17 @@ export function scoreRoute(
   // Minutes already driven before this trip (0 = starting fresh).
   const continuousDriveMinutes = options.continuousDriveMinutes ?? 0;
 
-  const { segments, features } = buildFeaturesFromRoute(route, {
+  const { segments, segmentScores, features } = buildFeaturesFromRoute(route, {
     stepSpeedsMph: options.stepSpeedsMph,
     departureTime: options.departureTime,
     departureLocalMinutes: options.departureLocalMinutes,
     conditions: options.conditions,
   });
 
-  const segmentScores = segments.map(scoreSegmentLocal);
-  const segmentAgg = aggregateSegmentScores(segmentScores);
-  const D_route = segmentAgg.aggregated;
+  // `buildFeaturesFromRoute` already aggregated these segment scores into
+  // `features`; reuse its aggregate rather than re-deriving a second one that
+  // could silently drift from the feature vector the rest of the model sees.
+  const D_route = features.segmentAggregated;
 
   const base = computeBaseScore(features);
   const fatigue = computeFatigue(features, {
@@ -77,10 +80,10 @@ export function scoreRoute(
   });
   const rawScore = computeRawScore(D_route, base.D_base, fatigue, features);
 
-  const uncalibrated = Math.max(0, Math.min(10, rawScore));
+  const uncalibrated = clampScore(rawScore);
 
   const calibrator = getCalibrator();
-  const score = Math.round(calibrator.transform(uncalibrated) * 10) / 10;
+  const score = Math.round(clampScore(calibrator.transform(uncalibrated)) * 10) / 10;
 
   const breakdown = buildBreakdown(base, fatigue, features.durationHours);
   const contributions = explainPrediction(breakdown, features);
@@ -107,9 +110,11 @@ export function scoreRoute(
     stepSpeedsMph: options.stepSpeedsMph,
   });
 
+  // A provider that omits either duration must not produce a NaN delay:
+  // `Math.max(0, NaN)` is NaN, which would serialize as `null` on the client.
   const trafficDelaySeconds = Math.max(
     0,
-    route.durationSeconds - route.staticDurationSeconds
+    finiteOr(route.durationSeconds) - finiteOr(route.staticDurationSeconds)
   );
 
   return {
