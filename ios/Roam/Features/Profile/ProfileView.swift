@@ -79,6 +79,14 @@ struct ProfileView: View {
         .onChange(of: insightsSignature, initial: true) { _, _ in
             refreshInsights()
         }
+        // Leaving the tab mid-edit is a commit like any other. Without this,
+        // a name typed but never confirmed keeps the untrimmed spacing the
+        // editing rules deliberately allow through on each keystroke.
+        .onDisappear {
+            guard isEditingIdentity else { return }
+            profile.commitDisplayNameEdit()
+            isEditingIdentity = false
+        }
         .sheet(isPresented: $showingThemePicker) {
             ThemePickerSheet(themeManager: theme)
                 .environmentObject(driveSession)
