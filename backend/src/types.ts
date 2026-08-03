@@ -248,7 +248,7 @@ export interface DepartureComparisonCandidateResult
   route?: ScoredRoute;
   error?: {
     message: string;
-    code?: "INVALID_REQUEST" | "ROUTE_UNAVAILABLE";
+    code?: "INVALID_REQUEST" | "ROUTE_UNAVAILABLE" | "RATE_LIMITED";
     requestId?: string;
   };
 }
