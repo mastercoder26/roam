@@ -139,6 +139,15 @@ enum LaunchIntroChoreography {
             leading: travelled.clampedToUnit
         )
     }
+
+    // MARK: - Shine
+
+    /// A second, narrower specular pass over the wordmark once the headlight
+    /// sweep has fully lit it — the glint that makes the reveal read as
+    /// polished metal rather than a flat fill. Starts the moment the sweep's
+    /// own reveal animation completes.
+    static let shineDelay: TimeInterval = revealDelay + revealDuration
+    static let shineDuration: TimeInterval = 0.45
 }
 
 private extension Double {

@@ -102,7 +102,7 @@ struct DriveView: View {
                     pendingDeletionID = nil
                 }
             } message: {
-                Text("This removes the drive from this device. It cannot be undone.")
+                Text("This drive will be permanently deleted.")
             }
         }
         .sheet(isPresented: $showingHelp) {
@@ -403,7 +403,7 @@ struct DriveView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Practice route")
                         .font(.subheadline.weight(.semibold))
-                    Text("Roam only counts this as route practice when saved GPS overlaps the route.")
+                    Text("Counts as practice only when saved GPS overlaps the route.")
                         .font(.footnote)
                         .foregroundStyle(AppDesign.Ink.secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -635,10 +635,9 @@ struct DriveView: View {
 
     private var howItWorksCard: some View {
         VStack(alignment: .leading, spacing: 12) {
-            SectionHeader(title: "What gets measured", subtitle: "A first-pass, on-device drive score. It is not a safety guarantee.")
+            SectionHeader(title: "What gets measured", subtitle: "A first-pass, on-device drive score.")
             Label("GPS speed changes flag hard braking and rapid acceleration.", systemImage: "location.fill")
-            Label("Possible phone handling needs sustained motion and device rotation while driving. One bump does not count.", systemImage: "waveform.path.ecg")
-            Label("A physical iPhone is required for meaningful sensor data.", systemImage: "iphone")
+            Label("Flags sustained motion and rotation while driving.", systemImage: "waveform.path.ecg")
         }
         .font(.footnote)
         .foregroundStyle(AppDesign.Ink.secondary)
@@ -647,7 +646,7 @@ struct DriveView: View {
 
     private var driveHistory: some View {
         VStack(alignment: .leading, spacing: 12) {
-            SectionHeader(title: "Past drives", subtitle: "Routes and coaching events stay on this device. Touch and hold to delete.")
+            SectionHeader(title: "Past drives", subtitle: "Touch and hold to delete.")
             ForEach(session.recordedDrives) { drive in
                 NavigationLink {
                     DriveDetailView(drive: drive)

@@ -63,7 +63,7 @@ struct DriverProgressView: View {
             Text("Recorded progress")
                 .font(AppDesign.Typography.heroTitle)
                 .tracking(-0.5)
-            Text("Private measurement coverage from drives recorded on this iPhone.")
+            Text("Measurement coverage from your recorded drives.")
                 .font(.subheadline)
                 .foregroundStyle(AppDesign.Ink.secondary)
         }
@@ -165,7 +165,7 @@ struct DriverProgressView: View {
 
             Text("No recorded evidence yet")
                 .font(.headline)
-            Text("Complete a drive with usable GPS and motion. It stays in history while Roam automatically analyzes its start-to-destination route difficulty.")
+            Text("Complete a drive with usable GPS and motion to start building history.")
                 .font(.footnote)
                 .foregroundStyle(AppDesign.Ink.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -200,7 +200,7 @@ struct DriverProgressView: View {
         HStack(alignment: .top, spacing: 10) {
             Image(systemName: "chart.bar.xaxis")
                 .foregroundStyle(AppDesign.accent)
-            Text("Recorded evidence is still limited. These measurements describe what this iPhone has captured so far, not a recommendation about a future drive.")
+            Text("Based only on drives recorded so far.")
                 .font(.footnote)
                 .foregroundStyle(AppDesign.Ink.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -289,7 +289,7 @@ struct DriverProgressView: View {
         HStack(alignment: .top, spacing: 10) {
             Image(systemName: "info.circle.fill")
                 .foregroundStyle(AppDesign.safety)
-            Text("\(notYetQualifyingDriveCount) \(notYetQualifyingDriveCount == 1 ? "saved drive is" : "saved drives are") not yet qualifying for progress totals. They remain in your private history and need enough usable GPS, motion, distance, and continuous trace data before they count here.")
+            Text("\(notYetQualifyingDriveCount) \(notYetQualifyingDriveCount == 1 ? "saved drive is" : "saved drives are") not yet qualifying for progress totals. Not enough GPS and motion data yet.")
                 .font(.footnote)
                 .foregroundStyle(AppDesign.Ink.secondary)
                 .fixedSize(horizontal: false, vertical: true)

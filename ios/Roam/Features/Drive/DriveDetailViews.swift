@@ -214,7 +214,7 @@ private struct DriveRouteDifficultyCard: View {
                 IconTile(symbol: "map.fill", color: analysis?.label?.color ?? AppDesign.accent)
                 VStack(alignment: .leading, spacing: 3) {
                     Text("Route difficulty").font(.headline)
-                    Text("Analyzed automatically from this drive’s start to destination.")
+                    Text("From this drive’s start to destination.")
                         .font(.footnote)
                         .foregroundStyle(AppDesign.Ink.secondary)
                 }
@@ -249,7 +249,7 @@ private struct DriveRouteDifficultyCard: View {
             ProgressView().tint(AppDesign.accent).frame(width: 34, height: 34)
             VStack(alignment: .leading, spacing: 3) {
                 Text("Analyzing route difficulty").font(.headline)
-                Text("Roam saved this drive already and is analyzing the measured start and destination in the background.")
+                Text("Analyzing this drive’s route in the background.")
                     .font(.footnote)
                     .foregroundStyle(AppDesign.Ink.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -323,7 +323,7 @@ private struct ReplayMomentDetail: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(moment.kind.title).font(.subheadline.weight(.semibold))
-            Text("Detected from \(moment.source.rawValue). This is a coaching signal, not a determination of unsafe driving.")
+            Text("Detected from \(moment.source.rawValue).")
                 .font(.footnote)
                 .foregroundStyle(AppDesign.Ink.secondary)
             if let progress = moment.routeProgress {
@@ -331,7 +331,7 @@ private struct ReplayMomentDetail: View {
                     .font(.caption)
                     .foregroundStyle(AppDesign.Ink.secondary)
             } else {
-                Text("This event is saved, but it could not be placed on a continuous GPS segment.")
+                Text("Not placed on a continuous GPS segment.")
                     .font(.caption)
                     .foregroundStyle(AppDesign.Ink.secondary)
             }
@@ -526,7 +526,7 @@ struct DriveHelpSheet: View {
         VStack(alignment: .leading, spacing: 18) {
             Image(systemName: "lifepreserver.fill").font(.system(size: 30)).foregroundStyle(.red)
             Text("Get help safely").font(.title2.weight(.bold))
-            Text("If you feel unsafe, pull over in a safe place before using your phone. Roam cannot contact emergency services or monitor a crash.")
+            Text("Pull over before using your phone. Roam cannot contact emergency services or monitor a crash.")
                 .foregroundStyle(AppDesign.Ink.secondary)
             Button("Call emergency services") {
                 if let number = URL(string: "tel://911") { openURL(number) }

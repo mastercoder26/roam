@@ -117,9 +117,6 @@ struct ReadinessHistorySummary: View {
                 readinessFact("45+ mph baseline", value: "\(String(format: "%.1f", profile.fastRoad45Exposure.miles)) mi across \(profile.fastRoad45Exposure.sessionCount) \(profile.fastRoad45Exposure.sessionCount == 1 ? "drive" : "drives")", symbol: "speedometer")
                 readinessFact("Longest validated GPS trace", value: durationText(profile.longestDriveDuration), symbol: "clock.fill")
             }
-            Text("GPS, motion, and route overlap are analyzed on this iPhone only.")
-                .font(.caption2)
-                .foregroundStyle(AppDesign.Ink.tertiary)
         }
         .padding(12)
         .background(AppDesign.cardSurfaceElevated, in: RoundedRectangle(cornerRadius: 12, style: .continuous))

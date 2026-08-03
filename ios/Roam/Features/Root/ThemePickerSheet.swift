@@ -24,7 +24,7 @@ struct ThemePickerSheet: View {
                     Text("Color schemes")
                         .font(.title2.weight(.bold))
                         .foregroundStyle(AppDesign.Ink.primary)
-                    Text("Tap Roam anytime to change the look. Your choice stays on this device.")
+                    Text("Tap Roam anytime to change the look.")
                         .font(.footnote)
                         .foregroundStyle(AppDesign.Ink.secondary)
                         .fixedSize(horizontal: false, vertical: true)

@@ -107,7 +107,7 @@ struct MilestonesSection: View {
         VStack(alignment: .leading, spacing: AppDesign.space12) {
             SectionHeader(
                 title: "Goals",
-                subtitle: "Progress toward your current stage, from measured drives only."
+                subtitle: "Progress toward your current stage."
             )
 
             ForEach(milestones) { milestone in
@@ -203,7 +203,7 @@ struct BehaviorSignalsSection: View {
         VStack(alignment: .leading, spacing: AppDesign.space12) {
             SectionHeader(
                 title: "Driving behavior",
-                subtitle: "Signals from analyzed drives. A missing value means not enough data yet, never a zero."
+                subtitle: "Signals from analyzed drives."
             )
 
             StatRow(title: "Driving score", value: formattedWholeScore(insights.performanceScore), symbol: "gauge.with.dots.needle.50percent")

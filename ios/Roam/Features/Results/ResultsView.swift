@@ -173,7 +173,7 @@ struct ResultsView: View {
         VStack(alignment: .leading, spacing: 14) {
             SectionHeader(
                 title: "Can I drive this?",
-                subtitle: "Compared with drives recorded privately on this phone."
+                subtitle: "Compared with your recorded drives."
             )
 
             HStack(alignment: .top, spacing: 12) {
@@ -251,7 +251,7 @@ struct ResultsView: View {
                 .buttonStyle(PressableScaleStyle())
                 .disabled(driveSession.isRecording)
                 .opacity(driveSession.isRecording ? 0.55 : 1)
-                .accessibilityHint("Prepares this route for your next manually started drive. It does not begin recording.")
+                .accessibilityHint("Prepares this route for your next drive.")
             }
 
             Label(
@@ -602,7 +602,7 @@ struct ResultsView: View {
         VStack(alignment: .leading, spacing: 12) {
             SectionHeader(
                 title: "Calmest departure",
-                subtitle: "A local comparison of nearby departure times. Your recorded driving history stays on this iPhone."
+                subtitle: "A comparison of nearby departure times."
             )
 
             if isComparingDepartures {

@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 /// Roam's launch sequence.
 ///
@@ -53,6 +54,10 @@ struct LaunchIntroView: View {
         .accessibilityLabel("Roam")
         .accessibilityAddTraits(.isImage)
         .onAppear(perform: play)
+        .onChange(of: isLockupVisible) { _, visible in
+            guard visible, !reduceMotion else { return }
+            UIImpactFeedbackGenerator(style: .soft).impactOccurred(intensity: 0.6)
+        }
     }
 
     // MARK: - Layers
@@ -62,6 +67,7 @@ struct LaunchIntroView: View {
     /// wordmark.
     private var atmosphere: some View {
         ZStack {
+            MapGridTexture()
             glow(color: AppDesign.accent, offset: CGSize(width: -90, height: -140), size: 300)
             glow(color: AppDesign.safety, offset: CGSize(width: 110, height: 170), size: 340)
         }
@@ -146,6 +152,35 @@ struct LaunchIntroView: View {
     }
 }
 
+// MARK: - Atmosphere texture
+
+/// A faint dotted grid, the same language as the map screens the intro hands
+/// off to. It ties the brand moment to what the app actually is instead of
+/// leaving the canvas as empty color.
+private struct MapGridTexture: View {
+    @ObservedObject private var theme = ThemeManager.shared
+    private let spacing: CGFloat = 28
+
+    var body: some View {
+        Canvas { context, size in
+            let dot = Path(ellipseIn: CGRect(x: 0, y: 0, width: 1.6, height: 1.6))
+            var x: CGFloat = spacing / 2
+            while x < size.width {
+                var y: CGFloat = spacing / 2
+                while y < size.height {
+                    context.opacity = 0.5
+                    context.translateBy(x: x, y: y)
+                    context.fill(dot, with: .color(AppDesign.cardStroke))
+                    context.translateBy(x: -x, y: -y)
+                    y += spacing
+                }
+                x += spacing
+            }
+        }
+        .allowsHitTesting(false)
+    }
+}
+
 // MARK: - Road
 
 private struct RoadTrace: View {
@@ -203,8 +238,61 @@ private struct RoadTrace: View {
 
     private var milestones: some View {
         ForEach(Array(LaunchIntroChoreography.milestones.enumerated()), id: \.offset) { _, fraction in
-            let isLit = LaunchIntroChoreography.isMilestoneLit(fraction, traceProgress: traceProgress)
-            let center = cgPoint(LaunchIntroChoreography.point(at: fraction))
+            MilestoneMarker(
+                center: cgPoint(LaunchIntroChoreography.point(at: fraction)),
+                isLit: LaunchIntroChoreography.isMilestoneLit(fraction, traceProgress: traceProgress)
+            )
+        }
+    }
+
+    /// The travelling light. Elongated along the direction of travel so it
+    /// reads as a vehicle's beam rather than a bouncing ball, with a soft
+    /// halo behind it for depth against the flat road.
+    private var head: some View {
+        let position = cgPoint(LaunchIntroChoreography.point(at: traceProgress))
+        let heading = LaunchIntroChoreography.headingDegrees(at: traceProgress)
+
+        return ZStack {
+            Circle()
+                .fill(AppDesign.safety.opacity(0.35))
+                .frame(width: 34, height: 34)
+                .blur(radius: 10)
+                .position(position)
+
+            Capsule()
+                .fill(AppDesign.Ink.primary)
+                .frame(width: 22, height: 10)
+                .rotationEffect(.degrees(heading))
+                .shadow(color: AppDesign.safety.opacity(0.8), radius: 10)
+                .position(position)
+        }
+        .opacity(showsHead ? 1 : 0)
+    }
+
+    private func cgPoint(_ point: IntroPoint) -> CGPoint {
+        CGPoint(x: point.x, y: point.y)
+    }
+}
+
+/// A single waypoint dot plus its one-shot ignition pulse — an expanding,
+/// fading ring fired the moment the trace passes it, so a waypoint reads as
+/// *reached* rather than merely recolored.
+private struct MilestoneMarker: View {
+    let center: CGPoint
+    let isLit: Bool
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var hasPulsed = false
+    @State private var pulseActive = false
+
+    var body: some View {
+        ZStack {
+            Circle()
+                .stroke(AppDesign.safety, lineWidth: 2)
+                .frame(width: 13, height: 13)
+                .scaleEffect(pulseActive ? 2.4 : 1)
+                .opacity(pulseActive ? 0 : 0.8)
+                .position(center)
 
             Circle()
                 .fill(AppDesign.canvas)
@@ -218,25 +306,13 @@ private struct RoadTrace: View {
                 .position(center)
                 .animation(AppAnimation.selection, value: isLit)
         }
-    }
-
-    /// The travelling light. Elongated along the direction of travel so it
-    /// reads as a vehicle's beam rather than a bouncing ball.
-    private var head: some View {
-        let position = cgPoint(LaunchIntroChoreography.point(at: traceProgress))
-        let heading = LaunchIntroChoreography.headingDegrees(at: traceProgress)
-
-        return Capsule()
-            .fill(AppDesign.Ink.primary)
-            .frame(width: 22, height: 10)
-            .rotationEffect(.degrees(heading))
-            .shadow(color: AppDesign.safety.opacity(0.8), radius: 10)
-            .position(position)
-            .opacity(showsHead ? 1 : 0)
-    }
-
-    private func cgPoint(_ point: IntroPoint) -> CGPoint {
-        CGPoint(x: point.x, y: point.y)
+        .onChange(of: isLit) { _, lit in
+            guard lit, !hasPulsed, !reduceMotion else { return }
+            hasPulsed = true
+            withAnimation(.easeOut(duration: 0.45)) {
+                pulseActive = true
+            }
+        }
     }
 }
 
@@ -249,6 +325,8 @@ private struct SweptWordmark: View {
     @ObservedObject private var theme = ThemeManager.shared
     let sweepProgress: Double
     let reduceMotion: Bool
+
+    @State private var shineProgress: Double = -0.4
 
     var body: some View {
         ZStack {
@@ -266,8 +344,34 @@ private struct SweptWordmark: View {
                     .allowsHitTesting(false)
                 }
                 .mask(alignment: .center) { litMask }
+                .overlay { shine }
         }
         .scaleEffect(reduceMotion ? 1 : 0.98 + 0.02 * sweepProgress)
+        .onChange(of: sweepProgress) { _, progress in
+            guard progress >= 1, !reduceMotion else { return }
+            withAnimation(.easeIn(duration: LaunchIntroChoreography.shineDuration)) {
+                shineProgress = 1.4
+            }
+        }
+    }
+
+    /// A narrow, brighter glint that crosses the now-lit wordmark once —
+    /// the specular pass that reads as polish rather than a flat fill.
+    private var shine: some View {
+        LinearGradient(
+            stops: [
+                .init(color: .white.opacity(0), location: 0),
+                .init(color: .white.opacity(0.55), location: 0.5),
+                .init(color: .white.opacity(0), location: 1)
+            ],
+            startPoint: .leading,
+            endPoint: .trailing
+        )
+        .rotationEffect(.degrees(18))
+        .offset(x: shineProgress * 220)
+        .blendMode(.plusLighter)
+        .mask(alignment: .center) { litMask }
+        .allowsHitTesting(false)
     }
 
     /// Opaque behind the band, transparent ahead of it, with a soft edge

@@ -310,11 +310,11 @@ final class DriveSessionManager: NSObject, ObservableObject {
         } else if finalPlacementQuality == .needsAdjustment {
             statusMessage = "Drive saved. Secure the phone when it is safe before your next drive."
         } else if motionSamples == 0 {
-            statusMessage = "No motion samples received. Try a physical iPhone."
+            statusMessage = "No motion samples received."
         } else if practiceRouteWasVerified == true {
-            statusMessage = "Drive saved. Planned-route overlap was verified on this device."
+            statusMessage = "Drive saved. Route overlap verified."
         } else if practiceRouteWasVerified == false {
-            statusMessage = "Drive saved. Planned-route overlap could not be verified from GPS."
+            statusMessage = "Drive saved. Route overlap unverified."
         } else {
             statusMessage = "Drive saved on this device"
         }
