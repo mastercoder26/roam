@@ -148,6 +148,18 @@ enum LaunchIntroChoreography {
     /// own reveal animation completes.
     static let shineDelay: TimeInterval = revealDelay + revealDuration
     static let shineDuration: TimeInterval = 0.45
+
+    // MARK: - Video wordmark overlay
+
+    /// How long after the globe clip starts before the wordmark fades in on
+    /// top of it. Chosen to land well before the clip's own fade-to-canvas,
+    /// so the mark appears while the globe is still fully lit rather than
+    /// after a separate transition.
+    static let videoWordmarkDelay: TimeInterval = 1.3
+    static let videoWordmarkFadeDuration: TimeInterval = 0.5
+    /// A short beat with the wordmark alone on the now-solid canvas before
+    /// handing off, so it reads rather than flashing past.
+    static let videoWordmarkHoldDuration: TimeInterval = 0.5
 }
 
 private extension Double {

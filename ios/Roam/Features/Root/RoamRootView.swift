@@ -61,7 +61,7 @@ struct RoamRootView: View {
                     ProfileView()
                 }
             }
-            .tabBarMinimizeBehavior(.automatic)
+            .tabBarMinimizeBehavior(.onScrollDown)
         }
         .environmentObject(driveSession)
         .environmentObject(themeManager)
