@@ -7,6 +7,16 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		1EBFCB6E4464444BB2936C89 /* AppIconManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D5BFA4B25844B26BFE25E88 /* AppIconManager.swift */; };
+		F38A1F7818134DBFA869E6BE /* AppIconPickerSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25396EAAE4294CDAACC5E8D4 /* AppIconPickerSheet.swift */; };
+		F12F741FFF4B406383961998 /* AppIconAlt-20x20@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = 9AFE5C0E53A840129B30EA00 /* AppIconAlt-20x20@2x.png */; };
+		506AEF7FDE8E4C71BBB23780 /* AppIconAlt-20x20@3x.png in Resources */ = {isa = PBXBuildFile; fileRef = CDA55DDA2E744AFAACA46532 /* AppIconAlt-20x20@3x.png */; };
+		B6E1CC5F1AA94E00A21E97E2 /* AppIconAlt-29x29@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = B5BE4FA90FE34147B917E18D /* AppIconAlt-29x29@2x.png */; };
+		717A8982D0B14159A7B333CA /* AppIconAlt-29x29@3x.png in Resources */ = {isa = PBXBuildFile; fileRef = D74B14B7666A4BE9BDED45FE /* AppIconAlt-29x29@3x.png */; };
+		9726FC9F89004325A495CD36 /* AppIconAlt-40x40@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = 300FAE595EA74EB7BD8451DD /* AppIconAlt-40x40@2x.png */; };
+		40A6EEF1D2F24291A3621A0C /* AppIconAlt-40x40@3x.png in Resources */ = {isa = PBXBuildFile; fileRef = 0E9EAF96588049B0852628E9 /* AppIconAlt-40x40@3x.png */; };
+		70FDA62F7B8C44DBA86A4DAE /* AppIconAlt-60x60@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = 2D2C27CEE3F9471F88F3BF3B /* AppIconAlt-60x60@2x.png */; };
+		63A5E297A33C464B9853C815 /* AppIconAlt-60x60@3x.png in Resources */ = {isa = PBXBuildFile; fileRef = 2D17157632DC46C1A30100A6 /* AppIconAlt-60x60@3x.png */; };
 		014C8D618E64CA88280CF1F5 /* intro-light.mp4 in Resources */ = {isa = PBXBuildFile; fileRef = EEF6DD490DCA0105367F7A7A /* intro-light.mp4 */; };
 		058FB74E7FB5F3A1D365A256 /* intro-ember.mp4 in Resources */ = {isa = PBXBuildFile; fileRef = 4B703458C075A9A036E73401 /* intro-ember.mp4 */; };
 		1B712EA91159040B45DA993D /* intro-sequoia.mp4 in Resources */ = {isa = PBXBuildFile; fileRef = 504414AC708735F35ECEC673 /* intro-sequoia.mp4 */; };
@@ -110,6 +120,16 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		2D5BFA4B25844B26BFE25E88 /* AppIconManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppIconManager.swift; sourceTree = "<group>"; };
+		25396EAAE4294CDAACC5E8D4 /* AppIconPickerSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppIconPickerSheet.swift; sourceTree = "<group>"; };
+		9AFE5C0E53A840129B30EA00 /* AppIconAlt-20x20@2x.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "AppIconAlt-20x20@2x.png"; sourceTree = "<group>"; };
+		CDA55DDA2E744AFAACA46532 /* AppIconAlt-20x20@3x.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "AppIconAlt-20x20@3x.png"; sourceTree = "<group>"; };
+		B5BE4FA90FE34147B917E18D /* AppIconAlt-29x29@2x.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "AppIconAlt-29x29@2x.png"; sourceTree = "<group>"; };
+		D74B14B7666A4BE9BDED45FE /* AppIconAlt-29x29@3x.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "AppIconAlt-29x29@3x.png"; sourceTree = "<group>"; };
+		300FAE595EA74EB7BD8451DD /* AppIconAlt-40x40@2x.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "AppIconAlt-40x40@2x.png"; sourceTree = "<group>"; };
+		0E9EAF96588049B0852628E9 /* AppIconAlt-40x40@3x.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "AppIconAlt-40x40@3x.png"; sourceTree = "<group>"; };
+		2D2C27CEE3F9471F88F3BF3B /* AppIconAlt-60x60@2x.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "AppIconAlt-60x60@2x.png"; sourceTree = "<group>"; };
+		2D17157632DC46C1A30100A6 /* AppIconAlt-60x60@3x.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "AppIconAlt-60x60@3x.png"; sourceTree = "<group>"; };
 		2B9DF49B43552A1481D5ECFD /* intro-goldfish.mp4 */ = {isa = PBXFileReference; includeInIndex = 1; path = "intro-goldfish.mp4"; sourceTree = "<group>"; };
 		2CB1D613E5C6086D71A25BE2 /* intro-dark.mp4 */ = {isa = PBXFileReference; includeInIndex = 1; path = "intro-dark.mp4"; sourceTree = "<group>"; };
 		36634240979564F16074C612 /* LaunchIntroVideoLayer.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LaunchIntroVideoLayer.swift; sourceTree = "<group>"; };
@@ -247,6 +267,7 @@
 				A50000000000000000000007 /* Components */,
 				A50000000000000000000008 /* Config */,
 				A2000000000000000000000C /* Assets.xcassets */,
+				825F10D7936841F4BE8AA4CD /* AlternateAppIcons */,
 				A2000000000000000000000D /* Info.plist */,
 				A2000000000000000000002C /* Roam.entitlements */,
 				D7F99E49D90C22CDFC826EC0 /* Resources */,
@@ -311,6 +332,7 @@
 		A50000000000000000000006 /* Services */ = {
 			isa = PBXGroup;
 			children = (
+				2D5BFA4B25844B26BFE25E88 /* AppIconManager.swift */,
 				A20000000000000000000005 /* APIClient.swift */,
 				A20000000000000000000014 /* DriveSessionManager.swift */,
 				A20000000000000000000022 /* DriveLiveActivityManager.swift */,
@@ -375,6 +397,7 @@
 		A5000000000000000000000C /* Root */ = {
 			isa = PBXGroup;
 			children = (
+				25396EAAE4294CDAACC5E8D4 /* AppIconPickerSheet.swift */,
 				A20000000000000000000012 /* RoamRootView.swift */,
 				A20000000000000000000031 /* ThemePickerSheet.swift */,
 				A20000000000000000000044 /* LaunchIntroView.swift */,
@@ -437,6 +460,21 @@
 			);
 			name = Resources;
 			path = Resources;
+			sourceTree = "<group>";
+		};
+		825F10D7936841F4BE8AA4CD /* AlternateAppIcons */ = {
+			isa = PBXGroup;
+			children = (
+				9AFE5C0E53A840129B30EA00 /* AppIconAlt-20x20@2x.png */,
+				CDA55DDA2E744AFAACA46532 /* AppIconAlt-20x20@3x.png */,
+				B5BE4FA90FE34147B917E18D /* AppIconAlt-29x29@2x.png */,
+				D74B14B7666A4BE9BDED45FE /* AppIconAlt-29x29@3x.png */,
+				300FAE595EA74EB7BD8451DD /* AppIconAlt-40x40@2x.png */,
+				0E9EAF96588049B0852628E9 /* AppIconAlt-40x40@3x.png */,
+				2D2C27CEE3F9471F88F3BF3B /* AppIconAlt-60x60@2x.png */,
+				2D17157632DC46C1A30100A6 /* AppIconAlt-60x60@3x.png */,
+			);
+			path = AlternateAppIcons;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -552,6 +590,14 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				F12F741FFF4B406383961998 /* AppIconAlt-20x20@2x.png in Resources */,
+				506AEF7FDE8E4C71BBB23780 /* AppIconAlt-20x20@3x.png in Resources */,
+				B6E1CC5F1AA94E00A21E97E2 /* AppIconAlt-29x29@2x.png in Resources */,
+				717A8982D0B14159A7B333CA /* AppIconAlt-29x29@3x.png in Resources */,
+				9726FC9F89004325A495CD36 /* AppIconAlt-40x40@2x.png in Resources */,
+				40A6EEF1D2F24291A3621A0C /* AppIconAlt-40x40@3x.png in Resources */,
+				70FDA62F7B8C44DBA86A4DAE /* AppIconAlt-60x60@2x.png in Resources */,
+				63A5E297A33C464B9853C815 /* AppIconAlt-60x60@3x.png in Resources */,
 				A1000000000000000000000C /* Assets.xcassets in Resources */,
 				75467AECA48723A914DA2E4B /* intro-dark.mp4 in Resources */,
 				014C8D618E64CA88280CF1F5 /* intro-light.mp4 in Resources */,
@@ -583,6 +629,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				1EBFCB6E4464444BB2936C89 /* AppIconManager.swift in Sources */,
+				F38A1F7818134DBFA869E6BE /* AppIconPickerSheet.swift in Sources */,
 				A10000000000000000000001 /* RoamApp.swift in Sources */,
 				A10000000000000000000002 /* HomeView.swift in Sources */,
 				A10000000000000000000003 /* ResultsView.swift in Sources */,

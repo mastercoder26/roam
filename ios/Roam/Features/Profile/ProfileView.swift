@@ -10,11 +10,13 @@ import SwiftUI
 /// and deliberately excluded from every score.
 struct ProfileView: View {
     @ObservedObject private var theme = ThemeManager.shared
+    @ObservedObject private var appIcon = AppIconManager.shared
     @EnvironmentObject private var driveSession: DriveSessionManager
     @StateObject private var profile = DriverProfileStore()
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     @State private var showingThemePicker = false
+    @State private var showingAppIconPicker = false
     @State private var isEditingIdentity = false
     @State private var insights = DriverProfileInsightsEngine.makeInsights(from: [], stage: .permit)
 
@@ -65,6 +67,7 @@ struct ProfileView: View {
                     WeeklyTrendSection(insights: insights, reduceMotion: reduceMotion)
                     stageCard
                     appearanceCard
+                    appIconCard
                 }
                 .padding(.horizontal, AppDesign.contentPadding)
                 .padding(.vertical, 12)
@@ -90,6 +93,9 @@ struct ProfileView: View {
         .sheet(isPresented: $showingThemePicker) {
             ThemePickerSheet(themeManager: theme)
                 .environmentObject(driveSession)
+        }
+        .sheet(isPresented: $showingAppIconPicker) {
+            AppIconPickerSheet(iconManager: appIcon)
         }
     }
 
@@ -261,6 +267,35 @@ struct ProfileView: View {
         .buttonStyle(PressableScaleStyle())
         .premiumCard()
         .accessibilityLabel("Color scheme, currently \(theme.currentID.title)")
+    }
+
+    private var appIconCard: some View {
+        Button {
+            showingAppIconPicker = true
+        } label: {
+            HStack(spacing: AppDesign.space12) {
+                IconTile(symbol: "app.badge")
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("App icon")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(AppDesign.Ink.primary)
+                    Text(appIcon.currentID.title)
+                        .font(.caption)
+                        .foregroundStyle(AppDesign.Ink.secondary)
+                }
+
+                Spacer(minLength: 8)
+
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(AppDesign.Ink.tertiary)
+            }
+            .frame(minHeight: 44)
+        }
+        .buttonStyle(PressableScaleStyle())
+        .premiumCard()
+        .accessibilityLabel("App icon, currently \(appIcon.currentID.title)")
     }
 }
 
