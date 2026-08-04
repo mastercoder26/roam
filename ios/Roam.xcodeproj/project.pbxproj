@@ -7,6 +7,12 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		014C8D618E64CA88280CF1F5 /* intro-light.mp4 in Resources */ = {isa = PBXBuildFile; fileRef = EEF6DD490DCA0105367F7A7A /* intro-light.mp4 */; };
+		058FB74E7FB5F3A1D365A256 /* intro-ember.mp4 in Resources */ = {isa = PBXBuildFile; fileRef = 4B703458C075A9A036E73401 /* intro-ember.mp4 */; };
+		1B712EA91159040B45DA993D /* intro-sequoia.mp4 in Resources */ = {isa = PBXBuildFile; fileRef = 504414AC708735F35ECEC673 /* intro-sequoia.mp4 */; };
+		75467AECA48723A914DA2E4B /* intro-dark.mp4 in Resources */ = {isa = PBXBuildFile; fileRef = 2CB1D613E5C6086D71A25BE2 /* intro-dark.mp4 */; };
+		7D24D4F1398E5E009BD768D4 /* LaunchIntroVideoLayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36634240979564F16074C612 /* LaunchIntroVideoLayer.swift */; };
+		801F9F25AA779A9953455411 /* intro-midnight.mp4 in Resources */ = {isa = PBXBuildFile; fileRef = B68748C760C76C76BA63801D /* intro-midnight.mp4 */; };
 		A10000000000000000000001 /* RoamApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000001 /* RoamApp.swift */; };
 		A10000000000000000000002 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000002 /* HomeView.swift */; };
 		A10000000000000000000003 /* ResultsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000003 /* ResultsView.swift */; };
@@ -48,10 +54,6 @@
 		A1000000000000000000002C /* SharedRouteImport.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000027 /* SharedRouteImport.swift */; };
 		A1000000000000000000002D /* RoamRouteShareExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = A30000000000000000000003 /* RoamRouteShareExtension.appex */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
 		A1000000000000000000002E /* DriveHistoryPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000002E /* DriveHistoryPolicy.swift */; };
-		A100000000000000000000F1 /* DriverProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = A200000000000000000000F1 /* DriverProfile.swift */; };
-		A100000000000000000000F2 /* ProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A200000000000000000000F2 /* ProfileView.swift */; };
-		A100000000000000000000F3 /* DriverProfileInsightsEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = A200000000000000000000F3 /* DriverProfileInsightsEngine.swift */; };
-		A100000000000000000000F4 /* ProfileSupportingViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = A200000000000000000000F4 /* ProfileSupportingViews.swift */; };
 		A1000000000000000000002F /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000002F /* Theme.swift */; };
 		A10000000000000000000030 /* ThemeManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000030 /* ThemeManager.swift */; };
 		A10000000000000000000031 /* ThemePickerSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000031 /* ThemePickerSheet.swift */; };
@@ -68,6 +70,11 @@
 		A10000000000000000000042 /* DrivePlanningSupportingViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000042 /* DrivePlanningSupportingViews.swift */; };
 		A10000000000000000000043 /* LaunchIntroChoreography.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000043 /* LaunchIntroChoreography.swift */; };
 		A10000000000000000000044 /* LaunchIntroView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000044 /* LaunchIntroView.swift */; };
+		A100000000000000000000F1 /* DriverProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = A200000000000000000000F1 /* DriverProfile.swift */; };
+		A100000000000000000000F2 /* ProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A200000000000000000000F2 /* ProfileView.swift */; };
+		A100000000000000000000F3 /* DriverProfileInsightsEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = A200000000000000000000F3 /* DriverProfileInsightsEngine.swift */; };
+		A100000000000000000000F4 /* ProfileSupportingViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = A200000000000000000000F4 /* ProfileSupportingViews.swift */; };
+		F6FF09CA970740C1E2A01644 /* intro-goldfish.mp4 in Resources */ = {isa = PBXBuildFile; fileRef = 2B9DF49B43552A1481D5ECFD /* intro-goldfish.mp4 */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -103,6 +110,11 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		2B9DF49B43552A1481D5ECFD /* intro-goldfish.mp4 */ = {isa = PBXFileReference; includeInIndex = 1; path = "intro-goldfish.mp4"; sourceTree = "<group>"; };
+		2CB1D613E5C6086D71A25BE2 /* intro-dark.mp4 */ = {isa = PBXFileReference; includeInIndex = 1; path = "intro-dark.mp4"; sourceTree = "<group>"; };
+		36634240979564F16074C612 /* LaunchIntroVideoLayer.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LaunchIntroVideoLayer.swift; sourceTree = "<group>"; };
+		4B703458C075A9A036E73401 /* intro-ember.mp4 */ = {isa = PBXFileReference; includeInIndex = 1; path = "intro-ember.mp4"; sourceTree = "<group>"; };
+		504414AC708735F35ECEC673 /* intro-sequoia.mp4 */ = {isa = PBXFileReference; includeInIndex = 1; path = "intro-sequoia.mp4"; sourceTree = "<group>"; };
 		A20000000000000000000001 /* RoamApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoamApp.swift; sourceTree = "<group>"; };
 		A20000000000000000000002 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
 		A20000000000000000000003 /* ResultsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResultsView.swift; sourceTree = "<group>"; };
@@ -147,10 +159,6 @@
 		A2000000000000000000002C /* Roam.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Roam.entitlements; sourceTree = "<group>"; };
 		A2000000000000000000002D /* RoamRouteShareExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = RoamRouteShareExtension.entitlements; sourceTree = "<group>"; };
 		A2000000000000000000002E /* DriveHistoryPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriveHistoryPolicy.swift; sourceTree = "<group>"; };
-		A200000000000000000000F1 /* DriverProfile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriverProfile.swift; sourceTree = "<group>"; };
-		A200000000000000000000F2 /* ProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileView.swift; sourceTree = "<group>"; };
-		A200000000000000000000F3 /* DriverProfileInsightsEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriverProfileInsightsEngine.swift; sourceTree = "<group>"; };
-		A200000000000000000000F4 /* ProfileSupportingViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileSupportingViews.swift; sourceTree = "<group>"; };
 		A2000000000000000000002F /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 		A20000000000000000000030 /* ThemeManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThemeManager.swift; sourceTree = "<group>"; };
 		A20000000000000000000031 /* ThemePickerSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThemePickerSheet.swift; sourceTree = "<group>"; };
@@ -167,9 +175,15 @@
 		A20000000000000000000042 /* DrivePlanningSupportingViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DrivePlanningSupportingViews.swift; sourceTree = "<group>"; };
 		A20000000000000000000043 /* LaunchIntroChoreography.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchIntroChoreography.swift; sourceTree = "<group>"; };
 		A20000000000000000000044 /* LaunchIntroView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchIntroView.swift; sourceTree = "<group>"; };
+		A200000000000000000000F1 /* DriverProfile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriverProfile.swift; sourceTree = "<group>"; };
+		A200000000000000000000F2 /* ProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileView.swift; sourceTree = "<group>"; };
+		A200000000000000000000F3 /* DriverProfileInsightsEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriverProfileInsightsEngine.swift; sourceTree = "<group>"; };
+		A200000000000000000000F4 /* ProfileSupportingViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileSupportingViews.swift; sourceTree = "<group>"; };
 		A30000000000000000000001 /* Roam.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Roam.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A30000000000000000000002 /* RoamDriveActivityExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = RoamDriveActivityExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		A30000000000000000000003 /* RoamRouteShareExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = RoamRouteShareExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		B68748C760C76C76BA63801D /* intro-midnight.mp4 */ = {isa = PBXFileReference; includeInIndex = 1; path = "intro-midnight.mp4"; sourceTree = "<group>"; };
+		EEF6DD490DCA0105367F7A7A /* intro-light.mp4 */ = {isa = PBXFileReference; includeInIndex = 1; path = "intro-light.mp4"; sourceTree = "<group>"; };
 		F4B7F709301E7D5F003C2863 /* Debug.local.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Debug.local.xcconfig; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -198,6 +212,20 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		9090B1B64E11ABD08391F90B /* Intro */ = {
+			isa = PBXGroup;
+			children = (
+				2CB1D613E5C6086D71A25BE2 /* intro-dark.mp4 */,
+				EEF6DD490DCA0105367F7A7A /* intro-light.mp4 */,
+				2B9DF49B43552A1481D5ECFD /* intro-goldfish.mp4 */,
+				B68748C760C76C76BA63801D /* intro-midnight.mp4 */,
+				4B703458C075A9A036E73401 /* intro-ember.mp4 */,
+				504414AC708735F35ECEC673 /* intro-sequoia.mp4 */,
+			);
+			name = Intro;
+			path = Intro;
+			sourceTree = "<group>";
+		};
 		A50000000000000000000001 = {
 			isa = PBXGroup;
 			children = (
@@ -221,6 +249,7 @@
 				A2000000000000000000000C /* Assets.xcassets */,
 				A2000000000000000000000D /* Info.plist */,
 				A2000000000000000000002C /* Roam.entitlements */,
+				D7F99E49D90C22CDFC826EC0 /* Resources */,
 			);
 			path = Roam;
 			sourceTree = "<group>";
@@ -349,6 +378,7 @@
 				A20000000000000000000012 /* RoamRootView.swift */,
 				A20000000000000000000031 /* ThemePickerSheet.swift */,
 				A20000000000000000000044 /* LaunchIntroView.swift */,
+				36634240979564F16074C612 /* LaunchIntroVideoLayer.swift */,
 			);
 			path = Root;
 			sourceTree = "<group>";
@@ -361,16 +391,6 @@
 				A20000000000000000000042 /* DrivePlanningSupportingViews.swift */,
 			);
 			path = Drive;
-			sourceTree = "<group>";
-		};
-		A500000000000000000000F0 /* Profile */ = {
-			isa = PBXGroup;
-			children = (
-				A200000000000000000000F1 /* DriverProfile.swift */,
-				A200000000000000000000F2 /* ProfileView.swift */,
-				A200000000000000000000F4 /* ProfileSupportingViews.swift */,
-			);
-			path = Profile;
 			sourceTree = "<group>";
 		};
 		A5000000000000000000000E /* Progress */ = {
@@ -398,6 +418,25 @@
 				A2000000000000000000002D /* RoamRouteShareExtension.entitlements */,
 			);
 			path = RoamRouteShareExtension;
+			sourceTree = "<group>";
+		};
+		A500000000000000000000F0 /* Profile */ = {
+			isa = PBXGroup;
+			children = (
+				A200000000000000000000F1 /* DriverProfile.swift */,
+				A200000000000000000000F2 /* ProfileView.swift */,
+				A200000000000000000000F4 /* ProfileSupportingViews.swift */,
+			);
+			path = Profile;
+			sourceTree = "<group>";
+		};
+		D7F99E49D90C22CDFC826EC0 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				9090B1B64E11ABD08391F90B /* Intro */,
+			);
+			name = Resources;
+			path = Resources;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -514,6 +553,12 @@
 			buildActionMask = 2147483647;
 			files = (
 				A1000000000000000000000C /* Assets.xcassets in Resources */,
+				75467AECA48723A914DA2E4B /* intro-dark.mp4 in Resources */,
+				014C8D618E64CA88280CF1F5 /* intro-light.mp4 in Resources */,
+				F6FF09CA970740C1E2A01644 /* intro-goldfish.mp4 in Resources */,
+				801F9F25AA779A9953455411 /* intro-midnight.mp4 in Resources */,
+				058FB74E7FB5F3A1D365A256 /* intro-ember.mp4 in Resources */,
+				1B712EA91159040B45DA993D /* intro-sequoia.mp4 in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -592,6 +637,7 @@
 				A10000000000000000000028 /* SharedRouteImport.swift in Sources */,
 				A10000000000000000000029 /* RoutePlanningFormModel.swift in Sources */,
 				A1000000000000000000002A /* SharedRouteImportCoordinator.swift in Sources */,
+				7D24D4F1398E5E009BD768D4 /* LaunchIntroVideoLayer.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

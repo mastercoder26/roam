@@ -17,6 +17,7 @@ struct LaunchIntroView: View {
     @State private var sweepProgress: Double = 0
     @State private var isLockupVisible = false
     @State private var hasHandedOff = false
+    @State private var isVideoPhaseActive = false
 
     private var choreography: LaunchIntroChoreography.Type { LaunchIntroChoreography.self }
 
@@ -46,6 +47,13 @@ struct LaunchIntroView: View {
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
+
+            // The pre-rendered globe-and-route clip sits on top until it
+            // finishes, then steps aside for the native trace/wordmark beat
+            // it was authored to hand off into.
+            if isVideoPhaseActive {
+                LaunchIntroVideoLayer(themeID: theme.currentID, onFinished: handOffFromVideo)
+            }
         }
         // Nobody should be held hostage by a brand moment. A tap finishes it.
         .contentShape(Rectangle())
@@ -53,7 +61,7 @@ struct LaunchIntroView: View {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Roam")
         .accessibilityAddTraits(.isImage)
-        .onAppear(perform: play)
+        .onAppear(perform: start)
         .onChange(of: isLockupVisible) { _, visible in
             guard visible, !reduceMotion else { return }
             UIImpactFeedbackGenerator(style: .soft).impactOccurred(intensity: 0.6)
@@ -113,6 +121,21 @@ struct LaunchIntroView: View {
     }
 
     // MARK: - Sequence
+
+    /// Reduce Motion, and any theme missing a rendered clip, skip straight
+    /// to the native trace/wordmark beat. Everyone else gets the globe first.
+    private func start() {
+        guard !reduceMotion, LaunchIntroVideoLayer.videoURL(for: theme.currentID) != nil else {
+            play()
+            return
+        }
+        isVideoPhaseActive = true
+    }
+
+    private func handOffFromVideo() {
+        isVideoPhaseActive = false
+        play()
+    }
 
     private func play() {
         guard !reduceMotion else {

@@ -12,3 +12,6 @@ node_modules/
 # Local agent tooling (machine-specific; not part of the project)
 .claude/
 .conductor/
+
+# Regeneratable render output
+tools/intro-render/out/
