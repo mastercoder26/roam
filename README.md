@@ -130,52 +130,48 @@ Run the backend scoring tests with:
 npm test
 ```
 
-Run the deterministic manual-drive checks with:
+The iOS engines are covered by standalone Swift command-line checks in
+`ios/tests/`. They compile with `swiftc` alone — no Xcode scheme, simulator or
+XCTest bundle — and cover the private local engines separately from the app
+target. Run all of them with:
 
 ```bash
-swiftc ios/Roam/Models/RouteDifficultyModels.swift ios/Roam/Models/PhonePlacementAnalyzer.swift ios/Roam/Models/DriveScoringEngine.swift ios/Roam/Models/DrivingScore.swift ios/Roam/Models/DriveExperienceEngine.swift ios/Roam/Models/DriverReadinessModels.swift ios/Roam/Models/DriverReadinessSupport.swift ios/Roam/Models/DriverReadinessConfiguration.swift ios/Roam/Models/DriverReadinessProfileBuilder.swift ios/Roam/Models/DriverReadinessRouteMatcher.swift ios/Roam/Models/DriverReadinessEngine.swift ios/Roam/Models/PracticePlanEngine.swift ios/Roam/Models/DriverPerformanceEngine.swift ios/tests/DriveScoringEngineChecks.swift -o /tmp/roam-drive-checks
-/tmp/roam-drive-checks
+ios/tests/run-checks.sh
 ```
 
-Run the overall driver-performance checks with:
+The runner exits non-zero if any check fails to compile or fails an assertion.
+To run a subset, pass one or more name filters:
 
 ```bash
-swiftc ios/Roam/Models/RouteDifficultyModels.swift ios/Roam/Models/PhonePlacementAnalyzer.swift ios/Roam/Models/DriveScoringEngine.swift ios/Roam/Models/DrivingScore.swift ios/Roam/Models/DriveExperienceEngine.swift ios/Roam/Models/DriverReadinessModels.swift ios/Roam/Models/DriverReadinessSupport.swift ios/Roam/Models/DriverReadinessConfiguration.swift ios/Roam/Models/DriverReadinessProfileBuilder.swift ios/Roam/Models/DriverReadinessRouteMatcher.swift ios/Roam/Models/DriverReadinessEngine.swift ios/Roam/Models/PracticePlanEngine.swift ios/Roam/Models/DriverPerformanceEngine.swift ios/tests/DriverPerformanceEngineChecks.swift -o /tmp/roam-performance-checks
-/tmp/roam-performance-checks
+ios/tests/run-checks.sh Theme Readiness
 ```
 
-Run the drive-history policy checks with:
+The seventeen checks are:
 
-```bash
-swiftc ios/Roam/Models/DriveHistoryPolicy.swift ios/tests/DriveHistoryPolicyChecks.swift -o /tmp/roam-history-checks
-/tmp/roam-history-checks
-```
+| Check | Covers |
+|---|---|
+| `APIClientChecks` | Backend error text shown to users, and the request time budget across candidate hosts |
+| `DepartureComparisonChecks` | Departure-time comparison |
+| `DriveHistoryPolicyChecks` | Drive-history retention and pruning |
+| `DriveInsightEngineChecks` | Per-drive insights |
+| `DrivePresentationChecks` | Drive summary presentation |
+| `DriveScoringEngineChecks` | Deterministic manual-drive scoring, and the confidence tier a drive is allowed to claim |
+| `DriverPerformanceEngineChecks` | Overall driver performance |
+| `DriverProfileInsightsChecks` | Profile-level insights |
+| `DriverProfileStoreChecks` | Profile persistence |
+| `DriverReadinessEngineChecks` | Route readiness assessment |
+| `LaunchIntroChoreographyChecks` | Launch intro timing and wordmark docking |
+| `LayoutResponsivenessChecks` | Compact-width and large-text layout thresholds |
+| `RoutePlanningLocationChecks` | Route-entry state, including a coarse or slow GPS fix |
+| `RoutePlanningPresentationChecks` | Route planning presentation |
+| `RoutePracticeEnginesChecks` | Practice plans, route matching, and untrusted-input hardening of the engines |
+| `SharedRouteImportChecks` | Shared-route import, inbox durability, and retriable vs permanent link failures |
+| `ThemeCatalogChecks` | Theme catalog |
 
-Run the theme catalog checks with:
-
-```bash
-swiftc ios/Roam/Models/Theme.swift ios/tests/ThemeCatalogChecks.swift -o /tmp/roam-theme-checks
-/tmp/roam-theme-checks
-```
-
-Run the route-entry state checks with:
-
-```bash
-swiftc ios/Roam/Models/RoutePlanningLocationCoordinator.swift ios/tests/RoutePlanningLocationChecks.swift -o /tmp/roam-route-location-checks
-/tmp/roam-route-location-checks
-```
-
-Run the launch intro choreography checks with:
-
-```bash
-swiftc ios/Roam/Models/LaunchIntroChoreography.swift ios/tests/LaunchIntroChoreographyChecks.swift -o /tmp/roam-intro-checks
-/tmp/roam-intro-checks
-```
-
-The route-readiness, practice, replay, placement, progress, departure-time,
-shared-route-import, and layout/presentation checks are standalone Swift
-command-line checks in `ios/tests/`. They cover the private local engines
-separately from the iOS app target.
+Every check compiles against the same source set, declared once at the top of
+`run-checks.sh`. If a check stops compiling because an engine gained a
+dependency, add the source there — a per-check source list is what previously
+let a stale runner masquerade as a broken test.
 
 ## Deploy the backend
 

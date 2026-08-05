@@ -343,7 +343,333 @@ struct RoutePracticeEnginesChecks {
         expect(decodedContext.practicePlan == demandPlan, "saved practice plans should round-trip with a route context")
         expect(decodedContext.debrief == verifiedDebrief, "saved debriefs should round-trip with a route context")
 
+        try checkUntrustedInputHardening(
+            history: steadyHistory,
+            configuration: configuration,
+            calendar: calendar,
+            referenceDate: referenceDate
+        )
+
         print("RoutePracticeEngines checks passed")
+    }
+
+    // MARK: - Untrusted backend and persisted input
+
+    /// Every check below fails by trapping rather than by returning `false` on
+    /// the unfixed engines: each input is one the trapping form of the code
+    /// turns into a process kill. Reaching the `expect` at all is half the
+    /// assertion.
+    private static func checkUntrustedInputHardening(
+        history: [RecordedDrive],
+        configuration: DriverReadinessEngine.Configuration,
+        calendar: Calendar,
+        referenceDate: Date
+    ) throws {
+        // Finding 1 — a repeated backend demand id must not trap.
+        let duplicateDemandRoute = route(
+            polyline: "duplicate-demand-route",
+            score: 5.0,
+            duration: 700,
+            demands: [
+                demand(.fastRoads, intensity: 0.90, level: .high),
+                demand(.fastRoads, intensity: 0.10, level: .low)
+            ]
+        )
+        let duplicateAssessment = DriverReadinessEngine.assess(
+            route: duplicateDemandRoute,
+            recordedDrives: history,
+            configuration: configuration,
+            calendar: calendar,
+            referenceDate: referenceDate
+        )
+        let duplicateIDs = duplicateAssessment.insights.map(\.id)
+        expect(
+            Set(duplicateIDs).count == duplicateIDs.count,
+            "a repeated backend demand id must yield unique readiness insight ids"
+        )
+        let duplicateRanking = RouteChoiceRankingEngine.rank(
+            primaryRoute: duplicateDemandRoute,
+            alternateRoutes: [],
+            recordedDrives: history,
+            configuration: configuration,
+            calendar: calendar,
+            referenceDate: referenceDate
+        )
+        expect(
+            duplicateRanking.choices.count == 1,
+            "route ranking must tolerate a repeated backend demand id"
+        )
+
+        // Finding 2 — a backend demand id that shadows a locally generated
+        // insight must not collide, and the plan must still be buildable.
+        expect(
+            DriverReadinessInsightID.familiarity.hasPrefix(DriverReadinessInsightID.reservedPrefix)
+                && DriverReadinessInsightID.drivingQuality.hasPrefix(DriverReadinessInsightID.reservedPrefix),
+            "locally generated insight ids must carry the reserved prefix"
+        )
+        expect(
+            RouteDemandKind.allCases.allSatisfy { !DriverReadinessInsightID.isSynthetic($0.rawValue) },
+            "no backend demand kind may occupy the reserved local insight namespace"
+        )
+        let shadowingRoute = route(
+            polyline: "shadowing-demand-route",
+            score: 5.0,
+            duration: 700,
+            demands: [
+                RouteDemand(
+                    id: "familiarity",
+                    intensity: 0.80,
+                    level: .high,
+                    evidence: "Measured route demand.",
+                    available: true
+                ),
+                RouteDemand(
+                    id: "drivingQuality",
+                    intensity: 0.80,
+                    level: .high,
+                    evidence: "Measured route demand.",
+                    available: true
+                )
+            ]
+        )
+        let shadowingAssessment = DriverReadinessEngine.assess(
+            route: shadowingRoute,
+            recordedDrives: history,
+            configuration: configuration,
+            calendar: calendar,
+            referenceDate: referenceDate
+        )
+        let shadowingIDs = shadowingAssessment.insights.map(\.id)
+        expect(
+            Set(shadowingIDs).count == shadowingIDs.count,
+            "a backend demand named after a local insight must not duplicate an insight id"
+        )
+        expect(
+            shadowingIDs.contains("familiarity") && shadowingIDs.contains(DriverReadinessInsightID.familiarity),
+            "the backend demand and the local familiarity insight must both survive, under separate ids"
+        )
+        let shadowingPlan = PracticePlanEngine.makePlan(
+            assessment: shadowingAssessment,
+            route: shadowingRoute,
+            createdAt: referenceDate
+        )
+        expect(
+            shadowingPlan.goals.count <= PracticePlan.maximumGoalCount,
+            "a plan built from a shadowed assessment must respect the goal cap"
+        )
+
+        // A plan built from an assessment that predates deduplication (a stale
+        // persisted one) must not trap either.
+        let repeatedInsight = DriverReadinessInsight(
+            id: "familiarity",
+            title: "Route familiarity",
+            detail: "Stale persisted duplicate.",
+            state: .practiceNeeded,
+            evidence: nil
+        )
+        let staleAssessment = DriverReadinessAssessment(
+            verdict: shadowingAssessment.verdict,
+            headline: shadowingAssessment.headline,
+            summary: shadowingAssessment.summary,
+            insights: shadowingAssessment.insights + [repeatedInsight],
+            profile: shadowingAssessment.profile,
+            familiarity: shadowingAssessment.familiarity
+        )
+        expect(
+            PracticePlanEngine.makePlan(
+                assessment: staleAssessment,
+                route: shadowingRoute,
+                createdAt: referenceDate
+            ).goals.count <= PracticePlan.maximumGoalCount,
+            "a stale assessment holding duplicate insight ids must not trap when a plan is built"
+        )
+
+        // Finding 3 — a malformed polyline overflows Int32 accumulation.
+        let overflowingPolyline = String(repeating: "}~~~~~@", count: 6)
+        let overflowPoints = RoutePolylineDecoder.decode(overflowingPolyline)
+        expect(
+            overflowPoints.allSatisfy { CLLocationCoordinate2DIsValid($0) },
+            "an overflowing polyline must yield only valid coordinates"
+        )
+        expect(
+            overflowPoints.count < 6,
+            "an overflowing polyline must truncate rather than decode every component"
+        )
+        expect(
+            RoutePolylineDecoder.decode(String(repeating: "~", count: 64)).isEmpty,
+            "an unterminated polyline component must decode to nothing"
+        )
+        let wellFormedPolyline = "_p~iF~ps|U_ulLnnqC_mqNvxq`@"
+        expect(
+            RoutePolylineDecoder.decode(wellFormedPolyline).count == 3,
+            "overflow hardening must not change a well-formed polyline"
+        )
+
+        // Finding 5 — an unvalidated backend metric must not trap on `Int`.
+        let hugeMetricRoute = route(
+            polyline: "huge-metric-route",
+            score: 5.0,
+            duration: 700,
+            demands: [
+                RouteDemand(
+                    id: RouteDemandKind.sustainedDrive.rawValue,
+                    intensity: 0.90,
+                    level: .high,
+                    evidence: "Measured route demand.",
+                    available: true,
+                    metrics: ["expectedDurationMinutes": 1e300]
+                )
+            ]
+        )
+        expect(
+            hugeMetricRoute.routeDemands?.first?.metrics?["expectedDurationMinutes"] == nil,
+            "an implausible backend metric must be dropped rather than retained"
+        )
+        expect(
+            !DriverReadinessEngine.assess(
+                route: hugeMetricRoute,
+                recordedDrives: history,
+                configuration: configuration,
+                calendar: calendar,
+                referenceDate: referenceDate
+            ).insights.isEmpty,
+            "an implausible backend metric must not trap the readiness assessment"
+        )
+        let nonFiniteDemand = RouteDemand(
+            id: RouteDemandKind.traffic.rawValue,
+            intensity: .nan,
+            level: .high,
+            evidence: "Measured route demand.",
+            available: true,
+            metrics: ["expectedDurationMinutes": .infinity]
+        )
+        expect(
+            nonFiniteDemand.intensity == 0,
+            "a non-finite intensity must clamp rather than propagate NaN"
+        )
+        expect(
+            nonFiniteDemand.metrics?.isEmpty == true,
+            "a non-finite backend metric must be dropped"
+        )
+        let farFutureAssessment = DriverReadinessEngine.assess(
+            route: hugeMetricRoute,
+            recordedDrives: history,
+            configuration: configuration,
+            calendar: calendar,
+            referenceDate: Date(timeIntervalSince1970: 1e17)
+        )
+        expect(
+            !farFutureAssessment.summary.isEmpty,
+            "an extreme recency interval must not trap the readiness summary"
+        )
+
+        try checkDecodedInvariants()
+    }
+
+    /// Finding 6 — the invariants below live in hand-written initializers, so
+    /// they are only meaningful if the `Decodable` path enforces them too.
+    /// These decode from JSON rather than calling `init` directly, which is
+    /// exactly what the pre-existing checks could not see.
+    private static func checkDecodedInvariants() throws {
+        let decoder = JSONDecoder()
+
+        let decodedDemand = try decoder.decode(
+            RouteDemand.self,
+            from: Data(#"""
+            {"id":"fastRoads","title":"Fast roads","intensity":60,"level":"high",
+             "evidence":"e","available":true,
+             "metrics":{"expectedDurationMinutes":1e300,"routeBandMiles":12},
+             "coverageRanges":[{"startFraction":-3,"endFraction":9}]}
+            """#.utf8)
+        )
+        expect(decodedDemand.intensity == 1, "a decoded demand intensity must clamp to 0…1")
+        expect(
+            decodedDemand.metrics?["expectedDurationMinutes"] == nil,
+            "a decoded implausible metric must be dropped"
+        )
+        expect(
+            decodedDemand.metrics?["routeBandMiles"] == 12,
+            "a decoded plausible metric must be kept"
+        )
+        expect(
+            decodedDemand.coverageRanges?.first?.startFraction == 0
+                && decodedDemand.coverageRanges?.first?.endFraction == 1,
+            "a decoded coverage range must clamp to 0…1"
+        )
+
+        let decodedRange = try decoder.decode(
+            RouteDemandCoverageRange.self,
+            from: Data(#"{"startFraction":-3,"endFraction":9}"#.utf8)
+        )
+        expect(
+            decodedRange.startFraction == 0 && decodedRange.endFraction == 1,
+            "a decoded coverage range must clamp to 0…1 on its own"
+        )
+
+        let goalsJSON = (0..<7)
+            .map { #"{"id":"goal\#($0)","kind":"drivingQuality","status":"queued"}"# }
+            .joined(separator: ",")
+        let decodedPlan = try decoder.decode(
+            PracticePlan.self,
+            from: Data(#"""
+            {"id":"7C4C7F1E-0F5E-4C2E-9C1B-0C3A5E2D1F00","createdAt":0,"goals":[\#(goalsJSON)]}
+            """#.utf8)
+        )
+        expect(
+            decodedPlan.goals.count == PracticePlan.maximumGoalCount,
+            "a decoded practice plan must cap its goals like a built one"
+        )
+
+        let decodedSummary = try decoder.decode(
+            PracticeRouteCoverageSummary.self,
+            from: Data(#"""
+            {"recordedAt":0,"overallCoverage":4,"longestContinuousCoverage":-1,
+             "originCoverage":0.5,"destinationCoverage":0.5,
+             "demandCoverage":[{"demandID":"fastRoads","demandIntensity":5,
+                                "coveredShare":9,"routeShare":-4}]}
+            """#.utf8)
+        )
+        expect(
+            decodedSummary.overallCoverage == 1 && decodedSummary.longestContinuousCoverage == 0,
+            "a decoded coverage summary must clamp to 0…1"
+        )
+        let decodedCoverage = decodedSummary.demandCoverage.first!
+        expect(
+            decodedCoverage.demandIntensity == 1
+                && decodedCoverage.coveredShare == 1
+                && decodedCoverage.routeShare == 0,
+            "decoded demand coverage must clamp to 0…1"
+        )
+
+        // Explicit decoding must not have disturbed the encoded key names, or
+        // already-persisted data would stop loading.
+        let encodedDemand = try JSONEncoder().encode(decodedDemand)
+        let demandObject = try JSONSerialization.jsonObject(with: encodedDemand) as! [String: Any]
+        expect(
+            Set(demandObject.keys) == ["id", "title", "intensity", "level", "evidence", "available", "metrics", "coverageRanges"],
+            "route demands must keep their persisted key names"
+        )
+        let roundTrippedDemand = try decoder.decode(RouteDemand.self, from: encodedDemand)
+        expect(
+            roundTrippedDemand == decodedDemand,
+            "route demands must round-trip through their explicit decoder"
+        )
+        let roundTrippedSummary = try decoder.decode(
+            PracticeRouteCoverageSummary.self,
+            from: JSONEncoder().encode(decodedSummary)
+        )
+        expect(
+            roundTrippedSummary == decodedSummary,
+            "coverage summaries must round-trip through their explicit decoder"
+        )
+        let roundTrippedPlan = try decoder.decode(
+            PracticePlan.self,
+            from: JSONEncoder().encode(decodedPlan)
+        )
+        expect(
+            roundTrippedPlan == decodedPlan,
+            "practice plans must round-trip through their explicit decoder"
+        )
     }
 
     private static func route(

@@ -420,6 +420,9 @@ struct SharedRouteInbox {
     static let appGroupIdentifier = "group.com.akhilkonduru.roam"
 
     private static let storageFileName = "shared-route-inbox-v1.json"
+    /// Holds an inbox this build could not decode, so a shared route survives
+    /// a schema change instead of being erased on the first read.
+    private static let quarantinedStorageFileName = "shared-route-inbox-v1-quarantined.json"
     private static let maximumEntries = 5
     private static let directRouteLifetime: TimeInterval = 60 * 60 * 24
     private static let unresolvedLinkLifetime: TimeInterval = 60 * 15
@@ -483,6 +486,27 @@ struct SharedRouteInbox {
             .first?.item
     }
 
+    /// True when something is stored that this build cannot decode. The route
+    /// is kept rather than deleted, so the app can explain the gap instead of
+    /// showing an empty inbox that looks like nothing was ever shared.
+    var hasUnreadableEntries: Bool {
+        guard let directory = preparedStorageDirectory() else { return false }
+
+        let coordinator = NSFileCoordinator(filePresenter: nil)
+        var coordinationError: NSError?
+        var isUnreadable = false
+        coordinator.coordinate(
+            readingItemAt: directory,
+            options: .withoutChanges,
+            error: &coordinationError
+        ) { coordinatedDirectory in
+            if case .unreadable = readStoredEntries(in: coordinatedDirectory) {
+                isUnreadable = true
+            }
+        }
+        return coordinationError == nil && isUnreadable
+    }
+
     func acknowledge(id: UUID, now: Date = Date()) {
         _ = mutate(now: now) { entries in
             let countBefore = entries.count
@@ -525,8 +549,20 @@ struct SharedRouteInbox {
             options: .forReplacing,
             error: &coordinationError
         ) { coordinatedDirectory in
-            var entries = decodedEntries(in: coordinatedDirectory)
-                .filter { $0.expiresAt > now && $0.item != nil }
+            // An unreadable file must never be treated as "no shared routes".
+            // Writing the resulting empty list back would delete the route the
+            // driver just shared, with no card and no error — the same way an
+            // unreadable drive history used to be destroyed on first read.
+            let stored: [StoredEntry]
+            switch readStoredEntries(in: coordinatedDirectory) {
+            case let .entries(readable):
+                stored = readable
+            case let .unreadable(data):
+                quarantine(data, in: coordinatedDirectory)
+                return
+            }
+
+            var entries = stored.filter { $0.expiresAt > now && $0.item != nil }
             guard transform(&entries) else { return }
 
             entries.sort { $0.receivedAt < $1.receivedAt }
@@ -572,13 +608,44 @@ struct SharedRouteInbox {
         }
     }
 
-    private func decodedEntries(in directory: URL) -> [StoredEntry] {
+    /// Distinguishes "nothing is stored" from "something is stored that this
+    /// build cannot read". The two must never share a code path: only the
+    /// first one is safe to overwrite.
+    private enum StoredEntriesReadResult {
+        case entries([StoredEntry])
+        case unreadable(Data)
+    }
+
+    private func readStoredEntries(in directory: URL) -> StoredEntriesReadResult {
         let fileURL = directory.appendingPathComponent(Self.storageFileName, isDirectory: false)
-        guard let data = try? Data(contentsOf: fileURL),
-              let entries = try? JSONDecoder().decode([StoredEntry].self, from: data) else {
-            return []
+        guard let data = try? Data(contentsOf: fileURL) else {
+            return .entries([])
         }
+        guard let entries = try? JSONDecoder().decode([StoredEntry].self, from: data) else {
+            return .unreadable(data)
+        }
+        return .entries(entries)
+    }
+
+    private func decodedEntries(in directory: URL) -> [StoredEntry] {
+        guard case let .entries(entries) = readStoredEntries(in: directory) else { return [] }
         return entries
+    }
+
+    /// Keeps the original bytes under a separate name so a later build can
+    /// still read them, and leaves the live file untouched.
+    private func quarantine(_ data: Data, in directory: URL) {
+        let quarantineURL = directory.appendingPathComponent(
+            Self.quarantinedStorageFileName,
+            isDirectory: false
+        )
+        do {
+            try data.write(to: quarantineURL, options: .atomic)
+        } catch {
+            // The live file is still intact, which is the guarantee that
+            // matters. A failed copy must not escalate into a deletion.
+            return
+        }
     }
 
     private func persist(_ entries: [StoredEntry], in directory: URL) -> Bool {
@@ -651,8 +718,25 @@ protocol GoogleMapsShortLinkResolving {
 
 enum GoogleMapsShortLinkResolverError: LocalizedError {
     case invalidLink
+    /// The redirect chain left the trusted Google allowlist, or ran past the
+    /// redirect limit. Following the same link again cannot change that.
     case unsupportedRedirect
+    /// The chain stayed on Google but the page it landed on was not readable
+    /// as a route — a consent interstitial, a regional variant, or a response
+    /// that never arrived. The same link may well work on the next attempt.
+    case unreadableRedirectTarget
     case responseTooLarge
+
+    /// Only failures that cannot change on a retry may consume the saved
+    /// share. Everything else keeps the link so the advertised retry is real.
+    var isPermanent: Bool {
+        switch self {
+        case .invalidLink, .unsupportedRedirect, .responseTooLarge:
+            true
+        case .unreadableRedirectTarget:
+            false
+        }
+    }
 
     var errorDescription: String? {
         switch self {
@@ -660,6 +744,8 @@ enum GoogleMapsShortLinkResolverError: LocalizedError {
             "That Google Maps link could not be resolved."
         case .unsupportedRedirect:
             "That Google Maps link did not lead to a supported directions route."
+        case .unreadableRedirectTarget:
+            "Roam could not read a route from that Google Maps link this time."
         case .responseTooLarge:
             "That Google Maps link returned more data than Roam can safely read."
         }
@@ -745,10 +831,18 @@ private final class GoogleMapsRedirectWalker: NSObject, URLSessionDataDelegate, 
         guard let httpResponse = response as? HTTPURLResponse,
               (200 ... 299).contains(httpResponse.statusCode),
               let finalURL = response.url,
-              SharedRouteImportParser.isTrustedGoogleRedirectURL(finalURL),
-              case .ready = SharedRouteImportParser.parse(url: finalURL, text: nil) else {
+              SharedRouteImportParser.isTrustedGoogleRedirectURL(finalURL) else {
             completionHandler(.cancel)
             finish(.failure(GoogleMapsShortLinkResolverError.unsupportedRedirect))
+            return
+        }
+
+        // The chain ended on a trusted Google host but the page is not one
+        // Roam can read as a route. That is often a consent interstitial, so
+        // it is transient, not a reason to throw the share away.
+        guard case .ready = SharedRouteImportParser.parse(url: finalURL, text: nil) else {
+            completionHandler(.cancel)
+            finish(.failure(GoogleMapsShortLinkResolverError.unreadableRedirectTarget))
             return
         }
 
@@ -775,7 +869,9 @@ private final class GoogleMapsRedirectWalker: NSObject, URLSessionDataDelegate, 
         if let error {
             finish(.failure(error))
         } else {
-            finish(.failure(GoogleMapsShortLinkResolverError.unsupportedRedirect))
+            // The task completed without ever producing a usable response.
+            // Nothing here proves the link is bad, so it stays retriable.
+            finish(.failure(GoogleMapsShortLinkResolverError.unreadableRedirectTarget))
         }
     }
 

@@ -1,6 +1,70 @@
 import Foundation
 import CoreLocation
 
+// MARK: - Untrusted numbers
+
+/// Clamping and conversion helpers for numbers that arrive from the backend or
+/// from persisted JSON. Two Swift behaviours make the obvious spelling unsafe
+/// here: `min`/`max` propagate `NaN` instead of clamping it, and `Int(_: Double)`
+/// traps rather than saturating. Every value type that treats server data as
+/// untrusted routes its clamping through this type so the rules stay identical
+/// on the `init` path and the `Decodable` path.
+enum UntrustedNumber {
+    /// Fractions of a route, a share, or an intensity are all `0...1`.
+    static let unitRange: ClosedRange<Double> = 0...1
+
+    /// Widest magnitude a backend metric may carry before it is treated as
+    /// corrupt rather than as data. Roam's metrics are miles, minutes, and
+    /// miles per hour; nothing legitimate approaches this bound.
+    static let metricMagnitudeLimit: Double = 1e9
+
+    /// Clamps into `range`, substituting `fallback` for a non-finite value.
+    static func clamped(
+        _ value: Double,
+        to range: ClosedRange<Double>,
+        fallback: Double
+    ) -> Double {
+        guard value.isFinite else { return fallback }
+        return min(max(value, range.lowerBound), range.upperBound)
+    }
+
+    /// Clamps into `0...1`. A non-finite value carries no information, so it
+    /// collapses to `fallback` rather than to an arbitrary endpoint.
+    static func unitFraction(_ value: Double, fallback: Double = 0) -> Double {
+        clamped(value, to: unitRange, fallback: fallback)
+    }
+
+    /// `Int` conversion that saturates instead of trapping. `Int(_: Double)`
+    /// is a runtime trap for `NaN`, infinity, and anything beyond `Int`'s
+    /// range, so no untrusted `Double` may reach it directly.
+    static func roundedInt(
+        _ value: Double,
+        rule: FloatingPointRoundingRule = .toNearestOrAwayFromZero,
+        fallback: Int = 0
+    ) -> Int {
+        guard value.isFinite else { return fallback }
+        let rounded = value.rounded(rule)
+        // `Double(Int.max)` rounds *up* to 2^63, so the upper bound is strict.
+        guard rounded >= Double(Int.min) else { return Int.min }
+        guard rounded < Double(Int.max) else { return Int.max }
+        return Int(rounded)
+    }
+
+    /// A backend metric that is finite and within a plausible magnitude, or
+    /// `nil`. Callers fall back to their own derived value when this returns
+    /// `nil`, which is more honest than clamping nonsense into range.
+    static func metric(_ value: Double) -> Double? {
+        guard value.isFinite, abs(value) <= metricMagnitudeLimit else { return nil }
+        return value
+    }
+
+    /// Drops every metric that fails `metric(_:)`. Returns `nil` when the input
+    /// was `nil` so "absent" and "present but empty" stay distinguishable.
+    static func metrics(_ values: [String: Double]?) -> [String: Double]? {
+        values?.compactMapValues(metric)
+    }
+}
+
 // MARK: - Request
 
 struct RouteCoordinateEndpoint: Codable, Hashable {
@@ -274,8 +338,21 @@ struct RouteDemandCoverageRange: Codable, Hashable {
     let endFraction: Double
 
     init(startFraction: Double, endFraction: Double) {
-        self.startFraction = min(max(startFraction, 0), 1)
-        self.endFraction = min(max(endFraction, 0), 1)
+        self.startFraction = UntrustedNumber.unitFraction(startFraction)
+        self.endFraction = UntrustedNumber.unitFraction(endFraction)
+    }
+
+    /// The synthesized `Decodable` would assign both stored properties
+    /// directly and skip the clamp above, which is exactly backwards: decoding
+    /// *is* the untrusted path. Routing the decoded values back through the
+    /// designated initializer keeps one set of invariants. `Encodable` stays
+    /// synthesized, so the encoded key names are unchanged.
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(
+            startFraction: try container.decode(Double.self, forKey: .startFraction),
+            endFraction: try container.decode(Double.self, forKey: .endFraction)
+        )
     }
 
     var normalized: RouteDemandCoverageRange {
@@ -314,12 +391,35 @@ struct RouteDemand: Codable, Hashable, Identifiable {
     ) {
         self.id = id
         self.title = title ?? RouteDemandKind(rawValue: id)?.defaultTitle ?? id
-        self.intensity = min(max(intensity, 0), 1)
+        self.intensity = UntrustedNumber.unitFraction(intensity)
         self.level = level
         self.evidence = evidence
         self.available = available
-        self.metrics = metrics
+        // A metric outside a plausible magnitude is dropped rather than
+        // clamped: readiness copy falls back to a route-derived value, which is
+        // truthful, where a clamped 1e300 would be invented data.
+        self.metrics = UntrustedNumber.metrics(metrics)
         self.coverageRanges = coverageRanges?.map(\.normalized)
+    }
+
+    /// Explicit decoding so the clamping above also applies to server and
+    /// persisted JSON. The keys match the synthesized `CodingKeys`, and
+    /// `Encodable` remains synthesized, so stored data stays readable.
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(
+            id: try container.decode(String.self, forKey: .id),
+            title: try container.decode(String.self, forKey: .title),
+            intensity: try container.decode(Double.self, forKey: .intensity),
+            level: try container.decode(RouteDemandLevel.self, forKey: .level),
+            evidence: try container.decode(String.self, forKey: .evidence),
+            available: try container.decode(Bool.self, forKey: .available),
+            metrics: try container.decodeIfPresent([String: Double].self, forKey: .metrics),
+            coverageRanges: try container.decodeIfPresent(
+                [RouteDemandCoverageRange].self,
+                forKey: .coverageRanges
+            )
+        )
     }
 
     var kind: RouteDemandKind? {

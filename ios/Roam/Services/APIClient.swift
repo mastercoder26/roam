@@ -1,4 +1,7 @@
 import Foundation
+import os
+
+private let apiLogger = Logger(subsystem: "com.akhilkonduru.roam", category: "APIClient")
 
 enum APIError: LocalizedError {
     case invalidURL
@@ -27,6 +30,17 @@ enum APIError: LocalizedError {
 }
 
 struct APIClient {
+    /// The whole attempt, across every candidate host, is bounded by this.
+    /// It used to apply per candidate, so a weak connection could spend a full
+    /// minute per host with no way to cancel.
+    static let totalRequestBudget: TimeInterval = 45
+    /// Below this much remaining budget, starting another candidate would only
+    /// produce a second timeout, so the attempt ends instead.
+    static let minimumCandidateTimeout: TimeInterval = 8
+    /// The longest a single candidate may hold the budget, so a first host
+    /// that never answers still leaves room for the next one.
+    static let maximumCandidateTimeout: TimeInterval = 25
+
     /// Tried in order until one responds. See AppConfiguration.candidateBaseURLs.
     private let candidateBaseURLs: [URL]
     private let session: URLSession
@@ -146,28 +160,60 @@ struct APIClient {
     /// Tries each candidate base URL in order, only moving to the next one on
     /// a network failure (an HTTP error or bad response means that host is
     /// reachable, so it's the final answer, not a reason to try another).
+    /// The candidates share one time budget: a host that consumed it does not
+    /// get to hand a second full wait to the host after it.
     private func sendWithFallback<Response: Decodable>(
         path: String,
         body: Data,
         responseType: Response.Type
     ) async throws -> Response {
+        guard !candidateBaseURLs.isEmpty else { throw APIError.invalidURL }
+
         var lastNetworkError: Error = URLError(.cannotConnectToHost)
+        let deadline = Date().addingTimeInterval(Self.totalRequestBudget)
 
         for baseURL in candidateBaseURLs {
+            let remaining = deadline.timeIntervalSinceNow
+            guard remaining >= Self.minimumCandidateTimeout else { break }
+
             do {
-                return try await sendRequest(to: baseURL, path: path, body: body, responseType: responseType)
+                return try await sendRequest(
+                    to: baseURL,
+                    path: path,
+                    body: body,
+                    timeout: min(remaining, Self.maximumCandidateTimeout),
+                    responseType: responseType
+                )
             } catch APIError.networkError(let error) {
                 lastNetworkError = error
+                guard Self.shouldTryNextCandidate(after: error) else {
+                    throw APIError.networkError(error)
+                }
             }
         }
 
         throw APIError.networkError(lastNetworkError)
     }
 
+    /// A timeout already spent the shared budget, and a cancellation is a
+    /// deliberate stop (`deleteDrive()` cancels in-flight route analysis).
+    /// Neither is a reason to send another request to another host.
+    static func shouldTryNextCandidate(after error: Error) -> Bool {
+        if error is CancellationError { return false }
+        guard let urlError = error as? URLError else { return true }
+        switch urlError.code {
+        case .timedOut, .cancelled:
+            return false
+        default:
+            return true
+        }
+    }
+
     private func sendRequest<Response: Decodable>(
         to baseURL: URL,
         path: String,
         body: Data,
+        timeout: TimeInterval,
         responseType: Response.Type
     ) async throws -> Response {
         let endpoint = baseURL.appendingPathComponent(path)
@@ -175,7 +221,7 @@ struct APIClient {
         var request = URLRequest(url: endpoint)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.timeoutInterval = 60
+        request.timeoutInterval = timeout
         request.httpBody = body
 
         let data: Data
@@ -192,7 +238,14 @@ struct APIClient {
         }
 
         guard (200...299).contains(httpResponse.statusCode) else {
-            let message = parseErrorMessage(from: data)
+            let message = Self.userFacingErrorMessage(from: data)
+            if message == nil, !data.isEmpty {
+                // A proxy's HTML error page is useful to a developer and
+                // meaningless in a banner, so it is logged and not shown.
+                apiLogger.error(
+                    "Unreadable \(httpResponse.statusCode, privacy: .public) body from \(endpoint.absoluteString, privacy: .public): \(String(decoding: data.prefix(Self.maximumLoggedErrorBodyBytes), as: UTF8.self), privacy: .private)"
+                )
+            }
             throw APIError.httpError(statusCode: httpResponse.statusCode, message: message)
         }
 
@@ -204,16 +257,33 @@ struct APIClient {
         }
     }
 
-    private func parseErrorMessage(from data: Data) -> String? {
+    /// Only the backend's own JSON error text is ever shown. Anything else —
+    /// a proxy's HTML page, a truncated body, an essay — returns nil, so the
+    /// banner falls back to "Server error (502)." rather than pasting a page
+    /// into the UI.
+    static func userFacingErrorMessage(from data: Data) -> String? {
         struct ErrorBody: Decodable {
             let error: String?
             let message: String?
         }
-        guard let body = try? JSONDecoder().decode(ErrorBody.self, from: data) else {
-            return String(data: data, encoding: .utf8)
+        guard let body = try? JSONDecoder().decode(ErrorBody.self, from: data),
+              let raw = body.error ?? body.message else {
+            return nil
         }
-        return body.error ?? body.message
+        let message = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !message.isEmpty,
+              message.count <= maximumErrorMessageLength,
+              !message.contains(where: { $0.isNewline }),
+              !message.contains("<") else {
+            return nil
+        }
+        return message
     }
+
+    /// Long enough for a real backend message, short enough that nothing
+    /// page-sized reaches a banner.
+    private static let maximumErrorMessageLength = 200
+    private static let maximumLoggedErrorBodyBytes = 2_048
 }
 
 enum AppConfiguration {
@@ -224,9 +294,19 @@ enum AppConfiguration {
     /// duplicates removed. A fresh checkout with no local config still works
     /// against a locally running backend; a physical iPhone with the
     /// deployed URL configured never needs the Mac to be reachable at all.
+    ///
+    /// Localhost exists only in a debug build. On a shipped app nothing is
+    /// listening on the phone itself, so keeping it would only spend a
+    /// driver's time failing to reach a host that cannot be there.
     static var candidateBaseURLs: [URL] {
+        #if DEBUG
+        let ordered = [configuredAPIBaseURL, localhostBaseURL, configuredFallbackBaseURL]
+        #else
+        let ordered = [configuredAPIBaseURL, configuredFallbackBaseURL]
+        #endif
+
         var candidates: [URL] = []
-        for url in [configuredAPIBaseURL, localhostBaseURL, configuredFallbackBaseURL] {
+        for url in ordered {
             guard let url, !candidates.contains(url) else { continue }
             candidates.append(url)
         }

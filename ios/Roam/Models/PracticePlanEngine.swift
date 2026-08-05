@@ -87,6 +87,10 @@ struct PracticeGoal: Identifiable, Codable, Hashable {
 /// A privacy-safe plan that can be queued with a manually started drive.
 /// It has no route geometry, address, or raw sensor samples.
 struct PracticePlan: Identifiable, Codable, Hashable {
+    /// A plan stays actionable only while it is short. This is the single
+    /// source of truth for that cap, on both the build and the decode path.
+    static let maximumGoalCount = 3
+
     let id: UUID
     let createdAt: Date
     let goals: [PracticeGoal]
@@ -94,7 +98,19 @@ struct PracticePlan: Identifiable, Codable, Hashable {
     init(id: UUID = UUID(), createdAt: Date = Date(), goals: [PracticeGoal]) {
         self.id = id
         self.createdAt = createdAt
-        self.goals = Array(goals.prefix(3))
+        self.goals = Array(goals.prefix(Self.maximumGoalCount))
+    }
+
+    /// Explicit decoding: the synthesized `Decodable` would assign `goals`
+    /// directly and restore a plan with more goals than the cap allows.
+    /// `Encodable` stays synthesized so persisted keys are unchanged.
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(
+            id: try container.decode(UUID.self, forKey: .id),
+            createdAt: try container.decode(Date.self, forKey: .createdAt),
+            goals: try container.decode([PracticeGoal].self, forKey: .goals)
+        )
     }
 
     var summary: String {
@@ -124,9 +140,22 @@ struct PracticeDemandCoverage: Identifiable, Codable, Hashable {
         routeShare: Double
     ) {
         self.demandID = demandID
-        self.demandIntensity = min(max(demandIntensity, 0), 1)
-        self.coveredShare = min(max(coveredShare, 0), 1)
-        self.routeShare = min(max(routeShare, 0), 1)
+        self.demandIntensity = UntrustedNumber.unitFraction(demandIntensity)
+        self.coveredShare = UntrustedNumber.unitFraction(coveredShare)
+        self.routeShare = UntrustedNumber.unitFraction(routeShare)
+    }
+
+    /// Explicit decoding so persisted coverage cannot restore an out-of-range
+    /// share, which `DriverReadinessProfileBuilder`'s practice-evidence gate
+    /// would otherwise accept as valid evidence.
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(
+            demandID: try container.decode(String.self, forKey: .demandID),
+            demandIntensity: try container.decode(Double.self, forKey: .demandIntensity),
+            coveredShare: try container.decode(Double.self, forKey: .coveredShare),
+            routeShare: try container.decode(Double.self, forKey: .routeShare)
+        )
     }
 
     init(_ exposure: VerifiedDemandExposure) {
@@ -161,11 +190,26 @@ struct PracticeRouteCoverageSummary: Codable, Hashable {
         demandCoverage: [PracticeDemandCoverage]
     ) {
         self.recordedAt = recordedAt
-        self.overallCoverage = min(max(overallCoverage, 0), 1)
-        self.longestContinuousCoverage = min(max(longestContinuousCoverage, 0), 1)
-        self.originCoverage = min(max(originCoverage, 0), 1)
-        self.destinationCoverage = min(max(destinationCoverage, 0), 1)
+        self.overallCoverage = UntrustedNumber.unitFraction(overallCoverage)
+        self.longestContinuousCoverage = UntrustedNumber.unitFraction(longestContinuousCoverage)
+        self.originCoverage = UntrustedNumber.unitFraction(originCoverage)
+        self.destinationCoverage = UntrustedNumber.unitFraction(destinationCoverage)
         self.demandCoverage = demandCoverage
+    }
+
+    /// Explicit decoding so persisted summaries are clamped exactly as freshly
+    /// computed ones are. Every coverage figure is compared against a
+    /// threshold, so an unclamped value silently passes every gate.
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(
+            recordedAt: try container.decode(Date.self, forKey: .recordedAt),
+            overallCoverage: try container.decode(Double.self, forKey: .overallCoverage),
+            longestContinuousCoverage: try container.decode(Double.self, forKey: .longestContinuousCoverage),
+            originCoverage: try container.decode(Double.self, forKey: .originCoverage),
+            destinationCoverage: try container.decode(Double.self, forKey: .destinationCoverage),
+            demandCoverage: try container.decode([PracticeDemandCoverage].self, forKey: .demandCoverage)
+        )
     }
 
     init(coverage: PracticeRouteCoverage, recordedAt: Date) {
@@ -289,7 +333,9 @@ enum PracticePlanEngine {
             )
         }
 
-        let insightsByID = Dictionary(uniqueKeysWithValues: assessment.insights.map { ($0.id, $0) })
+        // A persisted assessment predates this file's deduplication, so the
+        // dictionary build must tolerate repeats rather than trap on them.
+        let insightsByID = assessment.insights.keyedByID()
         let demandGoals = (route.routeDemands ?? []).enumerated().compactMap { index, demand -> (demand: RouteDemand, index: Int, state: DriverReadinessInsightState)? in
             guard demand.available,
                   demand.intensity >= 0.34,
@@ -311,7 +357,7 @@ enum PracticePlanEngine {
             return lhs.index < rhs.index
         }
 
-        for candidate in demandGoals where goals.count < 3 {
+        for candidate in demandGoals where goals.count < PracticePlan.maximumGoalCount {
             goals.append(
                 PracticeGoal(
                     id: "demand:\(candidate.demand.id)",
@@ -321,8 +367,8 @@ enum PracticePlanEngine {
             )
         }
 
-        if goals.count < 3,
-           insightsByID["familiarity"]?.state == .practiceNeeded {
+        if goals.count < PracticePlan.maximumGoalCount,
+           insightsByID[DriverReadinessInsightID.familiarity]?.state == .practiceNeeded {
             goals.append(
                 PracticeGoal(
                     id: "routeFamiliarity",
@@ -331,8 +377,8 @@ enum PracticePlanEngine {
             )
         }
 
-        if goals.count < 3,
-           insightsByID["drivingQuality"]?.state == .practiceNeeded {
+        if goals.count < PracticePlan.maximumGoalCount,
+           insightsByID[DriverReadinessInsightID.drivingQuality]?.state == .practiceNeeded {
             goals.append(
                 PracticeGoal(
                     id: "drivingQuality",

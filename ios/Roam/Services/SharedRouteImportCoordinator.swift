@@ -32,7 +32,10 @@ final class SharedRouteImportCoordinator: ObservableObject {
         if case .ready = state { return }
 
         guard let item = inbox.peek() else {
-            state = .idle
+            // A shared route that this build cannot decode is kept, not
+            // deleted. Say so rather than showing an empty Home screen that
+            // looks like the share never happened.
+            state = inbox.hasUnreadableEntries ? .failed(Self.unreadableInboxMessage) : .idle
             return
         }
 
@@ -47,8 +50,11 @@ final class SharedRouteImportCoordinator: ObservableObject {
             state = .resolvingGoogleMapsLink
             do {
                 let finalURL = try await shortLinkResolver.resolve(link.url)
+                // Failing to read the resolved page is not the same as the
+                // page being unsupported: a consent interstitial resolves
+                // differently on the next attempt. Keep it retriable.
                 guard case let .ready(candidate) = SharedRouteImportParser.parse(url: finalURL, text: nil) else {
-                    throw GoogleMapsShortLinkResolverError.unsupportedRedirect
+                    throw GoogleMapsShortLinkResolverError.unreadableRedirectTarget
                 }
                 let route = SharedRouteDraft(
                     id: link.id,
@@ -63,13 +69,11 @@ final class SharedRouteImportCoordinator: ObservableObject {
                 }
                 state = .ready(route)
             } catch {
-                if isPermanentResolutionFailure(error) {
+                if Self.isPermanentResolutionFailure(error) {
                     inbox.acknowledge(id: link.id)
                     state = .failed(error.localizedDescription)
                 } else {
-                    state = .failed(
-                        "Roam could not finish reading this Google Maps link right now. The route is saved and will be tried again when Roam is next active."
-                    )
+                    state = .failed(Self.retryableFailureMessage)
                 }
             }
         }
@@ -86,13 +90,18 @@ final class SharedRouteImportCoordinator: ObservableObject {
         state = .idle
     }
 
-    private func isPermanentResolutionFailure(_ error: Error) -> Bool {
+    static let retryableFailureMessage = "Roam could not finish reading this Google Maps link right now. The route is saved and will be tried again when Roam is next active."
+
+    static let unreadableInboxMessage = "A route shared with Roam could not be opened in this version. It is still saved on the device and is not being deleted."
+
+    /// Only a failure that cannot change on a retry may consume the saved
+    /// share. Anything else — a network error, an interstitial, a page Roam
+    /// could not read this time — keeps the link so the retry Roam promises
+    /// actually happens.
+    nonisolated static func isPermanentResolutionFailure(_ error: Error) -> Bool {
         guard let resolverError = error as? GoogleMapsShortLinkResolverError else {
             return false
         }
-        switch resolverError {
-        case .invalidLink, .unsupportedRedirect, .responseTooLarge:
-            return true
-        }
+        return resolverError.isPermanent
     }
 }

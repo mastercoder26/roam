@@ -1,6 +1,27 @@
 import CoreLocation
 import Foundation
 
+/// Identifiers for the readiness insights Roam generates locally.
+///
+/// Locally generated insights share one id namespace with backend route-demand
+/// ids, and that list is later keyed by id. A reserved prefix makes a collision
+/// structurally impossible: `RouteDemandKind` raw values are bare camel-case
+/// names, and any backend id containing the prefix is still deduplicated by
+/// `uniquedByID()` before the list leaves `assess`.
+enum DriverReadinessInsightID {
+    /// Reserved for client-generated insights. No backend demand id uses it.
+    static let reservedPrefix = "roam.local."
+
+    static let routeDemandsUnavailable = reservedPrefix + "routeDemandsUnavailable"
+    static let drivingQuality = reservedPrefix + "drivingQuality"
+    static let familiarity = reservedPrefix + "familiarity"
+    static let history = reservedPrefix + "history"
+
+    static func isSynthetic(_ id: String) -> Bool {
+        id.hasPrefix(reservedPrefix)
+    }
+}
+
 /// Pure local reasoning for “Can I drive this?” Route demands arrive from the
 /// backend, but all history and route-overlap analysis stays on the device.
 enum DriverReadinessEngine {
@@ -70,7 +91,7 @@ enum DriverReadinessEngine {
                 summary: "Route demand details are not available yet, so this route cannot be compared with recorded experience.",
                 insights: [
                     DriverReadinessInsight(
-                        id: "routeDemandsUnavailable",
+                        id: DriverReadinessInsightID.routeDemandsUnavailable,
                         title: "Route readiness details",
                         detail: "This route’s specific demands were not available to verify.",
                         state: .informational,
@@ -90,7 +111,7 @@ enum DriverReadinessEngine {
             )
         }
 
-        var insights = routeDemands.map {
+        let demandInsights = routeDemands.map {
             readinessInsight(
                 for: $0,
                 route: route,
@@ -104,10 +125,14 @@ enum DriverReadinessEngine {
             familiarity,
             routeMaxIntensity: routeDemands.map(\.intensity).max() ?? 0
         )
-        insights.append(quality)
-        insights.append(familiarityInsightValue)
+        // Two duplicate ids are possible here even with the reserved prefix:
+        // the backend may repeat a demand id. Deduplicating once, at the point
+        // the list is built, means no later consumer can be handed a list that
+        // traps when keyed by id — including a plan built from a persisted
+        // assessment.
+        let insights = (demandInsights + [quality, familiarityInsightValue]).uniquedByID()
 
-        let demandByID = Dictionary(uniqueKeysWithValues: routeDemands.map { ($0.id, $0) })
+        let demandByID = routeDemands.keyedByID()
         let demandGap = insights.contains { insight in
             guard let demand = demandByID[insight.id] else { return false }
             switch insight.state {
@@ -517,7 +542,7 @@ enum DriverReadinessEngine {
               let recentRate = behavior.recentWeightedEventRatePerTenMiles,
               let recentScore = behavior.recentWeightedAverageScore else {
             return DriverReadinessInsight(
-                id: "drivingQuality",
+                id: DriverReadinessInsightID.drivingQuality,
                 title: "Recent driving quality",
                 detail: "Recent coaching-event data is still thin, so it is not being used to judge this route.",
                 state: .unmeasured,
@@ -532,7 +557,7 @@ enum DriverReadinessEngine {
         }
 
         let needsPractice = recentRate > 3.5 || recentScore < 75
-        let recordText = "last \(milesText(behavior.recentMeasuredMiles)) · \(String(format: "%.1f", recentRate)) weighted coaching events per 10 mi · \(Int(recentScore.rounded()))/100"
+        let recordText = "last \(milesText(behavior.recentMeasuredMiles)) · \(String(format: "%.1f", recentRate)) weighted coaching events per 10 mi · \(UntrustedNumber.roundedInt(recentScore))/100"
         let detail: String
         if needsPractice {
             detail = "Recent trace-backed drives show \(recordText). Continue practicing smooth braking, acceleration, and turns before adding more demand."
@@ -540,7 +565,7 @@ enum DriverReadinessEngine {
             detail = "Recent trace-backed drives show \(recordText). Keep using those calm driving habits on a new route."
         }
         return DriverReadinessInsight(
-            id: "drivingQuality",
+            id: DriverReadinessInsightID.drivingQuality,
             title: "Recent driving quality",
             detail: detail,
             state: needsPractice ? .practiceNeeded : .matched,
@@ -561,7 +586,7 @@ enum DriverReadinessEngine {
         let recordText = historyBaseText(profile)
         let target = "\(configuration.minimumHistoryDriveCount) qualifying drives on \(configuration.minimumHistoryDayCount) days · \(milesText(configuration.minimumHistoryMiles)) · \(durationText(configuration.minimumHistoryTraceDuration))"
         return DriverReadinessInsight(
-            id: "history",
+            id: DriverReadinessInsightID.history,
             title: "Recorded history",
             detail: "\(recordText). Roam needs more repeated, trace-backed driving before comparing this route with confidence.",
             state: .informational,
@@ -596,7 +621,7 @@ enum DriverReadinessEngine {
         switch familiarity.level {
         case .unmeasured:
             return DriverReadinessInsight(
-                id: "familiarity",
+                id: DriverReadinessInsightID.familiarity,
                 title: "Route familiarity",
                 detail: "Route overlap has not yet been measured because saved qualifying drives need usable continuous GPS traces.",
                 state: .unmeasured,
@@ -611,7 +636,7 @@ enum DriverReadinessEngine {
         case .unfamiliar:
             let needsPractice = routeMaxIntensity >= 0.60
             return DriverReadinessInsight(
-                id: "familiarity",
+                id: DriverReadinessInsightID.familiarity,
                 title: "Route familiarity",
                 detail: "\(recordText). \(needsPractice ? "Practice the route with an adult before relying on familiarity." : "This route is not familiar yet, but the route-demand comparison above remains separate.")",
                 state: needsPractice ? .practiceNeeded : .informational,
@@ -625,7 +650,7 @@ enum DriverReadinessEngine {
             )
         case .partlyFamiliar:
             return DriverReadinessInsight(
-                id: "familiarity",
+                id: DriverReadinessInsightID.familiarity,
                 title: "Route familiarity",
                 detail: "\(recordText) across \(familiarity.matchingDriveCount) saved \(driveWord(familiarity.matchingDriveCount)).",
                 state: .matched,
@@ -639,7 +664,7 @@ enum DriverReadinessEngine {
             )
         case .familiar:
             return DriverReadinessInsight(
-                id: "familiarity",
+                id: DriverReadinessInsightID.familiarity,
                 title: "Route familiarity",
                 detail: "\(recordText); the best single saved drive covered \(percentText(familiarity.bestSingleDriveShare)) of the route.",
                 state: .matched,
@@ -680,8 +705,10 @@ enum DriverReadinessEngine {
         String(format: "%.1f mi", max(0, miles))
     }
 
+    /// `duration` can originate in an unvalidated backend metric, so the
+    /// `Int` conversion saturates rather than trapping.
     private static func durationText(_ duration: TimeInterval) -> String {
-        let minutes = max(0, Int((duration / 60).rounded()))
+        let minutes = max(0, UntrustedNumber.roundedInt(duration / 60))
         if minutes >= 60 { return "\(minutes / 60)h \(minutes % 60)m" }
         return "\(minutes) min"
     }
@@ -691,12 +718,17 @@ enum DriverReadinessEngine {
     }
 
     private static func percentText(_ value: Double) -> String {
-        "\(Int((min(max(value, 0), 1) * 100).rounded()))%"
+        "\(UntrustedNumber.roundedInt(UntrustedNumber.unitFraction(value) * 100))%"
     }
 
+    /// A decoded `Date` can be arbitrarily far from `referenceDate`, so the day
+    /// count saturates rather than trapping on the `Int` conversion.
     private static func recencyText(_ date: Date?, referenceDate: Date) -> String {
         guard let date else { return "" }
-        let days = max(0, Int((referenceDate.timeIntervalSince(date) / 86_400).rounded(.down)))
+        let days = max(0, UntrustedNumber.roundedInt(
+            referenceDate.timeIntervalSince(date) / 86_400,
+            rule: .down
+        ))
         if days == 0 { return " today" }
         if days == 1 { return " 1 day ago" }
         return " \(days) days ago"

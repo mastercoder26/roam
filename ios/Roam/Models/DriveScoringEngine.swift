@@ -141,6 +141,15 @@ struct DriveDataQuality: Codable {
     /// distance an undercount rather than a reading. Optional so drives written
     /// before this field existed still decode, matching `placementQuality`.
     let locationInterruptedMidDrive: Bool?
+    /// True when the app was suspended in the background during the drive, so
+    /// no location updates arrived for a long stretch while authorization was
+    /// still granted.
+    ///
+    /// Deliberately distinct from `locationInterruptedMidDrive`: authorization
+    /// was never withdrawn here, and reporting a suspension as revoked access
+    /// would name the wrong cause. Optional so drives written before this field
+    /// existed still decode.
+    let recordingSuspendedInBackground: Bool?
 
     init(
         acceptedLocationSamples: Int,
@@ -148,7 +157,8 @@ struct DriveDataQuality: Codable {
         motionSamples: Int,
         confidence: DriveScoreConfidence,
         placementQuality: PhonePlacementAssessment? = nil,
-        locationInterruptedMidDrive: Bool? = nil
+        locationInterruptedMidDrive: Bool? = nil,
+        recordingSuspendedInBackground: Bool? = nil
     ) {
         self.acceptedLocationSamples = acceptedLocationSamples
         self.rejectedLocationSamples = rejectedLocationSamples
@@ -156,6 +166,7 @@ struct DriveDataQuality: Codable {
         self.confidence = confidence
         self.placementQuality = placementQuality
         self.locationInterruptedMidDrive = locationInterruptedMidDrive
+        self.recordingSuspendedInBackground = recordingSuspendedInBackground
     }
 
     var summary: String {
@@ -164,6 +175,11 @@ struct DriveDataQuality: Codable {
         // data as "sufficient" or "sustained" would misrepresent it.
         if locationInterruptedMidDrive == true {
             return "Location access was turned off during this drive, so the distance recorded after that point is missing."
+        }
+        // Same reasoning, different cause: access was never withdrawn, the app
+        // simply stopped receiving updates while it was in the background.
+        if recordingSuspendedInBackground == true {
+            return "Roam was suspended in the background for part of this drive, so the distance covered while the phone was locked is missing. Allow location access \"Always\" to record a locked-phone drive."
         }
         switch confidence {
         case .low:
@@ -185,6 +201,21 @@ enum DriveScoringEngine {
     static let rapidAccelerationThreshold = 2.8
     static let sharpCornerDegreesPerSecond = 28.0
     static let highMotionThresholdG = PhoneMovementDetector.peakAccelerationThresholdG
+
+    // Confidence gates. These are stated against *usable trace* time, not
+    // wall-clock time: a suspended app, a tunnel, or an urban canyon all keep
+    // accruing wall-clock seconds while measuring nothing.
+    static let highConfidenceUsableTraceDuration: TimeInterval = 300
+    static let highConfidenceDistanceMiles = 2.0
+    static let highConfidenceAcceptedSamples = 24
+    static let highConfidenceMotionSamples = 1_200
+    static let mediumConfidenceUsableTraceDuration: TimeInterval = 90
+    static let mediumConfidenceDistanceMiles = 0.5
+    static let mediumConfidenceAcceptedSamples = 8
+    static let mediumConfidenceMotionSamples = 240
+    /// When most delivered fixes had to be thrown away, the trace is too sparse
+    /// to describe as anything but preliminary, however long the drive ran.
+    static let minimumAcceptedLocationSampleShare = 0.5
 
     static func accepts(_ sample: DriveLocationSample) -> Bool {
         sample.horizontalAccuracyMeters > 0 &&
@@ -268,13 +299,62 @@ enum DriveScoringEngine {
         horizontalAccelerationG >= highMotionThresholdG
     }
 
+    /// Share of delivered location fixes that survived the accuracy and
+    /// plausibility filters. `nil` when no fix was ever delivered — that is a
+    /// motion-only drive, not a starved one, and the sample-share gate below
+    /// must not judge it.
+    static func acceptedLocationSampleShare(
+        acceptedLocationSamples: Int,
+        rejectedLocationSamples: Int
+    ) -> Double? {
+        let delivered = max(0, acceptedLocationSamples) + max(0, rejectedLocationSamples)
+        guard delivered > 0 else { return nil }
+        return Double(max(0, acceptedLocationSamples)) / Double(delivered)
+    }
+
+    /// The honest confidence label. `usableTraceDuration` is the measured time
+    /// covered by continuous, plausible GPS (`DriveTraceQuality.usableDuration`),
+    /// never the drive's wall-clock length.
+    static func confidence(
+        usableTraceDuration: TimeInterval,
+        distanceMiles: Double,
+        acceptedLocationSamples: Int,
+        rejectedLocationSamples: Int,
+        motionSamples: Int
+    ) -> DriveScoreConfidence {
+        if let share = acceptedLocationSampleShare(
+            acceptedLocationSamples: acceptedLocationSamples,
+            rejectedLocationSamples: rejectedLocationSamples
+        ), share < minimumAcceptedLocationSampleShare {
+            return .low
+        }
+
+        if usableTraceDuration >= highConfidenceUsableTraceDuration,
+           distanceMiles >= highConfidenceDistanceMiles,
+           acceptedLocationSamples >= highConfidenceAcceptedSamples,
+           motionSamples >= highConfidenceMotionSamples {
+            return .high
+        }
+        if usableTraceDuration >= mediumConfidenceUsableTraceDuration,
+           distanceMiles >= mediumConfidenceDistanceMiles,
+           acceptedLocationSamples >= mediumConfidenceAcceptedSamples,
+           motionSamples >= mediumConfidenceMotionSamples {
+            return .medium
+        }
+        return .low
+    }
+
+    /// - Parameter usableTraceDuration: Measured continuous-trace time from
+    ///   `DriveExperienceEngine`. Omitted only by callers that have no trace to
+    ///   measure, where wall-clock duration is the sole available proxy.
     static func score(
         duration: TimeInterval,
         distanceMeters: Double,
         events: [DrivingEvent],
         acceptedLocationSamples: Int,
         rejectedLocationSamples: Int,
-        motionSamples: Int
+        motionSamples: Int,
+        usableTraceDuration: TimeInterval? = nil
     ) -> (score: Int, quality: DriveDataQuality) {
         let distanceMiles = distanceMeters / 1_609.344
         // Use a 3-mile floor so a single event in a brief trip does not turn
@@ -296,14 +376,10 @@ enum DriveScoringEngine {
                 phoneMovement * 0.75
         )
 
-        let confidence: DriveScoreConfidence
-        if duration >= 300, distanceMiles >= 2, acceptedLocationSamples >= 24, motionSamples >= 1_200 {
-            confidence = .high
-        } else if duration >= 90, distanceMiles >= 0.5, acceptedLocationSamples >= 8, motionSamples >= 240 {
-            confidence = .medium
-        } else {
-            confidence = .low
-        }
+        // A trace can never be longer than the drive that produced it, and a
+        // caller without a measured trace falls back to wall-clock time.
+        let measuredTraceDuration = usableTraceDuration
+            .map { max(0, min($0, max(0, duration))) } ?? duration
 
         return (
             score: max(20, Int((100 - penalty).rounded())),
@@ -311,7 +387,13 @@ enum DriveScoringEngine {
                 acceptedLocationSamples: acceptedLocationSamples,
                 rejectedLocationSamples: rejectedLocationSamples,
                 motionSamples: motionSamples,
-                confidence: confidence
+                confidence: confidence(
+                    usableTraceDuration: measuredTraceDuration,
+                    distanceMiles: distanceMiles,
+                    acceptedLocationSamples: acceptedLocationSamples,
+                    rejectedLocationSamples: rejectedLocationSamples,
+                    motionSamples: motionSamples
+                )
             )
         )
     }

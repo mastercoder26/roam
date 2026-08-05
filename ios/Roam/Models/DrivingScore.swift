@@ -131,6 +131,14 @@ struct VerifiedDemandExposure: Identifiable, Codable, Hashable {
     let routeShare: Double
     let recordedAt: Date
 
+    private enum CodingKeys: String, CodingKey {
+        case demandID
+        case demandIntensity
+        case coveredShare
+        case routeShare
+        case recordedAt
+    }
+
     init(
         demandID: String,
         demandIntensity: Double,
@@ -143,6 +151,22 @@ struct VerifiedDemandExposure: Identifiable, Codable, Hashable {
         self.coveredShare = min(max(coveredShare, 0), 1)
         self.routeShare = min(max(routeShare, 0), 1)
         self.recordedAt = recordedAt
+    }
+
+    /// Decoding is the untrusted path, so it must not be the one path that
+    /// skips the clamping above. The synthesized conformance assigned stored
+    /// properties directly, letting a `coveredShare` of 9 pass every share
+    /// threshold downstream. Key names are unchanged, so saved history that was
+    /// written before this initializer existed still reads back.
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(
+            demandID: try values.decode(String.self, forKey: .demandID),
+            demandIntensity: try values.decode(Double.self, forKey: .demandIntensity),
+            coveredShare: try values.decode(Double.self, forKey: .coveredShare),
+            routeShare: try values.decode(Double.self, forKey: .routeShare),
+            recordedAt: try values.decode(Date.self, forKey: .recordedAt)
+        )
     }
 }
 

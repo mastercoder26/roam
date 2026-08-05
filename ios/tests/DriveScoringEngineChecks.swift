@@ -196,6 +196,130 @@ struct DriveScoringEngineChecks {
         )
         expect(boundedScore.score == 45, "penalties must remain capped instead of producing unusable scores")
 
+        // A 45-minute drive whose GPS was almost entirely unusable must not be
+        // presented as a strong sample just because the clock kept running.
+        let starvedTrip = DriveScoringEngine.score(
+            duration: 2_700,
+            distanceMeters: 3_479,
+            events: [],
+            acceptedLocationSamples: 27,
+            rejectedLocationSamples: 4_000,
+            motionSamples: 54_000
+        )
+        expect(
+            starvedTrip.quality.confidence == .low,
+            "a drive where nearly every GPS fix was rejected must stay preliminary"
+        )
+        let starvedScore = DrivingScore(
+            score: starvedTrip.score, duration: 2_700, distanceMeters: 3_479,
+            topSpeedMetersPerSecond: 12, events: [], motionSamples: 54_000,
+            dataQuality: starvedTrip.quality
+        )
+        expect(starvedScore.grade == "Preliminary", "a starved GPS trace must be graded Preliminary, not Excellent")
+        expect(
+            !starvedScore.summary.contains("sustained GPS"),
+            "a starved GPS trace must not claim it is based on sustained GPS data"
+        )
+        expect(
+            !DriverReadinessEngine.qualifies(
+                RecordedDrive(startedAt: Date(), score: starvedScore, route: [])
+            ),
+            "a starved GPS trace must not count as readiness evidence"
+        )
+
+        // Same samples, but the usable trace is short: wall-clock duration must
+        // not be what earns high confidence.
+        let suspendedTrip = DriveScoringEngine.score(
+            duration: 2_700,
+            distanceMeters: 6_437.376,
+            events: [],
+            acceptedLocationSamples: 40,
+            rejectedLocationSamples: 0,
+            motionSamples: 54_000,
+            usableTraceDuration: 130
+        )
+        expect(
+            suspendedTrip.quality.confidence == .medium,
+            "confidence must key off measured trace time, not the drive's wall-clock length"
+        )
+        expect(
+            DriveScoringEngine.score(
+                duration: 2_700, distanceMeters: 6_437.376, events: [],
+                acceptedLocationSamples: 40, rejectedLocationSamples: 0,
+                motionSamples: 54_000, usableTraceDuration: 20
+            ).quality.confidence == .low,
+            "a drive with almost no usable trace must be preliminary"
+        )
+        expect(
+            DriveScoringEngine.acceptedLocationSampleShare(
+                acceptedLocationSamples: 0, rejectedLocationSamples: 0
+            ) == nil,
+            "a motion-only drive has no delivered fixes to judge as sparse"
+        )
+        expect(
+            DriveScoringEngine.score(
+                duration: 600, distanceMeters: 6_437.376, events: [],
+                acceptedLocationSamples: 0, rejectedLocationSamples: 0, motionSamples: 54_000
+            ).quality.confidence == .low,
+            "a drive with no GPS fixes at all cannot be a strong sample"
+        )
+
+        // Background suspension must report its own cause, not revoked access.
+        let suspendedQuality = DriveDataQuality(
+            acceptedLocationSamples: 27, rejectedLocationSamples: 0, motionSamples: 54_000,
+            confidence: .low, recordingSuspendedInBackground: true
+        )
+        let revokedQuality = DriveDataQuality(
+            acceptedLocationSamples: 27, rejectedLocationSamples: 0, motionSamples: 54_000,
+            confidence: .low, locationInterruptedMidDrive: true
+        )
+        expect(
+            suspendedQuality.summary != revokedQuality.summary,
+            "a background suspension must not be described as revoked location access"
+        )
+        expect(
+            suspendedQuality.summary.contains("suspended"),
+            "a background suspension must say the app was suspended"
+        )
+        expect(
+            DriveDataQuality(
+                acceptedLocationSamples: 27, rejectedLocationSamples: 0, motionSamples: 54_000,
+                confidence: .low
+            ).recordingSuspendedInBackground == nil,
+            "an ordinary drive must not claim it was suspended"
+        )
+        let legacyQualityJSON = Data(
+            #"{"acceptedLocationSamples":30,"rejectedLocationSamples":2,"motionSamples":1400,"confidence":"high"}"#.utf8
+        )
+        let legacyQuality = try! JSONDecoder().decode(DriveDataQuality.self, from: legacyQualityJSON)
+        expect(
+            legacyQuality.recordingSuspendedInBackground == nil && legacyQuality.confidence == .high,
+            "drives saved before the suspension signal existed must still decode"
+        )
+
+        // The decode path is the untrusted path: it must clamp exactly as the
+        // designated initializer does.
+        let hostileExposureJSON = Data(
+            #"{"demandID":"fastRoads","demandIntensity":5,"coveredShare":9,"routeShare":-4,"recordedAt":0}"#.utf8
+        )
+        let decodedExposure = try! JSONDecoder().decode(VerifiedDemandExposure.self, from: hostileExposureJSON)
+        expect(decodedExposure.demandIntensity == 1, "decoded demand intensity must be clamped to 1")
+        expect(decodedExposure.coveredShare == 1, "decoded covered share must be clamped to 1")
+        expect(decodedExposure.routeShare == 0, "decoded route share must be clamped to 0")
+        let roundTrippedExposure = try! JSONDecoder().decode(
+            VerifiedDemandExposure.self,
+            from: try! JSONEncoder().encode(
+                VerifiedDemandExposure(
+                    demandID: "fastRoads", demandIntensity: 0.5, coveredShare: 0.25,
+                    routeShare: 0.75, recordedAt: Date(timeIntervalSinceReferenceDate: 0)
+                )
+            )
+        )
+        expect(
+            roundTrippedExposure.demandID == "fastRoads" && roundTrippedExposure.coveredShare == 0.25,
+            "saved exposures must keep round-tripping through their existing key names"
+        )
+
         let encoded = try! JSONEncoder().encode(RecordedDrive(startedAt: Date(), score: DrivingScore(
             score: 90, duration: 120, distanceMeters: 1_000, topSpeedMetersPerSecond: 12,
             events: events, motionSamples: 300, dataQuality: sustainedTrip.quality

@@ -170,7 +170,7 @@ enum RouteChoiceRankingEngine {
         for route: ScoredRoute,
         assessment: DriverReadinessAssessment
     ) -> Int {
-        let demandsByID = Dictionary(uniqueKeysWithValues: (route.routeDemands ?? []).map { ($0.id, $0) })
+        let demandsByID = (route.routeDemands ?? []).keyedByID()
         return assessment.insights.reduce(into: 0) { count, insight in
             switch insight.state {
             case .practiceNeeded:

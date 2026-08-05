@@ -174,42 +174,55 @@ struct HomeView: View {
     @ViewBuilder
     private var originRow: some View {
         if form.usesCurrentLocation {
-            HStack(alignment: .center, spacing: 14) {
-                RoutePlanningFieldIcon(symbol: "location.circle.fill", tint: AppDesign.Ink.primary)
+            VStack(alignment: .leading, spacing: AppDesign.space8) {
+                HStack(alignment: .center, spacing: 14) {
+                    RoutePlanningFieldIcon(symbol: "location.circle.fill", tint: AppDesign.Ink.primary)
 
-                Button {
-                    locationCoordinator.useCurrentLocation()
-                } label: {
-                    routeFieldCopy(
-                        label: "FROM",
-                        value: currentLocationTitle,
-                        valueColor: AppDesign.Ink.primary
-                    )
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Starting location")
-                .accessibilityValue(currentLocationTitle)
-                .accessibilityHint("Double tap to refresh your current location")
+                    Button {
+                        locationCoordinator.useCurrentLocation()
+                    } label: {
+                        routeFieldCopy(
+                            label: "FROM",
+                            value: currentLocationTitle,
+                            valueColor: AppDesign.Ink.primary
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Starting location")
+                    .accessibilityValue(currentLocationTitle)
+                    .accessibilityHint("Double tap to refresh your current location")
 
-                if case .locating = locationCoordinator.state {
-                    ProgressView()
-                        .controlSize(.small)
-                        .tint(AppDesign.Ink.primary)
+                    if case .locating = locationCoordinator.state {
+                        ProgressView()
+                            .controlSize(.small)
+                            .tint(AppDesign.Ink.primary)
+                    }
+
+                    Button(action: switchToManualOrigin) {
+                        Image(systemName: "pencil")
+                            .font(.subheadline.weight(.bold))
+                            .foregroundStyle(AppDesign.Ink.primary.opacity(0.88))
+                            .frame(width: 36, height: 36)
+                            .background(AppDesign.Ink.primary.opacity(0.14), in: Circle())
+                            // Keeps the visible chip at its designed 36pt while
+                            // still meeting the 44pt minimum tap target.
+                            .frame(minWidth: 44, minHeight: 44)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(PressableScaleStyle())
+                    .accessibilityLabel("Enter a different starting location")
                 }
 
-                Button(action: switchToManualOrigin) {
-                    Image(systemName: "pencil")
-                        .font(.subheadline.weight(.bold))
-                        .foregroundStyle(AppDesign.Ink.primary.opacity(0.88))
-                        .frame(width: 36, height: 36)
-                        .background(AppDesign.Ink.primary.opacity(0.14), in: Circle())
-                        // Keeps the visible chip at its designed 36pt while
-                        // still meeting the 44pt minimum tap target.
-                        .frame(minWidth: 44, minHeight: 44)
-                        .contentShape(Rectangle())
+                // A coarse fix is used rather than left spinning, but it is
+                // never presented as an exact address.
+                if let accuracyNotice = locationCoordinator.accuracyNotice {
+                    Text(accuracyNotice)
+                        .font(.caption)
+                        .foregroundStyle(AppDesign.safety.opacity(0.95))
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.leading, 50)
+                        .transition(.opacity)
                 }
-                .buttonStyle(PressableScaleStyle())
-                .accessibilityLabel("Enter a different starting location")
             }
             .padding(.horizontal, 18)
             .padding(.vertical, 17)

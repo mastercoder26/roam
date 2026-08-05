@@ -4,7 +4,6 @@ import Foundation
 @main
 struct LayoutResponsivenessChecks {
     static func main() {
-        tabBarUsesItsCompactFormBeforeLabelsCanCollide()
         inlineControlsStackForNarrowOrLargeTextLayouts()
         routePlanningTitleUsesItsCompactTextStyleAtAccessibilitySizes()
         loadingSceneNeverOutgrowsTheAvailableWidth()
@@ -12,20 +11,10 @@ struct LayoutResponsivenessChecks {
         print("Layout responsiveness checks passed")
     }
 
-    private static func tabBarUsesItsCompactFormBeforeLabelsCanCollide() {
-        expect(
-            LayoutResponsiveness.usesCompactTabBar(availableWidth: 252, usesLargeText: false),
-            "a 320-point iPhone must collapse tab labels before they compete for width"
-        )
-        expect(
-            !LayoutResponsiveness.usesCompactTabBar(availableWidth: 346, usesLargeText: false),
-            "a regular-width phone should keep the selected tab label"
-        )
-        expect(
-            LayoutResponsiveness.usesCompactTabBar(availableWidth: 346, usesLargeText: true),
-            "large Dynamic Type must not force the tab labels into one horizontal row"
-        )
-    }
+    // The tab bar compact-form check was removed alongside
+    // LayoutResponsiveness.usesCompactTabBar in aa3fcc2, which reverted the
+    // tab bar minimize behavior to .onScrollDown. The assertions outlived the
+    // API they covered and had stopped compiling.
 
     private static func inlineControlsStackForNarrowOrLargeTextLayouts() {
         expect(

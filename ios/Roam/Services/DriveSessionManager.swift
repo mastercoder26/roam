@@ -2,6 +2,7 @@ import CoreLocation
 import CoreMotion
 import Combine
 import Foundation
+import UIKit
 
 /// Everything needed to reconstruct a `RecordedDrive` if the app is
 /// terminated mid-drive. Deliberately mirrors only measured quantities —
@@ -19,6 +20,9 @@ private struct InProgressDriveSnapshot: Codable {
     let topSpeedMetersPerSecond: CLLocationSpeed
     let plannedRouteContext: PlannedRouteContext?
     let lastUpdatedAt: Date
+    /// Optional so snapshots written before this field existed still decode —
+    /// an undecodable snapshot is a lost drive, not a lost flag.
+    let recordingSuspendedInBackground: Bool?
 }
 
 @MainActor
@@ -88,6 +92,20 @@ final class DriveSessionManager: NSObject, ObservableObject {
     /// Set when location authorization is withdrawn while recording, so the
     /// saved drive can state that its distance stops short of the real trip.
     private var didLoseLocationMidDrive = false
+    /// Set when a long stretch of the drive produced no location updates while
+    /// background updates were not permitted — the *When In Use* + locked-phone
+    /// case. Deliberately separate from `didLoseLocationMidDrive`: nothing was
+    /// revoked, so reporting it as revoked access would name the wrong cause.
+    private var didSuspendRecordingInBackground = false
+    /// Whether the app was backgrounded at any point during this drive. A long
+    /// GPS gap while the app stayed on screen is ordinary starvation, not
+    /// suspension, and must not be reported as one.
+    private var didEnterBackgroundDuringDrive = false
+    private var backgroundEntryObserver: NSObjectProtocol?
+    /// A gap shorter than this is ordinary GPS starvation (a tunnel, a parking
+    /// garage, a stop at a light). Only a sustained silence is evidence that
+    /// the app itself stopped being scheduled.
+    private static let backgroundSuspensionGapSeconds: TimeInterval = 60
     private var routeAnalysisTasks: [UUID: Task<Void, Never>] = [:]
 
     var currentDistanceMiles: Double { distanceMeters / 1_609.344 }
@@ -113,6 +131,23 @@ final class DriveSessionManager: NSObject, ObservableObject {
         // Nothing is recording at launch, so any Live Activity still on screen
         // is a leftover from a drive that was terminated before it could end.
         DriveLiveActivityManager.shared.endOrphanedActivities()
+        observeBackgroundEntry()
+    }
+
+    /// Notes that the app left the screen while a drive was recording. This is
+    /// the precondition for calling a later GPS gap a background suspension
+    /// rather than ordinary signal loss.
+    private func observeBackgroundEntry() {
+        backgroundEntryObserver = NotificationCenter.default.addObserver(
+            forName: UIApplication.didEnterBackgroundNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                guard let self, self.isRecording else { return }
+                self.didEnterBackgroundDuringDrive = true
+            }
+        }
     }
 
     func startDrive() {
@@ -214,13 +249,15 @@ final class DriveSessionManager: NSObject, ObservableObject {
             return
         }
 
+        noteTrailingLocationGap(endedAt: driveEndedAt)
         let result = DriveScoringEngine.score(
             duration: duration,
             distanceMeters: distanceMeters,
             events: events,
             acceptedLocationSamples: acceptedLocationSamples,
             rejectedLocationSamples: rejectedLocationSamples,
-            motionSamples: motionSamples
+            motionSamples: motionSamples,
+            usableTraceDuration: usableTraceDuration(for: routePoints)
         )
         let finalPlacementQuality = phonePlacementAnalyzer.finish(at: driveEndedAt)
         phonePlacementAssessment = finalPlacementQuality
@@ -230,7 +267,8 @@ final class DriveSessionManager: NSObject, ObservableObject {
             motionSamples: result.quality.motionSamples,
             confidence: result.quality.confidence,
             placementQuality: finalPlacementQuality,
-            locationInterruptedMidDrive: didLoseLocationMidDrive ? true : nil
+            locationInterruptedMidDrive: didLoseLocationMidDrive ? true : nil,
+            recordingSuspendedInBackground: didSuspendRecordingInBackground ? true : nil
         )
         let score = DrivingScore(
             score: result.score,
@@ -329,7 +367,9 @@ final class DriveSessionManager: NSObject, ObservableObject {
         recordedDrives = Array(([drive] + recordedDrives).prefix(50))
         saveRecordedDrives()
         lastCompletedDrive = drive
-        if initialRouteAnalysis.status == .pending {
+        if didSuspendRecordingInBackground {
+            statusMessage = "Drive saved. Roam was suspended in the background for part of it, so some distance is missing."
+        } else if initialRouteAnalysis.status == .pending {
             statusMessage = "Drive saved. Analyzing route difficulty."
         } else if finalPlacementQuality == .needsAdjustment {
             statusMessage = "Drive saved. Secure the phone when it is safe before your next drive."
@@ -466,6 +506,8 @@ final class DriveSessionManager: NSObject, ObservableObject {
         currentHorizontalAccelerationG = 0
         previousLocation = nil
         didLoseLocationMidDrive = false
+        didSuspendRecordingInBackground = false
+        didEnterBackgroundDuringDrive = false
         distanceMeters = 0
         topSpeed = 0
         events = []
@@ -626,6 +668,7 @@ final class DriveSessionManager: NSObject, ObservableObject {
             } else if time > DriveScoringEngine.maximumSampleGap {
                 // Resume the route after a long background gap without drawing
                 // a synthetic straight line or deriving a false acceleration.
+                noteLocationGap(seconds: time)
                 appendRoutePoint(routePoint)
             }
         } else {
@@ -637,6 +680,32 @@ final class DriveSessionManager: NSObject, ObservableObject {
         latestAcceptedLocationAt = location.timestamp
         publishLiveDriveSnapshot()
         persistInProgressSnapshot()
+    }
+
+    /// Records that a stretch of the drive produced no location fixes. Without
+    /// this a *When In Use* drive with a locked phone saved as 45 minutes and
+    /// 0.2 miles with nothing at all to explain the missing distance.
+    private func noteLocationGap(seconds: TimeInterval) {
+        guard seconds >= Self.backgroundSuspensionGapSeconds,
+              didEnterBackgroundDuringDrive,
+              !locationManager.allowsBackgroundLocationUpdates else { return }
+        didSuspendRecordingInBackground = true
+    }
+
+    /// The trailing silence between the last accepted fix and the end of the
+    /// drive. A phone locked at minute 1 and unlocked only to stop recording
+    /// never delivers the fix that would otherwise close the gap.
+    private func noteTrailingLocationGap(endedAt: Date) {
+        guard let latestAcceptedLocationAt else { return }
+        noteLocationGap(seconds: endedAt.timeIntervalSince(latestAcceptedLocationAt))
+    }
+
+    /// Continuous, plausible trace time — the same measure
+    /// `DriveTraceQuality.usableDuration` reports. Confidence is stated against
+    /// this rather than the drive's wall-clock length.
+    private func usableTraceDuration(for route: [DriveRoutePoint]) -> TimeInterval {
+        DriveExperienceEngine.validTraceSegments(for: route)
+            .reduce(0) { $0 + $1.duration }
     }
 
     private func appendRoutePoint(_ point: DriveRoutePoint) {
@@ -746,7 +815,8 @@ final class DriveSessionManager: NSObject, ObservableObject {
             distanceMeters: distanceMeters,
             topSpeedMetersPerSecond: topSpeed,
             plannedRouteContext: activePracticeRoute,
-            lastUpdatedAt: now
+            lastUpdatedAt: now,
+            recordingSuspendedInBackground: didSuspendRecordingInBackground ? true : nil
         )
         guard let data = try? JSONEncoder().encode(snapshot) else { return }
         UserDefaults.standard.set(data, forKey: inProgressDriveKey)
@@ -786,14 +856,16 @@ final class DriveSessionManager: NSObject, ObservableObject {
             events: snapshot.events,
             acceptedLocationSamples: snapshot.acceptedLocationSamples,
             rejectedLocationSamples: snapshot.rejectedLocationSamples,
-            motionSamples: snapshot.motionSamples
+            motionSamples: snapshot.motionSamples,
+            usableTraceDuration: usableTraceDuration(for: snapshot.route)
         )
         let dataQuality = DriveDataQuality(
             acceptedLocationSamples: result.quality.acceptedLocationSamples,
             rejectedLocationSamples: result.quality.rejectedLocationSamples,
             motionSamples: result.quality.motionSamples,
             confidence: result.quality.confidence,
-            placementQuality: nil
+            placementQuality: nil,
+            recordingSuspendedInBackground: snapshot.recordingSuspendedInBackground
         )
         let score = DrivingScore(
             score: result.score,

@@ -17,8 +17,13 @@ struct SharedRouteImportChecks {
         staleAcknowledgementDoesNotDropANewerRoute()
         expiredSharesArePhysicallyPurged()
         formReducerPreservesUserControl()
+        unreadableInboxIsQuarantinedInsteadOfDeleted()
+        onlyUnchangeableFailuresAreTreatedAsPermanent()
         await googleShortLinkResolutionStaysOutsideTheScoringBackend()
         await transientGoogleShortLinkFailureKeepsTheRoute()
+        await anUnreadableRedirectTargetKeepsTheLinkForRetry()
+        await anUnsupportedRedirectConsumesTheLink()
+        await anUnreadableInboxIsReportedInsteadOfShowingNothing()
 
         print("Shared route import checks passed")
     }
@@ -299,6 +304,166 @@ struct SharedRouteImportChecks {
             fail("a temporary resolution failure should be shown honestly")
         }
         expect(inbox.peek()?.id == id, "a temporary network failure must not discard the saved route")
+    }
+
+    /// A schema change must not destroy a saved share. This is the same class
+    /// of bug as the drive-history loss, and it gets the same quarantine.
+    private static func unreadableInboxIsQuarantinedInsteadOfDeleted() {
+        let directory = temporaryInboxDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+
+        let storageURL = directory.appendingPathComponent("shared-route-inbox-v1.json", isDirectory: false)
+        // A future build's entry: valid JSON, undecodable by this schema.
+        let futureSchema = Data(#"[{"id":"not-a-uuid","somethingNew":true}]"#.utf8)
+        try? futureSchema.write(to: storageURL, options: .atomic)
+
+        let inbox = SharedRouteInbox(storageDirectory: directory)
+
+        expect(inbox.peek() == nil, "an unreadable inbox has no route this build can present")
+        expect(
+            inbox.hasUnreadableEntries,
+            "an unreadable inbox must be reportable, not silently indistinguishable from an empty one"
+        )
+        expect(
+            (try? Data(contentsOf: storageURL)) == futureSchema,
+            "reading an unreadable inbox must not overwrite or delete the shared route"
+        )
+
+        let quarantineURL = directory.appendingPathComponent(
+            "shared-route-inbox-v1-quarantined.json",
+            isDirectory: false
+        )
+        expect(
+            (try? Data(contentsOf: quarantineURL)) == futureSchema,
+            "the original bytes should be kept for a later build that can read them"
+        )
+
+        let route = SharedRouteDraft(
+            id: UUID(),
+            provider: .appleMaps,
+            origin: "Austin, TX",
+            destination: "Dallas, TX",
+            importedAt: Date(),
+            waypointCount: 0
+        )
+        expect(
+            !inbox.enqueue(route: route),
+            "a write must refuse to run over an inbox this build could not read"
+        )
+        expect(
+            (try? Data(contentsOf: storageURL)) == futureSchema,
+            "a refused write must leave the stored share exactly as it was"
+        )
+    }
+
+    private static func onlyUnchangeableFailuresAreTreatedAsPermanent() {
+        typealias ResolverError = GoogleMapsShortLinkResolverError
+
+        expect(ResolverError.invalidLink.isPermanent, "a link that is not a Google short link cannot become one")
+        expect(
+            ResolverError.unsupportedRedirect.isPermanent,
+            "a redirect that leaves the trusted Google allowlist is genuinely unsupported"
+        )
+        expect(ResolverError.responseTooLarge.isPermanent, "an oversized response is a property of the link")
+        expect(
+            !ResolverError.unreadableRedirectTarget.isPermanent,
+            "a page Roam could not read this time — an interstitial — must stay retriable"
+        )
+
+        expect(
+            SharedRouteImportCoordinator.isPermanentResolutionFailure(URLError(.timedOut)) == false,
+            "a network failure is never a reason to delete the saved route"
+        )
+        expect(
+            SharedRouteImportCoordinator.isPermanentResolutionFailure(ResolverError.unreadableRedirectTarget) == false,
+            "an unreadable redirect target must not consume the share"
+        )
+        expect(
+            SharedRouteImportCoordinator.isPermanentResolutionFailure(ResolverError.unsupportedRedirect),
+            "an unsupported redirect is still permanent"
+        )
+    }
+
+    @MainActor
+    private static func anUnreadableRedirectTargetKeepsTheLinkForRetry() async {
+        let directory = temporaryInboxDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let shortURL = URL(string: "https://maps.app.goo.gl/abc123")!
+        let id = UUID()
+        let inbox = SharedRouteInbox(storageDirectory: directory)
+        expect(inbox.enqueueGoogleShortLink(shortURL, id: id), "a Google short link should be queued")
+
+        // A consent interstitial: still Google, still HTTPS, not a route.
+        let interstitial = URL(string: "https://www.google.com/maps/consent?continue=%2Fmaps")!
+        let coordinator = SharedRouteImportCoordinator(
+            inbox: inbox,
+            shortLinkResolver: StubGoogleShortLinkResolver(url: interstitial)
+        )
+        await coordinator.refresh()
+
+        guard case let .failed(message) = coordinator.state else {
+            fail("an unreadable redirect target should be reported, not silently dropped")
+        }
+        expect(
+            message == SharedRouteImportCoordinator.retryableFailureMessage,
+            "the message should promise the retry that actually happens"
+        )
+        expect(
+            inbox.peek()?.id == id,
+            "a region-dependent interstitial must not delete the shared link"
+        )
+    }
+
+    @MainActor
+    private static func anUnsupportedRedirectConsumesTheLink() async {
+        let directory = temporaryInboxDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let shortURL = URL(string: "https://maps.app.goo.gl/abc123")!
+        let inbox = SharedRouteInbox(storageDirectory: directory)
+        expect(inbox.enqueueGoogleShortLink(shortURL, id: UUID()), "a Google short link should be queued")
+
+        let coordinator = SharedRouteImportCoordinator(
+            inbox: inbox,
+            shortLinkResolver: StubGoogleShortLinkResolver(
+                error: GoogleMapsShortLinkResolverError.unsupportedRedirect
+            )
+        )
+        await coordinator.refresh()
+
+        guard case .failed = coordinator.state else {
+            fail("a genuinely unsupported redirect should still be reported")
+        }
+        expect(
+            inbox.peek() == nil,
+            "a failure that cannot change on a retry should not be retried forever"
+        )
+    }
+
+    @MainActor
+    private static func anUnreadableInboxIsReportedInsteadOfShowingNothing() async {
+        let directory = temporaryInboxDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+
+        let storageURL = directory.appendingPathComponent("shared-route-inbox-v1.json", isDirectory: false)
+        try? Data(#"[{"id":"not-a-uuid"}]"#.utf8).write(to: storageURL, options: .atomic)
+
+        let coordinator = SharedRouteImportCoordinator(
+            inbox: SharedRouteInbox(storageDirectory: directory),
+            shortLinkResolver: StubGoogleShortLinkResolver(url: URL(string: "https://maps.app.goo.gl/abc123")!)
+        )
+        await coordinator.refresh()
+
+        guard case let .failed(message) = coordinator.state else {
+            fail("a shared route this build cannot read should be explained, not hidden")
+        }
+        expect(
+            message == SharedRouteImportCoordinator.unreadableInboxMessage,
+            "the message should say the route is kept, not lost"
+        )
     }
 
     private static func temporaryInboxDirectory() -> URL {

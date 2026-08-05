@@ -168,6 +168,27 @@ struct BehaviorAccumulator {
     }
 }
 
+extension Sequence where Element: Identifiable {
+    /// Non-trapping counterpart to `Dictionary(uniqueKeysWithValues:)`.
+    ///
+    /// Route demands and readiness insights are keyed by server-supplied ids,
+    /// so uniqueness is not a property the client may assume. The first
+    /// occurrence wins, which keeps the result deterministic for a given input
+    /// order.
+    func keyedByID() -> [Element.ID: Element] {
+        Dictionary(map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+    }
+}
+
+extension Array where Element: Identifiable {
+    /// Keeps the first element per id, preserving order. Applied where a list
+    /// mixes locally generated entries with server-supplied ones.
+    func uniquedByID() -> [Element] {
+        var seenIDs = Set<Element.ID>()
+        return filter { seenIDs.insert($0.id).inserted }
+    }
+}
+
 struct RouteProgressSample {
     let coordinate: DriveCoordinate
     let fraction: Double
@@ -183,20 +204,40 @@ struct OrderedRouteMatches {
 /// A Foundation/CoreLocation-only Google encoded-polyline decoder. Keeping it
 /// here lets readiness checks run without importing the SwiftUI map component.
 enum RoutePolylineDecoder {
+    /// Widest shift a well-formed 32-bit varint component can reach. A valid
+    /// component is at most seven 5-bit chunks, so anything beyond this is a
+    /// malformed component rather than a long one.
+    private static let maximumComponentShift: Int32 = 30
+
     static func decode(_ encoded: String) -> [CLLocationCoordinate2D] {
         var coordinates: [CLLocationCoordinate2D] = []
         var index = encoded.startIndex
         var latitude: Int32 = 0
         var longitude: Int32 = 0
         while index < encoded.endIndex {
+            // Accumulation reports overflow instead of trapping: a malformed
+            // polyline must degrade to a truncated result, never kill the
+            // process. Wrapping (`&+`) is not an option either — it would hand
+            // the matcher a plausible-looking coordinate on the far side of the
+            // globe. Overflow takes the same exit as a bad component.
             guard let latitudeDelta = decodeComponent(from: encoded, index: &index) else { break }
-            latitude += latitudeDelta
+            let (accumulatedLatitude, latitudeOverflowed) = latitude.addingReportingOverflow(latitudeDelta)
+            guard !latitudeOverflowed else { break }
+            latitude = accumulatedLatitude
             guard let longitudeDelta = decodeComponent(from: encoded, index: &index) else { break }
-            longitude += longitudeDelta
-            coordinates.append(CLLocationCoordinate2D(
+            let (accumulatedLongitude, longitudeOverflowed) = longitude.addingReportingOverflow(longitudeDelta)
+            guard !longitudeOverflowed else { break }
+            longitude = accumulatedLongitude
+            // A component can be in range and still accumulate past the poles
+            // or the antimeridian. Such a point is not a location, and feeding
+            // it to the route matcher would silently corrupt familiarity, so it
+            // ends the decode on the same path as a bad component.
+            let coordinate = CLLocationCoordinate2D(
                 latitude: Double(latitude) / 1e5,
                 longitude: Double(longitude) / 1e5
-            ))
+            )
+            guard CLLocationCoordinate2DIsValid(coordinate) else { break }
+            coordinates.append(coordinate)
         }
         return coordinates
     }
@@ -206,7 +247,7 @@ enum RoutePolylineDecoder {
         var shift: Int32 = 0
         var byte: Int32
         repeat {
-            guard index < encoded.endIndex else { return nil }
+            guard index < encoded.endIndex, shift <= maximumComponentShift else { return nil }
             let scalar = encoded[index].asciiValue.map(Int32.init) ?? 0
             index = encoded.index(after: index)
             byte = scalar - 63

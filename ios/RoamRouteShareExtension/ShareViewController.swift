@@ -1,3 +1,4 @@
+import OSLog
 import SwiftUI
 import UIKit
 import UniformTypeIdentifiers
@@ -30,8 +31,8 @@ final class ShareViewController: UIViewController {
         let attachments = (extensionContext?.inputItems as? [NSExtensionItem])?
             .flatMap { $0.attachments ?? [] } ?? []
         Task { [model] in
-            let sharedItem = await SharedRouteShareItemReader.read(from: attachments)
-            model.importRoute(from: sharedItem)
+            let outcome = await SharedRouteShareItemReader.read(from: attachments)
+            model.importRoute(from: outcome)
         }
     }
 }
@@ -48,8 +49,18 @@ private final class ShareRouteImportViewModel: ObservableObject {
     @Published private(set) var state: State = .loading
     private let inbox = SharedRouteInbox()
 
-    func importRoute(from sharedItem: SharedRouteShareItem?) {
-        guard let sharedItem else {
+    func importRoute(from outcome: SharedRouteShareItemReader.Outcome) {
+        let sharedItem: SharedRouteShareItem
+        switch outcome {
+        case let .item(item):
+            sharedItem = item
+        case .attachmentFailedToLoad:
+            // Distinct from an unsupported link: the attachment was the right
+            // kind, the system just could not hand it over. Retrying the same
+            // share can work, so say so instead of blaming the link.
+            state = .unsupported("Roam could not read the shared item. Try sharing the route again.")
+            return
+        case .noSupportedAttachment:
             state = .unsupported("Share a route link from Apple Maps or Google Maps to add it to Roam.")
             return
         }
@@ -275,49 +286,92 @@ private struct SharedRouteShareItem {
 }
 
 private enum SharedRouteShareItemReader {
-    static func read(from attachments: [NSItemProvider]) async -> SharedRouteShareItem? {
-        for provider in attachments {
-            if let url = await loadURL(from: provider) {
-                return SharedRouteShareItem(url: url, text: nil)
-            }
-        }
-
-        for provider in attachments {
-            if let text = await loadText(from: provider) {
-                return SharedRouteShareItem(url: nil, text: text)
-            }
-        }
-
-        return nil
+    /// Separates "nothing here Roam can use" from "the attachment was the
+    /// right kind but the system failed to hand it over". Collapsing the two
+    /// makes a transient load failure read as an unsupported link, so the user
+    /// retries the same share expecting a different outcome.
+    enum Outcome {
+        case item(SharedRouteShareItem)
+        case attachmentFailedToLoad
+        case noSupportedAttachment
     }
 
-    private static func loadURL(from provider: NSItemProvider) async -> URL? {
-        guard provider.hasItemConformingToTypeIdentifier(UTType.url.identifier) else { return nil }
+    /// The result of asking one provider for one type.
+    private enum Load<Value> {
+        /// The provider does not offer this type at all.
+        case notOffered
+        case loaded(Value)
+        /// The provider offered this type and failed to produce it.
+        case failed(Error?)
+    }
+
+    static func read(from attachments: [NSItemProvider]) async -> Outcome {
+        var sawLoadFailure = false
+
+        for provider in attachments {
+            switch await loadURL(from: provider) {
+            case let .loaded(url):
+                return .item(SharedRouteShareItem(url: url, text: nil))
+            case let .failed(error):
+                log(error, forType: "URL")
+                sawLoadFailure = true
+            case .notOffered:
+                continue
+            }
+        }
+
+        for provider in attachments {
+            switch await loadText(from: provider) {
+            case let .loaded(text):
+                return .item(SharedRouteShareItem(url: nil, text: text))
+            case let .failed(error):
+                log(error, forType: "plain text")
+                sawLoadFailure = true
+            case .notOffered:
+                continue
+            }
+        }
+
+        return sawLoadFailure ? .attachmentFailedToLoad : .noSupportedAttachment
+    }
+
+    private static func log(_ error: Error?, forType type: String) {
+        // The underlying error is diagnostic detail, not user-facing copy.
+        logger.error("Share attachment (\(type, privacy: .public)) failed to load: \(error?.localizedDescription ?? "no error reported", privacy: .public)")
+    }
+
+    private static let logger = Logger(
+        subsystem: Bundle.main.bundleIdentifier ?? "com.roam.share",
+        category: "SharedRouteShareItemReader"
+    )
+
+    private static func loadURL(from provider: NSItemProvider) async -> Load<URL> {
+        guard provider.hasItemConformingToTypeIdentifier(UTType.url.identifier) else { return .notOffered }
         return await withCheckedContinuation { continuation in
-            provider.loadItem(forTypeIdentifier: UTType.url.identifier, options: nil) { item, _ in
+            provider.loadItem(forTypeIdentifier: UTType.url.identifier, options: nil) { item, error in
                 if let url = item as? URL {
-                    continuation.resume(returning: url)
+                    continuation.resume(returning: .loaded(url))
                 } else if let url = item as? NSURL {
-                    continuation.resume(returning: url as URL)
-                } else if let string = item as? String {
-                    continuation.resume(returning: URL(string: string))
+                    continuation.resume(returning: .loaded(url as URL))
+                } else if let string = item as? String, let url = URL(string: string) {
+                    continuation.resume(returning: .loaded(url))
                 } else {
-                    continuation.resume(returning: nil)
+                    continuation.resume(returning: .failed(error))
                 }
             }
         }
     }
 
-    private static func loadText(from provider: NSItemProvider) async -> String? {
-        guard provider.hasItemConformingToTypeIdentifier(UTType.plainText.identifier) else { return nil }
+    private static func loadText(from provider: NSItemProvider) async -> Load<String> {
+        guard provider.hasItemConformingToTypeIdentifier(UTType.plainText.identifier) else { return .notOffered }
         return await withCheckedContinuation { continuation in
-            provider.loadItem(forTypeIdentifier: UTType.plainText.identifier, options: nil) { item, _ in
+            provider.loadItem(forTypeIdentifier: UTType.plainText.identifier, options: nil) { item, error in
                 if let string = item as? String {
-                    continuation.resume(returning: string)
+                    continuation.resume(returning: .loaded(string))
                 } else if let string = item as? NSString {
-                    continuation.resume(returning: string as String)
+                    continuation.resume(returning: .loaded(string as String))
                 } else {
-                    continuation.resume(returning: nil)
+                    continuation.resume(returning: .failed(error))
                 }
             }
         }
