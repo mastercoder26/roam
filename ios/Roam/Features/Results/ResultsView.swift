@@ -150,7 +150,7 @@ struct ResultsView: View {
     }
 
     private var scoreSection: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: AppDesign.space12) {
             ScoreGaugeView(score: selectedRoute.score, label: selectedRoute.label)
 
             Text(selectedRoute.label.rawValue)
@@ -176,7 +176,7 @@ struct ResultsView: View {
                 subtitle: "Compared with your recorded drives."
             )
 
-            HStack(alignment: .top, spacing: 12) {
+            HStack(alignment: .top, spacing: AppDesign.space12) {
                 Image(systemName: readinessSymbol)
                     .font(.title3.weight(.semibold))
                     .foregroundStyle(readinessColor)
@@ -246,7 +246,7 @@ struct ResultsView: View {
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 12)
                         .foregroundStyle(AppDesign.accentForeground)
-                        .background(AppDesign.accent, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        .background(AppDesign.accent, in: RoundedRectangle(cornerRadius: AppDesign.cornerRadiusSmall, style: .continuous))
                 }
                 .buttonStyle(PressableScaleStyle())
                 .disabled(driveSession.isRecording)
@@ -485,10 +485,10 @@ struct ResultsView: View {
     }
 
     private var navigationSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            SectionHeader(title: "Start Navigation")
+        VStack(alignment: .leading, spacing: AppDesign.space12) {
+            SectionHeader(title: "Start navigation")
 
-            HStack(spacing: 12) {
+            HStack(spacing: AppDesign.space12) {
                 Button {
                     openInAppleMaps()
                 } label: {
@@ -531,8 +531,8 @@ struct ResultsView: View {
     }
 
     private func hotspotsSection(_ hotspots: [SegmentHotspot]) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            SectionHeader(title: "Difficulty Hotspots")
+        VStack(alignment: .leading, spacing: AppDesign.space12) {
+            SectionHeader(title: "Difficulty hotspots")
 
             ForEach(Array(hotspots.prefix(5).enumerated()), id: \.element.id) { _, hotspot in
                 HStack(spacing: 10) {
@@ -558,8 +558,8 @@ struct ResultsView: View {
     }
 
     private var breakdownSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            SectionHeader(title: "Difficulty Breakdown")
+        VStack(alignment: .leading, spacing: AppDesign.space12) {
+            SectionHeader(title: "Difficulty breakdown")
 
             ForEach(selectedRoute.breakdown.items, id: \.key) { item in
                 BreakdownBarRow(title: item.title, value: item.value)
@@ -569,8 +569,8 @@ struct ResultsView: View {
     }
 
     private func contributionsSection(_ contributions: [FactorContribution]) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            SectionHeader(title: "Top Factors")
+        VStack(alignment: .leading, spacing: AppDesign.space12) {
+            SectionHeader(title: "Top factors")
 
             ForEach(contributions.prefix(5)) { entry in
                 BreakdownBarRow(
@@ -583,7 +583,7 @@ struct ResultsView: View {
     }
 
     private var reasonsSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: AppDesign.space12) {
             SectionHeader(title: "Why this score")
 
             if selectedRoute.reasons.isEmpty {
@@ -599,7 +599,7 @@ struct ResultsView: View {
 
     @ViewBuilder
     private var departureComparisonSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: AppDesign.space12) {
             SectionHeader(
                 title: "Calmest departure",
                 subtitle: "A comparison of nearby departure times."
@@ -608,7 +608,7 @@ struct ResultsView: View {
             if isComparingDepartures {
                 HStack(spacing: 10) {
                     ProgressView().tint(AppDesign.accent)
-                    Text("Comparing nearby departure times")
+                    Text("Comparing departure times")
                         .font(.subheadline)
                         .foregroundStyle(AppDesign.Ink.secondary)
                 }
@@ -643,12 +643,12 @@ struct ResultsView: View {
     }
 
     private var routeChoicesSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: AppDesign.space12) {
             SectionHeader(
                 title: "Route choices",
                 subtitle: routeChoiceRanking?.comparisonLimitedByHistory == true
                     ? "Recorded history is still building, so choices are ordered by route difficulty."
-                    : "Ranked by route demands and evidence recorded on this phone."
+                    : "Ranked by route demands and evidence recorded on this device."
             )
 
             if let ranking = routeChoiceRanking {

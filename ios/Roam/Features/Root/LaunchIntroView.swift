@@ -133,7 +133,7 @@ struct LaunchIntroView: View {
     }
 
     private var lockup: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: AppDesign.space12) {
             SweptWordmark(sweepProgress: sweepProgress, reduceMotion: reduceMotion)
 
             Text("Know the road before you drive it.")

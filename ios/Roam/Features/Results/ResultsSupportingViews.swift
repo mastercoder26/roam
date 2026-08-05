@@ -7,7 +7,7 @@ struct PracticePlanPreview: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 8) {
+            HStack(spacing: AppDesign.space8) {
                 Image(systemName: "target").foregroundStyle(AppDesign.safety)
                 Text("Guided practice plan").font(.subheadline.weight(.semibold))
             }
@@ -26,8 +26,8 @@ struct PracticePlanPreview: View {
             }
         }
         .padding(12)
-        .background(AppDesign.safety.opacity(0.08), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .overlay { RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(AppDesign.safety.opacity(0.16), lineWidth: 1) }
+        .background(AppDesign.safety.opacity(0.08), in: RoundedRectangle(cornerRadius: AppDesign.cornerRadiusSmall, style: .continuous))
+        .overlay { RoundedRectangle(cornerRadius: AppDesign.cornerRadiusSmall, style: .continuous).stroke(AppDesign.safety.opacity(0.16), lineWidth: 1) }
         .accessibilityElement(children: .combine)
     }
 }
@@ -49,7 +49,7 @@ struct DepartureComparisonRow: View {
         Group {
             if let route = candidate.route {
                 Button(action: action) {
-                    HStack(alignment: .top, spacing: 12) {
+                    HStack(alignment: .top, spacing: AppDesign.space12) {
                         Image(systemName: isCalmestAvailable ? "leaf.fill" : "clock")
                             .foregroundStyle(isCalmestAvailable ? AppDesign.positive : AppDesign.accent)
                             .frame(width: 28, height: 28)
@@ -77,13 +77,13 @@ struct DepartureComparisonRow: View {
                         }
                     }
                     .padding(10)
-                    .background(isCurrentDeparture ? AppDesign.accent.opacity(0.08) : AppDesign.cardSurfaceElevated, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .background(isCurrentDeparture ? AppDesign.accent.opacity(0.08) : AppDesign.cardSurfaceElevated, in: RoundedRectangle(cornerRadius: AppDesign.cornerRadiusSmall, style: .continuous))
                 }
                 .buttonStyle(PressableScaleStyle())
                 .disabled(isCurrentDeparture || isUpdating)
                 .accessibilityHint(isCurrentDeparture ? "This is the time used for the current route result." : "Refreshes the full route analysis for this departure time.")
             } else {
-                HStack(alignment: .top, spacing: 12) {
+                HStack(alignment: .top, spacing: AppDesign.space12) {
                     Image(systemName: "clock.badge.exclamationmark").foregroundStyle(AppDesign.Ink.secondary).frame(width: 28, height: 28)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(departureLabel).font(.subheadline.weight(.semibold))
@@ -94,7 +94,7 @@ struct DepartureComparisonRow: View {
                     }
                 }
                 .padding(10)
-                .background(AppDesign.cardSurfaceElevated, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .background(AppDesign.cardSurfaceElevated, in: RoundedRectangle(cornerRadius: AppDesign.cornerRadiusSmall, style: .continuous))
             }
         }
     }
@@ -106,20 +106,20 @@ struct ReadinessHistorySummary: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 7) {
-            Label("Evidence from your saved drives", systemImage: "lock.shield.fill")
+            Label("Evidence recorded on this device", systemImage: "lock.shield.fill")
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(AppDesign.Ink.secondary)
-            Text("\(profile.qualifyingDriveCount) qualifying \(profile.qualifyingDriveCount == 1 ? "drive" : "drives") · \(String(format: "%.1f", profile.reliableTraceMiles)) mi of validated GPS trace · \(profile.qualifyingDriveDayCount) \(profile.qualifyingDriveDayCount == 1 ? "day" : "days")")
+            Text("\(profile.qualifyingDriveCount) qualifying \(profile.qualifyingDriveCount == 1 ? "drive" : "drives") · \(String(format: "%.1f", profile.reliableTraceMiles)) validated mi · \(profile.qualifyingDriveDayCount) \(profile.qualifyingDriveDayCount == 1 ? "day" : "days")")
                 .font(.footnote.weight(.medium))
                 .monospacedDigit()
-            VStack(alignment: .leading, spacing: 4) {
-                readinessFact("8 PM–6 AM driving", value: "\(String(format: "%.1f", profile.nightExposure.miles)) mi across \(profile.nightExposure.sessionCount) \(profile.nightExposure.sessionCount == 1 ? "drive" : "drives")", symbol: "moon.stars.fill")
-                readinessFact("45+ mph baseline", value: "\(String(format: "%.1f", profile.fastRoad45Exposure.miles)) mi across \(profile.fastRoad45Exposure.sessionCount) \(profile.fastRoad45Exposure.sessionCount == 1 ? "drive" : "drives")", symbol: "speedometer")
-                readinessFact("Longest validated GPS trace", value: durationText(profile.longestDriveDuration), symbol: "clock.fill")
+            VStack(alignment: .leading, spacing: AppDesign.space4) {
+                readinessFact("After-dark miles", value: "\(String(format: "%.1f", profile.nightExposure.miles)) mi across \(profile.nightExposure.sessionCount) \(profile.nightExposure.sessionCount == 1 ? "drive" : "drives")", symbol: "moon.stars.fill")
+                readinessFact("45+ mph miles", value: "\(String(format: "%.1f", profile.fastRoad45Exposure.miles)) mi across \(profile.fastRoad45Exposure.sessionCount) \(profile.fastRoad45Exposure.sessionCount == 1 ? "drive" : "drives")", symbol: "speedometer")
+                readinessFact("Longest continuous trace", value: durationText(profile.longestDriveDuration), symbol: "clock.fill")
             }
         }
         .padding(12)
-        .background(AppDesign.cardSurfaceElevated, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .background(AppDesign.cardSurfaceElevated, in: RoundedRectangle(cornerRadius: AppDesign.cornerRadiusSmall, style: .continuous))
         .accessibilityElement(children: .combine)
     }
 
@@ -235,11 +235,11 @@ struct RouteDemandRow: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .top, spacing: 12) {
+        VStack(alignment: .leading, spacing: AppDesign.space8) {
+            HStack(alignment: .top, spacing: AppDesign.space12) {
                 Image(systemName: symbol).font(.subheadline.weight(.semibold)).foregroundStyle(color).frame(width: 36, height: 36).background(color.opacity(0.12), in: RoundedRectangle(cornerRadius: AppDesign.cornerRadiusTiny, style: .continuous))
                 VStack(alignment: .leading, spacing: 3) {
-                    HStack(spacing: 8) {
+                    HStack(spacing: AppDesign.space8) {
                         Text(demand.title).font(.subheadline.weight(.semibold))
                         Text(levelLabel).font(.caption2.weight(.bold)).foregroundStyle(color).padding(.horizontal, 7).padding(.vertical, 3).background(color.opacity(0.12), in: Capsule())
                     }
@@ -368,10 +368,10 @@ struct TripDetailsCard: View {
     let route: ScoredRoute
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            SectionHeader(title: "Trip at a glance", subtitle: "The essentials before you choose a route.")
+        VStack(alignment: .leading, spacing: AppDesign.space12) {
+            SectionHeader(title: "Trip at a glance")
 
-            HStack(spacing: 16) {
+            HStack(spacing: AppDesign.space16) {
                 DetailTile(
                     title: "ETA",
                     value: route.formattedDuration,
@@ -414,7 +414,7 @@ private struct DetailTile: View {
     var valueColor: Color = .primary
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: AppDesign.space4) {
             Image(systemName: systemImage)
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(AppDesign.accent)
@@ -436,10 +436,10 @@ struct RouteConditionsCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            SectionHeader(title: "Live Conditions")
+            SectionHeader(title: "Live conditions")
 
             if conditions.weather.available {
-                HStack(spacing: 12) {
+                HStack(spacing: AppDesign.space12) {
                     Image(systemName: conditions.weather.systemImage)
                         .font(.title2)
                         .symbolRenderingMode(.multicolor)
@@ -448,7 +448,7 @@ struct RouteConditionsCard: View {
                         .clipShape(RoundedRectangle(cornerRadius: AppDesign.cornerRadiusSmall, style: .continuous))
 
                     VStack(alignment: .leading, spacing: 2) {
-                        HStack(spacing: 8) {
+                        HStack(spacing: AppDesign.space8) {
                             Text(conditions.weather.condition)
                                 .font(.subheadline.weight(.semibold))
                             severityChip(
@@ -466,7 +466,7 @@ struct RouteConditionsCard: View {
 
             if conditions.road.available {
                 Divider()
-                HStack(spacing: 12) {
+                HStack(spacing: AppDesign.space12) {
                     Image(systemName: "road.lanes")
                         .font(.title2)
                         .foregroundStyle(.blue)

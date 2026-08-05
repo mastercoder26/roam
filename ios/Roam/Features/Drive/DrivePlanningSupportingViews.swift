@@ -12,8 +12,8 @@ struct BreakRecommendationsView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .top, spacing: 12) {
+        VStack(alignment: .leading, spacing: AppDesign.space12) {
+            HStack(alignment: .top, spacing: AppDesign.space12) {
                 IconTile(symbol: recommendation.symbol, color: recommendation.color)
                 VStack(alignment: .leading, spacing: 3) {
                     Text(recommendation.title)
@@ -26,7 +26,7 @@ struct BreakRecommendationsView: View {
             }
 
             if !recommendation.stops.isEmpty {
-                VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: .leading, spacing: AppDesign.space8) {
                     ForEach(recommendation.stops) { stop in
                         HStack(spacing: 10) {
                             Text(stop.label)
@@ -134,12 +134,12 @@ struct PracticeDebriefCard: View {
     var body: some View {
         if let debrief {
             VStack(alignment: .leading, spacing: 14) {
-                HStack(alignment: .top, spacing: 12) {
+                HStack(alignment: .top, spacing: AppDesign.space12) {
                     Image(systemName: debriefSymbol)
                         .font(.title3.weight(.semibold))
                         .foregroundStyle(debriefColor)
                         .frame(width: 40, height: 40)
-                        .background(debriefColor.opacity(0.12), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        .background(debriefColor.opacity(0.12), in: RoundedRectangle(cornerRadius: AppDesign.cornerRadiusSmall, style: .continuous))
                     VStack(alignment: .leading, spacing: 3) {
                         Text(debrief.headline).font(.headline)
                         Text(debrief.summary)
@@ -151,13 +151,13 @@ struct PracticeDebriefCard: View {
 
                 if !debrief.goalCompletions.isEmpty {
                     Divider()
-                    VStack(alignment: .leading, spacing: 8) {
+                    VStack(alignment: .leading, spacing: AppDesign.space8) {
                         Text("Practice goals")
                             .font(.caption.weight(.bold))
                             .foregroundStyle(AppDesign.Ink.secondary)
                         ForEach(debrief.goalCompletions) { completion in
                             let goal = planGoals.first(where: { $0.id == completion.goalID })
-                            HStack(alignment: .top, spacing: 8) {
+                            HStack(alignment: .top, spacing: AppDesign.space8) {
                                 Image(systemName: completion.wasMeasuredToday ? "checkmark.circle.fill" : "circle")
                                     .foregroundStyle(completion.wasMeasuredToday ? AppDesign.positive : .secondary)
                                 VStack(alignment: .leading, spacing: 1) {

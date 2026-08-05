@@ -27,8 +27,8 @@ struct AlternateRouteCard: View {
     var body: some View {
         Button(action: onSelect) {
             HStack(spacing: 14) {
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack(spacing: 8) {
+                VStack(alignment: .leading, spacing: AppDesign.space4) {
+                    HStack(spacing: AppDesign.space8) {
                         Text(route.formattedScore)
                             .font(.title3.weight(.bold).monospacedDigit())
                             .foregroundStyle(accentColor)
@@ -54,7 +54,7 @@ struct AlternateRouteCard: View {
                             .fixedSize(horizontal: false, vertical: true)
                     }
 
-                    HStack(spacing: 12) {
+                    HStack(spacing: AppDesign.space12) {
                         Label(route.formattedDuration, systemImage: "clock")
                         Label(route.formattedDistance, systemImage: "arrow.left.and.right")
                     }

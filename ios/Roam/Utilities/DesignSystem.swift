@@ -1,3 +1,4 @@
+import Charts
 import SwiftUI
 
 // MARK: - Theme subscription
@@ -304,6 +305,62 @@ struct StatRow: View {
                 .foregroundStyle(AppDesign.Ink.primary)
                 .monospacedDigit()
         }
+    }
+}
+
+// MARK: - Weekly miles chart
+
+/// The eight-week measured-miles bar chart shared by Progress and Profile.
+/// Both screens plot the same `DriverProgressWeek` series with the same marks
+/// and axes, so that shape lives here once; height is the only dimension a
+/// caller may vary.
+///
+/// Deliberately *not* included: `.animation(…)` and `.accessibilityLabel(…)`.
+/// Both depend on call-site state (the screen's reduce-motion flag and its own
+/// spoken summary), so each call site keeps applying them to this view.
+struct WeeklyMilesChart: View {
+    /// One source of truth for the chart height. Progress and Profile drifted
+    /// to 180 and 160 while the chart was copy-pasted; a caller that wants a
+    /// shorter chart must now say so explicitly.
+    static let defaultHeight: CGFloat = 180
+
+    /// Bar caps, not the icon-tile rung. `cornerRadiusTiny` (10) is half the
+    /// width of a bar in an eight-week series, which rounds the cap into a
+    /// dome and visually shortens the smallest weeks.
+    static let barCornerRadius: CGFloat = 5
+
+    let weeks: [DriverProgressWeek]
+    var height: CGFloat = WeeklyMilesChart.defaultHeight
+    @ObservedObject private var theme = ThemeManager.shared
+
+    var body: some View {
+        Chart(weeks) { week in
+            BarMark(
+                x: .value("Week", week.startDate, unit: .weekOfYear),
+                y: .value("Measured miles", week.measuredMiles)
+            )
+            .foregroundStyle(AppDesign.accent.gradient)
+            .cornerRadius(Self.barCornerRadius)
+        }
+        .chartYAxis {
+            AxisMarks(position: .leading) { value in
+                AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5))
+                    .foregroundStyle(AppDesign.cardStroke)
+                AxisValueLabel {
+                    if let miles = value.as(Double.self) {
+                        Text(miles, format: .number.precision(.fractionLength(0)))
+                            .font(.caption2)
+                    }
+                }
+            }
+        }
+        .chartXAxis {
+            AxisMarks(values: .stride(by: .weekOfYear, count: 2)) { _ in
+                AxisValueLabel(format: .dateTime.month(.abbreviated).day())
+                    .font(.caption2)
+            }
+        }
+        .frame(height: height)
     }
 }
 

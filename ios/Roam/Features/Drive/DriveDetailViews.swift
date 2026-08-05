@@ -34,7 +34,7 @@ struct DriveDetailView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: AppDesign.sectionSpacing) {
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: AppDesign.space4) {
                     Text("Drive details").font(AppDesign.Typography.heroTitle)
                     Text(drive.startedAt.formatted(date: .complete, time: .shortened))
                         .font(.subheadline)
@@ -98,7 +98,7 @@ struct DriveDetailView: View {
     }
 
     private var replaySection: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: AppDesign.space12) {
             SectionHeader(
                 title: "Moments that mattered",
                 subtitle: "Tap a moment or map marker to review the measured context."
@@ -210,7 +210,7 @@ private struct DriveRouteDifficultyCard: View {
 
     private var availableContent: some View {
         VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .top, spacing: 12) {
+            HStack(alignment: .top, spacing: AppDesign.space12) {
                 IconTile(symbol: "map.fill", color: analysis?.label?.color ?? AppDesign.accent)
                 VStack(alignment: .leading, spacing: 3) {
                     Text("Route difficulty").font(.headline)
@@ -245,7 +245,7 @@ private struct DriveRouteDifficultyCard: View {
     }
 
     private var pendingContent: some View {
-        HStack(alignment: .top, spacing: 12) {
+        HStack(alignment: .top, spacing: AppDesign.space12) {
             ProgressView().tint(AppDesign.accent).frame(width: 34, height: 34)
             VStack(alignment: .leading, spacing: 3) {
                 Text("Analyzing route difficulty").font(.headline)
@@ -258,7 +258,7 @@ private struct DriveRouteDifficultyCard: View {
     }
 
     private var unavailableContent: some View {
-        HStack(alignment: .top, spacing: 12) {
+        HStack(alignment: .top, spacing: AppDesign.space12) {
             IconTile(symbol: "map.fill.badge.ellipsis", color: .secondary)
             VStack(alignment: .leading, spacing: 3) {
                 Text("Route difficulty unavailable").font(.headline)
@@ -277,7 +277,7 @@ private struct ReplayMomentRow: View {
     let isSelected: Bool
 
     var body: some View {
-        HStack(alignment: .top, spacing: 12) {
+        HStack(alignment: .top, spacing: AppDesign.space12) {
             Image(systemName: moment.kind.symbol)
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(isSelected ? AppDesign.accent : AppDesign.safety)
@@ -302,9 +302,9 @@ private struct ReplayMomentRow: View {
                 .foregroundStyle(isSelected ? AppDesign.accent : AppDesign.Ink.tertiary)
         }
         .padding(10)
-        .background(isSelected ? AppDesign.accent.opacity(0.08) : Color.clear, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .background(isSelected ? AppDesign.accent.opacity(0.08) : Color.clear, in: RoundedRectangle(cornerRadius: AppDesign.cornerRadiusSmall, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
+            RoundedRectangle(cornerRadius: AppDesign.cornerRadiusSmall, style: .continuous)
                 .stroke(isSelected ? AppDesign.accent.opacity(0.22) : .clear, lineWidth: 1)
         }
         .accessibilityElement(children: .combine)
@@ -351,7 +351,7 @@ struct DriveScoreCard: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: AppDesign.space16) {
             HStack(alignment: .firstTextBaseline) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title).font(.headline)

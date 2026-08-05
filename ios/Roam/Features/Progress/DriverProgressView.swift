@@ -1,4 +1,3 @@
-import Charts
 import SwiftUI
 
 /// A private view of measured driving evidence and a route-adjusted coaching
@@ -30,7 +29,6 @@ struct DriverProgressView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: AppDesign.sectionSpacing) {
-                    header
                     overallScoreCard
 
                     if summary.hasRecordedEvidence {
@@ -58,19 +56,8 @@ struct DriverProgressView: View {
         }
     }
 
-    private var header: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("Recorded progress")
-                .font(AppDesign.Typography.heroTitle)
-                .tracking(-0.5)
-            Text("Measurement coverage from your recorded drives.")
-                .font(.subheadline)
-                .foregroundStyle(AppDesign.Ink.secondary)
-        }
-    }
-
     private var overallScoreCard: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: AppDesign.space12) {
             HStack(alignment: .top, spacing: 12) {
                 Image(systemName: "steeringwheel.and.heat.waves")
                     .font(.title3.weight(.semibold))
@@ -144,8 +131,8 @@ struct DriverProgressView: View {
             label: performance.includedDriveCount == 1 ? "analyzed drive" : "analyzed drives"
         )
         ProgressScoreSignal(
-            value: String(format: "%.1f mi", performance.measuredMiles),
-            label: "measured evidence"
+            value: String(format: "%.1f", performance.measuredMiles),
+            label: "analyzed miles"
         )
         if let difficulty = performance.averageDifficulty {
             ProgressScoreSignal(
@@ -156,7 +143,7 @@ struct DriverProgressView: View {
     }
 
     private var emptyEvidenceState: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: AppDesign.space12) {
             Image(systemName: "chart.line.uptrend.xyaxis")
                 .font(.system(size: 28, weight: .semibold))
                 .foregroundStyle(AppDesign.accent)
@@ -174,7 +161,7 @@ struct DriverProgressView: View {
     }
 
     private var evidenceSummary: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: AppDesign.space12) {
             SectionHeader(title: "Recorded evidence", subtitle: "Only qualifying local drives are included.")
 
             ViewThatFits(in: .horizontal) {
@@ -191,7 +178,7 @@ struct DriverProgressView: View {
 
     @ViewBuilder
     private var metrics: some View {
-        ProgressMetric(value: String(format: "%.1f", summary.validatedMiles), label: "validated mi", symbol: "location.fill")
+        ProgressMetric(value: String(format: "%.1f", summary.validatedMiles), label: "validated miles", symbol: "location.fill")
         ProgressMetric(value: "\(summary.qualifyingDriveCount)", label: "qualifying drives", symbol: "steeringwheel")
         ProgressMetric(value: "\(summary.qualifyingDriveDayCount)", label: "recorded days", symbol: "calendar")
     }
@@ -210,45 +197,19 @@ struct DriverProgressView: View {
     }
 
     private var weeklyChart: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: AppDesign.space12) {
             SectionHeader(title: "Measured miles", subtitle: "The last eight calendar weeks.")
 
-            Chart(summary.weeklyMeasuredMiles) { week in
-                BarMark(
-                    x: .value("Week", week.startDate, unit: .weekOfYear),
-                    y: .value("Measured miles", week.measuredMiles)
-                )
-                .foregroundStyle(AppDesign.accent.gradient)
-                .cornerRadius(5)
-            }
-            .chartYAxis {
-                AxisMarks(position: .leading) { value in
-                    AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5))
-                        .foregroundStyle(AppDesign.cardStroke)
-                    AxisValueLabel {
-                        if let miles = value.as(Double.self) {
-                            Text(miles, format: .number.precision(.fractionLength(0)))
-                                .font(.caption2)
-                        }
-                    }
-                }
-            }
-            .chartXAxis {
-                AxisMarks(values: .stride(by: .weekOfYear, count: 2)) { value in
-                    AxisValueLabel(format: .dateTime.month(.abbreviated).day())
-                        .font(.caption2)
-                }
-            }
-            .frame(height: 180)
-            .animation(reduceMotion ? .easeOut(duration: 0.16) : AppAnimation.content, value: summary.weeklyMeasuredMiles)
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel(chartAccessibilitySummary)
+            WeeklyMilesChart(weeks: summary.weeklyMeasuredMiles)
+                .animation(reduceMotion ? .easeOut(duration: 0.16) : AppAnimation.content, value: summary.weeklyMeasuredMiles)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(chartAccessibilitySummary)
         }
         .premiumCard()
     }
 
     private var coverageSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: AppDesign.space12) {
             SectionHeader(title: "Measurement coverage", subtitle: "What the qualifying GPS trace has actually captured.")
 
             ProgressCoverageRow(
@@ -289,7 +250,7 @@ struct DriverProgressView: View {
         HStack(alignment: .top, spacing: 10) {
             Image(systemName: "info.circle.fill")
                 .foregroundStyle(AppDesign.safety)
-            Text("\(notYetQualifyingDriveCount) \(notYetQualifyingDriveCount == 1 ? "saved drive is" : "saved drives are") not yet qualifying for progress totals. Not enough GPS and motion data yet.")
+            Text("\(notYetQualifyingDriveCount) \(notYetQualifyingDriveCount == 1 ? "saved drive is" : "saved drives are") not yet qualifying for progress totals: not enough GPS and motion data.")
                 .font(.footnote)
                 .foregroundStyle(AppDesign.Ink.secondary)
                 .fixedSize(horizontal: false, vertical: true)
