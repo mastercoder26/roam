@@ -37,6 +37,15 @@ function getRateLimitConfig(): { windowMs: number; maxRequests: number } {
 }
 
 const app = express();
+
+// Cloud Run terminates the connection at Google's front end, so the socket
+// address is the proxy's and is identical for every caller. Without this, the
+// rate limiter below keys every client into one shared bucket and throttles the
+// whole service at `RATE_LIMIT_MAX_REQUESTS` in aggregate. Trusting exactly one
+// hop takes the address the front end appended, not one a client supplied, so
+// `X-Forwarded-For` still cannot be spoofed to escape the limit.
+app.set("trust proxy", 1);
+
 const port = Number(process.env.PORT ?? 3000);
 const allowedOrigins = getAllowedOrigins();
 const rateLimiter = createRateLimiter(getRateLimitConfig());
@@ -65,8 +74,9 @@ app.use((req, res, next) => {
 
 /**
  * Both routes below proxy to metered upstream APIs (Google Routes/Roads).
- * Rate limiting is keyed by socket-derived IP, not a client-supplied header,
- * so it cannot be bypassed by spoofing `X-Forwarded-For`.
+ * Rate limiting is keyed by `req.ip`, which resolves under `trust proxy = 1`
+ * (see above) to the address the front-facing proxy appended rather than any
+ * value the client sent, so `X-Forwarded-For` cannot be spoofed to escape it.
  */
 function rateLimit(endpoint: string) {
   return (req: Request, res: Response, next: NextFunction) => {
