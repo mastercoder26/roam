@@ -36,16 +36,14 @@ struct RouteAnalysisLoadingView: View {
                     .frame(width: sceneWidth, height: sceneWidth * (190 / 320))
                     .clipped()
 
-                    VStack(spacing: 8) {
-                        Text(statusTitle)
-                            .font(.title2.weight(.semibold))
-                            .foregroundStyle(AppDesign.Ink.primary)
-                        Text("Tracing the route, then checking the road signals that shape its difficulty.")
-                            .font(.subheadline)
-                            .foregroundStyle(AppDesign.Ink.secondary)
-                            .multilineTextAlignment(.center)
-                            .frame(maxWidth: min(290, sceneWidth))
-                    }
+                    // The status title already narrates each step in turn, so it
+                    // carries the explanation on its own rather than repeating
+                    // it in a static caption underneath.
+                    Text(statusTitle)
+                        .font(.title2.weight(.semibold))
+                        .foregroundStyle(AppDesign.Ink.primary)
+                        .multilineTextAlignment(.center)
+                        .frame(maxWidth: min(290, sceneWidth))
 
                     ProgressView()
                         .tint(AppDesign.accent)

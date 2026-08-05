@@ -129,7 +129,7 @@ struct HomeView: View {
     }
 
     private var headerSection: some View {
-        HStack(alignment: .center, spacing: 16) {
+        HStack(alignment: .center, spacing: AppDesign.space16) {
             Text("Plan your route")
                 .font(AppDesign.Typography.heroTitle)
                 .tracking(-0.8)
@@ -218,11 +218,11 @@ struct HomeView: View {
                 RoutePlanningFieldIcon(symbol: "circle.inset.filled", tint: AppDesign.accent)
                     .padding(.top, 8)
 
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: AppDesign.space4) {
                     routeFieldLabel("FROM")
                     AddressSearchField(
                         title: "Starting location",
-                        placeholder: "Enter starting location",
+                        placeholder: "Enter a starting location",
                         systemImage: "circle.fill",
                         iconColor: AppDesign.accent,
                         showsIcon: false,
@@ -263,11 +263,11 @@ struct HomeView: View {
             RoutePlanningFieldIcon(symbol: "mappin.circle.fill", tint: AppDesign.Ink.secondary)
                 .padding(.top, 8)
 
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: AppDesign.space4) {
                 routeFieldLabel("TO")
                 AddressSearchField(
                     title: "Destination",
-                    placeholder: "Where are you headed?",
+                    placeholder: "Enter a destination",
                     systemImage: "mappin",
                     iconColor: AppDesign.Ink.secondary,
                     showsIcon: false,
@@ -282,7 +282,7 @@ struct HomeView: View {
     }
 
     private func routeFieldCopy(label: String, value: String, valueColor: Color) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: AppDesign.space4) {
             routeFieldLabel(label)
             Text(value)
                 .font(AppDesign.Typography.bodyEmphasized)
@@ -416,7 +416,7 @@ struct HomeView: View {
     private var analyzeButtonTitle: String {
         switch planningStage {
         case .chooseOrigin:
-            "Choose a starting point"
+            "Choose a starting location"
         case .chooseDestination:
             "Choose a destination"
         case .readyToAnalyze:
@@ -425,7 +425,7 @@ struct HomeView: View {
     }
 
     private var routeChecksSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: AppDesign.space12) {
             Text("What Roam checks")
                 .font(AppDesign.Typography.sectionTitle)
                 .foregroundStyle(AppDesign.Ink.primary)

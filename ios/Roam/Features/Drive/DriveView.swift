@@ -123,7 +123,7 @@ struct DriveView: View {
     }
 
     private var activeSpeed: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: AppDesign.space8) {
             Label("CURRENT SPEED", systemImage: "speedometer")
                 .font(.caption.weight(.bold))
                 .foregroundStyle(AppDesign.Ink.secondary)
@@ -315,7 +315,7 @@ struct DriveView: View {
     private var startingPointControl: some View {
         Group {
             if shouldStackBreakPlanningControls {
-                VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: .leading, spacing: AppDesign.space8) {
                     Text("Starting point")
                         .font(.subheadline.weight(.semibold))
                     startingPointPicker
@@ -392,15 +392,15 @@ struct DriveView: View {
     }
 
     private var practiceRouteReadyCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .top, spacing: 12) {
+        VStack(alignment: .leading, spacing: AppDesign.space12) {
+            HStack(alignment: .top, spacing: AppDesign.space12) {
                 Image(systemName: "point.topleft.down.to.point.bottomright.curvepath.fill")
                     .font(.title3.weight(.semibold))
                     .foregroundStyle(AppDesign.accent)
                     .frame(width: 34, height: 34)
                     .background(AppDesign.accent.opacity(0.12), in: Circle())
 
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: AppDesign.space4) {
                     Text("Practice route")
                         .font(.subheadline.weight(.semibold))
                     Text("Counts as practice only when saved GPS overlaps the route.")
@@ -465,7 +465,7 @@ struct DriveView: View {
             if isExpandedDriveSurface {
                 Spacer(minLength: 8)
 
-                VStack(spacing: 24) {
+                VStack(spacing: AppDesign.space24) {
                     FlipClock(elapsed: session.elapsed, style: .active)
                         .matchedGeometryEffect(id: DriveTransitionID.clock, in: driveTransition)
 
@@ -634,7 +634,7 @@ struct DriveView: View {
     }
 
     private var howItWorksCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: AppDesign.space12) {
             SectionHeader(title: "What gets measured", subtitle: "A first-pass, on-device drive score.")
             Label("GPS speed changes flag hard braking and rapid acceleration.", systemImage: "location.fill")
             Label("Flags sustained motion and rotation while driving.", systemImage: "waveform.path.ecg")
@@ -645,13 +645,13 @@ struct DriveView: View {
     }
 
     private var driveHistory: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: AppDesign.space12) {
             SectionHeader(title: "Past drives", subtitle: "Touch and hold to delete.")
             ForEach(session.recordedDrives) { drive in
                 NavigationLink {
                     DriveDetailView(drive: drive)
                 } label: {
-                    HStack(spacing: 12) {
+                    HStack(spacing: AppDesign.space12) {
                         Image(systemName: "map.fill")
                             .foregroundStyle(AppDesign.accent)
                             .frame(width: 30, height: 30)

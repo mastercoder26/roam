@@ -134,22 +134,37 @@ struct DriveDataQuality: Codable {
     /// Final advisory-only result from the first minute of a manual drive.
     /// No raw motion samples or episode timings are retained in saved history.
     let placementQuality: PhonePlacementAssessment?
+    /// True when location authorization was withdrawn while the drive was
+    /// recording, so GPS stopped partway through.
+    ///
+    /// Distance after that point is not measured, which makes the saved
+    /// distance an undercount rather than a reading. Optional so drives written
+    /// before this field existed still decode, matching `placementQuality`.
+    let locationInterruptedMidDrive: Bool?
 
     init(
         acceptedLocationSamples: Int,
         rejectedLocationSamples: Int,
         motionSamples: Int,
         confidence: DriveScoreConfidence,
-        placementQuality: PhonePlacementAssessment? = nil
+        placementQuality: PhonePlacementAssessment? = nil,
+        locationInterruptedMidDrive: Bool? = nil
     ) {
         self.acceptedLocationSamples = acceptedLocationSamples
         self.rejectedLocationSamples = rejectedLocationSamples
         self.motionSamples = motionSamples
         self.confidence = confidence
         self.placementQuality = placementQuality
+        self.locationInterruptedMidDrive = locationInterruptedMidDrive
     }
 
     var summary: String {
+        // Say this before anything about confidence: when GPS stopped partway
+        // through, the recorded distance is an undercount, so describing the
+        // data as "sufficient" or "sustained" would misrepresent it.
+        if locationInterruptedMidDrive == true {
+            return "Location access was turned off during this drive, so the distance recorded after that point is missing."
+        }
         switch confidence {
         case .low:
             return "More time and movement data will make the next score more reliable."

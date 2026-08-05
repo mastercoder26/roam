@@ -1,10 +1,20 @@
-import Charts
 import SwiftUI
 
 /// Presentational subviews for `ProfileView`. Split out to keep the main file
 /// focused on state and layout: every view here is a pure function of the
 /// `DriverProfileInsights` (or, for the live banner, the session) it is
 /// handed, so nothing here recomputes an engine or touches the network.
+
+// MARK: - Shared copy
+
+/// Copy repeated across more than one Profile subview. Declared once so the
+/// wording cannot drift between the rows that share it.
+enum ProfileCopy {
+    /// Stands in for any measurement that has no qualifying evidence behind it
+    /// yet. Deliberately states the absence rather than showing a zero, which
+    /// would read as a measured result.
+    static let notEnoughData = "Not enough data yet"
+}
 
 // MARK: - Live drive banner
 
@@ -175,11 +185,11 @@ struct ExperienceBreakdownSection: View {
                 StatRow(title: "Measured miles", value: String(format: "%.1f mi", insights.measuredMiles), symbol: "road.lanes")
                 StatRow(title: "Qualifying drives", value: "\(insights.qualifyingDriveCount)", symbol: "checkmark.seal")
                 StatRow(title: "Days driven", value: "\(insights.drivingDayCount)", symbol: "calendar")
-                StatRow(title: "After dark", value: String(format: "%.1f mi", insights.afterDarkMiles), symbol: "moon.stars")
-                StatRow(title: "45+ mph", value: String(format: "%.1f mi", insights.milesAt45Plus), symbol: "speedometer")
-                StatRow(title: "Longest continuous drive", value: longestDriveText, symbol: "point.3.connected.trianglepath.dotted")
+                StatRow(title: "After-dark miles", value: String(format: "%.1f mi", insights.afterDarkMiles), symbol: "moon.stars")
+                StatRow(title: "45+ mph miles", value: String(format: "%.1f mi", insights.milesAt45Plus), symbol: "speedometer")
+                StatRow(title: "Longest continuous trace", value: longestDriveText, symbol: "point.3.connected.trianglepath.dotted")
             } else {
-                Text("No qualifying drives yet. Record a drive from the Drive tab and your measured experience appears here.")
+                Text("No qualifying drives yet. Record one from the Drive tab.")
                     .font(.footnote)
                     .foregroundStyle(AppDesign.Ink.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -206,7 +216,7 @@ struct BehaviorSignalsSection: View {
                 subtitle: "Signals from analyzed drives."
             )
 
-            StatRow(title: "Driving score", value: formattedWholeScore(insights.performanceScore), symbol: "gauge.with.dots.needle.50percent")
+            StatRow(title: "Overall driving score", value: formattedWholeScore(insights.performanceScore), symbol: "gauge.with.dots.needle.50percent")
             StatRow(title: "Recent average score", value: formattedAverageScore(insights.recentAverageScore), symbol: "chart.line.uptrend.xyaxis")
             StatRow(title: "Hard brakes", value: formattedRate(insights.hardBrakesPerTenMiles), symbol: "exclamationmark.brakesignal")
             StatRow(title: "Sharp corners", value: formattedRate(insights.sharpCornersPerTenMiles), symbol: "arrow.triangle.turn.up.right.circle")
@@ -222,17 +232,17 @@ struct BehaviorSignalsSection: View {
     }
 
     private func formattedWholeScore(_ score: Int?) -> String {
-        guard let score else { return "Not enough data yet" }
+        guard let score else { return ProfileCopy.notEnoughData }
         return "\(score)/100"
     }
 
     private func formattedAverageScore(_ value: Double?) -> String {
-        guard let value, value.isFinite else { return "Not enough data yet" }
+        guard let value, value.isFinite else { return ProfileCopy.notEnoughData }
         return String(format: "%.0f/100", value)
     }
 
     private func formattedRate(_ value: Double?) -> String {
-        guard let value, value.isFinite else { return "Not enough data yet" }
+        guard let value, value.isFinite else { return ProfileCopy.notEnoughData }
         return String(format: "%.1f per 10 mi", value)
     }
 }
@@ -255,7 +265,7 @@ struct WeeklyTrendSection: View {
                 weeklyChart
                 weekComparison
             } else {
-                Text("Your weekly trend appears here once you have recorded drives.")
+                Text("Appears after your first recorded drive.")
                     .font(.footnote)
                     .foregroundStyle(AppDesign.Ink.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -264,37 +274,15 @@ struct WeeklyTrendSection: View {
         .premiumCard()
     }
 
+    /// Shorter than the shared default: this card also carries the week-over-week
+    /// comparison row, so the chart yields height to keep the whole card in view.
+    private static let chartHeight: CGFloat = 160
+
     private var weeklyChart: some View {
-        Chart(insights.weeklyMiles) { week in
-            BarMark(
-                x: .value("Week", week.startDate, unit: .weekOfYear),
-                y: .value("Measured miles", week.measuredMiles)
-            )
-            .foregroundStyle(AppDesign.accent.gradient)
-            .cornerRadius(5)
-        }
-        .chartYAxis {
-            AxisMarks(position: .leading) { value in
-                AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5))
-                    .foregroundStyle(AppDesign.cardStroke)
-                AxisValueLabel {
-                    if let miles = value.as(Double.self) {
-                        Text(miles, format: .number.precision(.fractionLength(0)))
-                            .font(.caption2)
-                    }
-                }
-            }
-        }
-        .chartXAxis {
-            AxisMarks(values: .stride(by: .weekOfYear, count: 2)) { _ in
-                AxisValueLabel(format: .dateTime.month(.abbreviated).day())
-                    .font(.caption2)
-            }
-        }
-        .frame(height: 160)
-        .animation(reduceMotion ? .easeOut(duration: 0.16) : AppAnimation.content, value: insights.weeklyMiles)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(chartAccessibilitySummary)
+        WeeklyMilesChart(weeks: insights.weeklyMiles, height: Self.chartHeight)
+            .animation(reduceMotion ? .easeOut(duration: 0.16) : AppAnimation.content, value: insights.weeklyMiles)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(chartAccessibilitySummary)
     }
 
     private var weekComparison: some View {

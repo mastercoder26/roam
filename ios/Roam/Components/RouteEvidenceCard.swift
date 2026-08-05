@@ -41,7 +41,7 @@ struct RouteEvidenceCard: View {
                     .tint(evidenceColor)
                     .accessibilityHidden(true)
 
-                Text("\(evidence.verifiedInputCount) of \(evidence.totalInputCount) route input types contributed verified evidence.")
+                Text("\(evidence.verifiedInputCount) of \(evidence.totalInputCount) route inputs verified.")
                     .font(.caption)
                     .foregroundStyle(AppDesign.Ink.secondary)
 
@@ -58,7 +58,7 @@ struct RouteEvidenceCard: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
 
-            Text("Coverage describes available route inputs—not a prediction of safety or whether someone should drive.")
+            Text("Coverage describes available route inputs, not a prediction of safety or whether someone should drive.")
                 .font(.caption2)
                 .foregroundStyle(AppDesign.Ink.tertiary)
                 .fixedSize(horizontal: false, vertical: true)

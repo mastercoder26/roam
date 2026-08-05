@@ -212,7 +212,7 @@ enum PolylineDecoder {
         )
     )
     .frame(height: 220)
-    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+    .clipShape(RoundedRectangle(cornerRadius: AppDesign.cornerRadius, style: .continuous))
 }
 
 /// A locally recorded route with replay annotations. A moment is shown only

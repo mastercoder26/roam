@@ -67,6 +67,13 @@ final class DriveSessionManager: NSObject, ObservableObject {
     private var queuedPracticeRoutePolyline: String?
     private var activePracticeRoutePolyline: String?
     private let historyKey = "recorded-drives-v1"
+    /// Holds a history blob this build could not decode, so it survives for a
+    /// later build to recover instead of being overwritten with an empty list.
+    private let quarantinedHistoryKey = "recorded-drives-v1-quarantined"
+    /// Set when `loadRecordedDrives` could not read the stored history. While
+    /// true, `saveRecordedDrives` refuses to write — an in-memory list that is
+    /// empty only because decoding failed must never replace the real one.
+    private var isHistoryUnreadable = false
     /// A throttled, incremental snapshot of the drive in progress. Without
     /// this, a background termination (low memory, force quit, or a crash)
     /// mid-drive would lose every sample the driver has already produced —
@@ -74,7 +81,13 @@ final class DriveSessionManager: NSObject, ObservableObject {
     /// on a normal finish; only an interrupted session leaves it behind for
     /// `recoverInterruptedDriveIfNeeded()` to find on the next launch.
     private let inProgressDriveKey = "in-progress-drive-v1"
+    /// Holds an interrupted-drive snapshot this build could not decode, so it
+    /// survives for a later build instead of being erased on first read.
+    private let quarantinedInProgressDriveKey = "in-progress-drive-v1-quarantined"
     private var lastProgressPersistAt: Date?
+    /// Set when location authorization is withdrawn while recording, so the
+    /// saved drive can state that its distance stops short of the real trip.
+    private var didLoseLocationMidDrive = false
     private var routeAnalysisTasks: [UUID: Task<Void, Never>] = [:]
 
     var currentDistanceMiles: Double { distanceMeters / 1_609.344 }
@@ -97,6 +110,9 @@ final class DriveSessionManager: NSObject, ObservableObject {
         loadRecordedDrives()
         recoverInterruptedDriveIfNeeded()
         resumeRouteAnalysesIfNeeded()
+        // Nothing is recording at launch, so any Live Activity still on screen
+        // is a leftover from a drive that was terminated before it could end.
+        DriveLiveActivityManager.shared.endOrphanedActivities()
     }
 
     func startDrive() {
@@ -163,13 +179,20 @@ final class DriveSessionManager: NSObject, ObservableObject {
         locationManager.stopUpdatingLocation()
         locationManager.allowsBackgroundLocationUpdates = false
         currentSpeedMetersPerSecond = 0
-        // A normal end-of-drive path always produces a definitive outcome
-        // (saved or discarded) below, so the interrupted-drive snapshot must
-        // not stick around to be "recovered" as a duplicate next launch.
-        UserDefaults.standard.removeObject(forKey: inProgressDriveKey)
-        lastProgressPersistAt = nil
 
         defer {
+            // A normal end-of-drive path always produces a definitive outcome
+            // (saved or discarded) below, so the interrupted-drive snapshot must
+            // not stick around to be "recovered" as a duplicate next launch.
+            //
+            // This clears in `defer` rather than up front because the save path
+            // below runs heavy synchronous scoring and summarization first. When
+            // the snapshot was dropped before that work, a termination in the
+            // gap lost the drive entirely — the snapshot was already gone and
+            // the record had not been written yet. Clearing last means the
+            // recovery path stays armed until the drive is durably saved.
+            UserDefaults.standard.removeObject(forKey: inProgressDriveKey)
+            lastProgressPersistAt = nil
             activePracticeRoute = nil
             activePracticeRoutePolyline = nil
             recordingTimeZoneIdentifier = nil
@@ -206,7 +229,8 @@ final class DriveSessionManager: NSObject, ObservableObject {
             rejectedLocationSamples: result.quality.rejectedLocationSamples,
             motionSamples: result.quality.motionSamples,
             confidence: result.quality.confidence,
-            placementQuality: finalPlacementQuality
+            placementQuality: finalPlacementQuality,
+            locationInterruptedMidDrive: didLoseLocationMidDrive ? true : nil
         )
         let score = DrivingScore(
             score: result.score,
@@ -441,6 +465,7 @@ final class DriveSessionManager: NSObject, ObservableObject {
         rejectedLocationSamples = 0
         currentHorizontalAccelerationG = 0
         previousLocation = nil
+        didLoseLocationMidDrive = false
         distanceMeters = 0
         topSpeed = 0
         events = []
@@ -462,6 +487,14 @@ final class DriveSessionManager: NSObject, ObservableObject {
                 guard let self, let startDate = self.startDate else { return }
                 self.elapsed = Date().timeIntervalSince(startDate)
                 self.publishLiveDriveSnapshot()
+                // Persist from the clock, not only from accepted GPS samples and
+                // coaching events. A motion-only drive (location denied, phone
+                // cradled so no handling episode fires) previously wrote nothing
+                // at all, so a mid-drive termination lost it completely — or,
+                // worse, left a single early snapshot that recovered a 50-minute
+                // trip as a 2-minute, 0-mile record. `persistInProgressSnapshot`
+                // throttles itself to once per 10s, so this stays cheap.
+                self.persistInProgressSnapshot()
             }
         }
     }
@@ -641,7 +674,20 @@ final class DriveSessionManager: NSObject, ObservableObject {
 
     private func loadRecordedDrives() {
         guard let data = UserDefaults.standard.data(forKey: historyKey) else { return }
-        recordedDrives = (try? JSONDecoder().decode([RecordedDrive].self, from: data)) ?? []
+        do {
+            recordedDrives = try JSONDecoder().decode([RecordedDrive].self, from: data)
+        } catch {
+            // Decoding `[RecordedDrive]` is all-or-nothing, so one unreadable
+            // element — or one added non-optional field in a new build — used to
+            // present as "no history". The next save then wrote that empty list
+            // straight over an intact blob, permanently destroying every drive.
+            // Keep the original bytes, refuse to write over them, and say so.
+            UserDefaults.standard.set(data, forKey: quarantinedHistoryKey)
+            isHistoryUnreadable = true
+            recordedDrives = []
+            statusMessage = "Saved drives could not be opened in this version. They are kept on the device and are not being overwritten."
+            return
+        }
         backfillHistoricalRouteAnalysis()
     }
 
@@ -668,6 +714,10 @@ final class DriveSessionManager: NSObject, ObservableObject {
     }
 
     private func saveRecordedDrives() {
+        // Never overwrite a history this build could not read. `recordedDrives`
+        // is empty in that case only because decoding failed, and writing it
+        // back would destroy every stored drive irreversibly.
+        guard !isHistoryUnreadable else { return }
         guard let data = try? JSONEncoder().encode(recordedDrives) else { return }
         UserDefaults.standard.set(data, forKey: historyKey)
     }
@@ -711,8 +761,21 @@ final class DriveSessionManager: NSObject, ObservableObject {
     /// is not available because the drive never reached a normal `finish`.
     private func recoverInterruptedDriveIfNeeded() {
         guard let data = UserDefaults.standard.data(forKey: inProgressDriveKey) else { return }
+        // Decode before clearing. Removing the key first meant any decode
+        // failure — a new build adding a required field, a partial write —
+        // destroyed the only copy of the interrupted drive with no retry.
+        guard let snapshot = try? JSONDecoder().decode(InProgressDriveSnapshot.self, from: data) else {
+            // Keep the bytes for a future build, but move them off the live key
+            // so an undecodable payload is not re-read on every launch.
+            UserDefaults.standard.set(data, forKey: quarantinedInProgressDriveKey)
+            UserDefaults.standard.removeObject(forKey: inProgressDriveKey)
+            return
+        }
+        guard !isHistoryUnreadable else {
+            statusMessage = "Recovered drive is waiting, but saved drives could not be opened in this version. Update Roam before recording another drive."
+            return
+        }
         UserDefaults.standard.removeObject(forKey: inProgressDriveKey)
-        guard let snapshot = try? JSONDecoder().decode(InProgressDriveSnapshot.self, from: data) else { return }
 
         let duration = snapshot.lastUpdatedAt.timeIntervalSince(snapshot.startedAt)
         guard duration > 0, DriveHistoryPolicy.shouldSave(duration: duration) else { return }
@@ -785,6 +848,15 @@ extension DriveSessionManager: CLLocationManagerDelegate {
                 manager.startUpdatingLocation()
                 self.statusMessage = "Recording this drive"
             case .denied, .restricted:
+                // Authorization was withdrawn mid-drive. Previously this only
+                // set a transient status string: location updates were left
+                // running, nothing was recorded on the drive, and `endDrive()`
+                // overwrote the message with "Drive saved on this device". A
+                // 30-mile trip whose GPS was cut at mile 6 saved as a 6-mile
+                // drive with a full score and no indication anything was lost.
+                manager.stopUpdatingLocation()
+                manager.allowsBackgroundLocationUpdates = false
+                self.didLoseLocationMidDrive = true
                 self.statusMessage = "Location access is off. Motion will still be recorded."
             default:
                 break

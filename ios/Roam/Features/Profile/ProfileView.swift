@@ -196,7 +196,7 @@ struct ProfileView: View {
         VStack(alignment: .leading, spacing: AppDesign.space12) {
             SectionHeader(
                 title: "Licensing stage",
-                subtitle: "Your own progress only."
+                subtitle: "Self-declared, and never used in a score."
             )
 
             ForEach(DriverProfile.Stage.allCases) { stage in

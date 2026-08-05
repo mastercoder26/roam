@@ -21,7 +21,7 @@ struct AddressSearchField: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: 12) {
+            HStack(spacing: AppDesign.space12) {
                 if showsIcon {
                     Image(systemName: systemImage)
                         .font(.caption)
