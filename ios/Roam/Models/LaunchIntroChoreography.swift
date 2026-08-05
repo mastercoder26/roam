@@ -151,15 +151,66 @@ enum LaunchIntroChoreography {
 
     // MARK: - Video wordmark overlay
 
-    /// How long after the globe clip starts before the wordmark fades in on
-    /// top of it. Chosen to land well before the clip's own fade-to-canvas,
-    /// so the mark appears while the globe is still fully lit rather than
-    /// after a separate transition.
-    static let videoWordmarkDelay: TimeInterval = 1.3
-    static let videoWordmarkFadeDuration: TimeInterval = 0.5
-    /// A short beat with the wordmark alone on the now-solid canvas before
-    /// handing off, so it reads rather than flashing past.
+    /// The clip's own timing, mirrored from `tools/intro-render/capture.mjs`.
+    /// The wordmark beats are placed against it: the mark arrives while the
+    /// globe is fully lit, and finishes docking as the clip fades to canvas.
+    static let videoDuration: TimeInterval = 2.4
+    static let videoGlobeSettledAt: TimeInterval = 0.34
+    static let videoFadeStartsAt: TimeInterval = 2.02
+
+    /// How long after the globe clip starts before the wordmark fades in
+    /// above it, large and centered.
+    static let videoWordmarkDelay: TimeInterval = 0.6
+    static let videoWordmarkFadeDuration: TimeInterval = 0.45
+    /// A beat at hero size, so the big mark reads before it moves.
+    static let wordmarkHeroHoldDuration: TimeInterval = 0.45
+    /// The glide from above-the-globe to the top-left corner it occupies
+    /// everywhere else in the app.
+    static let wordmarkDockDuration: TimeInterval = 0.7
+    /// A short beat with the docked wordmark alone on the now-solid canvas
+    /// before handing off, so it reads rather than flashing past.
     static let videoWordmarkHoldDuration: TimeInterval = 0.5
+
+    /// When the dock glide begins, measured from the start of the clip.
+    static var wordmarkDockDelay: TimeInterval {
+        videoWordmarkDelay + videoWordmarkFadeDuration + wordmarkHeroHoldDuration
+    }
+
+    // MARK: - Wordmark placement
+
+    /// The mark is *drawn* at hero size and scaled down to dock, never up.
+    /// Rasterizing at the larger of the two sizes is what keeps the docked
+    /// mark crisp, and scaling a fixed raster is what keeps the glide smooth —
+    /// re-laying out text at a new size every frame is not.
+    static let wordmarkHeroFontSize: Double = 72
+    /// Matches `BrandWordmark(compact:)`, so the mark lands at exactly the
+    /// size the app's own header wears.
+    static let wordmarkDockedFontSize: Double = 23
+    static var wordmarkDockedScale: Double { wordmarkDockedFontSize / wordmarkHeroFontSize }
+
+    /// Where the docked mark sits, inset from the safe area's top left — the
+    /// same inset the app's header uses.
+    static let wordmarkDockedInset = IntroPoint(x: 24, y: 20)
+    /// Vertical placement of the hero mark, as a fraction of screen height.
+    /// High enough to sit clear above the centered globe.
+    static let wordmarkHeroTopFraction: Double = 0.12
+
+    /// Top-left origin of the wordmark for the current phase. `wordmarkWidth`
+    /// is the mark's width as drawn — i.e. at hero size — and scaling is
+    /// anchored at the same top-left corner this origin places.
+    static func wordmarkOrigin(
+        docked: Bool,
+        screenWidth: Double,
+        screenHeight: Double,
+        wordmarkWidth: Double
+    ) -> IntroPoint {
+        guard !docked else { return wordmarkDockedInset }
+
+        return IntroPoint(
+            x: max(wordmarkDockedInset.x, (screenWidth - wordmarkWidth) / 2),
+            y: screenHeight * wordmarkHeroTopFraction
+        )
+    }
 }
 
 private extension Double {

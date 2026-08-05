@@ -19,6 +19,8 @@ struct LaunchIntroView: View {
     @State private var hasHandedOff = false
     @State private var isVideoPhaseActive = false
     @State private var isVideoWordmarkVisible = false
+    @State private var isWordmarkDocked = false
+    @State private var wordmarkWidth: CGFloat = 0
 
     private var choreography: LaunchIntroChoreography.Type { LaunchIntroChoreography.self }
 
@@ -69,6 +71,10 @@ struct LaunchIntroView: View {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Roam")
         .accessibilityAddTraits(.isImage)
+        .onPreferenceChange(WordmarkWidthKey.self) { width in
+            guard wordmarkWidth == 0, width > 0 else { return }
+            wordmarkWidth = width
+        }
         .onAppear(perform: start)
         .onChange(of: isLockupVisible) { _, visible in
             guard visible, !reduceMotion else { return }
@@ -82,23 +88,55 @@ struct LaunchIntroView: View {
 
     // MARK: - Layers
 
-    /// The wordmark fades in over the still-playing clip — top left, the
-    /// same corner it occupies everywhere else in the app — rather than
-    /// waiting for a separate transition once the globe is gone. The video's
-    /// own fade to canvas color then dims the globe out from underneath it.
+    /// The wordmark arrives large and centered above the still-turning globe,
+    /// holds for a beat, then glides down to the top-left corner it occupies
+    /// everywhere else in the app — so the intro hands the brand over to the
+    /// header instead of cutting to it. The clip's own fade to canvas color
+    /// dims the globe out from underneath as the mark lands.
     private var videoWordmarkOverlay: some View {
-        VStack {
-            HStack {
-                BrandWordmark(compact: true)
-                    .opacity(isVideoWordmarkVisible ? 1 : 0)
-                    .offset(y: isVideoWordmarkVisible ? 0 : -6)
-                Spacer(minLength: 0)
-            }
-            Spacer(minLength: 0)
+        GeometryReader { geometry in
+            let origin = choreography.wordmarkOrigin(
+                docked: isWordmarkDocked,
+                screenWidth: Double(geometry.size.width),
+                screenHeight: Double(geometry.size.height),
+                wordmarkWidth: Double(wordmarkWidth)
+            )
+
+            introWordmark
+                .scaleEffect(
+                    isWordmarkDocked ? choreography.wordmarkDockedScale : 1,
+                    anchor: .topLeading
+                )
+                .offset(x: CGFloat(origin.x), y: CGFloat(origin.y))
+                .opacity(isVideoWordmarkVisible ? 1 : 0)
         }
-        .padding(.top, 20)
-        .padding(.leading, 24)
         .allowsHitTesting(false)
+    }
+
+    /// Drawn once at hero size and rasterized, so the dock is a single GPU
+    /// transform on a finished image. Scaling `Text` itself re-lays out and
+    /// re-renders the glyphs on every frame, which is what makes the move
+    /// stutter; it also means the mark that lands in the corner was rendered
+    /// large and shrunk, never blown up.
+    private var introWordmark: some View {
+        Text("Roam")
+            .font(.custom("Baskerville-SemiBoldItalic", size: choreography.wordmarkHeroFontSize))
+            // Tracking is pre-divided so that, once scaled down, it matches
+            // the compact wordmark's -0.25 exactly.
+            .tracking(CGFloat(-0.25 / choreography.wordmarkDockedScale))
+            .foregroundStyle(theme.palette.inkPrimary.color.opacity(0.92))
+            .fixedSize()
+            .drawingGroup()
+            .background(wordmarkWidthReader)
+    }
+
+    /// The hero mark is centered by arithmetic rather than by layout, because
+    /// it has to end up left-aligned; that needs the mark's own width. Read
+    /// once — a width change arriving mid-glide would re-target the animation.
+    private var wordmarkWidthReader: some View {
+        GeometryReader { proxy in
+            Color.clear.preference(key: WordmarkWidthKey.self, value: proxy.size.width)
+        }
     }
 
     /// Two soft pools of theme light behind the road. They give the canvas
@@ -167,6 +205,16 @@ struct LaunchIntroView: View {
                 isVideoWordmarkVisible = true
             }
         }
+        DispatchQueue.main.asyncAfter(deadline: .now() + choreography.wordmarkDockDelay) {
+            // One animation drives both scale and offset, so the mark reads
+            // as a single object moving rather than a size change racing a
+            // position change.
+            withAnimation(
+                .timingCurve(0.32, 0, 0.16, 1, duration: choreography.wordmarkDockDuration)
+            ) {
+                isWordmarkDocked = true
+            }
+        }
     }
 
     /// The wordmark is already lit and the video has already faded itself to
@@ -212,6 +260,15 @@ struct LaunchIntroView: View {
         guard !hasHandedOff else { return }
         hasHandedOff = true
         onFinish()
+    }
+}
+
+/// Measured width of the unscaled wordmark, used to center its hero pose.
+private struct WordmarkWidthKey: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
     }
 }
 
