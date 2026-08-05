@@ -771,6 +771,10 @@ final class DriveSessionManager: NSObject, ObservableObject {
             UserDefaults.standard.removeObject(forKey: inProgressDriveKey)
             return
         }
+        guard !isHistoryUnreadable else {
+            statusMessage = "Recovered drive is waiting, but saved drives could not be opened in this version. Update Roam before recording another drive."
+            return
+        }
         UserDefaults.standard.removeObject(forKey: inProgressDriveKey)
 
         let duration = snapshot.lastUpdatedAt.timeIntervalSince(snapshot.startedAt)
