@@ -62,6 +62,24 @@ final class DriveLiveActivityManager {
         }
     }
 
+    /// Ends any Live Activity the system is still showing from a previous app
+    /// launch.
+    ///
+    /// `end(...)` can only act on the in-memory `activity` handle, which does
+    /// not survive termination, and the sweep inside `start(...)` only runs when
+    /// a *new* drive begins. So a drive interrupted by a jetsam left a Lock
+    /// Screen card reading "Recording this drive" — with frozen speed, distance,
+    /// and event counts — until the system's own staleness limit expired it,
+    /// telling the user a drive was recording when none was. Called at launch so
+    /// the surface matches reality even if the user never starts another drive.
+    func endOrphanedActivities() {
+        Task {
+            for staleActivity in Activity<DriveActivityAttributes>.activities {
+                await staleActivity.end(nil, dismissalPolicy: .immediate)
+            }
+        }
+    }
+
     func update(
         speedMetersPerSecond: Double,
         distanceMeters: Double,
