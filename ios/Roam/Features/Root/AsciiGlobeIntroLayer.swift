@@ -34,7 +34,7 @@ private struct AsciiGlobeScene: View {
 
     var body: some View {
         GeometryReader { geometry in
-            let center = CGPoint(x: geometry.size.width / 2, y: geometry.size.height * 0.42)
+            let center = CGPoint(x: geometry.size.width / 2, y: geometry.size.height * 0.39)
 
             TimelineView(.periodic(from: startDate, by: AsciiGlobeMetrics.frameInterval)) { timeline in
                 let elapsed = timeline.date.timeIntervalSince(startDate)
@@ -126,21 +126,35 @@ private struct AsciiGlobeScene: View {
             with: .color(palette.accent.color)
         )
 
-        if progress >= 0.999 {
-            drawArrowhead(in: &context, tip: route.end, heading: route.headingAtEnd, color: palette.safety.color)
-        }
+        drawCar(
+            in: &context,
+            at: route.point(at: progress),
+            heading: route.heading(at: progress),
+            color: palette.safety.color
+        )
     }
 
-    private func drawArrowhead(in context: inout GraphicsContext, tip: CGPoint, heading: Double, color: Color) {
-        var arrow = Path()
-        arrow.move(to: CGPoint(x: -7, y: -4))
-        arrow.addLine(to: CGPoint(x: 0, y: 0))
-        arrow.addLine(to: CGPoint(x: -7, y: 4))
+    /// The travelling head is a car, not an arrowhead — this is a road-trip
+    /// app, and the globe intro's route should read the same way `RoadTrace`'s
+    /// travelling light does in the Reduce Motion fallback. Drawn from plain
+    /// shapes (as `RoadTrace`'s own head is) rather than an SF Symbol, since
+    /// `GraphicsContext.draw` needs a concrete `Image` and a tinted symbol
+    /// loses that type the moment `.foregroundColor` is chained onto it.
+    private func drawCar(in context: inout GraphicsContext, at point: CGPoint, heading: Double, color: Color) {
+        let body = Path(roundedRect: CGRect(x: -11, y: -6, width: 22, height: 12), cornerRadius: 4)
+        var wheels = Path()
+        wheels.addEllipse(in: CGRect(x: -7, y: 4, width: 4.6, height: 4.6))
+        wheels.addEllipse(in: CGRect(x: 2.4, y: 4, width: 4.6, height: 4.6))
 
         context.drawLayer { layer in
-            layer.translateBy(x: tip.x, y: tip.y)
+            layer.translateBy(x: point.x, y: point.y)
+            layer.fill(
+                Path(ellipseIn: CGRect(x: -14, y: -14, width: 28, height: 28)),
+                with: .color(color.opacity(0.4))
+            )
             layer.rotate(by: .radians(heading))
-            layer.stroke(arrow, with: .color(color), style: StrokeStyle(lineWidth: 2.5, lineCap: .round, lineJoin: .round))
+            layer.fill(body, with: .color(palette.inkPrimary.color))
+            layer.fill(wheels, with: .color(palette.inkPrimary.color.opacity(0.85)))
         }
     }
 }
@@ -224,19 +238,47 @@ private struct AsciiGlobeRoute {
         }
     }
 
-    /// Tangent direction at the curve's end, for orienting the arrowhead.
-    var headingAtEnd: Double {
-        let dx = 3 * (end.x - control2.x)
-        let dy = 3 * (end.y - control2.y)
-        return atan2(dy, dx)
+    /// Position along the curve at `t` in 0...1, for placing the travelling car.
+    func point(at t: Double) -> CGPoint {
+        let clamped = t.clampedToUnit
+        let inverse = 1 - clamped
+
+        func channel(_ a: CGFloat, _ b: CGFloat, _ c: CGFloat, _ d: CGFloat) -> CGFloat {
+            CGFloat(inverse * inverse * inverse) * a
+                + CGFloat(3 * inverse * inverse * clamped) * b
+                + CGFloat(3 * inverse * clamped * clamped) * c
+                + CGFloat(clamped * clamped * clamped) * d
+        }
+
+        return CGPoint(
+            x: channel(start.x, control1.x, control2.x, end.x),
+            y: channel(start.y, control1.y, control2.y, end.y)
+        )
+    }
+
+    /// Tangent direction at `t`, for orienting the car along its travel.
+    func heading(at t: Double) -> Double {
+        let clamped = t.clampedToUnit
+        let inverse = 1 - clamped
+
+        func derivative(_ a: CGFloat, _ b: CGFloat, _ c: CGFloat, _ d: CGFloat) -> CGFloat {
+            3 * CGFloat(inverse * inverse) * (b - a)
+                + 6 * CGFloat(inverse * clamped) * (c - b)
+                + 3 * CGFloat(clamped * clamped) * (d - c)
+        }
+
+        let dx = derivative(start.x, control1.x, control2.x, end.x)
+        let dy = derivative(start.y, control1.y, control2.y, end.y)
+        guard dx != 0 || dy != 0 else { return 0 }
+        return atan2(Double(dy), Double(dx))
     }
 }
 
 // MARK: - Timing
 
 private enum AsciiGlobeMetrics {
-    static let radius: CGFloat = 108
-    static let spacing: CGFloat = 7
+    static let radius: CGFloat = 132
+    static let spacing: CGFloat = 6
     static let rotationSpeed: Double = 0.55
     static let glyphFont = Font.system(size: 9, weight: .semibold, design: .monospaced)
     /// A slower cadence than the display's own refresh reads as deliberately
