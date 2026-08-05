@@ -17,28 +17,26 @@ struct LaunchIntroView: View {
     @State private var sweepProgress: Double = 0
     @State private var isLockupVisible = false
     @State private var hasHandedOff = false
-    @State private var isVideoPhaseActive = false
-    @State private var isVideoWordmarkVisible = false
+    @State private var isGlobeIntroActive = false
+    @State private var isGlobeWordmarkVisible = false
     @State private var isWordmarkDocked = false
     @State private var wordmarkWidth: CGFloat = 0
 
     private var choreography: LaunchIntroChoreography.Type { LaunchIntroChoreography.self }
 
-    /// Reduce Motion, and any theme missing a rendered clip, fall back to the
-    /// original road-trace/wordmark sequence with no video involved.
-    private var usesVideoIntro: Bool {
-        !reduceMotion && LaunchIntroVideoLayer.videoURL(for: theme.currentID) != nil
-    }
+    /// Reduce Motion falls back to the original road-trace/wordmark sequence
+    /// with no globe animation involved.
+    private var usesGlobeIntro: Bool { !reduceMotion }
 
     var body: some View {
         ZStack {
             AppDesign.canvas.ignoresSafeArea()
 
-            if usesVideoIntro {
-                if isVideoPhaseActive {
-                    LaunchIntroVideoLayer(themeID: theme.currentID, onFinished: handOffFromVideo)
+            if usesGlobeIntro {
+                if isGlobeIntroActive {
+                    AsciiGlobeIntroLayer(themeID: theme.currentID, onFinished: handOffFromGlobeIntro)
                 }
-                videoWordmarkOverlay
+                globeWordmarkOverlay
             } else {
                 atmosphere
 
@@ -80,7 +78,7 @@ struct LaunchIntroView: View {
             guard visible, !reduceMotion else { return }
             UIImpactFeedbackGenerator(style: .soft).impactOccurred(intensity: 0.6)
         }
-        .onChange(of: isVideoWordmarkVisible) { _, visible in
+        .onChange(of: isGlobeWordmarkVisible) { _, visible in
             guard visible else { return }
             UIImpactFeedbackGenerator(style: .soft).impactOccurred(intensity: 0.6)
         }
@@ -91,9 +89,9 @@ struct LaunchIntroView: View {
     /// The wordmark arrives large and centered above the still-turning globe,
     /// holds for a beat, then glides down to the top-left corner it occupies
     /// everywhere else in the app — so the intro hands the brand over to the
-    /// header instead of cutting to it. The clip's own fade to canvas color
-    /// dims the globe out from underneath as the mark lands.
-    private var videoWordmarkOverlay: some View {
+    /// header instead of cutting to it. The globe's own fade to canvas color
+    /// dims it out from underneath as the mark lands.
+    private var globeWordmarkOverlay: some View {
         GeometryReader { geometry in
             let origin = choreography.wordmarkOrigin(
                 docked: isWordmarkDocked,
@@ -108,7 +106,7 @@ struct LaunchIntroView: View {
                     anchor: .topLeading
                 )
                 .offset(x: CGFloat(origin.x), y: CGFloat(origin.y))
-                .opacity(isVideoWordmarkVisible ? 1 : 0)
+                .opacity(isGlobeWordmarkVisible ? 1 : 0)
         }
         .allowsHitTesting(false)
     }
@@ -191,18 +189,18 @@ struct LaunchIntroView: View {
 
     // MARK: - Sequence
 
-    /// Reduce Motion, and any theme missing a rendered clip, skip straight
-    /// to the native trace/wordmark beat. Everyone else gets the globe, with
-    /// the wordmark fading in on top of it partway through.
+    /// Reduce Motion skips straight to the native trace/wordmark beat.
+    /// Everyone else gets the ASCII globe, with the wordmark fading in on
+    /// top of it partway through.
     private func start() {
-        guard usesVideoIntro else {
+        guard usesGlobeIntro else {
             play()
             return
         }
-        isVideoPhaseActive = true
+        isGlobeIntroActive = true
         DispatchQueue.main.asyncAfter(deadline: .now() + choreography.videoWordmarkDelay) {
             withAnimation(.easeOut(duration: choreography.videoWordmarkFadeDuration)) {
-                isVideoWordmarkVisible = true
+                isGlobeWordmarkVisible = true
             }
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + choreography.wordmarkDockDelay) {
@@ -217,11 +215,11 @@ struct LaunchIntroView: View {
         }
     }
 
-    /// The wordmark is already lit and the video has already faded itself to
+    /// The wordmark is already lit and the globe has already faded itself to
     /// canvas color, so there's nothing left to transition to — just hold on
     /// the mark for a beat, then hand off.
-    private func handOffFromVideo() {
-        isVideoPhaseActive = false
+    private func handOffFromGlobeIntro() {
+        isGlobeIntroActive = false
         scheduleHandOff(after: choreography.videoWordmarkHoldDuration)
     }
 
