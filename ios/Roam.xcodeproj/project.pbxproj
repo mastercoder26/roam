@@ -563,9 +563,6 @@
 							com.apple.ApplicationGroups.iOS = {
 								enabled = 1;
 							};
-							com.apple.AssociatedDomains = {
-								enabled = 1;
-							};
 						};
 					};
 					A60000000000000000000002 = {

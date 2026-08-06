@@ -188,11 +188,17 @@ else in this document is done and verified above.
    instance) — fine for now, but swap in real provider credentials before
    production.
 
-6. **Apple Developer portal:** enable Associated Domains and Sign in with Apple
-   on App ID `com.akhil.roam`, then refresh provisioning profiles. Xcode
-   entitlements alone are not enough — the App ID must match or signing fails.
-   The associated domain must be exactly
-   `webcredentials:capable-swan-35.clerk.accounts.dev`.
+6. **Apple Developer portal:** nothing to do here anymore. Both Sign in with
+   Apple and Associated Domains were removed from the iOS entitlements and
+   Xcode capabilities after the user (a) dropped Apple sign-in from the Clerk
+   dashboard and (b) hit an Xcode build error: Apple does not allow the
+   Associated Domains capability on personal (free) development teams at all,
+   regardless of entitlement config. Checked the clerk-ios SDK source directly
+   — nothing in `Sources/` references associated domains; it only powers
+   cross-app shared-session sync and Safari passkey/password autofill, neither
+   of which Roam uses (no companion app). Sign-in works identically without
+   it. Only revisit if a paid Apple Developer Program membership is added and
+   cross-app session sharing becomes a real requirement.
 
 7. **Rotate `CLERK_SECRET_KEY`.** The current dev key was pasted into a chat
    transcript on 2026-08-06. It is `sk_test_`, so only the dev instance is

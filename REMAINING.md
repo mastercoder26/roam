@@ -21,11 +21,16 @@ full narrative and reasoning if you need the "why."
 - [ ] **Register the native app in Clerk** (Configure → Native applications):
       Bundle ID `com.akhil.roam`, App ID Prefix `6RT6KBS4G9`. No API exposes
       whether this is already done — check the dashboard directly.
-- [ ] **Apple Developer portal:** confirm Associated Domains is enabled on
-      App ID `com.akhil.roam` with entry
-      `webcredentials:capable-swan-35.clerk.accounts.dev` (still needed —
-      only the Sign in with Apple capability was dropped, not the domain).
-      Refresh provisioning profiles after any change here.
+- [x] ~~Apple Developer portal: enable Associated Domains~~ — not possible.
+      Apple blocks the Associated Domains capability entirely on personal
+      (free) development teams; Xcode errors with "Personal development
+      teams... do not support the Associated Domains capability." Removed the
+      entitlement and Xcode capability. Confirmed via the clerk-ios SDK source
+      (no references to it anywhere in `Sources/`) that it's only used for
+      cross-app shared-session sync and Safari passkey/password autofill —
+      Roam has no companion app, so nothing needed it. Sign-in works
+      identically without it. Revisit only if you enroll in the paid Apple
+      Developer Program ($99/yr) and actually want cross-app session sharing.
 - [ ] **Swap Google OAuth off Clerk's shared dev credentials** before
       production — the instance is currently `test_mode: true`.
 - [ ] **Delete or clean up leftovers in Render:** the old manually-created
