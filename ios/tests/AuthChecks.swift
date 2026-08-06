@@ -7,6 +7,7 @@ struct AuthChecks {
         await authenticatedOperationUsesClerkSessionTokenContract()
         await signedOutOperationsAreRejected()
         errorResponsesRemainSafeAndBranchable()
+        remoteProfileDecoderTreatsNullStageAsPermit()
         profileConflictRulePrefersTheNewerSource()
 
         print("Auth checks passed")
@@ -50,6 +51,13 @@ struct AuthChecks {
 
         let malformed = AuthError.from(statusCode: 502, data: Data("<html>bad gateway</html>".utf8))
         expect(malformed.localizedDescription.count < 200, "untrusted error bodies must not become an oversized UI message")
+    }
+
+    private static func remoteProfileDecoderTreatsNullStageAsPermit() {
+        let response = Data(#"{"displayName":null,"stage":null,"payload":{},"updatedAt":"2026-08-06T18:00:00.000Z"}"#.utf8)
+        let profile = try? APIClient.makeDateDecoder().decode(RemoteProfile.self, from: response)
+
+        expect(profile?.stage == .permit, "a newly-created server profile with a null stage should use the local permit default")
     }
 
     private static func profileConflictRulePrefersTheNewerSource() {
