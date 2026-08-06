@@ -54,6 +54,7 @@ struct ProfileView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: AppDesign.sectionSpacing) {
+                    ScreenHeader(title: "Profile", symbol: "person.crop.circle.fill")
                     identityCard
 
                     if driveSession.isRecording {
@@ -68,10 +69,7 @@ struct ProfileView: View {
             }
             .background(AppDesign.canvas.ignoresSafeArea())
             .navigationTitle("Profile")
-            // Matches every other tab. Left at the default, the title mode can
-            // resolve differently after a tab switch than it does on first
-            // appearance, so it is stated explicitly here.
-            .navigationBarTitleDisplayMode(.large)
+            .toolbar(.hidden, for: .navigationBar)
         }
         .onChange(of: insightsSignature, initial: true) { _, _ in
             refreshInsights()
@@ -109,14 +107,22 @@ struct ProfileView: View {
                 .foregroundStyle(AppDesign.Ink.primary)
                 .padding(.horizontal, AppDesign.space4)
 
-            ForEach(ProfileFolder.allCases) { folder in
-                NavigationLink {
-                    folderDestination(folder)
-                } label: {
-                    ProfileFolderCard(folder: folder, summary: folderSummary(folder))
+            VStack(spacing: 0) {
+                ForEach(ProfileFolder.allCases) { folder in
+                    NavigationLink {
+                        folderDestination(folder)
+                    } label: {
+                        ProfileFolderCard(folder: folder, summary: folderSummary(folder))
+                    }
+                    .buttonStyle(PressableScaleStyle())
+
+                    if folder != ProfileFolder.allCases.last {
+                        Divider()
+                            .padding(.leading, 66)
+                    }
                 }
-                .buttonStyle(PressableScaleStyle())
             }
+            .premiumCard()
         }
     }
 
@@ -135,8 +141,7 @@ struct ProfileView: View {
                     BehaviorSignalsSection(insights: insights)
                     WeeklyTrendSection(insights: insights, reduceMotion: reduceMotion)
                 case .preferences:
-                    appearanceCard
-                    appIconCard
+                    preferencesCard
                 }
             }
             .padding(.horizontal, AppDesign.contentPadding)
@@ -145,6 +150,7 @@ struct ProfileView: View {
         .background(AppDesign.canvas.ignoresSafeArea())
         .navigationTitle(folder.title)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar(.visible, for: .navigationBar)
     }
 
     private func folderSummary(_ folder: ProfileFolder) -> String {
@@ -294,6 +300,16 @@ struct ProfileView: View {
 
     // MARK: - Appearance
 
+    private var preferencesCard: some View {
+        VStack(spacing: 0) {
+            appearanceCard
+            Divider()
+                .padding(.leading, 46)
+            appIconCard
+        }
+        .premiumCard()
+    }
+
     private var appearanceCard: some View {
         Button {
             showingThemePicker = true
@@ -319,7 +335,7 @@ struct ProfileView: View {
             .frame(minHeight: 44)
         }
         .buttonStyle(PressableScaleStyle())
-        .premiumCard()
+        .padding(.vertical, AppDesign.space8)
         .accessibilityLabel("Color scheme, currently \(theme.currentID.title)")
     }
 
@@ -348,7 +364,7 @@ struct ProfileView: View {
             .frame(minHeight: 44)
         }
         .buttonStyle(PressableScaleStyle())
-        .premiumCard()
+        .padding(.vertical, AppDesign.space8)
         .accessibilityLabel("App icon, currently \(appIcon.currentID.title)")
     }
 }

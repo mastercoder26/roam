@@ -185,6 +185,37 @@ struct SectionHeader: View {
     }
 }
 
+/// Shared top-of-screen title geometry for tabs that present a visible title.
+/// Keeping this in the design system prevents one tab from inheriting a tall
+/// system navigation-bar inset while another starts directly under the brand.
+struct ScreenHeader: View {
+    @ObservedObject private var theme = ThemeManager.shared
+    let title: String
+    let symbol: String
+
+    var body: some View {
+        HStack(alignment: .center, spacing: AppDesign.space16) {
+            Text(title)
+                .font(AppDesign.Typography.heroTitle)
+                .tracking(-0.8)
+                .foregroundStyle(AppDesign.Ink.primary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Spacer(minLength: AppDesign.space8)
+
+            Image(systemName: symbol)
+                .font(.system(size: 34, weight: .medium))
+                .foregroundStyle(AppDesign.Ink.primary.opacity(0.9))
+                .frame(width: 48, height: 48)
+                .background(AppDesign.Ink.primary.opacity(0.10), in: Circle())
+                .accessibilityHidden(true)
+        }
+        .frame(minHeight: 48)
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isHeader)
+    }
+}
+
 struct BrandWordmark: View {
     // Observe the shared manager directly. safeAreaInset content does not always
     // inherit EnvironmentObject from the modified ancestor, which crashed launch.

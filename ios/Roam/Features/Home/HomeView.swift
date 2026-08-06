@@ -129,22 +129,7 @@ struct HomeView: View {
     }
 
     private var headerSection: some View {
-        HStack(alignment: .center, spacing: AppDesign.space16) {
-            Text("Plan your route")
-                .font(AppDesign.Typography.heroTitle)
-                .tracking(-0.8)
-                .foregroundStyle(AppDesign.Ink.primary)
-                .fixedSize(horizontal: false, vertical: true)
-
-            Spacer(minLength: 8)
-
-            Image(systemName: "location.north.circle.fill")
-                .font(.system(size: 34, weight: .medium))
-                .foregroundStyle(AppDesign.Ink.primary.opacity(0.9))
-                .frame(width: 48, height: 48)
-                .background(AppDesign.Ink.primary.opacity(0.10), in: Circle())
-                .accessibilityHidden(true)
-        }
+        ScreenHeader(title: "Plan your route", symbol: "location.north.circle.fill")
     }
 
     private var routeCard: some View {

@@ -50,9 +50,9 @@ struct ProfileFolderCard: View {
                 .frame(width: 32, height: 32)
                 .background(AppDesign.trackSurface.opacity(0.72), in: Circle())
         }
-        .frame(maxWidth: .infinity, minHeight: 72, alignment: .leading)
+        .padding(.vertical, AppDesign.space8)
+        .frame(maxWidth: .infinity, minHeight: 60, alignment: .leading)
         .contentShape(Rectangle())
-        .premiumCard()
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(folder.title). \(summary)")
         .accessibilityHint("Opens \(folder.subtitle.lowercased())")
@@ -61,7 +61,7 @@ struct ProfileFolderCard: View {
     private var folderGlyph: some View {
         ZStack {
             Image(systemName: "folder.fill")
-                .font(.system(size: 50, weight: .semibold))
+                .font(.system(size: 44, weight: .semibold))
                 .foregroundStyle(AppDesign.accent.opacity(0.92))
 
             Image(systemName: folder.symbol)
@@ -69,7 +69,7 @@ struct ProfileFolderCard: View {
                 .foregroundStyle(AppDesign.accentForeground)
                 .offset(y: 4)
         }
-        .frame(width: 54, height: 48)
+        .frame(width: 50, height: 44)
         .accessibilityHidden(true)
     }
 }

@@ -146,7 +146,7 @@ To run a subset, pass one or more name filters:
 ios/tests/run-checks.sh Theme Readiness
 ```
 
-The seventeen checks are:
+The eighteen checks are:
 
 | Check | Covers |
 |---|---|
@@ -162,6 +162,7 @@ The seventeen checks are:
 | `DriverReadinessEngineChecks` | Route readiness assessment |
 | `LaunchIntroChoreographyChecks` | Launch intro timing and wordmark docking |
 | `LayoutResponsivenessChecks` | Compact-width and large-text layout thresholds |
+| `ProfileFolderChecks` | Profile folder order and user-facing navigation copy |
 | `RoutePlanningLocationChecks` | Route-entry state, including a coarse or slow GPS fix |
 | `RoutePlanningPresentationChecks` | Route planning presentation |
 | `RoutePracticeEnginesChecks` | Practice plans, route matching, and untrusted-input hardening of the engines |

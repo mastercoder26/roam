@@ -72,11 +72,20 @@ final class AppIconManager: ObservableObject {
             Task { @MainActor in
                 if let error {
                     self.currentID = previousID
-                    self.lastError = error.localizedDescription
+                    self.lastError = Self.userFacingErrorMessage(for: error)
                 } else {
                     self.currentID = id
                 }
             }
         }
+    }
+
+    private static func userFacingErrorMessage(for error: Error) -> String {
+        let description = error.localizedDescription.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !description.isEmpty,
+              !description.localizedCaseInsensitiveContains("missing error") else {
+            return "Couldn’t change the app icon. Try again in a moment."
+        }
+        return description
     }
 }
