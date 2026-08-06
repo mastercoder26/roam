@@ -1,6 +1,10 @@
 import Combine
 import Foundation
 
+#if canImport(ClerkKit)
+import ClerkKit
+#endif
+
 enum ProfileSyncAction: Equatable {
     case pullRemote
     case pushLocal
@@ -8,9 +12,6 @@ enum ProfileSyncAction: Equatable {
 }
 
 enum ProfileSyncConflictResolver {
-    /// Local edits win only when their timestamp is newer. A non-empty local
-    /// profile also wins over an empty remote profile so an initial offline
-    /// profile is not erased by a newly-created server row.
     static func resolve(
         local: DriverProfile,
         localUpdatedAt: Date,
@@ -19,16 +20,12 @@ enum ProfileSyncConflictResolver {
         let localIsEmpty = local.displayName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             && local.stage == .permit
 
-        guard let remote else {
-            return localIsEmpty ? .none : .pushLocal
-        }
+        guard let remote else { return localIsEmpty ? .none : .pushLocal }
 
         let remoteIsEmpty = remote.displayName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             && remote.stage == .permit
             && remote.payload.isEmpty
-        if remoteIsEmpty {
-            return localIsEmpty ? .none : .pushLocal
-        }
+        if remoteIsEmpty { return localIsEmpty ? .none : .pushLocal }
         if localIsEmpty { return .pullRemote }
         return remote.updatedAt >= localUpdatedAt ? .pullRemote : .pushLocal
     }
@@ -56,19 +53,16 @@ final class AuthSessionStore: ObservableObject {
     @Published private(set) var state: State = .restoring
     @Published private(set) var syncStatus: SyncStatus = .synced
 
-    private let client: any AuthServicing
-    private let tokenStore: TokenStore
-    private var accessToken: String?
-    private var refreshTask: Task<String, Error>?
+    private let client: ClerkBackendClient
+    private var testAccessToken: String?
     private var hasStartedRestore = false
+    private var driveHistorySyncRequest: (() -> Void)?
 
     init(
-        client: any AuthServicing = AuthClient(),
-        tokenStore: TokenStore = TokenStore(),
+        client: ClerkBackendClient = ClerkBackendClient(),
         automaticallyRestore: Bool = true
     ) {
         self.client = client
-        self.tokenStore = tokenStore
         guard automaticallyRestore else { return }
         Task { @MainActor [weak self] in
             await self?.restoreIfNeeded()
@@ -77,7 +71,7 @@ final class AuthSessionStore: ObservableObject {
 
     var currentUser: AuthUser? {
         switch state {
-        case .signedIn(let user), .signedInOffline(let user): user
+        case let .signedIn(user), let .signedInOffline(user): user
         case .restoring, .signedOut, .authenticating: nil
         }
     }
@@ -89,110 +83,59 @@ final class AuthSessionStore: ObservableObject {
         }
     }
 
+    /// Synchronizes the app-facing state with Clerk's observable user. This is
+    /// called on launch and whenever the prebuilt views activate or end a
+    /// Clerk session.
+    func synchronizeWithClerk() async {
+        #if canImport(ClerkKit)
+        guard let clerkUser = Clerk.shared.user else {
+            markSignedOut()
+            return
+        }
+
+        let clerkIdentity = AuthUser(
+            id: clerkUser.id,
+            email: clerkUser.primaryEmailAddress?.emailAddress ?? "",
+            displayName: [clerkUser.firstName, clerkUser.lastName]
+                .compactMap { $0 }
+                .joined(separator: " ")
+                .nilIfEmpty
+        )
+        state = .signedIn(clerkIdentity)
+
+        do {
+            let backendUser = try await performAuthenticated { token in
+                try await self.client.currentUser(accessToken: token)
+            }
+            state = .signedIn(backendUser)
+            await syncProfile()
+            requestDriveHistorySync()
+        } catch {
+            state = .signedInOffline(clerkIdentity)
+            syncStatus = .workingOffline
+            requestDriveHistorySync()
+        }
+        #else
+        if !isSignedIn { state = .signedOut }
+        #endif
+    }
+
     func restoreIfNeeded() async {
         guard !hasStartedRestore else { return }
         hasStartedRestore = true
         state = .restoring
-
-        do {
-            guard let stored = try tokenStore.load() else {
-                state = .signedOut
-                return
-            }
-
-            let cachedUser = stored.user ?? AuthUser(id: stored.userID, email: "", displayName: nil)
-            do {
-                _ = try await refreshAccessToken()
-            } catch let error as AuthError where error.code == .unauthorized {
-                // Only refresh's genuine UNAUTHORIZED reaches this branch.
-                state = .signedOut
-                return
-            } catch {
-                state = .signedInOffline(cachedUser)
-                syncStatus = .workingOffline
-                return
-            }
-
-            do {
-                let user = try await performAuthenticated { accessToken in
-                    try await self.client.currentUser(accessToken: accessToken)
-                }
-                state = .signedIn(user)
-                await syncProfile()
-            } catch {
-                state = .signedInOffline(cachedUser)
-                syncStatus = .workingOffline
-            }
-        } catch let error as TokenStoreError {
-            state = .signedOut
-            syncStatus = .failed(error.localizedDescription)
-        } catch {
-            state = .signedOut
-            syncStatus = .failed("Your saved session could not be restored. Sign in again.")
-        }
+        await synchronizeWithClerk()
     }
 
-    func signIn(email: String, password: String) async throws {
-        state = .authenticating
-        do {
-            let response = try await client.login(email: email, password: password)
-            try save(response: response)
-            state = .signedIn(response.user)
-            await syncProfile()
-        } catch let error as AuthError {
-            state = .signedOut
-            throw error
-        } catch let error as TokenStoreError {
-            state = .signedOut
-            throw AuthError.keychain(message: error.localizedDescription)
-        } catch {
-            state = .signedOut
-            throw AuthError.serverUnavailable
-        }
-    }
-
-    func signUp(email: String, password: String, displayName: String?) async throws {
-        state = .authenticating
-        do {
-            let response = try await client.signUp(email: email, password: password, displayName: displayName)
-            try save(response: response)
-            state = .signedIn(response.user)
-            await syncProfile()
-        } catch let error as AuthError {
-            state = .signedOut
-            throw error
-        } catch let error as TokenStoreError {
-            state = .signedOut
-            throw AuthError.keychain(message: error.localizedDescription)
-        } catch {
-            state = .signedOut
-            throw AuthError.serverUnavailable
-        }
-    }
+    /// Clerk owns sign-in and sign-up through AuthView. These methods are
+    /// intentionally absent: the app must never call the removed custom
+    /// /api/auth/signup or /api/auth/login endpoints.
 
     func signOut() async throws {
-        let stored = try tokenStore.load()
-        var failure: Error?
-        if let stored {
-            do {
-                try await client.logout(refreshToken: stored.refreshToken)
-            } catch {
-                failure = error
-            }
-        }
-
-        do {
-            try tokenStore.clear()
-        } catch {
-            failure = failure ?? error
-        }
-        accessToken = nil
-        refreshTask = nil
-        state = .signedOut
-
-        if let failure {
-            throw asAuthError(failure)
-        }
+        #if canImport(ClerkKit)
+        try await Clerk.shared.auth.signOut()
+        #endif
+        markSignedOut()
     }
 
     func deleteAccount() async throws {
@@ -200,94 +143,53 @@ final class AuthSessionStore: ObservableObject {
             try await self.client.deleteAccount(accessToken: token)
         }
         DriverProfileStore.shared.reset()
-        do {
-            try tokenStore.clear()
-        } catch let error as TokenStoreError {
-            throw AuthError.keychain(message: error.localizedDescription)
-        }
-        accessToken = nil
-        refreshTask = nil
-        state = .signedOut
-        syncStatus = .synced
+        #if canImport(ClerkKit)
+        try await Clerk.shared.auth.signOut()
+        #endif
+        markSignedOut()
     }
 
     func retryProfileSync() async {
-        await syncProfile()
+        await synchronizeWithClerk()
     }
 
-    /// Runs one authenticated operation, refreshing once when the backend
-    /// explicitly says the short-lived access token expired.
+    func requestDriveHistorySync() {
+        guard isSignedIn else { return }
+        driveHistorySyncRequest?()
+    }
+
+    func configureDriveHistorySync(_ request: @escaping () -> Void) {
+        driveHistorySyncRequest = request
+        if isSignedIn { request() }
+    }
+
+    /// Stable contract used by DriveHistorySyncService. Clerk returns a
+    /// short-lived session token and refreshes it internally; this method only
+    /// hands that current token to the authenticated operation.
     func performAuthenticated<Response>(
         _ operation: @escaping (String) async throws -> Response
     ) async throws -> Response {
-        let token = try await currentAccessToken()
-        do {
-            return try await operation(token)
-        } catch let error as AuthError where error.code == .tokenExpired {
-            let refreshedToken = try await refreshAccessToken()
-            return try await operation(refreshedToken)
+        #if canImport(ClerkKit)
+        guard Clerk.shared.user != nil else {
+            throw AuthError.unauthorized(message: "Sign in to continue.")
         }
+        guard let token = try await Clerk.shared.auth.getToken() else {
+            throw AuthError.unauthorized(message: "Your Clerk session is not available. Sign in again.")
+        }
+        return try await operation(token)
+        #else
+        guard let token = testAccessToken else {
+            throw AuthError.unauthorized(message: "Sign in to continue.")
+        }
+        return try await operation(token)
+        #endif
     }
 
-    /// Test hook for the pure session state-machine checks. It never persists
-    /// a token and is intentionally internal to this app module.
+    /// Test-only state injection for the standalone drive-sync checks. It does
+    /// not persist credentials or participate in production Clerk state.
     func setSignedInForTesting(user: AuthUser, accessToken: String) {
-        self.accessToken = accessToken
+        testAccessToken = accessToken
         state = .signedIn(user)
-    }
-
-    private func currentAccessToken() async throws -> String {
-        if let accessToken { return accessToken }
-        return try await refreshAccessToken()
-    }
-
-    private func refreshAccessToken() async throws -> String {
-        if let refreshTask {
-            return try await refreshTask.value
-        }
-
-        let task = Task { @MainActor [weak self] in
-            guard let self else { throw AuthError.serverUnavailable }
-            return try await self.performRefresh()
-        }
-        refreshTask = task
-        defer { refreshTask = nil }
-        return try await task.value
-    }
-
-    private func performRefresh() async throws -> String {
-        let stored: TokenStore.StoredSession
-        do {
-            guard let value = try tokenStore.load() else {
-                throw AuthError.unauthorized(message: "Your saved session is missing. Sign in again.")
-            }
-            stored = value
-        } catch let error as TokenStoreError {
-            throw AuthError.keychain(message: error.localizedDescription)
-        }
-
-        do {
-            let response = try await client.refresh(refreshToken: stored.refreshToken)
-            let user = currentUser ?? stored.user ?? AuthUser(id: stored.userID, email: "", displayName: nil)
-            try tokenStore.save(refreshToken: response.refreshToken, user: user)
-            accessToken = response.accessToken
-            return response.accessToken
-        } catch let error as AuthError where error.code == .unauthorized {
-            // This is the one sign-out path for a server response: the
-            // refresh token is genuinely rejected, not merely unreachable.
-            do {
-                try tokenStore.clear()
-            } catch let error as TokenStoreError {
-                accessToken = nil
-                state = .signedOut
-                throw AuthError.keychain(message: error.localizedDescription)
-            }
-            accessToken = nil
-            state = .signedOut
-            throw AuthError.unauthorized(message: "Your session has ended. Sign in again.")
-        } catch let error as TokenStoreError {
-            throw AuthError.keychain(message: error.localizedDescription)
-        }
     }
 
     private func syncProfile() async {
@@ -331,7 +233,7 @@ final class AuthSessionStore: ObservableObject {
             state = .signedIn(user)
             syncStatus = .synced
         } catch let error as AuthError {
-            if isReachabilityFailure(error) {
+            if error.isTransient {
                 state = .signedInOffline(user)
                 syncStatus = .workingOffline
             } else {
@@ -342,29 +244,16 @@ final class AuthSessionStore: ObservableObject {
         }
     }
 
-    private func save(response: AuthResponse) throws {
-        do {
-            try tokenStore.save(refreshToken: response.refreshToken, user: response.user)
-        } catch let error as TokenStoreError {
-            throw error
-        }
-        accessToken = response.accessToken
+    private func markSignedOut() {
+        testAccessToken = nil
+        state = .signedOut
+        syncStatus = .synced
+        DriveHistorySyncService.shared.didSignOut()
     }
+}
 
-    private func isReachabilityFailure(_ error: AuthError) -> Bool {
-        switch error {
-        case .offline, .serverUnavailable, .serviceUnavailable:
-            true
-        default:
-            false
-        }
-    }
-
-    private func asAuthError(_ error: Error) -> AuthError {
-        if let error = error as? AuthError { return error }
-        if let error = error as? TokenStoreError { return .keychain(message: error.localizedDescription) }
-        return .serverUnavailable
-    }
+private extension String {
+    var nilIfEmpty: String? { isEmpty ? nil : self }
 }
 
 typealias AuthSessionState = AuthSessionStore.State

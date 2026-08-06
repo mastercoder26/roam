@@ -10,16 +10,22 @@ import { createRequestId, logInternalFailure, logRateLimited } from "./src/error
 import { createRateLimiter } from "./src/utils/rateLimiter.js";
 import {
   handleDeleteAccount,
-  handleLogin,
-  handleLogout,
   handleMe,
-  handleRefresh,
-  handleSignup,
 } from "./src/handlers/auth.js";
 import { handleGetProfile, handleUpdateProfile } from "./src/handlers/profile.js";
 import { checkDatabase, isDatabaseConfigured } from "./src/db/pool.js";
 import { fileURLToPath } from "node:url";
 import { requireAuth } from "./src/auth/middleware.js";
+import {
+  handleDeleteDrive,
+  handleDeleteSavedRoute,
+  handleGetDrive,
+  handleGetDriveStats,
+  handleGetDrives,
+  handleGetSavedRoutes,
+  handleUpsertDrives,
+  handleUpsertSavedRoute,
+} from "./src/handlers/drives.js";
 
 // `server.ts` lives in `backend/`, alongside the local environment files.
 config({ path: resolve(import.meta.dirname, ".env.local") });
@@ -39,9 +45,9 @@ if (!isDatabaseConfigured()) {
   );
 }
 
-if (!process.env.JWT_SECRET) {
+if (!process.env.CLERK_SECRET_KEY) {
   console.error(
-    "JWT_SECRET is not configured. Account and profile requests will return 503 until it is set."
+    "CLERK_SECRET_KEY is not configured. Account and profile requests will return 503 until it is set."
   );
 }
 
@@ -160,14 +166,18 @@ app.post("/api/route/difficulty", rateLimit("difficulty"), asyncHandler(handleDi
 
 app.post("/api/route/departure-comparison", rateLimit("departure-comparison"), asyncHandler(handleDepartureComparison));
 
-app.post("/api/auth/signup", authRateLimit, asyncHandler(handleSignup));
-app.post("/api/auth/login", authRateLimit, asyncHandler(handleLogin));
-app.post("/api/auth/refresh", authRateLimit, asyncHandler(handleRefresh));
-app.post("/api/auth/logout", authRateLimit, asyncHandler(handleLogout));
 app.get("/api/auth/me", authRateLimit, requireAuth, asyncHandler(handleMe));
 app.get("/api/profile", requireAuth, asyncHandler(handleGetProfile));
 app.put("/api/profile", requireAuth, asyncHandler(handleUpdateProfile));
 app.delete("/api/account", requireAuth, asyncHandler(handleDeleteAccount));
+app.get("/api/drives", requireAuth, asyncHandler(handleGetDrives));
+app.post("/api/drives", requireAuth, asyncHandler(handleUpsertDrives));
+app.get("/api/drives/stats", requireAuth, asyncHandler(handleGetDriveStats));
+app.get("/api/drives/:id", requireAuth, asyncHandler(handleGetDrive));
+app.delete("/api/drives/:id", requireAuth, asyncHandler(handleDeleteDrive));
+app.get("/api/saved-routes", requireAuth, asyncHandler(handleGetSavedRoutes));
+app.post("/api/saved-routes", requireAuth, asyncHandler(handleUpsertSavedRoute));
+app.delete("/api/saved-routes/:id", requireAuth, asyncHandler(handleDeleteSavedRoute));
 
 app.use((error: unknown, _req: Request, res: Response, next: NextFunction) => {
   if (res.headersSent) {

@@ -1,5 +1,6 @@
 import SwiftUI
 import UIKit
+import ClerkKit
 
 struct RoamRootView: View {
     @ObservedObject private var theme = ThemeManager.shared
@@ -34,6 +35,7 @@ struct RoamRootView: View {
     @EnvironmentObject private var driveSession: DriveSessionManager
     @EnvironmentObject private var themeManager: ThemeManager
     @EnvironmentObject private var authSession: AuthSessionStore
+    @Environment(Clerk.self) private var clerk
     @StateObject private var routeForm = RoutePlanningFormModel()
     @StateObject private var sharedRouteImport = SharedRouteImportCoordinator()
     @Environment(\.scenePhase) private var scenePhase
@@ -100,6 +102,12 @@ struct RoamRootView: View {
         }
         .onChange(of: sharedRouteImport.state) { _, state in
             applySharedRouteStateIfSafe(state)
+        }
+        .onChange(of: clerk.user?.id, initial: true) { _, _ in
+            Task { await authSession.synchronizeWithClerk() }
+        }
+        .onOpenURL { url in
+            Task { try? await Clerk.shared.handle(url) }
         }
     }
 

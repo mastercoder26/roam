@@ -1,39 +1,125 @@
+import { verifyToken } from "@clerk/backend";
 import type { NextFunction, Request, Response } from "express";
-import { createRequestId } from "../errors.js";
-import { isDatabaseConfigured } from "../db/pool.js";
+import {
+  DatabaseOperationError,
+  DatabaseUnavailableError,
+  createRequestId,
+} from "../errors.js";
+import { findOrCreateByClerkId } from "../db/repositories/users.js";
 import { AuthConfigurationError } from "./errors.js";
-import { hasJwtSecret, TokenError, verifyAccessToken } from "./tokens.js";
 
-export interface AuthenticatedUser { id: string; email: string; }
-
-declare module "express-serve-static-core" {
-  interface Request { user?: AuthenticatedUser; }
+export interface AuthenticatedUser {
+  id: string;
+  email: string;
+  clerkUserId?: string;
 }
 
-function respond(res: Response, status: number, code: "UNAUTHORIZED" | "TOKEN_EXPIRED" | "SERVICE_UNAVAILABLE", error: string): void {
+declare module "express-serve-static-core" {
+  interface Request {
+    user?: AuthenticatedUser;
+  }
+}
+
+interface ClerkClaims {
+  sub?: unknown;
+  email?: unknown;
+  email_address?: unknown;
+  name?: unknown;
+  first_name?: unknown;
+  last_name?: unknown;
+}
+
+function respond(
+  res: Response,
+  status: 401 | 503,
+  code: "UNAUTHORIZED" | "SERVICE_UNAVAILABLE",
+  error: string,
+): void {
   res.status(status).json({ error, code, requestId: createRequestId() });
 }
 
-export function requireAuth(req: Request, res: Response, next: NextFunction): void {
-  if (!isDatabaseConfigured() || !hasJwtSecret()) {
-    respond(res, 503, "SERVICE_UNAVAILABLE", "Account services are temporarily unavailable. Please try again shortly.");
+function serviceUnavailable(res: Response): void {
+  respond(
+    res,
+    503,
+    "SERVICE_UNAVAILABLE",
+    "Account services are temporarily unavailable. Please try again shortly.",
+  );
+}
+
+function stringClaim(claim: unknown): string | null {
+  return typeof claim === "string" && claim.trim() ? claim.trim() : null;
+}
+
+function displayNameFromClaims(claims: ClerkClaims): string | null {
+  const fullName = stringClaim(claims.name);
+  if (fullName) return fullName;
+  const firstName = stringClaim(claims.first_name);
+  const lastName = stringClaim(claims.last_name);
+  return [firstName, lastName].filter(Boolean).join(" ") || null;
+}
+
+async function authenticate(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    assertAuthConfigured();
+  } catch (error) {
+    if (error instanceof AuthConfigurationError) {
+      serviceUnavailable(res);
+      return;
+    }
+    next(error);
     return;
   }
+
+  const secretKey = process.env.CLERK_SECRET_KEY?.trim();
+  if (!secretKey) {
+    serviceUnavailable(res);
+    return;
+  }
+
   const token = req.header("authorization")?.match(/^Bearer\s+([^\s]+)$/i)?.[1];
   if (!token) {
     respond(res, 401, "UNAUTHORIZED", "Authentication is required.");
     return;
   }
+
+  let claims: ClerkClaims;
   try {
-    req.user = verifyAccessToken(token);
+    claims = await verifyToken(token, { secretKey }) as ClerkClaims;
+  } catch {
+    respond(res, 401, "UNAUTHORIZED", "Authentication token is invalid.");
+    return;
+  }
+
+  const clerkUserId = stringClaim(claims.sub);
+  if (!clerkUserId) {
+    respond(res, 401, "UNAUTHORIZED", "Authentication token is invalid.");
+    return;
+  }
+
+  try {
+    const user = await findOrCreateByClerkId({
+      clerkUserId,
+      email: stringClaim(claims.email) ?? stringClaim(claims.email_address),
+      displayName: displayNameFromClaims(claims),
+    });
+    req.user = { id: user.id, email: user.email, clerkUserId };
     next();
   } catch (error) {
-    if (error instanceof AuthConfigurationError) {
-      respond(res, 503, "SERVICE_UNAVAILABLE", "Account services are temporarily unavailable. Please try again shortly.");
-    } else if (error instanceof TokenError && error.code === "TOKEN_EXPIRED") {
-      respond(res, 401, "TOKEN_EXPIRED", "Access token expired. Refresh your session.");
-    } else {
-      respond(res, 401, "UNAUTHORIZED", "Authentication token is invalid.");
+    if (error instanceof DatabaseUnavailableError || error instanceof DatabaseOperationError) {
+      serviceUnavailable(res);
+      return;
     }
+    next(error);
+  }
+}
+
+export function requireAuth(req: Request, res: Response, next: NextFunction): void {
+  void authenticate(req, res, next);
+}
+
+export function assertAuthConfigured(): void {
+  if (!process.env.DATABASE_URL?.trim() || !process.env.CLERK_SECRET_KEY?.trim()) {
+    throw new AuthConfigurationError("Clerk authentication is not configured.");
   }
 }

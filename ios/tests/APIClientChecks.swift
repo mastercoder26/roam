@@ -2,11 +2,12 @@ import Foundation
 
 @main
 struct APIClientChecks {
-    static func main() {
+    static func main() async {
         backendJSONErrorsReachTheUser()
         rawResponseBodiesDoNotReachTheUser()
         aTimeoutOrCancellationEndsTheAttempt()
         theTimeBudgetIsSharedAcrossCandidates()
+        await routeAndDataCallsUseSeparateHostSets()
 
         print("API client checks passed")
     }
@@ -105,6 +106,53 @@ struct APIClientChecks {
         )
     }
 
+    private static func routeAndDataCallsUseSeparateHostSets() async {
+        let routePrimary = URL(string: "https://route-primary.example")!
+        let routeFallback = URL(string: "https://route-fallback.example")!
+        let dataPrimary = URL(string: "https://data-primary.example")!
+        let sessionConfiguration = URLSessionConfiguration.ephemeral
+        sessionConfiguration.protocolClasses = [APIClientChecksURLProtocol.self]
+
+        APIClientChecksURLProtocol.reset(responses: [
+            routePrimary: .failure(URLError(.cannotConnectToHost)),
+            routeFallback: .success(Data("not a route response".utf8)),
+            dataPrimary: .success(Data())
+        ])
+
+        let client = APIClient(
+            candidateBaseURLs: [routePrimary, routeFallback],
+            dataCandidateBaseURLs: [dataPrimary],
+            session: URLSession(configuration: sessionConfiguration)
+        )
+
+        _ = try? await client.analyzeRoute(
+            origin: "Origin",
+            destination: "Destination",
+            departureTime: Date()
+        )
+        _ = try? await client.requestData(
+            path: "api/drives",
+            method: "GET",
+            host: .data
+        )
+
+        let requests = APIClientChecksURLProtocol.requests
+        expect(
+            requests.map { $0.url?.host } == [
+                "route-primary.example",
+                "route-fallback.example",
+                "data-primary.example"
+            ],
+            "route failover must stay within its host set before a data call uses the data host"
+        )
+        expect(
+            requests[0].url?.path == "/api/route/difficulty"
+                && requests[1].url?.path == "/api/route/difficulty"
+                && requests[2].url?.path == "/api/drives",
+            "difficulty and data endpoints must resolve against their respective host sets"
+        )
+    }
+
     private static func json(_ value: String) -> Data {
         Data(value.utf8)
     }
@@ -116,4 +164,47 @@ struct APIClientChecks {
     private static func fail(_ message: String) -> Never {
         fatalError("API client check failed: \(message)")
     }
+}
+
+private final class APIClientChecksURLProtocol: URLProtocol {
+    enum Response {
+        case success(Data)
+        case failure(Error)
+    }
+
+    private static var responseByHost: [String: Response] = [:]
+    private(set) static var requests: [URLRequest] = []
+
+    static func reset(responses: [URL: Response]) {
+        responseByHost = Dictionary(uniqueKeysWithValues: responses.map { ($0.key.host!, $0.value) })
+        requests = []
+    }
+
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+
+    override func startLoading() {
+        guard let url = request.url, let host = url.host, let response = Self.responseByHost[host] else {
+            client?.urlProtocol(self, didFailWithError: URLError(.badURL))
+            return
+        }
+        Self.requests.append(request)
+
+        switch response {
+        case let .success(data):
+            let httpResponse = HTTPURLResponse(
+                url: url,
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: ["Content-Type": "application/json"]
+            )!
+            client?.urlProtocol(self, didReceive: httpResponse, cacheStoragePolicy: .notAllowed)
+            client?.urlProtocol(self, didLoad: data)
+            client?.urlProtocolDidFinishLoading(self)
+        case let .failure(error):
+            client?.urlProtocol(self, didFailWithError: error)
+        }
+    }
+
+    override func stopLoading() {}
 }

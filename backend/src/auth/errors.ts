@@ -5,44 +5,16 @@ export class AuthConfigurationError extends Error {
   }
 }
 
-export class InvalidCredentialsError extends Error {
-  constructor() {
-    super("Invalid email or password.");
-    this.name = "InvalidCredentialsError";
+export class ClerkAccountDeletionError extends Error {
+  constructor(readonly originalError: unknown) {
+    super("The Clerk account could not be deleted.");
+    this.name = "ClerkAccountDeletionError";
   }
 }
 
-export class EmailTakenError extends Error {
+export class LocalUserNotFoundError extends Error {
   constructor() {
-    super("An account with that email already exists.");
-    this.name = "EmailTakenError";
-  }
-}
-
-export class InvalidRefreshTokenError extends Error {
-  constructor() {
-    super("Refresh token is invalid or expired.");
-    this.name = "InvalidRefreshTokenError";
-  }
-}
-
-export class RefreshTokenReuseError extends Error {
-  constructor() {
-    super("Refresh token reuse detected.");
-    this.name = "RefreshTokenReuseError";
-  }
-}
-
-export class AccessTokenExpiredError extends Error {
-  constructor() {
-    super("Access token expired.");
-    this.name = "AccessTokenExpiredError";
-  }
-}
-
-export class InvalidAccessTokenError extends Error {
-  constructor() {
-    super("Access token is invalid.");
-    this.name = "InvalidAccessTokenError";
+    super("The authenticated local user could not be found.");
+    this.name = "LocalUserNotFoundError";
   }
 }

@@ -30,6 +30,11 @@ enum APIError: LocalizedError {
 }
 
 struct APIClient {
+    enum Host {
+        case route
+        case data
+    }
+
     /// The whole attempt, across every candidate host, is bounded by this.
     /// It used to apply per candidate, so a weak connection could spend a full
     /// minute per host with no way to cancel.
@@ -46,16 +51,60 @@ struct APIClient {
         let response: HTTPURLResponse
     }
 
-    /// Tried in order until one responds. See AppConfiguration.candidateBaseURLs.
-    private let candidateBaseURLs: [URL]
+    /// Route analysis and authenticated data calls each keep their own ordered
+    /// candidates. Failover never crosses from one backend's host set to the
+    /// other.
+    private let routeCandidateBaseURLs: [URL]
+    private let dataCandidateBaseURLs: [URL]
     private let session: URLSession
 
     init(
         candidateBaseURLs: [URL] = AppConfiguration.candidateBaseURLs,
+        dataCandidateBaseURLs: [URL] = AppConfiguration.dataCandidateBaseURLs,
         session: URLSession = .shared
     ) {
-        self.candidateBaseURLs = candidateBaseURLs
+        self.routeCandidateBaseURLs = candidateBaseURLs
+        self.dataCandidateBaseURLs = dataCandidateBaseURLs
         self.session = session
+    }
+
+    /// The backend uses ISO-8601 strings with fractional seconds for all
+    /// persisted dates. Keep one encoder/decoder pair for every service that
+    /// sends or receives those values.
+    static func makeDateEncoder() -> JSONEncoder {
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .custom { date, encoder in
+            var container = encoder.singleValueContainer()
+            let formatter = ISO8601DateFormatter()
+            formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+            try container.encode(formatter.string(from: date))
+        }
+        return encoder
+    }
+
+    static func makeDateDecoder() -> JSONDecoder {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .custom { decoder in
+            let container = try decoder.singleValueContainer()
+            let value = try container.decode(String.self)
+
+            let fractional = ISO8601DateFormatter()
+            fractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+            if let date = fractional.date(from: value) {
+                return date
+            }
+
+            let standard = ISO8601DateFormatter()
+            standard.formatOptions = [.withInternetDateTime]
+            guard let date = standard.date(from: value) else {
+                throw DecodingError.dataCorruptedError(
+                    in: container,
+                    debugDescription: "Invalid server date"
+                )
+            }
+            return date
+        }
+        return decoder
     }
 
     /// Shared raw transport for services that need their own typed error
@@ -65,14 +114,16 @@ struct APIClient {
         path: String,
         method: String,
         body: Data? = nil,
-        headers: [String: String] = [:]
+        headers: [String: String] = [:],
+        host: Host = .data
     ) async throws -> HTTPResponseData {
-        guard !candidateBaseURLs.isEmpty else { throw APIError.invalidURL }
+        let candidates = candidateBaseURLs(for: host)
+        guard !candidates.isEmpty else { throw APIError.invalidURL }
 
         var lastNetworkError: Error = URLError(.cannotConnectToHost)
         let deadline = Date().addingTimeInterval(Self.totalRequestBudget)
 
-        for baseURL in candidateBaseURLs {
+        for baseURL in candidates {
             let remaining = deadline.timeIntervalSinceNow
             guard remaining >= Self.minimumCandidateTimeout else { break }
 
@@ -138,7 +189,7 @@ struct APIClient {
         continuousDriveMinutes: Double?
     ) async throws -> RouteDifficultyResponse {
         let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime]
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         let localTime = Calendar.autoupdatingCurrent.dateComponents([.hour, .minute], from: departureTime)
         let departureLocalMinutes = (localTime.hour ?? 0) * 60 + (localTime.minute ?? 0)
 
@@ -156,7 +207,8 @@ struct APIClient {
         return try await sendWithFallback(
             path: "api/route/difficulty",
             body: requestBody,
-            responseType: RouteDifficultyResponse.self
+            responseType: RouteDifficultyResponse.self,
+            host: .route
         )
     }
 
@@ -196,7 +248,8 @@ struct APIClient {
         return try await sendWithFallback(
             path: "api/route/departure-comparison",
             body: requestBody,
-            responseType: DepartureComparisonResponse.self
+            responseType: DepartureComparisonResponse.self,
+            host: .route
         )
     }
 
@@ -208,14 +261,16 @@ struct APIClient {
     private func sendWithFallback<Response: Decodable>(
         path: String,
         body: Data,
-        responseType: Response.Type
+        responseType: Response.Type,
+        host: Host
     ) async throws -> Response {
-        guard !candidateBaseURLs.isEmpty else { throw APIError.invalidURL }
+        let candidates = candidateBaseURLs(for: host)
+        guard !candidates.isEmpty else { throw APIError.invalidURL }
 
         var lastNetworkError: Error = URLError(.cannotConnectToHost)
         let deadline = Date().addingTimeInterval(Self.totalRequestBudget)
 
-        for baseURL in candidateBaseURLs {
+        for baseURL in candidates {
             let remaining = deadline.timeIntervalSinceNow
             guard remaining >= Self.minimumCandidateTimeout else { break }
 
@@ -236,6 +291,15 @@ struct APIClient {
         }
 
         throw APIError.networkError(lastNetworkError)
+    }
+
+    private func candidateBaseURLs(for host: Host) -> [URL] {
+        switch host {
+        case .route:
+            routeCandidateBaseURLs
+        case .data:
+            dataCandidateBaseURLs
+        }
     }
 
     /// A timeout already spent the shared budget, and a cancellation is a
@@ -259,7 +323,7 @@ struct APIClient {
         timeout: TimeInterval,
         responseType: Response.Type
     ) async throws -> Response {
-        let endpoint = baseURL.appendingPathComponent(path)
+        let endpoint = Self.endpoint(baseURL: baseURL, path: path)
 
         var request = URLRequest(url: endpoint)
         request.httpMethod = "POST"
@@ -308,7 +372,7 @@ struct APIClient {
         headers: [String: String],
         timeout: TimeInterval
     ) async throws -> HTTPResponseData {
-        let endpoint = baseURL.appendingPathComponent(path)
+        let endpoint = Self.endpoint(baseURL: baseURL, path: path)
         var request = URLRequest(url: endpoint)
         request.httpMethod = method
         request.timeoutInterval = timeout
@@ -358,10 +422,28 @@ struct APIClient {
     /// page-sized reaches a banner.
     private static let maximumErrorMessageLength = 200
     private static let maximumLoggedErrorBodyBytes = 2_048
+
+    private static func endpoint(baseURL: URL, path: String) -> URL {
+        guard let queryStart = path.firstIndex(of: "?") else {
+            return baseURL.appendingPathComponent(path)
+        }
+
+        let pathPart = String(path[..<queryStart])
+        let queryPart = String(path[path.index(after: queryStart)...])
+        guard var components = URLComponents(
+            url: baseURL.appendingPathComponent(pathPart),
+            resolvingAgainstBaseURL: false
+        ) else {
+            return baseURL.appendingPathComponent(path)
+        }
+        components.percentEncodedQuery = queryPart
+        return components.url ?? baseURL.appendingPathComponent(path)
+    }
 }
 
 enum AppConfiguration {
     private static let localhostBaseURL = URL(string: "http://localhost:3000")!
+    private static let dataLocalhostBaseURL = URL(string: "http://localhost:3001")!
 
     /// The deployed backend (if configured), then localhost, then a
     /// developer's Mac on the LAN (if configured) — in that order, with
@@ -387,8 +469,30 @@ enum AppConfiguration {
         return candidates
     }
 
+    /// The deployed data API (if configured), then its separate local
+    /// development port. The route API keeps port 3000, while the data API can
+    /// run with `PORT=3001` so both services can be started together.
+    static var dataCandidateBaseURLs: [URL] {
+        #if DEBUG
+        let ordered = [configuredDataAPIBaseURL, dataLocalhostBaseURL]
+        #else
+        let ordered = [configuredDataAPIBaseURL]
+        #endif
+
+        var candidates: [URL] = []
+        for url in ordered {
+            guard let url, !candidates.contains(url) else { continue }
+            candidates.append(url)
+        }
+        return candidates
+    }
+
     private static var configuredAPIBaseURL: URL? {
         configuredURL(forInfoDictionaryKey: "API_BASE_URL")
+    }
+
+    private static var configuredDataAPIBaseURL: URL? {
+        configuredURL(forInfoDictionaryKey: "DATA_API_BASE_URL")
     }
 
     private static var configuredFallbackBaseURL: URL? {

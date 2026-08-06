@@ -6,24 +6,9 @@ struct AuthUser: Codable, Equatable, Sendable {
     let displayName: String?
 }
 
-struct AuthResponse: Codable, Equatable, Sendable {
-    let user: AuthUser
-    let accessToken: String
-    let refreshToken: String
-    let expiresIn: Int
-}
-
-struct AuthTokenResponse: Codable, Equatable, Sendable {
-    let accessToken: String
-    let refreshToken: String
-    let expiresIn: Int
-}
-
 enum AuthErrorCode: String, Codable, Equatable, Sendable {
     case validationError = "VALIDATION_ERROR"
     case unauthorized = "UNAUTHORIZED"
-    case tokenExpired = "TOKEN_EXPIRED"
-    case emailTaken = "EMAIL_TAKEN"
     case rateLimited = "RATE_LIMITED"
     case serviceUnavailable = "SERVICE_UNAVAILABLE"
     case internalError = "INTERNAL_ERROR"
@@ -33,8 +18,6 @@ enum AuthError: LocalizedError, Equatable, Sendable {
     case backend(code: AuthErrorCode, message: String, requestID: String?, retryAfter: Int?)
     case validation(message: String)
     case unauthorized(message: String)
-    case tokenExpired(message: String)
-    case emailTaken(message: String)
     case rateLimited(message: String, retryAfter: Int?)
     case serviceUnavailable(message: String)
     case internalError(message: String)
@@ -42,64 +25,44 @@ enum AuthError: LocalizedError, Equatable, Sendable {
     case serverUnavailable
     case invalidResponse
     case decodingError
-    case keychain(message: String)
 
     var code: AuthErrorCode? {
         switch self {
-        case let .backend(code, _, _, _): return code
-        case .validation: return .validationError
-        case .unauthorized: return .unauthorized
-        case .tokenExpired: return .tokenExpired
-        case .emailTaken: return .emailTaken
-        case .rateLimited: return .rateLimited
-        case .serviceUnavailable: return .serviceUnavailable
-        case .internalError: return .internalError
-        case .offline, .serverUnavailable, .invalidResponse, .decodingError, .keychain: return nil
+        case let .backend(code, _, _, _): code
+        case .validation: .validationError
+        case .unauthorized: .unauthorized
+        case .rateLimited: .rateLimited
+        case .serviceUnavailable: .serviceUnavailable
+        case .internalError: .internalError
+        case .offline, .serverUnavailable, .invalidResponse, .decodingError: nil
         }
-    }
-
-    var requestID: String? {
-        if case let .backend(_, _, requestID, _) = self { return requestID }
-        return nil
     }
 
     var errorDescription: String? {
         switch self {
         case let .backend(code, message, _, retryAfter):
             if code == .rateLimited, let retryAfter {
-                let minutes = max(1, Int(ceil(Double(retryAfter) / 60)))
-                return "Too many attempts. Try again in about \(minutes) \(minutes == 1 ? "minute" : "minutes")."
+                return retryMessage(retryAfter: retryAfter)
             }
             return message
-        case let .validation(message), let .unauthorized(message), let .tokenExpired(message),
-             let .emailTaken(message), let .serviceUnavailable(message), let .internalError(message):
+        case let .validation(message), let .unauthorized(message), let .serviceUnavailable(message), let .internalError(message):
             return message
         case let .rateLimited(message, retryAfter):
-            if let retryAfter {
-                let minutes = max(1, Int(ceil(Double(retryAfter) / 60)))
-                let unit = minutes == 1 ? "minute" : "minutes"
-                return "Too many attempts. Try again in about " + String(minutes) + " " + unit + "."
-            }
-            return message
+            return retryAfter.map { retryMessage(retryAfter: $0) } ?? message
         case .offline:
             return "Working offline. Check your connection and try again when you are back online."
         case .serverUnavailable:
             return "Roam is having trouble right now. Try again soon."
         case .invalidResponse, .decodingError:
             return "Roam could not read the server response. Try again soon."
-        case let .keychain(message):
-            return message
         }
     }
 
     var isTransient: Bool {
         switch self {
-        case let .backend(code, _, _, _):
-            return [.rateLimited, .serviceUnavailable].contains(code)
-        case .offline, .serverUnavailable, .serviceUnavailable, .rateLimited:
-            return true
-        default:
-            return false
+        case let .backend(code, _, _, _): [.rateLimited, .serviceUnavailable].contains(code)
+        case .offline, .serverUnavailable, .serviceUnavailable, .rateLimited: true
+        default: false
         }
     }
 
@@ -114,31 +77,37 @@ enum AuthError: LocalizedError, Equatable, Sendable {
         let message = envelope?.error?.trimmingCharacters(in: .whitespacesAndNewlines)
         let safeMessage = message.flatMap { $0.isEmpty ? nil : $0 }
         let code = envelope?.code ?? fallbackCode(for: statusCode)
-        let text = safeMessage ?? defaultMessage(for: code)
-        return .backend(code: code, message: text, requestID: envelope?.requestId, retryAfter: retryAfter)
+        return .backend(
+            code: code,
+            message: safeMessage ?? defaultMessage(for: code),
+            requestID: envelope?.requestId,
+            retryAfter: retryAfter
+        )
     }
 
     private static func fallbackCode(for statusCode: Int) -> AuthErrorCode {
         switch statusCode {
-        case 400: return .validationError
-        case 401: return .unauthorized
-        case 409: return .emailTaken
-        case 429: return .rateLimited
-        case 503: return .serviceUnavailable
-        default: return .internalError
+        case 400: .validationError
+        case 401: .unauthorized
+        case 429: .rateLimited
+        case 503: .serviceUnavailable
+        default: .internalError
         }
     }
 
     private static func defaultMessage(for code: AuthErrorCode) -> String {
         switch code {
-        case .validationError: return "Check the details and try again."
-        case .unauthorized: return "That sign-in did not work. Check your details and try again."
-        case .tokenExpired: return "Your session has expired. Please sign in again."
-        case .emailTaken: return "That email is already in use."
-        case .rateLimited: return "Too many attempts. Try again soon."
-        case .serviceUnavailable: return "Roam is unavailable right now. Try again soon."
-        case .internalError: return "Something went wrong on Roam's side. Try again soon."
+        case .validationError: "Check the details and try again."
+        case .unauthorized: "Your Clerk session is not authorized for Roam."
+        case .rateLimited: "Too many attempts. Try again soon."
+        case .serviceUnavailable: "Roam is unavailable right now. Try again soon."
+        case .internalError: "Something went wrong on Roam's side. Try again soon."
         }
+    }
+
+    private func retryMessage(retryAfter: Int) -> String {
+        let minutes = max(1, Int(ceil(Double(retryAfter) / 60)))
+        return "Too many attempts. Try again in about \(minutes) \(minutes == 1 ? "minute" : "minutes")."
     }
 }
 
@@ -223,44 +192,19 @@ struct RemoteProfile: Codable, Equatable, Sendable {
     }
 }
 
-protocol AuthServicing: Sendable {
-    func signUp(email: String, password: String, displayName: String?) async throws -> AuthResponse
-    func login(email: String, password: String) async throws -> AuthResponse
-    func refresh(refreshToken: String) async throws -> AuthTokenResponse
-    func logout(refreshToken: String) async throws
-    func currentUser(accessToken: String) async throws -> AuthUser
-    func profile(accessToken: String) async throws -> RemoteProfile
-    func updateProfile(accessToken: String, displayName: String?, stage: DriverProfile.Stage?, payload: [String: JSONValue]?) async throws -> RemoteProfile
-    func deleteAccount(accessToken: String) async throws
-    func health() async throws -> HealthResponse
-}
-
-struct AuthClient: AuthServicing, Sendable {
+struct ClerkBackendClient: Sendable {
     private let apiClient: APIClient
 
     init(
         candidateBaseURLs: [URL] = AppConfiguration.candidateBaseURLs,
+        dataCandidateBaseURLs: [URL] = AppConfiguration.dataCandidateBaseURLs,
         session: URLSession = .shared
     ) {
-        apiClient = APIClient(candidateBaseURLs: candidateBaseURLs, session: session)
-    }
-
-    func signUp(email: String, password: String, displayName: String?) async throws -> AuthResponse {
-        let body = SignUpRequest(email: email, password: password, displayName: displayName)
-        return try await request(path: "api/auth/signup", method: "POST", body: body)
-    }
-
-    func login(email: String, password: String) async throws -> AuthResponse {
-        let body = LoginRequest(email: email, password: password)
-        return try await request(path: "api/auth/login", method: "POST", body: body)
-    }
-
-    func refresh(refreshToken: String) async throws -> AuthTokenResponse {
-        return try await request(path: "api/auth/refresh", method: "POST", body: RefreshRequest(refreshToken: refreshToken))
-    }
-
-    func logout(refreshToken: String) async throws {
-        try await requestNoContent(path: "api/auth/logout", method: "POST", body: RefreshRequest(refreshToken: refreshToken))
+        apiClient = APIClient(
+            candidateBaseURLs: candidateBaseURLs,
+            dataCandidateBaseURLs: dataCandidateBaseURLs,
+            session: session
+        )
     }
 
     func currentUser(accessToken: String) async throws -> AuthUser {
@@ -283,23 +227,19 @@ struct AuthClient: AuthServicing, Sendable {
         try await requestNoContent(path: "api/account", method: "DELETE", body: Optional<EmptyBody>.none, accessToken: accessToken)
     }
 
-    func health() async throws -> HealthResponse {
-        try await request(path: "health", method: "GET")
-    }
-
     private func request<Response: Decodable, Body: Encodable>(
         path: String,
         method: String,
         body: Body? = nil,
         accessToken: String? = nil
     ) async throws -> Response {
-        let encodedBody = try body.map { try JSONEncoder().encode($0) }
+        let encodedBody = try body.map { try APIClient.makeDateEncoder().encode($0) }
         let response = try await send(path: path, method: method, body: encodedBody, accessToken: accessToken)
         guard (200...299).contains(response.response.statusCode) else {
             throw Self.authError(from: response)
         }
         do {
-            return try makeDecoder().decode(Response.self, from: response.data)
+            return try APIClient.makeDateDecoder().decode(Response.self, from: response.data)
         } catch {
             throw AuthError.decodingError
         }
@@ -310,7 +250,7 @@ struct AuthClient: AuthServicing, Sendable {
     }
 
     private func requestNoContent<Body: Encodable>(path: String, method: String, body: Body? = nil, accessToken: String? = nil) async throws {
-        let encodedBody = try body.map { try JSONEncoder().encode($0) }
+        let encodedBody = try body.map { try APIClient.makeDateEncoder().encode($0) }
         let response = try await send(path: path, method: method, body: encodedBody, accessToken: accessToken)
         guard (200...299).contains(response.response.statusCode) else {
             throw Self.authError(from: response)
@@ -323,12 +263,16 @@ struct AuthClient: AuthServicing, Sendable {
             headers["Authorization"] = "Bearer " + accessToken
         }
         do {
-            return try await apiClient.requestData(path: path, method: method, body: body, headers: headers)
+            return try await apiClient.requestData(
+                path: path,
+                method: method,
+                body: body,
+                headers: headers,
+                host: .data
+            )
         } catch APIError.networkError {
             throw AuthError.offline
-        } catch APIError.invalidResponse {
-            throw AuthError.serverUnavailable
-        } catch APIError.invalidURL {
+        } catch APIError.invalidResponse, APIError.invalidURL {
             throw AuthError.serverUnavailable
         } catch {
             throw AuthError.serverUnavailable
@@ -339,52 +283,6 @@ struct AuthClient: AuthServicing, Sendable {
         let retryAfter = response.response.value(forHTTPHeaderField: "Retry-After").flatMap(Int.init)
         return AuthError.from(statusCode: response.response.statusCode, data: response.data, retryAfter: retryAfter)
     }
-
-    private func makeDecoder() -> JSONDecoder {
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .custom { decoder in
-            let container = try decoder.singleValueContainer()
-            let value = try container.decode(String.self)
-            let fractional = ISO8601DateFormatter()
-            fractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-            if let date = fractional.date(from: value) {
-                return date
-            }
-            let standard = ISO8601DateFormatter()
-            standard.formatOptions = [.withInternetDateTime]
-            guard let date = standard.date(from: value) else {
-                throw DecodingError.dataCorruptedError(in: container, debugDescription: "Invalid server date")
-            }
-            return date
-        }
-        return decoder
-    }
-}
-
-private struct SignUpRequest: Encodable {
-    let email: String
-    let password: String
-    let displayName: String?
-
-    func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(email, forKey: .email)
-        try container.encode(password, forKey: .password)
-        try container.encodeIfPresent(displayName, forKey: .displayName)
-    }
-
-    private enum CodingKeys: String, CodingKey {
-        case email, password, displayName
-    }
-}
-
-private struct LoginRequest: Encodable {
-    let email: String
-    let password: String
-}
-
-private struct RefreshRequest: Encodable {
-    let refreshToken: String
 }
 
 private struct ProfileUpdateRequest: Encodable {
@@ -392,24 +290,9 @@ private struct ProfileUpdateRequest: Encodable {
     let stage: DriverProfile.Stage?
     let payload: [String: JSONValue]?
 
-    func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encodeIfPresent(displayName, forKey: .displayName)
-        try container.encodeIfPresent(stage, forKey: .stage)
-        try container.encodeIfPresent(payload, forKey: .payload)
-    }
-
-    private enum CodingKeys: String, CodingKey {
-        case displayName, stage, payload
-    }
+    private enum CodingKeys: String, CodingKey { case displayName, stage, payload }
 }
 
 private struct EmptyBody: Encodable {}
-
-private struct MeResponse: Decodable {
-    let user: AuthUser
-}
-
-private struct ProfileResponse: Decodable {
-    let profile: RemoteProfile
-}
+private struct MeResponse: Decodable { let user: AuthUser }
+private struct ProfileResponse: Decodable { let profile: RemoteProfile }

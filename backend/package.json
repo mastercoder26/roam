@@ -13,7 +13,7 @@
     "migrate": "tsx src/db/migrations/migrate.ts"
   },
   "dependencies": {
-    "bcryptjs": "^3.0.2",
+    "@clerk/backend": "latest",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
     "pg": "^8.16.3",

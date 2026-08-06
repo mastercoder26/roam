@@ -366,6 +366,7 @@ final class DriveSessionManager: NSObject, ObservableObject {
         let practiceRouteWasVerified = persistedPracticeRoute?.recordedRouteMatched
         recordedDrives = Array(([drive] + recordedDrives).prefix(50))
         saveRecordedDrives()
+        requestDriveHistorySync()
         lastCompletedDrive = drive
         if didSuspendRecordingInBackground {
             statusMessage = "Drive saved. Roam was suspended in the background for part of it, so some distance is missing."
@@ -473,6 +474,28 @@ final class DriveSessionManager: NSObject, ObservableObject {
             lastCompletedDrive = updatedDrives.first(where: { $0.id == id })
         }
         saveRecordedDrives()
+        requestDriveHistorySync()
+    }
+
+    /// Applies a server merge without changing the on-disk shape of the
+    /// existing recorded-drive blob. Sync owns the remote confirmation marker;
+    /// this manager remains the local source of truth for the actual drives.
+    func applySyncedRecordedDrives(_ drives: [RecordedDrive]) {
+        guard !isHistoryUnreadable else { return }
+        recordedDrives = drives
+        if let lastCompletedDrive {
+            self.lastCompletedDrive = drives.first(where: { $0.id == lastCompletedDrive.id })
+        }
+        saveRecordedDrives()
+    }
+
+    private func requestDriveHistorySync() {
+        DriveHistorySyncService.shared.sync(
+            localDrives: recordedDrives,
+            applyLocalDrives: { [weak self] drives in
+                self?.applySyncedRecordedDrives(drives)
+            }
+        )
     }
 
     /// Queues a locally generated route context for the next manually started

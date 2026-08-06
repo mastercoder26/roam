@@ -45,9 +45,9 @@ sources+=(
     ios/Roam/Features/Profile/DriverProfile.swift
     ios/Roam/Features/Home/RoutePlanningFormModel.swift
     ios/Roam/Services/APIClient.swift
-    ios/Roam/Services/AuthClient.swift
-    ios/Roam/Services/TokenStore.swift
+    ios/Roam/Services/ClerkBackendClient.swift
     ios/Roam/Services/AuthSessionStore.swift
+    ios/Roam/Services/DriveHistorySyncService.swift
     ios/Roam/Services/SharedRouteImportCoordinator.swift
 )
 
@@ -61,6 +61,7 @@ done
 
 build_dir="$(mktemp -d)"
 trap 'rm -rf "$build_dir"' EXIT
+export CLANG_MODULE_CACHE_PATH="$build_dir/module-cache"
 
 checks=()
 while IFS= read -r file; do

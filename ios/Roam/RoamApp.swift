@@ -1,4 +1,5 @@
 import SwiftUI
+import ClerkKit
 
 @main
 struct RoamApp: App {
@@ -15,6 +16,10 @@ struct RoamApp: App {
     /// docked wordmark lands exactly where the real header's does.
     @State private var headerWordmarkFrame: CGRect = .zero
 
+    init() {
+        Clerk.configure(publishableKey: "pk_test_Y2FwYWJsZS1zd2FuLTM1LmNsZXJrLmFjY291bnRzLmRldiQ")
+    }
+
     var body: some Scene {
         WindowGroup {
             ZStack {
@@ -22,6 +27,7 @@ struct RoamApp: App {
                     .environmentObject(themeManager)
                     .environmentObject(driveSession)
                     .environmentObject(authSession)
+                    .environment(Clerk.shared)
                     // The app sits very slightly forward behind the intro, so
                     // the handoff settles into place instead of cutting.
                     .scaleEffect(isIntroPlaying && !reduceMotion ? 1.03 : 1)
@@ -39,6 +45,15 @@ struct RoamApp: App {
             .onPreferenceChange(HeaderWordmarkFrameKey.self) { headerWordmarkFrame = $0 }
             .preferredColorScheme(themeManager.preferredColorScheme)
             .task {
+                authSession.configureDriveHistorySync {
+                    let driveSession = DriveSessionManager.shared
+                    DriveHistorySyncService.shared.sync(
+                        localDrives: driveSession.recordedDrives,
+                        applyLocalDrives: { drives in
+                            driveSession.applySyncedRecordedDrives(drives)
+                        }
+                    )
+                }
                 await authSession.restoreIfNeeded()
             }
             .onChange(of: scenePhase) { _, phase in
@@ -63,6 +78,7 @@ struct RoamApp: App {
             leftForegroundAt = Date()
 
         case .active:
+            authSession.requestDriveHistorySync()
             guard let leftAt = leftForegroundAt else { return }
             leftForegroundAt = nil
             guard LaunchIntroChoreography.shouldReplay(

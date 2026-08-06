@@ -490,7 +490,7 @@ struct SharedRouteInbox {
     /// is kept rather than deleted, so the app can explain the gap instead of
     /// showing an empty inbox that looks like nothing was ever shared.
     var hasUnreadableEntries: Bool {
-        guard let directory = preparedStorageDirectory() else { return false }
+        guard let directory = preparedStorageDirectory() else { print("no directory in mutate"); return false }
 
         let coordinator = NSFileCoordinator(filePresenter: nil)
         var coordinationError: NSError?
@@ -571,6 +571,8 @@ struct SharedRouteInbox {
                 in: coordinatedDirectory
             )
         }
+        if let coordinationError { print("coordination error: \(coordinationError)") }
+        print("didPersist: \(didPersist)")
         return coordinationError == nil && didPersist
     }
 
@@ -604,6 +606,7 @@ struct SharedRouteInbox {
             )
             return storageDirectory
         } catch {
+            print("prepare directory error: \(error)")
             return nil
         }
     }

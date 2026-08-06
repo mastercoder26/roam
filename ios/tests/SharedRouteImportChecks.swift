@@ -467,9 +467,11 @@ struct SharedRouteImportChecks {
     }
 
     private static func temporaryInboxDirectory() -> URL {
-        FileManager.default.temporaryDirectory
+        let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("SharedRouteImportChecks", isDirectory: true)
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        return directory
     }
 
     private static func expect(_ condition: @autoclosure () -> Bool, _ message: String) {

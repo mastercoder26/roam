@@ -1,4 +1,5 @@
 import SwiftUI
+import ClerkKitUI
 
 /// The driver's own record: who they are, what they have actually driven, and
 /// the controls that belong to the person rather than to a single route or
@@ -14,12 +15,13 @@ struct ProfileView: View {
     @EnvironmentObject private var driveSession: DriveSessionManager
     @EnvironmentObject private var authSession: AuthSessionStore
     @StateObject private var profile = DriverProfileStore.shared
+    @StateObject private var driveHistorySync = DriveHistorySyncService.shared
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     @State private var showingThemePicker = false
     @State private var showingAppIconPicker = false
-    @State private var showingSignOutConfirmation = false
     @State private var showingDeleteConfirmation = false
+    @State private var authIsPresented = false
     @State private var accountError: String?
     @State private var isAccountActionRunning = false
     @State private var isEditingIdentity = false
@@ -80,6 +82,7 @@ struct ProfileView: View {
             .navigationTitle("Profile")
             .toolbar(.hidden, for: .navigationBar)
         }
+        .prefetchClerkImages()
         .onChange(of: insightsSignature, initial: true) { _, _ in
             refreshInsights()
         }
@@ -99,15 +102,8 @@ struct ProfileView: View {
         .sheet(isPresented: $showingAppIconPicker) {
             AppIconPickerSheet(iconManager: appIcon)
         }
-        .confirmationDialog(
-            "Sign out of Roam?",
-            isPresented: $showingSignOutConfirmation,
-            titleVisibility: .visible
-        ) {
-            Button("Sign out", role: .destructive, action: signOut)
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("Your local profile and driving features stay on this device.")
+        .sheet(isPresented: $authIsPresented) {
+            AuthView()
         }
         .confirmationDialog(
             "Delete your Roam account?",
@@ -186,39 +182,30 @@ struct ProfileView: View {
     }
 
     private var signedOutAccountRow: some View {
-        NavigationLink {
-            LoginView()
-        } label: {
-            HStack(spacing: AppDesign.space12) {
-                IconTile(symbol: "person.badge.key.fill")
+        HStack(spacing: AppDesign.space12) {
+            UserButton(signedOutContent: {
+                Button("Sign in to Roam") { authIsPresented = true }
+            })
 
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("Sign in to Roam")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(AppDesign.Ink.primary)
-                    Text("Sign in to sync this profile")
-                        .font(.caption)
-                        .foregroundStyle(AppDesign.Ink.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-
-                Spacer(minLength: AppDesign.space8)
-
-                Image(systemName: "chevron.right")
-                    .font(.caption.weight(.bold))
-                    .foregroundStyle(AppDesign.Ink.tertiary)
+            VStack(alignment: .leading, spacing: 3) {
+                Text("Sign in to Roam")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(AppDesign.Ink.primary)
+                Text("Sign in to sync this profile")
+                    .font(.caption)
+                    .foregroundStyle(AppDesign.Ink.secondary)
             }
-            .frame(maxWidth: .infinity, minHeight: 60, alignment: .leading)
-            .contentShape(Rectangle())
+            Spacer(minLength: AppDesign.space8)
         }
-        .buttonStyle(PressableScaleStyle())
-        .accessibilityHint("Opens the sign-in page")
+        .frame(maxWidth: .infinity, minHeight: 60, alignment: .leading)
     }
 
     private var signedInAccountRow: some View {
         VStack(alignment: .leading, spacing: AppDesign.space12) {
             HStack(spacing: AppDesign.space12) {
-                IconTile(symbol: "person.crop.circle.fill")
+                UserButton(signedOutContent: {
+                    Button("Sign in to Roam") { authIsPresented = true }
+                })
 
                 VStack(alignment: .leading, spacing: 3) {
                     Text(accountDisplayName)
@@ -233,6 +220,7 @@ struct ProfileView: View {
             }
 
             syncStatusRow
+            driveHistorySyncStatusRow
 
             if let accountError {
                 Text(accountError)
@@ -242,11 +230,6 @@ struct ProfileView: View {
             }
 
             Divider()
-
-            Button("Sign out", action: { showingSignOutConfirmation = true })
-                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-                .foregroundStyle(AppDesign.Ink.primary)
-                .disabled(isAccountActionRunning)
 
             Button("Delete account", role: .destructive, action: { showingDeleteConfirmation = true })
                 .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
@@ -282,6 +265,34 @@ struct ProfileView: View {
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(syncStatusTitle). \(syncStatusDetail)")
+    }
+
+    private var driveHistorySyncStatusRow: some View {
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: driveHistorySyncSymbol)
+                .foregroundStyle(driveHistorySyncColor)
+                .frame(width: 20)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(driveHistorySyncTitle)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(AppDesign.Ink.primary)
+                Text(driveHistorySyncDetail)
+                    .font(.caption2)
+                    .foregroundStyle(AppDesign.Ink.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+            if case .failed = driveHistorySync.state {
+                Button("Retry") {
+                    authSession.requestDriveHistorySync()
+                }
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(AppDesign.accent)
+                .frame(minWidth: 44, minHeight: 44)
+            }
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(driveHistorySyncTitle). \(driveHistorySyncDetail)")
     }
 
     private var accountDisplayName: String {
@@ -328,16 +339,43 @@ struct ProfileView: View {
         }
     }
 
-    private func signOut() {
-        isAccountActionRunning = true
-        accountError = nil
-        Task {
-            do {
-                try await authSession.signOut()
-            } catch {
-                accountError = error.localizedDescription
-            }
-            isAccountActionRunning = false
+    private var driveHistorySyncTitle: String {
+        switch driveHistorySync.state {
+        case .idle: "Drive history ready"
+        case .syncing: "Syncing drive history"
+        case .synced: "Drive history synced"
+        case .offline: "Working offline"
+        case .failed: "Drive history sync failed"
+        }
+    }
+
+    private var driveHistorySyncDetail: String {
+        switch driveHistorySync.state {
+        case .idle: "Your saved drives stay available on this device."
+        case .syncing: "Your local drives remain available while Roam syncs."
+        case .synced: "Your saved drives are backed up for this account."
+        case .offline: "Your local drives are queued and will retry when you are back online."
+        case .failed(let message): message
+        }
+    }
+
+    private var driveHistorySyncSymbol: String {
+        switch driveHistorySync.state {
+        case .idle: "internaldrive"
+        case .syncing: "arrow.triangle.2.circlepath"
+        case .synced: "checkmark.circle.fill"
+        case .offline: "wifi.slash"
+        case .failed: "exclamationmark.circle.fill"
+        }
+    }
+
+    private var driveHistorySyncColor: Color {
+        switch driveHistorySync.state {
+        case .idle: AppDesign.Ink.secondary
+        case .syncing: AppDesign.accent
+        case .synced: AppDesign.positive
+        case .offline: AppDesign.Ink.secondary
+        case .failed: AppDesign.danger
         }
     }
 
