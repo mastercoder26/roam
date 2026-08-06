@@ -61,13 +61,7 @@ struct ProfileView: View {
                     }
 
                     HeadlineMeasurementCard(insights: insights)
-                    MilestonesSection(milestones: insights.milestones)
-                    ExperienceBreakdownSection(insights: insights)
-                    BehaviorSignalsSection(insights: insights)
-                    WeeklyTrendSection(insights: insights, reduceMotion: reduceMotion)
-                    stageCard
-                    appearanceCard
-                    appIconCard
+                    folderBrowser
                 }
                 .padding(.horizontal, AppDesign.contentPadding)
                 .padding(.vertical, 12)
@@ -104,6 +98,66 @@ struct ProfileView: View {
             from: driveSession.recordedDrives,
             stage: profile.stage
         )
+    }
+
+    // MARK: - Folders
+
+    private var folderBrowser: some View {
+        VStack(alignment: .leading, spacing: AppDesign.space12) {
+            Text("Your folders")
+                .font(.headline)
+                .foregroundStyle(AppDesign.Ink.primary)
+                .padding(.horizontal, AppDesign.space4)
+
+            ForEach(ProfileFolder.allCases) { folder in
+                NavigationLink {
+                    folderDestination(folder)
+                } label: {
+                    ProfileFolderCard(folder: folder, summary: folderSummary(folder))
+                }
+                .buttonStyle(PressableScaleStyle())
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func folderDestination(_ folder: ProfileFolder) -> some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: AppDesign.sectionSpacing) {
+                ProfileFolderHero(folder: folder)
+
+                switch folder {
+                case .progress:
+                    MilestonesSection(milestones: insights.milestones)
+                    stageCard
+                case .drivingInsights:
+                    ExperienceBreakdownSection(insights: insights)
+                    BehaviorSignalsSection(insights: insights)
+                    WeeklyTrendSection(insights: insights, reduceMotion: reduceMotion)
+                case .preferences:
+                    appearanceCard
+                    appIconCard
+                }
+            }
+            .padding(.horizontal, AppDesign.contentPadding)
+            .padding(.vertical, 12)
+        }
+        .background(AppDesign.canvas.ignoresSafeArea())
+        .navigationTitle(folder.title)
+        .navigationBarTitleDisplayMode(.inline)
+    }
+
+    private func folderSummary(_ folder: ProfileFolder) -> String {
+        switch folder {
+        case .progress:
+            let complete = insights.milestones.filter(\.isComplete).count
+            return "\(complete) of \(insights.milestones.count) goals complete"
+        case .drivingInsights:
+            guard insights.hasEvidence else { return "Ready after your first recorded drive" }
+            return String(format: "%.1f mi across %d drives", insights.measuredMiles, insights.qualifyingDriveCount)
+        case .preferences:
+            return "\(theme.currentID.title) · \(appIcon.currentID.title) icon"
+        }
     }
 
     // MARK: - Identity

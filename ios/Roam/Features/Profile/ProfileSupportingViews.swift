@@ -16,6 +16,90 @@ enum ProfileCopy {
     static let notEnoughData = "Not enough data yet"
 }
 
+// MARK: - Folder navigation
+
+/// A compact entry point that keeps the Profile home scannable. The full
+/// report stays one tap away without competing with the driver's identity and
+/// headline mileage.
+struct ProfileFolderCard: View {
+    @ObservedObject private var theme = ThemeManager.shared
+    let folder: ProfileFolder
+    let summary: String
+
+    var body: some View {
+        HStack(spacing: AppDesign.space16) {
+            folderGlyph
+
+            VStack(alignment: .leading, spacing: AppDesign.space4) {
+                Text(folder.title)
+                    .font(.headline)
+                    .foregroundStyle(AppDesign.Ink.primary)
+
+                Text(summary)
+                    .font(.caption)
+                    .foregroundStyle(AppDesign.Ink.secondary)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
+            }
+
+            Spacer(minLength: AppDesign.space8)
+
+            Image(systemName: "chevron.right")
+                .font(.caption.weight(.bold))
+                .foregroundStyle(AppDesign.Ink.tertiary)
+                .frame(width: 32, height: 32)
+                .background(AppDesign.trackSurface.opacity(0.72), in: Circle())
+        }
+        .frame(maxWidth: .infinity, minHeight: 72, alignment: .leading)
+        .contentShape(Rectangle())
+        .premiumCard()
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(folder.title). \(summary)")
+        .accessibilityHint("Opens \(folder.subtitle.lowercased())")
+    }
+
+    private var folderGlyph: some View {
+        ZStack {
+            Image(systemName: "folder.fill")
+                .font(.system(size: 50, weight: .semibold))
+                .foregroundStyle(AppDesign.accent.opacity(0.92))
+
+            Image(systemName: folder.symbol)
+                .font(.system(size: 15, weight: .bold))
+                .foregroundStyle(AppDesign.accentForeground)
+                .offset(y: 4)
+        }
+        .frame(width: 54, height: 48)
+        .accessibilityHidden(true)
+    }
+}
+
+struct ProfileFolderHero: View {
+    @ObservedObject private var theme = ThemeManager.shared
+    let folder: ProfileFolder
+
+    var body: some View {
+        HStack(alignment: .center, spacing: AppDesign.space12) {
+            Image(systemName: folder.symbol)
+                .font(.title2.weight(.semibold))
+                .foregroundStyle(AppDesign.accentForeground)
+                .frame(width: 48, height: 48)
+                .background(AppDesign.accent, in: RoundedRectangle(cornerRadius: AppDesign.cornerRadiusSmall, style: .continuous))
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(folder.title)
+                    .font(.title3.weight(.bold))
+                    .foregroundStyle(AppDesign.Ink.primary)
+                Text(folder.subtitle)
+                    .font(.footnote)
+                    .foregroundStyle(AppDesign.Ink.secondary)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .combine)
+    }
+}
+
 // MARK: - Live drive banner
 
 /// Reflects an in-progress drive without duplicating the Drive tab: a single

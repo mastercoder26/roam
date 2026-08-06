@@ -1,6 +1,42 @@
 import Combine
 import Foundation
 
+/// The small, stable information architecture for the Profile tab. Keeping
+/// this separate from SwiftUI makes the order and user-facing copy testable.
+enum ProfileFolder: String, CaseIterable, Identifiable {
+    case progress
+    case drivingInsights
+    case preferences
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .progress: "Goals & progress"
+        case .drivingInsights: "Driving insights"
+        case .preferences: "Preferences"
+        }
+    }
+
+    var subtitle: String {
+        switch self {
+        case .progress: "Milestones and your licensing stage"
+        case .drivingInsights: "Experience, behavior, and weekly trends"
+        case .preferences: "Color scheme and app icon"
+        }
+    }
+
+    var summary: String { subtitle }
+
+    var symbol: String {
+        switch self {
+        case .progress: "flag.checkered"
+        case .drivingInsights: "chart.xyaxis.line"
+        case .preferences: "slider.horizontal.3"
+        }
+    }
+}
+
 /// The driver's self-declared identity. Deliberately separate from anything
 /// measured: nothing here feeds a route score, a drive score, or readiness.
 /// It exists so the app can address the person by name and frame their own
