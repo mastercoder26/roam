@@ -4,6 +4,7 @@ import Foundation
 struct ProfileFolderChecks {
     static func main() {
         checkFolderOrderMatchesTheProfileJourney()
+        checkHomeSectionsKeepAccountSeparateFromProfileNavigation()
         checkEveryFolderHasUsefulVisibleCopy()
 
         print("ProfileFolder checks passed")
@@ -13,6 +14,25 @@ struct ProfileFolderChecks {
         expect(
             ProfileFolder.allCases == [.progress, .drivingInsights, .preferences],
             "profile folders should lead with progress, then evidence, then personal settings"
+        )
+    }
+
+    private static func checkHomeSectionsKeepAccountSeparateFromProfileNavigation() {
+        expect(
+            ProfileHomeSection.allCases == [.explore, .appearance, .account],
+            "the profile home should present exploration, appearance, and account as separate sections"
+        )
+        expect(
+            ProfileHomeSection.explore.folders == [.progress, .drivingInsights],
+            "goals and driving insights belong together, away from account controls"
+        )
+        expect(
+            ProfileHomeSection.appearance.folders == [.preferences],
+            "preferences should have its own quiet visual group"
+        )
+        expect(
+            ProfileHomeSection.account.folders.isEmpty,
+            "account is an action area, not another profile destination"
         )
     }
 
