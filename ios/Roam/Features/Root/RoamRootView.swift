@@ -36,11 +36,12 @@ struct RoamRootView: View {
     @StateObject private var routeForm = RoutePlanningFormModel()
     @StateObject private var sharedRouteImport = SharedRouteImportCoordinator()
     @Environment(\.scenePhase) private var scenePhase
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         VStack(spacing: 0) {
-            topBrandBar
+            if !driveSession.isRecording {
+                topBrandBar
+            }
 
             // The system TabView on iOS 26 already renders a genuine Liquid
             // Glass bar and minimizes it to a compact capsule on scroll —
@@ -62,6 +63,7 @@ struct RoamRootView: View {
                 }
             }
             .tabBarMinimizeBehavior(.onScrollDown)
+            .toolbar(driveSession.isRecording ? .hidden : .visible, for: .tabBar)
         }
         .environmentObject(driveSession)
         .environmentObject(themeManager)
@@ -75,9 +77,6 @@ struct RoamRootView: View {
             ThemePickerSheet(themeManager: themeManager)
                 .environmentObject(driveSession)
         }
-        .transition(.opacity)
-        .animation(reduceMotion ? AppAnimation.tabSwitchReduced : AppAnimation.tabSwitch, value: selectedTab)
-        .animation(reduceMotion ? .easeOut(duration: 0.16) : AppAnimation.content, value: themeManager.currentID)
         .onChange(of: driveSession.practiceRoutePresentationRequest) { _, request in
             // The manager emits this only when a Results-screen action queues a
             // route for practice. Keeping the request separate from the route
@@ -106,37 +105,40 @@ struct RoamRootView: View {
     /// its occupied height explicit to every tab and prevents the active
     /// screen's title from disappearing behind a safe-area inset.
     private var topBrandBar: some View {
-        Button {
-            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-            showingThemePicker = true
-        } label: {
-            HStack(spacing: 10) {
-                BrandWordmark(compact: true)
-                    .background(
-                        GeometryReader { proxy in
-                            Color.clear.preference(
-                                key: HeaderWordmarkFrameKey.self,
-                                value: proxy.frame(in: .named(LaunchIntroDockSpace.name))
-                            )
-                        }
-                    )
-                Spacer(minLength: 8)
+        HStack(spacing: 10) {
+            BrandWordmark(compact: true)
+                .background(
+                    GeometryReader { proxy in
+                        Color.clear.preference(
+                            key: HeaderWordmarkFrameKey.self,
+                            value: proxy.frame(in: .named(LaunchIntroDockSpace.name))
+                        )
+                    }
+                )
+
+            Spacer(minLength: 8)
+
+            Button {
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                showingThemePicker = true
+            } label: {
                 Image(systemName: "paintpalette.fill")
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(AppDesign.Ink.secondary)
                     .frame(width: 36, height: 36)
                     .background(AppDesign.cardSurface, in: Circle())
-                    .accessibilityHidden(true)
+                    .frame(minWidth: 44, minHeight: 44)
+                    .contentShape(Rectangle())
             }
-            .frame(minHeight: 44)
+            .buttonStyle(PressableScaleStyle())
+            .accessibilityLabel("Roam color schemes")
+            .accessibilityHint("Opens color scheme options without changing this screen")
         }
-        .buttonStyle(PressableScaleStyle())
+        .frame(minHeight: 44)
         .padding(.horizontal, 20)
         .padding(.vertical, 4)
         .frame(maxWidth: .infinity)
         .background(themeManager.palette.canvas.color)
-        .accessibilityLabel("Roam color schemes")
-        .accessibilityHint("Opens color scheme options without changing this screen")
     }
 
     private func refreshSharedRouteIfSafe() {

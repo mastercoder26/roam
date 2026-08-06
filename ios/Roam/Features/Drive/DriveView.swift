@@ -187,8 +187,20 @@ struct DriveView: View {
     }
 
     private var driveToolbar: some View {
-        HStack {
-            Spacer(minLength: 0)
+        HStack(alignment: .top, spacing: AppDesign.space12) {
+            VStack(alignment: .leading, spacing: AppDesign.space4) {
+                Text("Drive")
+                    .font(AppDesign.Typography.heroTitle)
+                    .tracking(-0.8)
+                    .foregroundStyle(AppDesign.Ink.primary)
+                Text("Record a drive or review your history.")
+                    .font(.footnote)
+                    .foregroundStyle(AppDesign.Ink.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Spacer(minLength: AppDesign.space8)
+
             Button {
                 showingHelp = true
             } label: {
@@ -204,6 +216,8 @@ struct DriveView: View {
             .accessibilityLabel("Get help")
             .accessibilityHint("Shows safety and emergency options")
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .contain)
     }
 
 

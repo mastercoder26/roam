@@ -16,28 +16,16 @@ struct HomeView: View {
 
     private let apiClient = APIClient()
 
+    private var formPresentation: RoutePlanningFormPresentation {
+        RoutePlanningFormPresentation(
+            origin: form.origin,
+            destination: form.destination,
+            usesCurrentLocation: form.usesCurrentLocation
+        )
+    }
+
     private var planningStage: RoutePlanningStage {
-        RoutePlanningStage(origin: form.origin, destination: form.destination)
-    }
-
-    private var canEnterDestination: Bool {
-        planningStage != .chooseOrigin
-    }
-
-    /// Current-location selection is already a deliberate choice, even while
-    /// MapKit is still resolving its human-readable address. Reveal the next
-    /// field at that moment, but keep Analyze disabled until the origin is
-    /// actually confirmed.
-    private var destinationIsRevealed: Bool {
-        guard !canEnterDestination else { return true }
-        if !form.destination.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            return true
-        }
-        guard form.usesCurrentLocation else { return false }
-        if case .locating = locationCoordinator.state {
-            return true
-        }
-        return false
+        formPresentation.stage
     }
 
     private var canAnalyze: Bool {
@@ -56,6 +44,10 @@ struct HomeView: View {
         case .awaitingOrigin, .manualEntry:
             return false
         }
+    }
+
+    private var mapPreviewStage: RoutePlanningMapPreviewStage {
+        formPresentation.mapPreviewStage
     }
 
     private var progressiveReveal: AnyTransition {
@@ -136,14 +128,12 @@ struct HomeView: View {
         VStack(spacing: 0) {
             originRow
 
-            if destinationIsRevealed {
+            if formPresentation.showsDestination {
                 Divider()
                     .overlay(AppDesign.Ink.tertiary.opacity(0.55))
                     .padding(.leading, 68)
-                    .transition(.opacity)
 
                 destinationRow
-                    .transition(progressiveReveal)
             }
         }
         .padding(.vertical, 6)
@@ -153,7 +143,6 @@ struct HomeView: View {
                 .stroke(AppDesign.cardStroke, lineWidth: 1)
         }
         .elevation(AppDesign.Elevation.medium)
-        .animation(reduceMotion ? .easeOut(duration: 0.18) : AppAnimation.selection, value: destinationIsRevealed)
     }
 
     @ViewBuilder
@@ -311,25 +300,51 @@ struct HomeView: View {
         }
     }
 
+    @ViewBuilder
     private var mapPreviewSection: some View {
-        RoutePlanningMapPreview(
-            origin: form.origin,
-            destination: form.destination,
-            usesCurrentLocation: form.usesCurrentLocation,
-            showsCurrentLocation: shouldShowCurrentLocationOnMap,
-            summary: $mapPreview
-        )
-        .allowsHitTesting(false)
-        .frame(height: 248)
-        .background(AppDesign.cardSurfaceElevated)
-        .clipShape(RoundedRectangle(cornerRadius: AppDesign.cornerRadiusLarge, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: AppDesign.cornerRadiusLarge, style: .continuous)
-                .stroke(AppDesign.cardStrokeStrong, lineWidth: 1)
+        if mapPreviewStage == .locationPrompt {
+            VStack(alignment: .leading, spacing: AppDesign.space8) {
+                HStack(spacing: AppDesign.space12) {
+                    IconTile(symbol: "map")
+                    Text("Your route preview")
+                        .font(.headline)
+                        .foregroundStyle(AppDesign.Ink.primary)
+                }
+
+                Text("Choose a starting point to see the route take shape.")
+                    .font(.footnote)
+                    .foregroundStyle(AppDesign.Ink.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(AppDesign.cardPadding)
+            .frame(maxWidth: .infinity, minHeight: 124, alignment: .leading)
+            .background(AppDesign.cardSurfaceElevated, in: RoundedRectangle(cornerRadius: AppDesign.cornerRadiusLarge, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: AppDesign.cornerRadiusLarge, style: .continuous)
+                    .stroke(AppDesign.cardStrokeStrong, lineWidth: 1)
+            }
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("Route preview. Choose a starting point to see the route take shape.")
+        } else {
+            RoutePlanningMapPreview(
+                origin: form.origin,
+                destination: form.destination,
+                usesCurrentLocation: form.usesCurrentLocation,
+                showsCurrentLocation: shouldShowCurrentLocationOnMap,
+                summary: $mapPreview
+            )
+            .allowsHitTesting(false)
+            .frame(height: 248)
+            .background(AppDesign.cardSurfaceElevated)
+            .clipShape(RoundedRectangle(cornerRadius: AppDesign.cornerRadiusLarge, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: AppDesign.cornerRadiusLarge, style: .continuous)
+                    .stroke(AppDesign.cardStrokeStrong, lineWidth: 1)
+            }
+            .shadow(color: AppDesign.accent.opacity(0.12), radius: 16, y: 8)
+            .elevation(AppDesign.Elevation.high)
+            .accessibilityLabel(mapPreview?.accessibilityLabel ?? "Route map")
         }
-        .shadow(color: AppDesign.accent.opacity(0.12), radius: 16, y: 8)
-        .elevation(AppDesign.Elevation.high)
-        .accessibilityLabel(mapPreview?.accessibilityLabel ?? "Route map")
     }
 
     private var departureSection: some View {

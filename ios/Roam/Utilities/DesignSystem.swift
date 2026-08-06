@@ -225,8 +225,7 @@ struct BrandWordmark: View {
     var body: some View {
         Text("Roam")
             .font(wordmarkFont)
-            // The compact wordmark lives inside a fully-labelled color-scheme
-            // control. Keep decorative chrome at a stable optical size so an
+            // Keep the compact wordmark at a stable optical size so an
             // accessibility text setting reserves its space for route inputs.
             .dynamicTypeSize(compact ? .large : .accessibility5)
             .tracking(compact ? -0.25 : -0.4)
@@ -234,7 +233,6 @@ struct BrandWordmark: View {
             .contentShape(Rectangle())
             .accessibilityLabel("Roam")
             .accessibilityAddTraits(.isHeader)
-            .accessibilityHint("Opens color scheme options")
     }
 
     /// High-contrast brand ink for the current canvas (never uses a stale palette).
@@ -243,8 +241,7 @@ struct BrandWordmark: View {
     }
 
     private var wordmarkFont: Font {
-        // A wordmark is decorative inside the labelled color-scheme button.
-        // Keep its compact form fixed so accessibility text enlarges the task
+        // Keep the compact form fixed so accessibility text enlarges task
         // controls, not a persistent brand bar that would push them away.
         if compact {
             return .custom("Baskerville-SemiBoldItalic", size: 23)

@@ -28,7 +28,7 @@ struct ProfileFolderCard: View {
 
     var body: some View {
         HStack(spacing: AppDesign.space16) {
-            folderGlyph
+            IconTile(symbol: folder.symbol)
 
             VStack(alignment: .leading, spacing: AppDesign.space4) {
                 Text(folder.title)
@@ -47,8 +47,7 @@ struct ProfileFolderCard: View {
             Image(systemName: "chevron.right")
                 .font(.caption.weight(.bold))
                 .foregroundStyle(AppDesign.Ink.tertiary)
-                .frame(width: 32, height: 32)
-                .background(AppDesign.trackSurface.opacity(0.72), in: Circle())
+                .frame(width: 24, height: 24)
         }
         .padding(.vertical, AppDesign.space8)
         .frame(maxWidth: .infinity, minHeight: 60, alignment: .leading)
@@ -56,47 +55,6 @@ struct ProfileFolderCard: View {
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(folder.title). \(summary)")
         .accessibilityHint("Opens \(folder.subtitle.lowercased())")
-    }
-
-    private var folderGlyph: some View {
-        ZStack {
-            Image(systemName: "folder.fill")
-                .font(.system(size: 44, weight: .semibold))
-                .foregroundStyle(AppDesign.accent.opacity(0.92))
-
-            Image(systemName: folder.symbol)
-                .font(.system(size: 15, weight: .bold))
-                .foregroundStyle(AppDesign.accentForeground)
-                .offset(y: 4)
-        }
-        .frame(width: 50, height: 44)
-        .accessibilityHidden(true)
-    }
-}
-
-struct ProfileFolderHero: View {
-    @ObservedObject private var theme = ThemeManager.shared
-    let folder: ProfileFolder
-
-    var body: some View {
-        HStack(alignment: .center, spacing: AppDesign.space12) {
-            Image(systemName: folder.symbol)
-                .font(.title2.weight(.semibold))
-                .foregroundStyle(AppDesign.accentForeground)
-                .frame(width: 48, height: 48)
-                .background(AppDesign.accent, in: RoundedRectangle(cornerRadius: AppDesign.cornerRadiusSmall, style: .continuous))
-
-            VStack(alignment: .leading, spacing: 3) {
-                Text(folder.title)
-                    .font(.title3.weight(.bold))
-                    .foregroundStyle(AppDesign.Ink.primary)
-                Text(folder.subtitle)
-                    .font(.footnote)
-                    .foregroundStyle(AppDesign.Ink.secondary)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .accessibilityElement(children: .combine)
     }
 }
 
@@ -135,59 +93,6 @@ struct LiveDriveBanner: View {
                 + "Distance \(String(format: "%.1f", driveSession.currentDistanceMiles)) miles. "
                 + "Speed \(driveSession.currentSpeedMilesPerHour) miles per hour."
         )
-    }
-}
-
-// MARK: - Headline
-
-/// The single number a driver cares about most, framed with stage guidance
-/// and, when there is one, the date of their last recorded drive.
-struct HeadlineMeasurementCard: View {
-    @ObservedObject private var theme = ThemeManager.shared
-    let insights: DriverProfileInsights
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: AppDesign.space12) {
-            HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Text(String(format: "%.1f", insights.hasEvidence ? insights.measuredMiles : 0))
-                    .font(.system(size: 40, weight: .bold, design: .rounded))
-                    .monospacedDigit()
-                Text("measured miles")
-                    .font(.subheadline.weight(.medium))
-                    .foregroundStyle(AppDesign.Ink.secondary)
-            }
-            .accessibilityElement(children: .combine)
-            .accessibilityLabel(
-                insights.hasEvidence
-                    ? "\(String(format: "%.1f", insights.measuredMiles)) measured miles"
-                    : "No measured miles yet"
-            )
-
-            Text(insights.stageGuidance)
-                .font(.footnote)
-                .foregroundStyle(AppDesign.Ink.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-
-            if let lastDriveDate = insights.lastDriveDate {
-                Label("Last drive \(lastDriveDate.formatted(date: .abbreviated, time: .omitted))", systemImage: "clock")
-                    .font(.caption)
-                    .foregroundStyle(AppDesign.Ink.tertiary)
-            }
-        }
-        .padding(AppDesign.cardPadding)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            LinearGradient(
-                colors: [AppDesign.accent.opacity(0.16), AppDesign.cardSurface],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            ),
-            in: RoundedRectangle(cornerRadius: AppDesign.cornerRadiusLarge, style: .continuous)
-        )
-        .overlay {
-            RoundedRectangle(cornerRadius: AppDesign.cornerRadiusLarge, style: .continuous)
-                .stroke(AppDesign.accent.opacity(0.24), lineWidth: 1)
-        }
     }
 }
 

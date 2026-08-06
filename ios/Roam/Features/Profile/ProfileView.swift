@@ -19,6 +19,11 @@ struct ProfileView: View {
     @State private var showingAppIconPicker = false
     @State private var isEditingIdentity = false
     @State private var insights = DriverProfileInsightsEngine.makeInsights(from: [], stage: .permit)
+    @FocusState private var focusedIdentityField: IdentityField?
+
+    private enum IdentityField: Hashable {
+        case name
+    }
 
     /// A cheap fingerprint of everything that can change the aggregated
     /// insights: drive count, the most recent drive's identity, each drive's
@@ -54,14 +59,13 @@ struct ProfileView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: AppDesign.sectionSpacing) {
-                    ScreenHeader(title: "Profile", symbol: "person.crop.circle.fill")
+                    profileHeader
                     identityCard
 
                     if driveSession.isRecording {
                         LiveDriveBanner(driveSession: driveSession)
                     }
 
-                    HeadlineMeasurementCard(insights: insights)
                     folderBrowser
                 }
                 .padding(.horizontal, AppDesign.contentPadding)
@@ -81,6 +85,7 @@ struct ProfileView: View {
             guard isEditingIdentity else { return }
             profile.commitDisplayNameEdit()
             isEditingIdentity = false
+            focusedIdentityField = nil
         }
         .sheet(isPresented: $showingThemePicker) {
             ThemePickerSheet(themeManager: theme)
@@ -98,14 +103,22 @@ struct ProfileView: View {
         )
     }
 
-    // MARK: - Folders
+    private var profileHeader: some View {
+        Text("Profile")
+            .font(AppDesign.Typography.heroTitle)
+            .tracking(-0.8)
+            .foregroundStyle(AppDesign.Ink.primary)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityAddTraits(.isHeader)
+    }
+
+    // MARK: - Navigation
 
     private var folderBrowser: some View {
         VStack(alignment: .leading, spacing: AppDesign.space12) {
-            Text("Your folders")
-                .font(.headline)
-                .foregroundStyle(AppDesign.Ink.primary)
-                .padding(.horizontal, AppDesign.space4)
+            SectionHeader(
+                title: "Explore your profile"
+            )
 
             VStack(spacing: 0) {
                 ForEach(ProfileFolder.allCases) { folder in
@@ -118,20 +131,59 @@ struct ProfileView: View {
 
                     if folder != ProfileFolder.allCases.last {
                         Divider()
-                            .padding(.leading, 66)
+                            .padding(.leading, 52)
                     }
                 }
+
+                Divider()
+                    .padding(.leading, 52)
+
+                accountRow
             }
-            .premiumCard()
+            .padding(.horizontal, AppDesign.space4)
+            .background(AppDesign.cardSurface, in: RoundedRectangle(cornerRadius: AppDesign.cornerRadius, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: AppDesign.cornerRadius, style: .continuous)
+                    .stroke(AppDesign.cardStroke, lineWidth: 1)
+            }
+            .elevation(AppDesign.Elevation.low)
         }
+    }
+
+    private var accountRow: some View {
+        NavigationLink {
+            LoginView()
+        } label: {
+            HStack(spacing: AppDesign.space12) {
+                IconTile(symbol: "person.badge.key.fill")
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Sign in to Roam")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(AppDesign.Ink.primary)
+                    Text("Account sync is coming soon.")
+                        .font(.caption)
+                        .foregroundStyle(AppDesign.Ink.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                Spacer(minLength: AppDesign.space8)
+
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(AppDesign.Ink.tertiary)
+            }
+            .frame(maxWidth: .infinity, minHeight: 60, alignment: .leading)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(PressableScaleStyle())
+        .accessibilityHint("Opens the sign-in page")
     }
 
     @ViewBuilder
     private func folderDestination(_ folder: ProfileFolder) -> some View {
         ScrollView {
             VStack(alignment: .leading, spacing: AppDesign.sectionSpacing) {
-                ProfileFolderHero(folder: folder)
-
                 switch folder {
                 case .progress:
                     MilestonesSection(milestones: insights.milestones)
@@ -160,7 +212,7 @@ struct ProfileView: View {
             return "\(complete) of \(insights.milestones.count) goals complete"
         case .drivingInsights:
             guard insights.hasEvidence else { return "Ready after your first recorded drive" }
-            return String(format: "%.1f mi across %d drives", insights.measuredMiles, insights.qualifyingDriveCount)
+            return "\(insights.qualifyingDriveCount) qualifying \(insights.qualifyingDriveCount == 1 ? "drive" : "drives") recorded"
         case .preferences:
             return "\(theme.currentID.title) · \(appIcon.currentID.title) icon"
         }
@@ -169,23 +221,32 @@ struct ProfileView: View {
     // MARK: - Identity
 
     private var identityCard: some View {
-        VStack(alignment: .leading, spacing: AppDesign.space8) {
-            HStack(spacing: AppDesign.space12) {
+        VStack(alignment: .leading, spacing: AppDesign.space12) {
+            HStack(alignment: .top, spacing: AppDesign.space12) {
                 monogram
 
                 VStack(alignment: .leading, spacing: 2) {
                     if isEditingIdentity {
-                        TextField("Your name", text: $profile.displayName)
+                        TextField("Add your name", text: $profile.displayName)
                             .font(AppDesign.Typography.bodyEmphasized)
                             .foregroundStyle(AppDesign.Ink.primary)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 8)
+                            .background(AppDesign.cardSurfaceElevated, in: RoundedRectangle(cornerRadius: AppDesign.cornerRadiusSmall, style: .continuous))
+                            .overlay {
+                                RoundedRectangle(cornerRadius: AppDesign.cornerRadiusSmall, style: .continuous)
+                                    .stroke(AppDesign.cardStrokeStrong, lineWidth: 1)
+                            }
                             .textInputAutocapitalization(.words)
                             .submitLabel(.done)
+                            .focused($focusedIdentityField, equals: .name)
                             .onSubmit {
                                 profile.commitDisplayNameEdit()
                                 isEditingIdentity = false
+                                focusedIdentityField = nil
                             }
                     } else {
-                        Text(profile.resolvedDisplayName)
+                        Text(profile.displayName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Add your name" : profile.resolvedDisplayName)
                             .font(.title3.weight(.semibold))
                             .foregroundStyle(AppDesign.Ink.primary)
                     }
@@ -200,8 +261,14 @@ struct ProfileView: View {
                 Button {
                     if isEditingIdentity {
                         profile.commitDisplayNameEdit()
+                        focusedIdentityField = nil
+                        withAnimation(AppAnimation.quick) { isEditingIdentity = false }
+                        return
                     }
-                    withAnimation(AppAnimation.quick) { isEditingIdentity.toggle() }
+                    withAnimation(AppAnimation.quick) { isEditingIdentity = true }
+                    DispatchQueue.main.async {
+                        focusedIdentityField = .name
+                    }
                 } label: {
                     Image(systemName: isEditingIdentity ? "checkmark" : "pencil")
                         .font(.subheadline.weight(.semibold))
@@ -213,10 +280,33 @@ struct ProfileView: View {
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(PressableScaleStyle())
-                .accessibilityLabel(isEditingIdentity ? "Save name" : "Edit name")
+                .accessibilityLabel(
+                    isEditingIdentity
+                        ? "Save name"
+                        : (profile.displayName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Add your name" : "Edit name")
+                )
             }
 
             persistenceErrorNote
+
+            Divider()
+
+            if insights.hasEvidence {
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Text(String(format: "%.1f", insights.measuredMiles))
+                        .font(.title.weight(.bold).monospacedDigit())
+                        .foregroundStyle(AppDesign.Ink.primary)
+                    Text("measured miles")
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(AppDesign.Ink.secondary)
+                }
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel("\(String(format: "%.1f", insights.measuredMiles)) measured miles")
+            } else {
+                Text("No measured miles yet")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(AppDesign.Ink.secondary)
+            }
         }
         .premiumCard()
     }
