@@ -566,9 +566,6 @@
 							com.apple.AssociatedDomains = {
 								enabled = 1;
 							};
-							com.apple.SignInWithApple = {
-								enabled = 1;
-							};
 						};
 					};
 					A60000000000000000000002 = {
