@@ -33,6 +33,7 @@ struct RoamRootView: View {
     @State private var showingThemePicker = false
     @EnvironmentObject private var driveSession: DriveSessionManager
     @EnvironmentObject private var themeManager: ThemeManager
+    @EnvironmentObject private var authSession: AuthSessionStore
     @StateObject private var routeForm = RoutePlanningFormModel()
     @StateObject private var sharedRouteImport = SharedRouteImportCoordinator()
     @Environment(\.scenePhase) private var scenePhase
@@ -91,6 +92,7 @@ struct RoamRootView: View {
         .onChange(of: scenePhase) { _, phase in
             guard phase == .active else { return }
             refreshSharedRouteIfSafe()
+            Task { await authSession.retryProfileSync() }
         }
         .onChange(of: driveSession.isRecording) { _, isRecording in
             guard !isRecording else { return }
@@ -174,4 +176,5 @@ struct RoamRootView: View {
     RoamRootView()
         .environmentObject(ThemeManager.shared)
         .environmentObject(DriveSessionManager.shared)
+        .environmentObject(AuthSessionStore.shared)
 }

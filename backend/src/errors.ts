@@ -1,6 +1,19 @@
 import { randomUUID } from "node:crypto";
 
-export type PublicErrorCode = "INVALID_REQUEST" | "ROUTE_UNAVAILABLE" | "RATE_LIMITED";
+export type PublicErrorCode =
+  | "INVALID_REQUEST"
+  | "ROUTE_UNAVAILABLE"
+  | "RATE_LIMITED"
+  | "VALIDATION_ERROR"
+  | "UNAUTHORIZED"
+  | "TOKEN_EXPIRED"
+  | "EMAIL_TAKEN"
+  | "SERVICE_UNAVAILABLE"
+  | "INTERNAL_ERROR";
+
+export function isDatabaseConfigured(): boolean {
+  return Boolean(process.env.DATABASE_URL?.trim());
+}
 
 export class RequestValidationError extends Error {
   constructor(message: string) {
@@ -15,6 +28,21 @@ export class RouteProviderError extends Error {
   constructor(readonly providerStatus?: number) {
     super("Routes provider returned invalid data");
     this.name = "RouteProviderError";
+  }
+}
+
+export class DatabaseUnavailableError extends Error {
+  constructor(message = "Database is unavailable", options?: ErrorOptions) {
+    super(message);
+    this.name = "DatabaseUnavailableError";
+    if (options?.cause !== undefined) this.cause = options.cause;
+  }
+}
+
+export class DatabaseOperationError extends DatabaseUnavailableError {
+  constructor(readonly originalError: unknown) {
+    super("Database operation failed");
+    this.name = "DatabaseOperationError";
   }
 }
 
@@ -49,6 +77,32 @@ export function logRateLimited(
     event: "rate_limited",
     requestId,
     endpoint: context.endpoint,
+  }));
+}
+
+export function logDatabaseFailure(
+  requestId: string,
+  context: { endpoint: string },
+  error: unknown
+): void {
+  console.error(JSON.stringify({
+    event: "database_request_failed",
+    requestId,
+    endpoint: context.endpoint,
+    errorClass: error instanceof Error ? error.name : "UnknownError",
+  }));
+}
+
+export function logInternalFailure(
+  requestId: string,
+  context: { endpoint: string },
+  error: unknown
+): void {
+  console.error(JSON.stringify({
+    event: "request_failed",
+    requestId,
+    endpoint: context.endpoint,
+    errorClass: error instanceof Error ? error.name : "UnknownError",
   }));
 }
 

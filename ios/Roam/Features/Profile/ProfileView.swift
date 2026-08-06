@@ -12,11 +12,16 @@ struct ProfileView: View {
     @ObservedObject private var theme = ThemeManager.shared
     @ObservedObject private var appIcon = AppIconManager.shared
     @EnvironmentObject private var driveSession: DriveSessionManager
-    @StateObject private var profile = DriverProfileStore()
+    @EnvironmentObject private var authSession: AuthSessionStore
+    @StateObject private var profile = DriverProfileStore.shared
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     @State private var showingThemePicker = false
     @State private var showingAppIconPicker = false
+    @State private var showingSignOutConfirmation = false
+    @State private var showingDeleteConfirmation = false
+    @State private var accountError: String?
+    @State private var isAccountActionRunning = false
     @State private var isEditingIdentity = false
     @State private var insights = DriverProfileInsightsEngine.makeInsights(from: [], stage: .permit)
     @FocusState private var focusedIdentityField: IdentityField?
@@ -94,6 +99,26 @@ struct ProfileView: View {
         .sheet(isPresented: $showingAppIconPicker) {
             AppIconPickerSheet(iconManager: appIcon)
         }
+        .confirmationDialog(
+            "Sign out of Roam?",
+            isPresented: $showingSignOutConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Sign out", role: .destructive, action: signOut)
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Your local profile and driving features stay on this device.")
+        }
+        .confirmationDialog(
+            "Delete your Roam account?",
+            isPresented: $showingDeleteConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Delete account", role: .destructive, action: deleteAccount)
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This deletes your server account and synced profile. Your local drives stay, but the local profile fields are cleared.")
+        }
     }
 
     private func refreshInsights() {
@@ -150,7 +175,17 @@ struct ProfileView: View {
         }
     }
 
+    @ViewBuilder
     private var accountRow: some View {
+        switch authSession.state {
+        case .signedIn, .signedInOffline:
+            signedInAccountRow
+        case .restoring, .signedOut, .authenticating:
+            signedOutAccountRow
+        }
+    }
+
+    private var signedOutAccountRow: some View {
         NavigationLink {
             LoginView()
         } label: {
@@ -161,7 +196,7 @@ struct ProfileView: View {
                     Text("Sign in to Roam")
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(AppDesign.Ink.primary)
-                    Text("Account sync is coming soon.")
+                    Text("Sign in to sync this profile")
                         .font(.caption)
                         .foregroundStyle(AppDesign.Ink.secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -178,6 +213,145 @@ struct ProfileView: View {
         }
         .buttonStyle(PressableScaleStyle())
         .accessibilityHint("Opens the sign-in page")
+    }
+
+    private var signedInAccountRow: some View {
+        VStack(alignment: .leading, spacing: AppDesign.space12) {
+            HStack(spacing: AppDesign.space12) {
+                IconTile(symbol: "person.crop.circle.fill")
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(accountDisplayName)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(AppDesign.Ink.primary)
+                    Text(authSession.currentUser?.email.isEmpty == false ? authSession.currentUser?.email ?? "" : "Signed in")
+                        .font(.caption)
+                        .foregroundStyle(AppDesign.Ink.secondary)
+                }
+
+                Spacer(minLength: AppDesign.space8)
+            }
+
+            syncStatusRow
+
+            if let accountError {
+                Text(accountError)
+                    .font(.caption)
+                    .foregroundStyle(AppDesign.danger)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Divider()
+
+            Button("Sign out", action: { showingSignOutConfirmation = true })
+                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                .foregroundStyle(AppDesign.Ink.primary)
+                .disabled(isAccountActionRunning)
+
+            Button("Delete account", role: .destructive, action: { showingDeleteConfirmation = true })
+                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                .foregroundStyle(AppDesign.danger)
+                .disabled(isAccountActionRunning)
+        }
+        .padding(.vertical, AppDesign.space8)
+    }
+
+    private var syncStatusRow: some View {
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: syncStatusSymbol)
+                .foregroundStyle(syncStatusColor)
+                .frame(width: 20)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(syncStatusTitle)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(AppDesign.Ink.primary)
+                Text(syncStatusDetail)
+                    .font(.caption2)
+                    .foregroundStyle(AppDesign.Ink.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+            if case .failed = authSession.syncStatus {
+                Button("Retry") {
+                    Task { await authSession.retryProfileSync() }
+                }
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(AppDesign.accent)
+                .frame(minWidth: 44, minHeight: 44)
+            }
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(syncStatusTitle). \(syncStatusDetail)")
+    }
+
+    private var accountDisplayName: String {
+        guard let displayName = authSession.currentUser?.displayName?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !displayName.isEmpty else {
+            return "Your Roam account"
+        }
+        return displayName
+    }
+
+    private var syncStatusTitle: String {
+        switch authSession.syncStatus {
+        case .synced: "Synced"
+        case .syncing: "Syncing profile"
+        case .workingOffline: "Working offline"
+        case .failed: "Sync failed"
+        }
+    }
+
+    private var syncStatusDetail: String {
+        switch authSession.syncStatus {
+        case .synced: "Your profile is up to date."
+        case .syncing: "Saving your profile changes."
+        case .workingOffline: "Changes will sync when you are back."
+        case .failed(let message): message
+        }
+    }
+
+    private var syncStatusSymbol: String {
+        switch authSession.syncStatus {
+        case .synced: "checkmark.circle.fill"
+        case .syncing: "arrow.triangle.2.circlepath"
+        case .workingOffline: "wifi.slash"
+        case .failed: "exclamationmark.circle.fill"
+        }
+    }
+
+    private var syncStatusColor: Color {
+        switch authSession.syncStatus {
+        case .synced: AppDesign.positive
+        case .syncing: AppDesign.accent
+        case .workingOffline: AppDesign.Ink.secondary
+        case .failed: AppDesign.danger
+        }
+    }
+
+    private func signOut() {
+        isAccountActionRunning = true
+        accountError = nil
+        Task {
+            do {
+                try await authSession.signOut()
+            } catch {
+                accountError = error.localizedDescription
+            }
+            isAccountActionRunning = false
+        }
+    }
+
+    private func deleteAccount() {
+        isAccountActionRunning = true
+        accountError = nil
+        Task {
+            do {
+                try await authSession.deleteAccount()
+            } catch {
+                accountError = error.localizedDescription
+            }
+            isAccountActionRunning = false
+        }
     }
 
     @ViewBuilder
@@ -462,4 +636,5 @@ struct ProfileView: View {
 #Preview {
     ProfileView()
         .environmentObject(DriveSessionManager.shared)
+        .environmentObject(AuthSessionStore.shared)
 }

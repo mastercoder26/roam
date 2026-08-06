@@ -1,15 +1,17 @@
 import SwiftUI
 
-/// A visual account entry point for the prototype. The controls intentionally
-/// stop at presentation for now; wiring authentication can happen without
-/// changing the screen's hierarchy or copy.
 struct LoginView: View {
     @ObservedObject private var theme = ThemeManager.shared
+    @EnvironmentObject private var authSession: AuthSessionStore
+    @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     @State private var email = ""
     @State private var password = ""
-    @State private var showingComingSoon = false
+    @State private var emailError: String?
+    @State private var passwordError: String?
+    @State private var formError: AuthError?
+    @State private var isSubmitting = false
     @FocusState private var focusedField: Field?
 
     private enum Field: Hashable {
@@ -64,11 +66,12 @@ struct LoginView: View {
                 .font(.headline)
                 .foregroundStyle(AppDesign.Ink.primary)
 
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Email")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(AppDesign.Ink.secondary)
+            if formError != nil {
+                loginBanner
+                    .transition(.opacity)
+            }
 
+            labeledField(title: "Email", error: emailError) {
                 HStack(spacing: 10) {
                     Image(systemName: "envelope")
                         .foregroundStyle(AppDesign.Ink.tertiary)
@@ -85,13 +88,7 @@ struct LoginView: View {
                         .submitLabel(.next)
                         .onSubmit { focusedField = .password }
                 }
-                .padding(.horizontal, 12)
-                .frame(minHeight: 48)
-                .background(AppDesign.cardSurfaceElevated, in: RoundedRectangle(cornerRadius: AppDesign.cornerRadiusSmall, style: .continuous))
-                .overlay {
-                    RoundedRectangle(cornerRadius: AppDesign.cornerRadiusSmall, style: .continuous)
-                        .stroke(focusedField == .email ? AppDesign.accent : AppDesign.cardStroke, lineWidth: focusedField == .email ? 1.5 : 1)
-                }
+                .fieldContainer(isFocused: focusedField == .email)
             }
 
             VStack(alignment: .leading, spacing: 8) {
@@ -100,12 +97,12 @@ struct LoginView: View {
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(AppDesign.Ink.secondary)
                     Spacer()
-                    Button("Forgot password?") { placeholderAction() }
+                    NavigationLink("Forgot password?", destination: ForgotPasswordView())
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(AppDesign.accent)
                         .frame(minHeight: 44, alignment: .trailing)
                         .buttonStyle(PressableScaleStyle())
-                        .accessibilityHint("Password recovery will be available soon")
+                        .accessibilityHint("Opens honest recovery options and support contact details")
                 }
 
                 HStack(spacing: 10) {
@@ -119,95 +116,138 @@ struct LoginView: View {
                         .accessibilityLabel("Password")
                         .focused($focusedField, equals: .password)
                         .submitLabel(.done)
+                        .onSubmit { submit() }
                 }
-                .padding(.horizontal, 12)
-                .frame(minHeight: 48)
-                .background(AppDesign.cardSurfaceElevated, in: RoundedRectangle(cornerRadius: AppDesign.cornerRadiusSmall, style: .continuous))
-                .overlay {
-                    RoundedRectangle(cornerRadius: AppDesign.cornerRadiusSmall, style: .continuous)
-                        .stroke(focusedField == .password ? AppDesign.accent : AppDesign.cardStroke, lineWidth: focusedField == .password ? 1.5 : 1)
+                .fieldContainer(isFocused: focusedField == .password)
+
+                if let passwordError {
+                    AuthFieldError(text: passwordError)
                 }
             }
 
-            Button { placeholderAction() }
-            label: {
-                Text("Sign in")
-                    .font(.body.weight(.semibold))
-                    .frame(maxWidth: .infinity)
-                    .frame(minHeight: 52)
-                    .foregroundStyle(AppDesign.accentForeground)
-                    .background(AppDesign.accent, in: RoundedRectangle(cornerRadius: AppDesign.cornerRadiusSmall, style: .continuous))
+            Button(action: submit) {
+                Group {
+                    if isSubmitting {
+                        ProgressView()
+                            .tint(AppDesign.accentForeground)
+                    } else {
+                        Text("Sign in")
+                    }
+                }
+                .font(.body.weight(.semibold))
+                .frame(maxWidth: .infinity)
+                .frame(minHeight: 52)
+                .foregroundStyle(AppDesign.accentForeground)
+                .background(AppDesign.accent, in: RoundedRectangle(cornerRadius: AppDesign.cornerRadiusSmall, style: .continuous))
             }
             .buttonStyle(PressableScaleStyle())
-            .accessibilityHint("Sign-in is not connected in this prototype")
+            .disabled(isSubmitting)
+            .accessibilityHint("Signs in and syncs your local profile when the server is available")
         }
         .premiumCard()
     }
 
+    private func labeledField<Content: View>(title: String, error: String?, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(AppDesign.Ink.secondary)
+            content()
+            if let error {
+                AuthFieldError(text: error)
+            }
+        }
+    }
+
     private var providerDivider: some View {
         HStack(spacing: 12) {
-            Rectangle()
-                .fill(AppDesign.cardStroke)
-                .frame(height: 1)
+            Rectangle().fill(AppDesign.cardStroke).frame(height: 1)
             Text("or continue with")
                 .font(.caption)
                 .foregroundStyle(AppDesign.Ink.tertiary)
                 .fixedSize()
-            Rectangle()
-                .fill(AppDesign.cardStroke)
-                .frame(height: 1)
+            Rectangle().fill(AppDesign.cardStroke).frame(height: 1)
         }
         .accessibilityHidden(true)
     }
 
     private var providerButtons: some View {
         VStack(spacing: 10) {
-            AuthProviderButton(title: "Continue with Apple", symbol: "apple.logo", action: placeholderAction)
-            AuthProviderButton(title: "Continue with Google", symbol: "globe", action: placeholderAction)
+            // The backend would need POST /api/auth/apple to exchange an Apple identity token.
+            AuthProviderButton(title: "Continue with Apple", symbol: "apple.logo")
+            // The backend would need POST /api/auth/google to exchange a Google identity token.
+            AuthProviderButton(title: "Continue with Google", symbol: "globe")
         }
     }
 
     private var footer: some View {
-        VStack(spacing: 12) {
-            if showingComingSoon {
-                Label("Authentication is being prepared for this prototype.", systemImage: "info.circle.fill")
-                    .font(.caption)
-                    .foregroundStyle(AppDesign.Ink.secondary)
-                    .multilineTextAlignment(.center)
-                    .frame(maxWidth: .infinity)
-                    .transition(.opacity)
-            }
-
-            Button { placeholderAction() }
-            label: {
-                Text("New to Roam? Create an account")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(AppDesign.accent)
-                    .frame(minHeight: 44)
-            }
-            .buttonStyle(PressableScaleStyle())
-            .accessibilityHint("Account creation will be available soon")
+        NavigationLink(destination: SignUpView()) {
+            Text("New to Roam? Create an account")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(AppDesign.accent)
+                .frame(maxWidth: .infinity, minHeight: 44)
         }
-        .animation(reduceMotion ? .easeOut(duration: 0.16) : AppAnimation.quick, value: showingComingSoon)
+        .buttonStyle(PressableScaleStyle())
+        .accessibilityHint("Opens the account creation form")
+        .animation(reduceMotion ? .easeOut(duration: 0.16) : AppAnimation.quick, value: formError != nil)
     }
 
-    private func placeholderAction() {
-        showingComingSoon = true
+    @ViewBuilder
+    private var loginBanner: some View {
+        if let formError {
+            AuthFormErrorBanner(error: formError, onRetry: formError.isTransient ? submit : nil) {
+                self.formError = nil
+            }
+        }
+    }
+
+    private func submit() {
+        guard !isSubmitting else { return }
+        emailError = nil
+        passwordError = nil
+        formError = nil
+
+        let normalizedEmail = email.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard Self.isValidEmail(normalizedEmail) else {
+            emailError = "Enter a valid email address."
+            focusedField = .email
+            return
+        }
+        guard password.count >= 8 else {
+            passwordError = "Use at least 8 characters."
+            focusedField = .password
+            return
+        }
+
+        isSubmitting = true
+        Task { @MainActor in
+            defer { isSubmitting = false }
+            do {
+                try await authSession.signIn(email: normalizedEmail, password: password)
+                dismiss()
+            } catch let error as AuthError {
+                if error.code == .emailTaken {
+                    emailError = error.localizedDescription
+                } else {
+                    formError = error
+                }
+            } catch {
+                formError = .serverUnavailable
+            }
+        }
+    }
+
+    private static func isValidEmail(_ value: String) -> Bool {
+        let parts = value.split(separator: "@", omittingEmptySubsequences: false)
+        guard parts.count == 2, !parts[0].isEmpty else { return false }
+        return parts[1].contains(".") && !parts[1].hasPrefix(".") && !parts[1].hasSuffix(".")
     }
 
     private var loginBackground: some View {
         ZStack {
             AppDesign.canvas
-
             Circle()
-                .fill(
-                    RadialGradient(
-                        colors: [AppDesign.accent.opacity(0.16), AppDesign.accent.opacity(0)],
-                        center: .center,
-                        startRadius: 0,
-                        endRadius: 220
-                    )
-                )
+                .fill(RadialGradient(colors: [AppDesign.accent.opacity(0.16), AppDesign.accent.opacity(0)], center: .center, startRadius: 0, endRadius: 220))
                 .frame(width: 440, height: 440)
                 .offset(x: 150, y: -300)
                 .blur(radius: 12)
@@ -217,23 +257,79 @@ struct LoginView: View {
     }
 }
 
-private struct AuthProviderButton: View {
-    @ObservedObject private var theme = ThemeManager.shared
-    let title: String
-    let symbol: String
-    let action: () -> Void
+private extension View {
+    func fieldContainer(isFocused: Bool) -> some View {
+        padding(.horizontal, 12)
+            .frame(minHeight: 48)
+            .background(AppDesign.cardSurfaceElevated, in: RoundedRectangle(cornerRadius: AppDesign.cornerRadiusSmall, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: AppDesign.cornerRadiusSmall, style: .continuous)
+                    .stroke(isFocused ? AppDesign.accent : AppDesign.cardStroke, lineWidth: isFocused ? 1.5 : 1)
+            }
+    }
+}
+
+struct AuthFieldError: View {
+    let text: String
 
     var body: some View {
-        Button(action: action) {
+        Label(text, systemImage: "exclamationmark.circle")
+            .font(.caption)
+            .foregroundStyle(AppDesign.danger)
+            .fixedSize(horizontal: false, vertical: true)
+            .accessibilityLabel(text)
+    }
+}
+
+struct AuthFormErrorBanner: View {
+    let error: AuthError
+    let onRetry: (() -> Void)?
+    let onDismiss: () -> Void
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 10) {
+            Label(error.localizedDescription, systemImage: "exclamationmark.triangle.fill")
+                .font(.caption)
+                .foregroundStyle(AppDesign.Ink.primary)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 4)
+            if let onRetry {
+                Button("Retry", action: onRetry)
+                    .font(.caption.weight(.semibold))
+                    .frame(minHeight: 44)
+                    .buttonStyle(PressableScaleStyle())
+            }
+            Button(action: onDismiss) {
+                Image(systemName: "xmark")
+                    .frame(width: 44, height: 44)
+            }
+            .accessibilityLabel("Dismiss message")
+        }
+        .padding(12)
+        .background(AppDesign.cardSurface, in: RoundedRectangle(cornerRadius: AppDesign.cornerRadiusSmall, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: AppDesign.cornerRadiusSmall, style: .continuous)
+                .stroke(AppDesign.cardStroke, lineWidth: 1)
+        }
+    }
+}
+
+struct AuthProviderButton: View {
+    let title: String
+    let symbol: String
+
+    var body: some View {
+        Button(action: {}) {
             HStack(spacing: 10) {
                 Image(systemName: symbol)
                     .font(.body.weight(.semibold))
                     .frame(width: 20)
-
                 Text(title)
                     .font(.subheadline.weight(.semibold))
-
                 Spacer(minLength: 0)
+                Text("Not available yet")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(AppDesign.Ink.tertiary)
             }
             .foregroundStyle(AppDesign.Ink.primary)
             .padding(.horizontal, 16)
@@ -245,13 +341,13 @@ private struct AuthProviderButton: View {
             }
         }
         .buttonStyle(PressableScaleStyle())
-        .accessibilityHint("This sign-in option is not connected in the prototype")
+        .disabled(true)
+        .accessibilityHint("This provider option is not available yet")
     }
 }
 
 #Preview {
-    NavigationStack {
-        LoginView()
-    }
-    .environmentObject(DriveSessionManager.shared)
+    NavigationStack { LoginView() }
+        .environmentObject(DriveSessionManager.shared)
+        .environmentObject(AuthSessionStore.shared)
 }

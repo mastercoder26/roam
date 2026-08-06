@@ -8,11 +8,11 @@ ENV NODE_ENV=production
 
 WORKDIR /app
 
-# Dependencies install from the lockfile in their own layer so a source change
-# does not reinstall them. `tsx` is a runtime dependency here, not a dev one:
-# the server runs TypeScript directly, so `--omit=dev` is safe.
+# `tsx` is a runtime dependency here, not a dev one: the server runs TypeScript
+# directly, so `--omit=dev` is safe. npm install resolves runtime dependencies
+# from package.json during a Render build.
 COPY package.json package-lock.json ./
-RUN npm ci --omit=dev
+RUN npm install --omit=dev
 
 COPY server.ts tsconfig.json ./
 COPY src ./src

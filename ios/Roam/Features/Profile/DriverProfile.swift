@@ -90,16 +90,22 @@ struct DriverProfile: Equatable, Codable {
 /// preference, not a credential and not a measurement.
 @MainActor
 final class DriverProfileStore: ObservableObject {
+    static let shared = DriverProfileStore()
+
     /// Declared once. `load` and `persist` both read this instead of
     /// carrying their own copies of the literal, so the key cannot drift
     /// between the two call sites.
     static let storageKey = "roam.driver-profile-v1"
+    private static let updateDateKey = "roam.driver-profile-updated-at-v1"
 
     /// Names longer than this are truncated, not rejected, so a driver who
     /// pastes something long still ends up with a usable, storable value.
     private static let maxNameLength = 80
 
     private let defaults: UserDefaults
+    private var isApplyingRemoteUpdate = false
+
+    private(set) var lastUpdatedAt: Date
 
     @Published var displayName: String {
         didSet {
@@ -128,7 +134,9 @@ final class DriverProfileStore: ObservableObject {
     }
 
     @Published var stage: DriverProfile.Stage {
-        didSet { persist() }
+        didSet {
+            persist()
+        }
     }
 
     /// Set whenever the most recent write to `UserDefaults` failed. This is
@@ -166,6 +174,37 @@ final class DriverProfileStore: ObservableObject {
         let stored = Self.load(from: defaults) ?? .empty
         displayName = stored.displayName
         stage = stored.stage
+        lastUpdatedAt = defaults.object(forKey: Self.updateDateKey) as? Date ?? .distantPast
+    }
+
+    var snapshot: DriverProfile {
+        DriverProfile(displayName: displayName, stage: stage)
+    }
+
+    /// Applies the server's winning profile without making it look like a new
+    /// local edit. The server timestamp remains the conflict baseline for the
+    /// next offline edit.
+    func applyRemoteProfile(_ remote: RemoteProfile) {
+        isApplyingRemoteUpdate = true
+        displayName = remote.displayName
+        stage = remote.stage
+        commitDisplayNameEdit()
+        isApplyingRemoteUpdate = false
+        lastUpdatedAt = remote.updatedAt
+        defaults.set(remote.updatedAt, forKey: Self.updateDateKey)
+    }
+
+    /// Account deletion clears only the local profile preference. Recorded
+    /// drives and other local app features remain available in guest mode.
+    func reset() {
+        isApplyingRemoteUpdate = true
+        displayName = DriverProfile.empty.displayName
+        stage = DriverProfile.empty.stage
+        isApplyingRemoteUpdate = false
+        defaults.removeObject(forKey: Self.storageKey)
+        defaults.removeObject(forKey: Self.updateDateKey)
+        lastUpdatedAt = .distantPast
+        lastPersistenceError = nil
     }
 
     private static func load(from defaults: UserDefaults) -> DriverProfile? {
@@ -178,6 +217,10 @@ final class DriverProfileStore: ObservableObject {
         do {
             let data = try JSONEncoder().encode(profile)
             defaults.set(data, forKey: Self.storageKey)
+            if !isApplyingRemoteUpdate {
+                lastUpdatedAt = Date()
+                defaults.set(lastUpdatedAt, forKey: Self.updateDateKey)
+            }
             lastPersistenceError = nil
         } catch {
             lastPersistenceError = error.localizedDescription

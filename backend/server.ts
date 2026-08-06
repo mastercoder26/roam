@@ -6,8 +6,20 @@ import {
   handleDepartureComparison,
   handleDifficulty,
 } from "./src/handlers/difficulty.js";
-import { createRequestId, logRateLimited } from "./src/errors.js";
+import { createRequestId, logInternalFailure, logRateLimited } from "./src/errors.js";
 import { createRateLimiter } from "./src/utils/rateLimiter.js";
+import {
+  handleDeleteAccount,
+  handleLogin,
+  handleLogout,
+  handleMe,
+  handleRefresh,
+  handleSignup,
+} from "./src/handlers/auth.js";
+import { handleGetProfile, handleUpdateProfile } from "./src/handlers/profile.js";
+import { checkDatabase, isDatabaseConfigured } from "./src/db/pool.js";
+import { fileURLToPath } from "node:url";
+import { requireAuth } from "./src/auth/middleware.js";
 
 // `server.ts` lives in `backend/`, alongside the local environment files.
 config({ path: resolve(import.meta.dirname, ".env.local") });
@@ -18,6 +30,18 @@ config({ path: resolve(import.meta.dirname, ".env") });
 if (!process.env.GOOGLE_MAPS_API_KEY) {
   console.error(
     "GOOGLE_MAPS_API_KEY is not configured. Route analysis requests will fail until it is set in backend/.env.local."
+  );
+}
+
+if (!isDatabaseConfigured()) {
+  console.error(
+    "DATABASE_URL is not configured. Account and profile requests will return 503 until it is set."
+  );
+}
+
+if (!process.env.JWT_SECRET) {
+  console.error(
+    "JWT_SECRET is not configured. Account and profile requests will return 503 until it is set."
   );
 }
 
@@ -36,7 +60,7 @@ function getRateLimitConfig(): { windowMs: number; maxRequests: number } {
   };
 }
 
-const app = express();
+export const app = express();
 
 // Cloud Run terminates the connection at Google's front end, so the socket
 // address is the proxy's and is identical for every caller. Without this, the
@@ -49,6 +73,7 @@ app.set("trust proxy", 1);
 const port = Number(process.env.PORT ?? 3000);
 const allowedOrigins = getAllowedOrigins();
 const rateLimiter = createRateLimiter(getRateLimitConfig());
+const authRateLimiter = createRateLimiter({ windowMs: 15 * 60_000, maxRequests: 10 });
 
 app.use(express.json());
 
@@ -61,8 +86,8 @@ app.use((req, res, next) => {
     res.setHeader("Access-Control-Allow-Origin", origin);
   }
 
-  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
 
   if (req.method === "OPTIONS") {
     res.status(204).end();
@@ -99,26 +124,84 @@ function rateLimit(endpoint: string) {
   };
 }
 
-app.post("/api/route/difficulty", rateLimit("difficulty"), (req, res) => {
-  void handleDifficulty(req, res);
-});
+function asyncHandler(handler: (req: Request, res: Response) => Promise<void>) {
+  return (req: Request, res: Response, next: NextFunction) => {
+    void handler(req, res).catch(next);
+  };
+}
 
-app.post("/api/route/departure-comparison", rateLimit("departure-comparison"), (req, res) => {
-  void handleDepartureComparison(req, res);
-});
-
-const server = app.listen(port, () => {
-  console.log(`Roam API listening on http://localhost:${port}`);
-});
-
-server.on("error", (error: NodeJS.ErrnoException) => {
-  if (error.code === "EADDRINUSE") {
-    console.error(
-      `Port ${port} is already in use. Stop the existing Roam API, or start this one with PORT=3001 npm run dev.`,
-    );
-  } else {
-    console.error("Roam API failed to start:", error);
+function authRateLimit(req: Request, res: Response, next: NextFunction): void {
+  const key = req.ip ?? req.socket.remoteAddress ?? "unknown";
+  const result = authRateLimiter.check(key);
+  if (!result.allowed) {
+    const requestId = createRequestId();
+    logRateLimited(requestId, { endpoint: "auth" });
+    res.setHeader("Retry-After", String(result.retryAfterSeconds));
+    res.status(429).json({
+      error: "Too many requests. Please try again later.",
+      code: "RATE_LIMITED",
+      requestId,
+    });
+    return;
   }
+  next();
+}
 
-  process.exitCode = 1;
+app.get("/health", async (_req, res) => {
+  const database = await checkDatabase();
+  res.status(200).json({
+    status: database === "up" ? "ok" : "degraded",
+    database,
+    version: process.env.npm_package_version ?? "1.0.0",
+  });
 });
+
+app.post("/api/route/difficulty", rateLimit("difficulty"), asyncHandler(handleDifficulty));
+
+app.post("/api/route/departure-comparison", rateLimit("departure-comparison"), asyncHandler(handleDepartureComparison));
+
+app.post("/api/auth/signup", authRateLimit, asyncHandler(handleSignup));
+app.post("/api/auth/login", authRateLimit, asyncHandler(handleLogin));
+app.post("/api/auth/refresh", authRateLimit, asyncHandler(handleRefresh));
+app.post("/api/auth/logout", authRateLimit, asyncHandler(handleLogout));
+app.get("/api/auth/me", authRateLimit, requireAuth, asyncHandler(handleMe));
+app.get("/api/profile", requireAuth, asyncHandler(handleGetProfile));
+app.put("/api/profile", requireAuth, asyncHandler(handleUpdateProfile));
+app.delete("/api/account", requireAuth, asyncHandler(handleDeleteAccount));
+
+app.use((error: unknown, _req: Request, res: Response, next: NextFunction) => {
+  if (res.headersSent) {
+    next(error);
+    return;
+  }
+  const requestId = createRequestId();
+  if (error instanceof SyntaxError) {
+    res.status(400).json({ error: "Request body is invalid JSON.", code: "VALIDATION_ERROR", requestId });
+    return;
+  }
+  logInternalFailure(requestId, { endpoint: "unknown" }, error);
+  res.status(500).json({ error: "An unexpected error occurred.", code: "INTERNAL_ERROR", requestId });
+});
+
+export function startServer() {
+  const server = app.listen(port, () => {
+    console.log(`Roam API listening on http://localhost:${port}`);
+  });
+
+  server.on("error", (error: NodeJS.ErrnoException) => {
+    if (error.code === "EADDRINUSE") {
+      console.error(
+        `Port ${port} is already in use. Stop the existing Roam API, or start this one with PORT=3001 npm run dev.`,
+      );
+    } else {
+      console.error("Roam API failed to start:", error);
+    }
+
+    process.exitCode = 1;
+  });
+  return server;
+}
+
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  startServer();
+}

@@ -12,7 +12,7 @@ struct LaunchIntroChoreographyChecks {
         theWholeSequenceStaysShortEnoughToNotAnnoy()
         aReturningDriverOnlySeesItAfterARealAbsence()
         theWordmarkIsBigAndCenteredBeforeItDocks()
-        theWordmarkDocksWhileTheGlobeIsStillOnScreen()
+        theNoPathGlobeRevealKeepsItsVisualBeatsOrdered()
 
         print("Launch intro choreography checks passed")
     }
@@ -234,22 +234,25 @@ struct LaunchIntroChoreographyChecks {
         )
     }
 
-    private static func theWordmarkDocksWhileTheGlobeIsStillOnScreen() {
+    /// The globe and wordmark are the complete intro. Keeping these beats
+    /// contiguous prevents a route, flight, or other path animation from
+    /// being inserted between the globe reveal and the brand handoff.
+    private static func theNoPathGlobeRevealKeepsItsVisualBeatsOrdered() {
         expect(
             LaunchIntroChoreography.videoWordmarkDelay
                 > LaunchIntroChoreography.videoGlobeSettledAt,
-            "the wordmark must appear over a settled globe, not mid-entrance"
+            "the globe must fully settle before the wordmark begins"
         )
         expect(
-            LaunchIntroChoreography.wordmarkDockDelay
-                < LaunchIntroChoreography.videoFadeStartsAt,
-            "the dock must begin before the clip starts fading the globe out"
+            LaunchIntroChoreography.videoFadeStartsAt
+                > LaunchIntroChoreography.wordmarkDockDelay,
+            "the globe must not begin fading until the wordmark starts docking"
         )
         expect(
             LaunchIntroChoreography.wordmarkDockDelay
                 + LaunchIntroChoreography.wordmarkDockDuration
-                <= LaunchIntroChoreography.videoDuration,
-            "the wordmark must have landed by the time the clip ends"
+                < LaunchIntroChoreography.videoDuration,
+            "the globe duration must leave the docked wordmark visible before handoff"
         )
     }
 

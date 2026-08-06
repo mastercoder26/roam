@@ -41,6 +41,11 @@ struct APIClient {
     /// that never answers still leaves room for the next one.
     static let maximumCandidateTimeout: TimeInterval = 25
 
+    struct HTTPResponseData {
+        let data: Data
+        let response: HTTPURLResponse
+    }
+
     /// Tried in order until one responds. See AppConfiguration.candidateBaseURLs.
     private let candidateBaseURLs: [URL]
     private let session: URLSession
@@ -51,6 +56,44 @@ struct APIClient {
     ) {
         self.candidateBaseURLs = candidateBaseURLs
         self.session = session
+    }
+
+    /// Shared raw transport for services that need their own typed error
+    /// envelope. It deliberately uses the same candidate ordering and one
+    /// total budget as route analysis.
+    func requestData(
+        path: String,
+        method: String,
+        body: Data? = nil,
+        headers: [String: String] = [:]
+    ) async throws -> HTTPResponseData {
+        guard !candidateBaseURLs.isEmpty else { throw APIError.invalidURL }
+
+        var lastNetworkError: Error = URLError(.cannotConnectToHost)
+        let deadline = Date().addingTimeInterval(Self.totalRequestBudget)
+
+        for baseURL in candidateBaseURLs {
+            let remaining = deadline.timeIntervalSinceNow
+            guard remaining >= Self.minimumCandidateTimeout else { break }
+
+            do {
+                return try await requestData(
+                    to: baseURL,
+                    path: path,
+                    method: method,
+                    body: body,
+                    headers: headers,
+                    timeout: min(remaining, Self.maximumCandidateTimeout)
+                )
+            } catch APIError.networkError(let error) {
+                lastNetworkError = error
+                guard Self.shouldTryNextCandidate(after: error) else {
+                    throw APIError.networkError(error)
+                }
+            }
+        }
+
+        throw APIError.networkError(lastNetworkError)
     }
 
     func analyzeRoute(
@@ -255,6 +298,37 @@ struct APIClient {
         } catch {
             throw APIError.decodingError(error)
         }
+    }
+
+    private func requestData(
+        to baseURL: URL,
+        path: String,
+        method: String,
+        body: Data?,
+        headers: [String: String],
+        timeout: TimeInterval
+    ) async throws -> HTTPResponseData {
+        let endpoint = baseURL.appendingPathComponent(path)
+        var request = URLRequest(url: endpoint)
+        request.httpMethod = method
+        request.timeoutInterval = timeout
+        request.httpBody = body
+        for (field, value) in headers {
+            request.setValue(value, forHTTPHeaderField: field)
+        }
+
+        let data: Data
+        let response: URLResponse
+        do {
+            (data, response) = try await session.data(for: request)
+        } catch {
+            throw APIError.networkError(error)
+        }
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw APIError.invalidResponse
+        }
+        return HTTPResponseData(data: data, response: httpResponse)
     }
 
     /// Only the backend's own JSON error text is ever shown. Anything else —

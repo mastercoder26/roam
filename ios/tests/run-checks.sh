@@ -45,6 +45,9 @@ sources+=(
     ios/Roam/Features/Profile/DriverProfile.swift
     ios/Roam/Features/Home/RoutePlanningFormModel.swift
     ios/Roam/Services/APIClient.swift
+    ios/Roam/Services/AuthClient.swift
+    ios/Roam/Services/TokenStore.swift
+    ios/Roam/Services/AuthSessionStore.swift
     ios/Roam/Services/SharedRouteImportCoordinator.swift
 )
 

@@ -4,6 +4,7 @@ import SwiftUI
 struct RoamApp: App {
     @StateObject private var themeManager = ThemeManager.shared
     @StateObject private var driveSession = DriveSessionManager.shared
+    @StateObject private var authSession = AuthSessionStore.shared
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -20,6 +21,7 @@ struct RoamApp: App {
                 RoamRootView()
                     .environmentObject(themeManager)
                     .environmentObject(driveSession)
+                    .environmentObject(authSession)
                     // The app sits very slightly forward behind the intro, so
                     // the handoff settles into place instead of cutting.
                     .scaleEffect(isIntroPlaying && !reduceMotion ? 1.03 : 1)
@@ -36,6 +38,9 @@ struct RoamApp: App {
             .coordinateSpace(name: LaunchIntroDockSpace.name)
             .onPreferenceChange(HeaderWordmarkFrameKey.self) { headerWordmarkFrame = $0 }
             .preferredColorScheme(themeManager.preferredColorScheme)
+            .task {
+                await authSession.restoreIfNeeded()
+            }
             .onChange(of: scenePhase) { _, phase in
                 handleScenePhase(phase)
             }

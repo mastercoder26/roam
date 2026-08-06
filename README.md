@@ -130,6 +130,30 @@ Run the backend scoring tests with:
 npm test
 ```
 
+### Auth & database
+
+The backend can persist accounts and driver profiles in PostgreSQL. For local
+development, create a database named `roam`, set `DATABASE_URL` and
+`PGSSLMODE=disable` in `backend/.env.local`, then apply the plain SQL
+migrations:
+
+```bash
+createdb roam
+npm --prefix backend run migrate
+```
+
+`JWT_SECRET` is required for account endpoints. If either it or
+`DATABASE_URL` is absent, the backend still starts: route analysis keeps its
+existing behavior and account/profile endpoints return `503`.
+
+For Render, create the service from the root `render.yaml`, set
+`GOOGLE_MAPS_API_KEY` and `JWT_SECRET` in the dashboard, and deploy. Render's
+managed PostgreSQL connection is supplied as `DATABASE_URL`; run
+`npm --prefix backend run migrate` against that connection once before using
+account endpoints. `/health` remains a `200` response while reporting a
+degraded database state so a temporary database outage does not restart the
+web service.
+
 The iOS engines are covered by standalone Swift command-line checks in
 `ios/tests/`. They compile with `swiftc` alone — no Xcode scheme, simulator or
 XCTest bundle — and cover the private local engines separately from the app

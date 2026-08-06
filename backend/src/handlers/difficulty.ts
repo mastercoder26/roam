@@ -245,7 +245,7 @@ export async function analyzeDepartureComparisonRequest(
           ...candidate,
           error: {
             message: failure.message,
-            code: failure.code,
+            code: failure.code as "INVALID_REQUEST" | "ROUTE_UNAVAILABLE" | "RATE_LIMITED",
             requestId,
           },
         };

@@ -87,9 +87,9 @@ private struct AsciiGlobeScene: View {
         )
     }
 
-    /// Each glyph's density character is resolved fresh every frame because
-    /// its *level* changes as the sphere spins; resolving all seven levels
-    /// once up front (rather than once per glyph) keeps that cheap.
+    /// Each glyph's character is resolved fresh every frame as the texture
+    /// rolls over the sphere. Resolving the atlas once up front keeps the
+    /// varied character field inexpensive to draw.
     private func drawGlobe(
         in context: inout GraphicsContext,
         center: CGPoint,
@@ -109,7 +109,7 @@ private struct AsciiGlobeScene: View {
 
         for glyph in glyphs {
             let shade = glyph.shade(phase: phase)
-            let level = min(levels.count - 1, Int(shade * Double(levels.count)))
+            let level = glyph.characterLevel(phase: phase, count: levels.count)
             context.opacity = sceneOpacity * (0.16 + shade * 0.84)
             context.draw(
                 levels[level],
@@ -140,12 +140,25 @@ private struct GlobeGlyph {
         let lit = depth * 0.55 - latitude * 0.25
         return (pattern * 0.5 + lit * 0.5).clampedToUnit
     }
+
+    /// A stable, travelling character field gives the surface its own
+    /// typographic texture. This deliberately uses several glyph families
+    /// (dots, symbols, numerals, and dense marks), rather than making the
+    /// whole sphere a single repeated character at each brightness level.
+    func characterLevel(phase: Double, count: Int) -> Int {
+        let longitude = atan2(dxNormalized, depth) + phase
+        let bands = sin(longitude * 2.4 + latitude * 7.2)
+        let grain = sin(longitude * 6.8 - latitude * 4.1)
+        let value = ((bands * 0.7 + grain * 0.3) + 1) / 2
+        return min(count - 1, max(0, Int(value * Double(count))))
+    }
 }
 
 private enum AsciiGlobe {
-    /// Sparse to dense, matching the reference: a lightly-stippled edge
-    /// thickening into solid glyphs toward the lit face.
-    static let charset = [".", ":", "%", "&", "0", "#", "@"]
+    /// The reference globe is a field of distinct keyboard characters, not
+    /// a dot matrix. Keep the set compact enough to read as texture, but use
+    /// visibly different marks from sparse to dense.
+    static let charset = ["·", ".", ":", "+", "*", "%", "&", "0", "#", "@"]
 
     static func glyphs(radius: CGFloat, spacing: CGFloat) -> [GlobeGlyph] {
         var result: [GlobeGlyph] = []
