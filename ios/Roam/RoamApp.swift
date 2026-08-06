@@ -9,6 +9,10 @@ struct RoamApp: App {
 
     @State private var isIntroPlaying = true
     @State private var leftForegroundAt: Date?
+    /// The header wordmark's live frame, read from `RoamRootView` (which sits
+    /// behind the intro, just invisible, for its entire run) so the intro's
+    /// docked wordmark lands exactly where the real header's does.
+    @State private var headerWordmarkFrame: CGRect = .zero
 
     var body: some Scene {
         WindowGroup {
@@ -23,12 +27,14 @@ struct RoamApp: App {
                     .allowsHitTesting(!isIntroPlaying)
 
                 if isIntroPlaying {
-                    LaunchIntroView(onFinish: finishIntro)
+                    LaunchIntroView(onFinish: finishIntro, dockTargetFrame: headerWordmarkFrame)
                         .environmentObject(themeManager)
                         .transition(.opacity)
                         .zIndex(1)
                 }
             }
+            .coordinateSpace(name: LaunchIntroDockSpace.name)
+            .onPreferenceChange(HeaderWordmarkFrameKey.self) { headerWordmarkFrame = $0 }
             .preferredColorScheme(themeManager.preferredColorScheme)
             .onChange(of: scenePhase) { _, phase in
                 handleScenePhase(phase)

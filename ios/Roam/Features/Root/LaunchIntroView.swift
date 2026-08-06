@@ -1,6 +1,26 @@
 import SwiftUI
 import UIKit
 
+/// Coordinate space the launch intro and the real header share, so the
+/// header's wordmark frame (captured via `HeaderWordmarkFrameKey`) can be
+/// read directly as a docking target instead of an inset kept in sync by hand.
+enum LaunchIntroDockSpace {
+    static let name = "launchIntroDock"
+}
+
+/// The real header wordmark's on-screen frame, published from `RoamRootView`
+/// — which sits behind the intro for its entire run, just invisible — so the
+/// intro's docked wordmark can land in its exact usual spot.
+struct HeaderWordmarkFrameKey: PreferenceKey {
+    static let defaultValue: CGRect = .zero
+
+    static func reduce(value: inout CGRect, nextValue: () -> CGRect) {
+        let next = nextValue()
+        guard next != .zero else { return }
+        value = next
+    }
+}
+
 /// Roam's launch sequence.
 ///
 /// A road draws itself across the canvas with a lit head running along it,
@@ -11,6 +31,11 @@ import UIKit
 struct LaunchIntroView: View {
     @ObservedObject private var theme = ThemeManager.shared
     let onFinish: () -> Void
+    /// The real header wordmark's live on-screen frame, read by `RoamApp`
+    /// from `RoamRootView` (which sits behind the intro the whole time) and
+    /// handed down here so the docked mark lands exactly where the header's
+    /// own wordmark already sits, rather than an inset kept in sync by hand.
+    let dockTargetFrame: CGRect
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var traceProgress: Double = 0
@@ -97,7 +122,10 @@ struct LaunchIntroView: View {
                 docked: isWordmarkDocked,
                 screenWidth: Double(geometry.size.width),
                 screenHeight: Double(geometry.size.height),
-                wordmarkWidth: Double(wordmarkWidth)
+                wordmarkWidth: Double(wordmarkWidth),
+                measuredDockedTarget: dockTargetFrame == .zero
+                    ? nil
+                    : IntroPoint(x: dockTargetFrame.origin.x, y: dockTargetFrame.origin.y)
             )
 
             introWordmark
@@ -511,6 +539,6 @@ private struct SweptWordmark: View {
 }
 
 #Preview {
-    LaunchIntroView(onFinish: {})
+    LaunchIntroView(onFinish: {}, dockTargetFrame: .zero)
         .environmentObject(ThemeManager.shared)
 }

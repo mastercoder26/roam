@@ -112,6 +112,14 @@ struct RoamRootView: View {
         } label: {
             HStack(spacing: 10) {
                 BrandWordmark(compact: true)
+                    .background(
+                        GeometryReader { proxy in
+                            Color.clear.preference(
+                                key: HeaderWordmarkFrameKey.self,
+                                value: proxy.frame(in: .named(LaunchIntroDockSpace.name))
+                            )
+                        }
+                    )
                 Spacer(minLength: 8)
                 Image(systemName: "paintpalette.fill")
                     .font(.subheadline.weight(.semibold))

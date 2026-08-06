@@ -198,13 +198,20 @@ enum LaunchIntroChoreography {
     /// Top-left origin of the wordmark for the current phase. `wordmarkWidth`
     /// is the mark's width as drawn — i.e. at hero size — and scaling is
     /// anchored at the same top-left corner this origin places.
+    ///
+    /// `measuredDockedTarget`, when supplied, is the real header wordmark's
+    /// on-screen frame (read live via a preference from `RoamRootView`, which
+    /// sits behind the intro the whole time) — so the docked mark lands in
+    /// its exact usual spot instead of an inset that has to be kept in sync
+    /// by hand whenever the header's own padding changes.
     static func wordmarkOrigin(
         docked: Bool,
         screenWidth: Double,
         screenHeight: Double,
-        wordmarkWidth: Double
+        wordmarkWidth: Double,
+        measuredDockedTarget: IntroPoint? = nil
     ) -> IntroPoint {
-        guard !docked else { return wordmarkDockedInset }
+        guard !docked else { return measuredDockedTarget ?? wordmarkDockedInset }
 
         return IntroPoint(
             x: max(wordmarkDockedInset.x, (screenWidth - wordmarkWidth) / 2),
