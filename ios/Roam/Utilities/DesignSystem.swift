@@ -65,6 +65,7 @@ enum AppDesign {
     static let space8: CGFloat = 8
     static let space12: CGFloat = 12
     static let space16: CGFloat = 16
+    static let space20: CGFloat = 20
     static let space24: CGFloat = 24
     /// Shared radius scale — keep cards, buttons, and pills on this ladder.
     static let cornerRadius: CGFloat = 16

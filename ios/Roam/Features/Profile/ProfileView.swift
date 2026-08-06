@@ -73,10 +73,11 @@ struct ProfileView: View {
                         LiveDriveBanner(driveSession: driveSession)
                     }
 
-                    folderBrowser
+                    profileNavigation
+                    accountSection
                 }
-                .padding(.horizontal, AppDesign.contentPadding)
-                .padding(.vertical, 12)
+                .padding(.horizontal, AppDesign.space20)
+                .padding(.vertical, AppDesign.space16)
             }
             .safeAreaPadding(.bottom, AppDesign.space24)
             .background(AppDesign.canvas.ignoresSafeArea())
@@ -130,20 +131,28 @@ struct ProfileView: View {
             .font(AppDesign.Typography.heroTitle)
             .tracking(-0.8)
             .foregroundStyle(AppDesign.Ink.primary)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .accessibilityAddTraits(.isHeader)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .accessibilityAddTraits(.isHeader)
     }
 
     // MARK: - Navigation
 
-    private var folderBrowser: some View {
+    private var profileNavigation: some View {
+        VStack(alignment: .leading, spacing: AppDesign.space24) {
+            profileFolderSection(.explore)
+            profileFolderSection(.appearance)
+        }
+    }
+
+    private func profileFolderSection(_ section: ProfileHomeSection) -> some View {
         VStack(alignment: .leading, spacing: AppDesign.space12) {
             SectionHeader(
-                title: "Explore your profile"
+                title: section.title,
+                subtitle: section.subtitle
             )
 
             VStack(spacing: 0) {
-                ForEach(ProfileFolder.allCases) { folder in
+                ForEach(section.folders) { folder in
                     NavigationLink {
                         folderDestination(folder)
                     } label: {
@@ -151,64 +160,81 @@ struct ProfileView: View {
                     }
                     .buttonStyle(PressableScaleStyle())
 
-                    if folder != ProfileFolder.allCases.last {
+                    if folder != section.folders.last {
                         Divider()
-                            .padding(.leading, 52)
+                            .padding(.leading, 50)
                     }
                 }
-
-                Divider()
-                    .padding(.leading, 52)
-
-                accountRow
             }
-            .padding(.horizontal, AppDesign.space4)
-            .background(AppDesign.cardSurface, in: RoundedRectangle(cornerRadius: AppDesign.cornerRadius, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: AppDesign.cornerRadius, style: .continuous)
-                    .stroke(AppDesign.cardStroke, lineWidth: 1)
-            }
-            .elevation(AppDesign.Elevation.low)
+            .premiumCard()
         }
     }
 
     @ViewBuilder
-    private var accountRow: some View {
+    private var accountSection: some View {
+        VStack(alignment: .leading, spacing: AppDesign.space12) {
+            SectionHeader(
+                title: ProfileHomeSection.account.title,
+                subtitle: ProfileHomeSection.account.subtitle
+            )
+
+            accountCard
+
+            if isSignedIn {
+                deleteAccountSection
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var accountCard: some View {
         switch authSession.state {
         case .signedIn, .signedInOffline:
-            signedInAccountRow
+            signedInAccountCard
         case .restoring, .signedOut, .authenticating:
-            signedOutAccountRow
+            signedOutAccountCard
         }
     }
 
-    private var signedOutAccountRow: some View {
-        HStack(spacing: AppDesign.space12) {
-            UserButton(signedOutContent: {
-                Button("Sign in to Roam") { authIsPresented = true }
-            })
+    private var signedOutAccountCard: some View {
+        Button {
+            authIsPresented = true
+        } label: {
+            HStack(spacing: AppDesign.space12) {
+                IconTile(symbol: "person.crop.circle.badge.plus")
 
-            VStack(alignment: .leading, spacing: 3) {
-                Text("Sign in to Roam")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(AppDesign.Ink.primary)
-                Text("Sign in to sync this profile")
-                    .font(.caption)
-                    .foregroundStyle(AppDesign.Ink.secondary)
+                VStack(alignment: .leading, spacing: AppDesign.space4) {
+                    Text("Sign in to Roam")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(AppDesign.Ink.primary)
+                    Text("Back up your profile and saved drives.")
+                        .font(.caption)
+                        .foregroundStyle(AppDesign.Ink.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                Spacer(minLength: 0)
+
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(AppDesign.Ink.tertiary)
+                    .frame(width: 24, height: 24)
             }
-            Spacer(minLength: AppDesign.space8)
+            .frame(maxWidth: .infinity, minHeight: 56, alignment: .leading)
+            .contentShape(Rectangle())
         }
-        .frame(maxWidth: .infinity, minHeight: 60, alignment: .leading)
+        .buttonStyle(PressableScaleStyle())
+        .premiumCard()
+        .accessibilityLabel("Sign in to Roam")
+        .accessibilityHint("Back up your profile and saved drives")
     }
 
-    private var signedInAccountRow: some View {
+    private var signedInAccountCard: some View {
         VStack(alignment: .leading, spacing: AppDesign.space8) {
             HStack(spacing: AppDesign.space12) {
-                UserButton(signedOutContent: {
-                    Button("Sign in to Roam") { authIsPresented = true }
-                })
+                IconTile(symbol: "person.crop.circle.fill")
 
-                VStack(alignment: .leading, spacing: 3) {
+                VStack(alignment: .leading, spacing: AppDesign.space4) {
                     Text(accountDisplayName)
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(AppDesign.Ink.primary)
@@ -219,6 +245,8 @@ struct ProfileView: View {
 
                 Spacer(minLength: AppDesign.space8)
             }
+
+            Divider()
 
             syncStatusRow
             driveHistorySyncStatusRow
@@ -233,20 +261,57 @@ struct ProfileView: View {
             VStack(spacing: 0) {
                 Divider()
 
-                Button("Sign out", action: signOut)
+                Button(action: signOut) {
+                    HStack {
+                        Text("Sign out")
+                        Spacer()
+                        if isAccountActionRunning {
+                            ProgressView()
+                                .controlSize(.small)
+                        }
+                    }
                     .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-                    .foregroundStyle(AppDesign.accent)
-                    .disabled(isAccountActionRunning)
-
-                Divider()
-
-                Button("Delete account", role: .destructive, action: { showingDeleteConfirmation = true })
-                    .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-                    .foregroundStyle(AppDesign.danger)
-                    .disabled(isAccountActionRunning)
+                }
+                .foregroundStyle(AppDesign.accent)
+                .disabled(isAccountActionRunning)
             }
         }
         .padding(.vertical, AppDesign.space8)
+        .premiumCard()
+    }
+
+    private var deleteAccountSection: some View {
+        VStack(alignment: .leading, spacing: AppDesign.space8) {
+            SectionHeader(title: "Delete account")
+
+            Button(role: .destructive, action: { showingDeleteConfirmation = true }) {
+                HStack {
+                    VStack(alignment: .leading, spacing: AppDesign.space4) {
+                        Text("Delete your Roam account")
+                            .font(.subheadline.weight(.semibold))
+                        Text("This cannot be undone. Your local drives stay on this device.")
+                            .font(.caption)
+                            .multilineTextAlignment(.leading)
+                    }
+                    Spacer(minLength: AppDesign.space8)
+                    Image(systemName: "chevron.right")
+                        .font(.caption.weight(.bold))
+                }
+                .frame(maxWidth: .infinity, minHeight: 56, alignment: .leading)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(PressableScaleStyle())
+            .foregroundStyle(AppDesign.danger)
+            .disabled(isAccountActionRunning)
+            .premiumCard()
+        }
+    }
+
+    private var isSignedIn: Bool {
+        switch authSession.state {
+        case .signedIn, .signedInOffline: true
+        case .restoring, .signedOut, .authenticating: false
+        }
     }
 
     private var syncStatusRow: some View {

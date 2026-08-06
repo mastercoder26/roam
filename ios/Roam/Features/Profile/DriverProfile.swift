@@ -37,6 +37,41 @@ enum ProfileFolder: String, CaseIterable, Identifiable {
     }
 }
 
+/// The top-level groups on Profile home. Account actions deliberately do not
+/// share a card with progress or appearance settings: they have different
+/// consequences and need their own visual boundary.
+enum ProfileHomeSection: String, CaseIterable, Identifiable {
+    case explore
+    case appearance
+    case account
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .explore: "Explore your profile"
+        case .appearance: "Appearance"
+        case .account: "Account"
+        }
+    }
+
+    var subtitle: String? {
+        switch self {
+        case .explore: "Your progress and driving patterns."
+        case .appearance: "Make Roam feel like yours."
+        case .account: "Sync and security."
+        }
+    }
+
+    var folders: [ProfileFolder] {
+        switch self {
+        case .explore: [.progress, .drivingInsights]
+        case .appearance: [.preferences]
+        case .account: []
+        }
+    }
+}
+
 /// The driver's self-declared identity. Deliberately separate from anything
 /// measured: nothing here feeds a route score, a drive score, or readiness.
 /// It exists so the app can address the person by name and frame their own
