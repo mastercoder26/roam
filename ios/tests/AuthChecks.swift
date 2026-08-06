@@ -58,6 +58,11 @@ struct AuthChecks {
         let profile = try? APIClient.makeDateDecoder().decode(RemoteProfile.self, from: response)
 
         expect(profile?.stage == .permit, "a newly-created server profile with a null stage should use the local permit default")
+
+        let licensedResponse = Data(#"{"displayName":"Driver","stage":"licensed","payload":{},"updatedAt":"2026-08-06T18:00:00.000Z"}"#.utf8)
+        let licensedProfile = try? APIClient.makeDateDecoder().decode(RemoteProfile.self, from: licensedResponse)
+
+        expect(licensedProfile?.stage == .licensed, "a non-null server stage should remain unchanged")
     }
 
     private static func profileConflictRulePrefersTheNewerSource() {

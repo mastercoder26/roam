@@ -186,7 +186,12 @@ struct RemoteProfile: Codable, Equatable, Sendable {
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         displayName = try container.decodeIfPresent(String.self, forKey: .displayName) ?? ""
-        stage = try container.decode(DriverProfile.Stage.self, forKey: .stage)
+        // Profiles created before the driver chooses a stage are returned by
+        // the data API with a null stage. The local profile model has always
+        // treated a new driver as being at the permit stage, so preserve that
+        // default instead of turning an otherwise valid profile response into
+        // a decoding failure.
+        stage = try container.decodeIfPresent(DriverProfile.Stage.self, forKey: .stage) ?? .permit
         payload = try container.decodeIfPresent([String: JSONValue].self, forKey: .payload) ?? [:]
         updatedAt = try container.decode(Date.self, forKey: .updatedAt)
     }
