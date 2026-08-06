@@ -305,7 +305,11 @@ final class AuthSessionStore: ObservableObject {
                 remote: remote
             ) {
             case .pullRemote:
-                localStore.applyRemoteProfile(remote)
+                localStore.applyRemoteProfile(
+                    displayName: remote.displayName,
+                    stage: remote.stage,
+                    updatedAt: remote.updatedAt
+                )
             case .pushLocal:
                 let local = localStore.snapshot
                 let updated = try await performAuthenticated { token in
@@ -316,7 +320,11 @@ final class AuthSessionStore: ObservableObject {
                         payload: nil
                     )
                 }
-                localStore.applyRemoteProfile(updated)
+                localStore.applyRemoteProfile(
+                    displayName: updated.displayName,
+                    stage: updated.stage,
+                    updatedAt: updated.updatedAt
+                )
             case .none:
                 break
             }

@@ -257,7 +257,7 @@ struct LoginView: View {
     }
 }
 
-private extension View {
+extension View {
     func fieldContainer(isFocused: Bool) -> some View {
         padding(.horizontal, 12)
             .frame(minHeight: 48)

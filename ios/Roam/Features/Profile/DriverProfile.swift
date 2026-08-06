@@ -184,14 +184,14 @@ final class DriverProfileStore: ObservableObject {
     /// Applies the server's winning profile without making it look like a new
     /// local edit. The server timestamp remains the conflict baseline for the
     /// next offline edit.
-    func applyRemoteProfile(_ remote: RemoteProfile) {
+    func applyRemoteProfile(displayName: String, stage: DriverProfile.Stage, updatedAt: Date) {
         isApplyingRemoteUpdate = true
-        displayName = remote.displayName
-        stage = remote.stage
+        self.displayName = displayName
+        self.stage = stage
         commitDisplayNameEdit()
         isApplyingRemoteUpdate = false
-        lastUpdatedAt = remote.updatedAt
-        defaults.set(remote.updatedAt, forKey: Self.updateDateKey)
+        lastUpdatedAt = updatedAt
+        defaults.set(updatedAt, forKey: Self.updateDateKey)
     }
 
     /// Account deletion clears only the local profile preference. Recorded
