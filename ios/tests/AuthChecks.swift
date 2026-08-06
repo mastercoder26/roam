@@ -6,6 +6,7 @@ struct AuthChecks {
     static func main() async {
         await authenticatedOperationUsesClerkSessionTokenContract()
         await signedOutOperationsAreRejected()
+        await signingOutEndsTheSessionWithoutDeletingTheAccount()
         errorResponsesRemainSafeAndBranchable()
         remoteProfileDecoderTreatsNullStageAsPermit()
         profileConflictRulePrefersTheNewerSource()
@@ -40,6 +41,31 @@ struct AuthChecks {
             expect(error.code == .unauthorized, "signed-out authenticated work should report unauthorized")
         } catch {
             fail("signed-out authenticated work returned the wrong error: \(error)")
+        }
+    }
+
+    @MainActor
+    private static func signingOutEndsTheSessionWithoutDeletingTheAccount() async {
+        let user = AuthUser(id: "clerk-user", email: "driver@example.com", displayName: "Driver")
+        let session = AuthSessionStore(automaticallyRestore: false)
+        session.setSignedInForTesting(user: user, accessToken: "clerk-session-token")
+
+        do {
+            try await session.signOut()
+        } catch {
+            fail("sign out should end the local session without failing: \(error)")
+        }
+
+        expect(session.state == .signedOut, "sign out should clear the signed-in state")
+        expect(session.currentUser == nil, "sign out should clear the current user")
+
+        do {
+            _ = try await session.performAuthenticated { _ in "unexpected" }
+            fail("authenticated work must not run after sign out")
+        } catch let error as AuthError {
+            expect(error.code == .unauthorized, "authenticated work after sign out should be unauthorized")
+        } catch {
+            fail("sign out returned the wrong follow-up error: \(error)")
         }
     }
 

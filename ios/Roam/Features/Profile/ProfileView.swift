@@ -78,6 +78,7 @@ struct ProfileView: View {
                 .padding(.horizontal, AppDesign.contentPadding)
                 .padding(.vertical, 12)
             }
+            .safeAreaPadding(.bottom, AppDesign.space24)
             .background(AppDesign.canvas.ignoresSafeArea())
             .navigationTitle("Profile")
             .toolbar(.hidden, for: .navigationBar)
@@ -201,7 +202,7 @@ struct ProfileView: View {
     }
 
     private var signedInAccountRow: some View {
-        VStack(alignment: .leading, spacing: AppDesign.space12) {
+        VStack(alignment: .leading, spacing: AppDesign.space8) {
             HStack(spacing: AppDesign.space12) {
                 UserButton(signedOutContent: {
                     Button("Sign in to Roam") { authIsPresented = true }
@@ -229,12 +230,21 @@ struct ProfileView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
 
-            Divider()
+            VStack(spacing: 0) {
+                Divider()
 
-            Button("Delete account", role: .destructive, action: { showingDeleteConfirmation = true })
-                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-                .foregroundStyle(AppDesign.danger)
-                .disabled(isAccountActionRunning)
+                Button("Sign out", action: signOut)
+                    .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                    .foregroundStyle(AppDesign.accent)
+                    .disabled(isAccountActionRunning)
+
+                Divider()
+
+                Button("Delete account", role: .destructive, action: { showingDeleteConfirmation = true })
+                    .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                    .foregroundStyle(AppDesign.danger)
+                    .disabled(isAccountActionRunning)
+            }
         }
         .padding(.vertical, AppDesign.space8)
     }
@@ -385,6 +395,19 @@ struct ProfileView: View {
         Task {
             do {
                 try await authSession.deleteAccount()
+            } catch {
+                accountError = error.localizedDescription
+            }
+            isAccountActionRunning = false
+        }
+    }
+
+    private func signOut() {
+        isAccountActionRunning = true
+        accountError = nil
+        Task {
+            do {
+                try await authSession.signOut()
             } catch {
                 accountError = error.localizedDescription
             }
