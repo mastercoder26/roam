@@ -55,6 +55,9 @@ const savedRouteInputSchema = z.object({
 const listQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(200).default(50),
   before: isoDateSchema.optional(),
+  /// Paired with `before` to make the page boundary unambiguous when several
+  /// drives share a start timestamp. Optional so older cursors still work.
+  beforeId: z.string().uuid().optional(),
 }).strict();
 
 function validationMessage(error: z.ZodError): string {
@@ -146,10 +149,13 @@ export async function handleGetDrives(req: Request, res: Response): Promise<void
     const drives = await listDrives(userId(req), {
       limit: query.limit,
       before: query.before ? new Date(query.before) : undefined,
+      beforeId: query.beforeId,
     });
+    const last = drives[drives.length - 1];
     res.status(200).json({
       drives: drives.map(publicDrive),
-      nextCursor: drives.length > 0 ? drives[drives.length - 1].startedAt.toISOString() : null,
+      nextCursor: last ? last.startedAt.toISOString() : null,
+      nextCursorId: last ? last.id : null,
     });
   } catch (error) {
     sendError(res, requestId, error, "drives-list");

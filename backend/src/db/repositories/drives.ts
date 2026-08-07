@@ -78,14 +78,30 @@ const driveColumns = `
   payload, created_at, updated_at
 `;
 
+/**
+ * Pages drive history newest-first.
+ *
+ * `started_at` alone is not a stable sort key: two drives can share a
+ * timestamp, and when such a pair straddles a page boundary a cursor of
+ * "everything strictly before this timestamp" skips the rest of the group
+ * entirely, dropping those drives from sync permanently. Ordering and
+ * paginating by the `(started_at, id)` pair makes the sequence total, so every
+ * row is visited exactly once.
+ *
+ * `beforeId` is optional so cursors issued by older clients (a bare timestamp)
+ * still page, just with the original tie behaviour.
+ */
 export async function listDrives(
   userId: string,
-  options: { limit?: number; before?: Date } = {}
+  options: { limit?: number; before?: Date; beforeId?: string } = {}
 ): Promise<DriveRecord[]> {
   const limit = boundedLimit(options.limit);
   const values: unknown[] = [userId];
   let beforeClause = "";
-  if (options.before) {
+  if (options.before && options.beforeId) {
+    values.push(options.before, options.beforeId);
+    beforeClause = " AND (started_at, id) < ($2, $3)";
+  } else if (options.before) {
     values.push(options.before);
     beforeClause = " AND started_at < $2";
   }
@@ -95,7 +111,7 @@ export async function listDrives(
     SELECT ${driveColumns}
     FROM drives
     WHERE user_id = $1 AND deleted_at IS NULL${beforeClause}
-    ORDER BY started_at DESC
+    ORDER BY started_at DESC, id DESC
     LIMIT ${limitParameter}
   `, values);
   return result.rows.map(mapDrive);

@@ -38,6 +38,8 @@ afterEach(() => {
 
 describe("OSM turn protection", () => {
   it("does not treat a stop sign as protected turn control", async () => {
+    // A stop sign controls the turning driver, not the oncoming traffic being
+    // crossed, so the turn counts as unprotected rather than as unknown.
     mockOverpass([road, {
       type: "node", id: 2, lat: 0, lon: 0, tags: { highway: "stop" },
     }]);
@@ -46,20 +48,20 @@ describe("OSM turn protection", () => {
 
     expect(result.road.available).toBe(true);
     expect(result.turns).toMatchObject({
-      available: false,
-      unprotectedLeftTurns: 0,
+      available: true,
+      unprotectedLeftTurns: 1,
       protectedLeftTurns: 0,
     });
   });
 
-  it("marks ambiguous or distant traffic signals unavailable", async () => {
+  it("treats several signals at one turn as protected", async () => {
     mockOverpass([road,
       { type: "node", id: 2, lat: 0, lon: 0, tags: { highway: "traffic_signals" } },
       { type: "node", id: 3, lat: 0, lon: 0.0001, tags: { highway: "traffic_signals" } },
     ]);
 
     await expect(fetchOsmRouteData(leftTurnRoute)).resolves.toMatchObject({
-      turns: { available: false },
+      turns: { available: true, protectedLeftTurns: 1, unprotectedLeftTurns: 0 },
     });
   });
 

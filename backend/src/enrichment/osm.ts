@@ -314,7 +314,9 @@ export async function fetchOsmRouteData(route: ParsedRoute): Promise<OsmRouteDat
           classCounts,
         };
 
-  const turns: TurnExposure = determineTurnProtection(turnPoints, signalNodes);
+  // `road.available` means Overpass resolved real ways along this corridor, so
+  // a turn with no signal nearby is genuinely unsignalized rather than unmapped.
+  const turns: TurnExposure = determineTurnProtection(turnPoints, signalNodes, road.available);
 
   return { road, turns, available: road.available || turns.available };
 }
