@@ -11,7 +11,7 @@ vi.mock("../../db/repositories/users.js", () => ({
   findOrCreateByClerkId: findOrCreateByClerkIdMock,
 }));
 
-import { requireAuth } from "../middleware.js";
+import { requireAuth, requireVerifiedIdentity } from "../middleware.js";
 
 const localUser = {
   id: "00000000-0000-0000-0000-000000000001",
@@ -157,5 +157,79 @@ describe("Clerk authentication middleware", () => {
     expect(requests[0].user?.id).toBe(localUser.id);
     expect(requests[1].user?.id).toBe(localUser.id);
     expect(next).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("requireVerifiedIdentity", () => {
+  const previousDatabaseUrl = process.env.DATABASE_URL;
+  const previousClerkSecret = process.env.CLERK_SECRET_KEY;
+
+  beforeEach(() => {
+    process.env.CLERK_SECRET_KEY = "test-clerk-secret";
+    verifyTokenMock.mockResolvedValue({ sub: "user_clerk_123" });
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+    if (previousDatabaseUrl === undefined) delete process.env.DATABASE_URL;
+    else process.env.DATABASE_URL = previousDatabaseUrl;
+    if (previousClerkSecret === undefined) delete process.env.CLERK_SECRET_KEY;
+    else process.env.CLERK_SECRET_KEY = previousClerkSecret;
+  });
+
+  it("admits a signed-in account without touching the database", async () => {
+    // The route deployment has no DATABASE_URL at all. Authenticating must
+    // still succeed, or route analysis could not run there.
+    delete process.env.DATABASE_URL;
+    const request = requestWithToken("valid-token");
+    const response = responseDouble();
+    const next = vi.fn();
+
+    requireVerifiedIdentity(request, response, next);
+    await settle();
+
+    expect(next).toHaveBeenCalledTimes(1);
+    expect(request.clerkUserId).toBe("user_clerk_123");
+    expect(findOrCreateByClerkIdMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects an anonymous caller before any upstream work", async () => {
+    const request = requestWithToken(undefined);
+    const response = responseDouble();
+    const next = vi.fn();
+
+    requireVerifiedIdentity(request, response, next);
+    await settle();
+
+    expect(next).not.toHaveBeenCalled();
+    expect(response.statusCode).toBe(401);
+    expect(verifyTokenMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects an invalid token", async () => {
+    verifyTokenMock.mockRejectedValue(new Error("bad token"));
+    const request = requestWithToken("forged-token");
+    const response = responseDouble();
+    const next = vi.fn();
+
+    requireVerifiedIdentity(request, response, next);
+    await settle();
+
+    expect(next).not.toHaveBeenCalled();
+    expect(response.statusCode).toBe(401);
+    expect(request.clerkUserId).toBeUndefined();
+  });
+
+  it("reports 503 when the deployment has no Clerk secret", async () => {
+    delete process.env.CLERK_SECRET_KEY;
+    const request = requestWithToken("valid-token");
+    const response = responseDouble();
+    const next = vi.fn();
+
+    requireVerifiedIdentity(request, response, next);
+    await settle();
+
+    expect(next).not.toHaveBeenCalled();
+    expect(response.statusCode).toBe(503);
   });
 });

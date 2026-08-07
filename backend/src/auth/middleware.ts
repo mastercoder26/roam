@@ -17,6 +17,9 @@ export interface AuthenticatedUser {
 declare module "express-serve-static-core" {
   interface Request {
     user?: AuthenticatedUser;
+    /// Set by `requireVerifiedIdentity` only. It is a verified Clerk subject,
+    /// not a local user row, so it must not be used as a database key.
+    clerkUserId?: string;
   }
 }
 
@@ -116,6 +119,53 @@ async function authenticate(req: Request, res: Response, next: NextFunction): Pr
 
 export function requireAuth(req: Request, res: Response, next: NextFunction): void {
   void authenticate(req, res, next);
+}
+
+/**
+ * Proves the caller is a signed-in Roam account and stops there.
+ *
+ * The route-analysis endpoints proxy metered Google APIs, so they must not be
+ * open to anonymous callers — but they take no user identity and read no user
+ * data. `requireAuth` is the wrong tool for them: it provisions a local user
+ * row, which would force a Postgres connection onto the stateless route
+ * deployment purely as an authentication side effect.
+ *
+ * This verifies the Clerk token and nothing else, so the deployment that
+ * serves route analysis needs `CLERK_SECRET_KEY` and no database at all.
+ */
+async function verifyIdentity(req: Request, res: Response, next: NextFunction): Promise<void> {
+  const secretKey = process.env.CLERK_SECRET_KEY?.trim();
+  if (!secretKey) {
+    serviceUnavailable(res);
+    return;
+  }
+
+  const token = req.header("authorization")?.match(/^Bearer\s+([^\s]+)$/i)?.[1];
+  if (!token) {
+    respond(res, 401, "UNAUTHORIZED", "Sign in to analyze routes.");
+    return;
+  }
+
+  let claims: ClerkClaims;
+  try {
+    claims = await verifyToken(token, { secretKey }) as ClerkClaims;
+  } catch {
+    respond(res, 401, "UNAUTHORIZED", "Authentication token is invalid.");
+    return;
+  }
+
+  const clerkUserId = stringClaim(claims.sub);
+  if (!clerkUserId) {
+    respond(res, 401, "UNAUTHORIZED", "Authentication token is invalid.");
+    return;
+  }
+
+  req.clerkUserId = clerkUserId;
+  next();
+}
+
+export function requireVerifiedIdentity(req: Request, res: Response, next: NextFunction): void {
+  void verifyIdentity(req, res, next);
 }
 
 export function assertAuthConfigured(): void {

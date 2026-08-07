@@ -90,7 +90,11 @@ enum RouteRequestEndpoint: Encodable {
 struct RouteDifficultyRequest: Encodable {
     let origin: RouteRequestEndpoint
     let destination: RouteRequestEndpoint
-    let departureTime: String
+    /// Omitted when analyzing "right now": by the time a timestamp captured
+    /// on-device reaches Google's Routes API, network and queueing latency
+    /// can put it in the past, which Google rejects outright. Leaving it out
+    /// tells the provider to use live conditions instead of failing.
+    let departureTime: String?
     /// The driver's selected local clock time, independent from server timezone.
     let departureLocalMinutes: Int
     let includeAlternates: Bool

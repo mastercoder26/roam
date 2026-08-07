@@ -15,7 +15,7 @@ import {
 import { handleGetProfile, handleUpdateProfile } from "./src/handlers/profile.js";
 import { checkDatabase, isDatabaseConfigured } from "./src/db/pool.js";
 import { fileURLToPath } from "node:url";
-import { requireAuth } from "./src/auth/middleware.js";
+import { requireAuth, requireVerifiedIdentity } from "./src/auth/middleware.js";
 import {
   handleDeleteDrive,
   handleDeleteSavedRoute,
@@ -105,13 +105,15 @@ app.use((req, res, next) => {
 
 /**
  * Both routes below proxy to metered upstream APIs (Google Routes/Roads).
- * Rate limiting is keyed by `req.ip`, which resolves under `trust proxy = 1`
- * (see above) to the address the front-facing proxy appended rather than any
- * value the client sent, so `X-Forwarded-For` cannot be spoofed to escape it.
+ * Rate limiting prefers the verified Clerk subject so one account cannot
+ * multiply its budget by rotating addresses. It falls back to `req.ip`, which
+ * resolves under `trust proxy = 1` (see above) to the address the front-facing
+ * proxy appended rather than any value the client sent, so `X-Forwarded-For`
+ * cannot be spoofed to escape it.
  */
 function rateLimit(endpoint: string) {
   return (req: Request, res: Response, next: NextFunction) => {
-    const key = req.ip ?? req.socket.remoteAddress ?? "unknown";
+    const key = req.clerkUserId ?? req.ip ?? req.socket.remoteAddress ?? "unknown";
     const result = rateLimiter.check(key);
 
     if (!result.allowed) {
@@ -162,9 +164,32 @@ app.get("/health", async (_req, res) => {
   });
 });
 
-app.post("/api/route/difficulty", rateLimit("difficulty"), asyncHandler(handleDifficulty));
+/**
+ * Route analysis proxies metered Google APIs, so it is gated on a signed-in
+ * account. The limiter is applied on both sides of the identity check on
+ * purpose: the first pass sees no verified subject and so caps *anonymous*
+ * traffic by address, which bounds how much token verification a flood can
+ * force; the second pass sees `req.clerkUserId` and caps each account, which
+ * an attacker cannot widen by rotating addresses.
+ *
+ * `requireVerifiedIdentity` (not `requireAuth`) keeps this deployment free of
+ * any database dependency — see the note on that middleware.
+ */
+app.post(
+  "/api/route/difficulty",
+  rateLimit("difficulty"),
+  requireVerifiedIdentity,
+  rateLimit("difficulty"),
+  asyncHandler(handleDifficulty)
+);
 
-app.post("/api/route/departure-comparison", rateLimit("departure-comparison"), asyncHandler(handleDepartureComparison));
+app.post(
+  "/api/route/departure-comparison",
+  rateLimit("departure-comparison"),
+  requireVerifiedIdentity,
+  rateLimit("departure-comparison"),
+  asyncHandler(handleDepartureComparison)
+);
 
 app.get("/api/auth/me", authRateLimit, requireAuth, asyncHandler(handleMe));
 app.get("/api/profile", requireAuth, asyncHandler(handleGetProfile));

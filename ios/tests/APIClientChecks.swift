@@ -128,7 +128,8 @@ struct APIClientChecks {
         _ = try? await client.analyzeRoute(
             origin: "Origin",
             destination: "Destination",
-            departureTime: Date()
+            departureTime: Date(),
+            accessToken: "test-token"
         )
         _ = try? await client.requestData(
             path: "api/drives",

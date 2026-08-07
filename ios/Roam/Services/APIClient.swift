@@ -147,10 +147,13 @@ struct APIClient {
         throw APIError.networkError(lastNetworkError)
     }
 
+    /// `accessToken` is required: route analysis proxies metered upstream APIs
+    /// and the backend rejects anonymous callers.
     func analyzeRoute(
         origin: String,
         destination: String,
         departureTime: Date,
+        accessToken: String,
         includeAlternates: Bool = true,
         continuousDriveMinutes: Double? = nil
     ) async throws -> RouteDifficultyResponse {
@@ -158,6 +161,7 @@ struct APIClient {
             origin: .address(origin.trimmingCharacters(in: .whitespacesAndNewlines)),
             destination: .address(destination.trimmingCharacters(in: .whitespacesAndNewlines)),
             departureTime: departureTime,
+            accessToken: accessToken,
             includeAlternates: includeAlternates,
             continuousDriveMinutes: continuousDriveMinutes
         )
@@ -165,10 +169,17 @@ struct APIClient {
 
     /// Uses the measured endpoints of a completed local drive. The server
     /// receives coordinates as native route waypoints, never as display text.
+    ///
+    /// `departureTime` defaults to `nil`, meaning "analyze current
+    /// conditions" rather than a specific moment: this call analyzes a drive
+    /// that already happened, so there is no real departure to schedule
+    /// against, and sending "now" as a timestamp risks it reading as past by
+    /// the time it reaches Google's Routes API.
     func analyzeRoute(
         origin: RouteCoordinateEndpoint,
         destination: RouteCoordinateEndpoint,
-        departureTime: Date,
+        accessToken: String,
+        departureTime: Date? = nil,
         includeAlternates: Bool = false,
         continuousDriveMinutes: Double? = nil
     ) async throws -> RouteDifficultyResponse {
@@ -176,6 +187,7 @@ struct APIClient {
             origin: .coordinate(origin),
             destination: .coordinate(destination),
             departureTime: departureTime,
+            accessToken: accessToken,
             includeAlternates: includeAlternates,
             continuousDriveMinutes: continuousDriveMinutes
         )
@@ -184,19 +196,23 @@ struct APIClient {
     private func analyzeRoute(
         origin: RouteRequestEndpoint,
         destination: RouteRequestEndpoint,
-        departureTime: Date,
+        departureTime: Date?,
+        accessToken: String,
         includeAlternates: Bool,
         continuousDriveMinutes: Double?
     ) async throws -> RouteDifficultyResponse {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        let localTime = Calendar.autoupdatingCurrent.dateComponents([.hour, .minute], from: departureTime)
+        let localTime = Calendar.autoupdatingCurrent.dateComponents(
+            [.hour, .minute],
+            from: departureTime ?? Date()
+        )
         let departureLocalMinutes = (localTime.hour ?? 0) * 60 + (localTime.minute ?? 0)
 
         let body = RouteDifficultyRequest(
             origin: origin,
             destination: destination,
-            departureTime: formatter.string(from: departureTime),
+            departureTime: departureTime.map(formatter.string(from:)),
             departureLocalMinutes: departureLocalMinutes,
             includeAlternates: includeAlternates,
             continuousDriveMinutes: continuousDriveMinutes
@@ -208,7 +224,8 @@ struct APIClient {
             path: "api/route/difficulty",
             body: requestBody,
             responseType: RouteDifficultyResponse.self,
-            host: .route
+            host: .route,
+            accessToken: accessToken
         )
     }
 
@@ -218,6 +235,7 @@ struct APIClient {
         origin: String,
         destination: String,
         selectedDeparture: Date,
+        accessToken: String,
         now: Date = Date(),
         calendar: Calendar = .autoupdatingCurrent
     ) async throws -> DepartureComparisonResponse {
@@ -229,14 +247,16 @@ struct APIClient {
         return try await compareDepartureTimes(
             origin: origin,
             destination: destination,
-            candidates: candidates
+            candidates: candidates,
+            accessToken: accessToken
         )
     }
 
     func compareDepartureTimes(
         origin: String,
         destination: String,
-        candidates: [DepartureComparisonCandidate]
+        candidates: [DepartureComparisonCandidate],
+        accessToken: String
     ) async throws -> DepartureComparisonResponse {
         let body = DepartureComparisonRequest(
             origin: origin.trimmingCharacters(in: .whitespacesAndNewlines),
@@ -249,7 +269,8 @@ struct APIClient {
             path: "api/route/departure-comparison",
             body: requestBody,
             responseType: DepartureComparisonResponse.self,
-            host: .route
+            host: .route,
+            accessToken: accessToken
         )
     }
 
@@ -262,7 +283,8 @@ struct APIClient {
         path: String,
         body: Data,
         responseType: Response.Type,
-        host: Host
+        host: Host,
+        accessToken: String? = nil
     ) async throws -> Response {
         let candidates = candidateBaseURLs(for: host)
         guard !candidates.isEmpty else { throw APIError.invalidURL }
@@ -280,7 +302,8 @@ struct APIClient {
                     path: path,
                     body: body,
                     timeout: min(remaining, Self.maximumCandidateTimeout),
-                    responseType: responseType
+                    responseType: responseType,
+                    accessToken: accessToken
                 )
             } catch APIError.networkError(let error) {
                 lastNetworkError = error
@@ -321,13 +344,17 @@ struct APIClient {
         path: String,
         body: Data,
         timeout: TimeInterval,
-        responseType: Response.Type
+        responseType: Response.Type,
+        accessToken: String? = nil
     ) async throws -> Response {
         let endpoint = Self.endpoint(baseURL: baseURL, path: path)
 
         var request = URLRequest(url: endpoint)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        if let accessToken {
+            request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+        }
         request.timeoutInterval = timeout
         request.httpBody = body
 
