@@ -3,6 +3,7 @@ import SwiftUI
 struct DriveView: View {
     @ObservedObject private var theme = ThemeManager.shared
     @EnvironmentObject private var session: DriveSessionManager
+    @EnvironmentObject private var authSession: AuthSessionStore
     @State private var showingHelp = false
     @State private var presentationState = DrivePresentationState()
     @State private var transitionToken = UUID()
@@ -384,13 +385,16 @@ struct DriveView: View {
             breakPlanningError = nil
         }
         do {
-            let response = try await apiClient.analyzeRoute(
-                origin: routeOrigin,
-                destination: routeDestination,
-                departureTime: routeDepartureTime,
-                includeAlternates: false,
-                continuousDriveMinutes: session.elapsed / 60
-            )
+            let response = try await authSession.performAuthenticated { token in
+                try await apiClient.analyzeRoute(
+                    origin: routeOrigin,
+                    destination: routeDestination,
+                    departureTime: routeDepartureTime,
+                    accessToken: token,
+                    includeAlternates: false,
+                    continuousDriveMinutes: session.elapsed / 60
+                )
+            }
             withAnimation(reduceMotion ? .easeOut(duration: 0.18) : AppAnimation.content) {
                 plannedBreakRoute = response.primaryRoute
                 isPlanningBreaks = false

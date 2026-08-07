@@ -87,10 +87,27 @@ struct DriveHistoryDTO: Decodable {
 struct DriveHistoryPage: Decodable {
     let drives: [DriveHistoryDTO]
     let nextCursor: String?
+    /// Paired with `nextCursor` so a page boundary that falls inside a group of
+    /// drives sharing one start timestamp does not skip the rest of that group.
+    let nextCursorId: String?
 
-    init(drives: [DriveHistoryDTO], nextCursor: String?) {
+    init(drives: [DriveHistoryDTO], nextCursor: String?, nextCursorId: String? = nil) {
         self.drives = drives
         self.nextCursor = nextCursor
+        self.nextCursorId = nextCursorId
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case drives, nextCursor, nextCursorId
+    }
+
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(
+            drives: try values.decode([DriveHistoryDTO].self, forKey: .drives),
+            nextCursor: try values.decodeIfPresent(String.self, forKey: .nextCursor),
+            nextCursorId: try values.decodeIfPresent(String.self, forKey: .nextCursorId)
+        )
     }
 }
 
@@ -100,8 +117,10 @@ private struct DriveHistoryBatch: Encodable {
 
 @MainActor
 protocol DriveHistorySyncTransport {
-    func fetchDrives(limit: Int, before: String?, accessToken: String) async throws -> DriveHistoryPage
+    func fetchDrives(limit: Int, before: String?, beforeId: String?, accessToken: String) async throws -> DriveHistoryPage
     func uploadDrives(_ drives: [DriveHistoryInput], accessToken: String) async throws -> [DriveHistoryDTO]
+    /// Idempotent: a drive already deleted (or never uploaded) is treated as success.
+    func deleteDrive(id: String, accessToken: String) async throws
 }
 
 struct APIClientDriveHistoryTransport: DriveHistorySyncTransport {
@@ -111,10 +130,13 @@ struct APIClientDriveHistoryTransport: DriveHistorySyncTransport {
         self.client = client
     }
 
-    func fetchDrives(limit: Int, before: String?, accessToken: String) async throws -> DriveHistoryPage {
+    func fetchDrives(limit: Int, before: String?, beforeId: String?, accessToken: String) async throws -> DriveHistoryPage {
         var path = "api/drives?limit=\(min(max(limit, 1), 200))"
         if let before, let encoded = before.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) {
             path += "&before=\(encoded)"
+            if let beforeId, let encodedId = beforeId.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) {
+                path += "&beforeId=\(encodedId)"
+            }
         }
         let response = try await client.requestData(
             path: path,
@@ -149,6 +171,17 @@ struct APIClientDriveHistoryTransport: DriveHistorySyncTransport {
         } catch {
             throw APIError.decodingError(error)
         }
+    }
+
+    func deleteDrive(id: String, accessToken: String) async throws {
+        let response = try await client.requestData(
+            path: "api/drives/\(id)",
+            method: "DELETE",
+            headers: ["Authorization": "Bearer \(accessToken)"],
+            host: .data
+        )
+        if response.response.statusCode == 404 { return }
+        try validate(response)
     }
 
     private func validate(_ response: APIClient.HTTPResponseData) throws {
@@ -227,7 +260,29 @@ final class DriveHistorySyncService: ObservableObject {
 
     private struct SyncMetadata: Codable {
         var syncedDriveIDs: Set<String>
+        /// Drives removed locally whose remote deletion hasn't been confirmed
+        /// yet. Kept across launches so a delete made offline still reaches
+        /// the server, and checked on every sync so a remote copy already
+        /// fetched before the delete confirms can't resurrect it.
+        var pendingDeletionIDs: Set<String>
         var lastSyncedAt: Date?
+
+        init(syncedDriveIDs: Set<String>, pendingDeletionIDs: Set<String> = [], lastSyncedAt: Date?) {
+            self.syncedDriveIDs = syncedDriveIDs
+            self.pendingDeletionIDs = pendingDeletionIDs
+            self.lastSyncedAt = lastSyncedAt
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case syncedDriveIDs, pendingDeletionIDs, lastSyncedAt
+        }
+
+        init(from decoder: Decoder) throws {
+            let values = try decoder.container(keyedBy: CodingKeys.self)
+            syncedDriveIDs = try values.decode(Set<String>.self, forKey: .syncedDriveIDs)
+            pendingDeletionIDs = try values.decodeIfPresent(Set<String>.self, forKey: .pendingDeletionIDs) ?? []
+            lastSyncedAt = try values.decodeIfPresent(Date.self, forKey: .lastSyncedAt)
+        }
     }
 
     private let transport: any DriveHistorySyncTransport
@@ -277,6 +332,18 @@ final class DriveHistorySyncService: ObservableObject {
         for drive in localDrives where !metadata.syncedDriveIDs.contains(drive.id.uuidString) {
             pendingDrives[drive.id] = drive
         }
+
+        // A drive this device previously confirmed synced but that is no
+        // longer in the local list was removed by the user; the server
+        // needs to hear about it too, or the next fetch would bring it back.
+        let localIDStrings = Set(localIDs.map(\.uuidString))
+        let removedIDs = metadata.syncedDriveIDs.subtracting(localIDStrings)
+        if !removedIDs.isEmpty {
+            metadata.pendingDeletionIDs.formUnion(removedIDs)
+            metadata.syncedDriveIDs.subtract(removedIDs)
+            persistMetadata()
+        }
+
         needsSync = true
         guard syncTask == nil else { return }
 
@@ -333,17 +400,36 @@ final class DriveHistorySyncService: ObservableObject {
     }
 
     private func syncOnce() async throws {
+        try await pushPendingDeletions()
+
         var remoteDrives: [DriveHistoryDTO] = []
         var cursor: String?
+        var cursorId: String?
         var seenCursors = Set<String>()
 
         repeat {
+            let currentCursor = cursor
+            let currentCursorId = cursorId
             let page = try await authSession.performAuthenticated { token in
-                try await self.transport.fetchDrives(limit: 200, before: cursor, accessToken: token)
+                try await self.transport.fetchDrives(
+                    limit: 200,
+                    before: currentCursor,
+                    beforeId: currentCursorId,
+                    accessToken: token
+                )
             }
             remoteDrives.append(contentsOf: page.drives)
             cursor = page.nextCursor
-        } while cursor != nil && seenCursors.insert(cursor!).inserted
+            cursorId = page.nextCursorId
+            // The pair is what advances, so the loop guard has to key on both.
+        } while cursor != nil && seenCursors.insert("\(cursor!)|\(cursorId ?? "")").inserted
+
+        // Defensive: a deletion pushed above but not yet reflected in this
+        // fetch (or one still pending from a prior failed attempt) must not
+        // be re-merged back into local history.
+        if !metadata.pendingDeletionIDs.isEmpty {
+            remoteDrives = remoteDrives.filter { !metadata.pendingDeletionIDs.contains($0.id) }
+        }
 
         let merged = DriveHistorySyncEngine.merge(local: latestLocalDrives, remote: remoteDrives)
         latestLocalDrives = merged
@@ -373,6 +459,17 @@ final class DriveHistorySyncService: ObservableObject {
 
         metadata.lastSyncedAt = Date()
         persistMetadata()
+    }
+
+    private func pushPendingDeletions() async throws {
+        guard !metadata.pendingDeletionIDs.isEmpty else { return }
+        for id in metadata.pendingDeletionIDs {
+            try await authSession.performAuthenticated { token in
+                try await self.transport.deleteDrive(id: id, accessToken: token)
+            }
+            metadata.pendingDeletionIDs.remove(id)
+            persistMetadata()
+        }
     }
 
     private static func input(for drive: RecordedDrive) -> DriveHistoryInput {

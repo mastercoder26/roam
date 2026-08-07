@@ -69,6 +69,7 @@
 		A10000000000000000000031 /* ThemePickerSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000031 /* ThemePickerSheet.swift */; };
 		A10000000000000000000032 /* LayoutResponsiveness.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000032 /* LayoutResponsiveness.swift */; };
 		A10000000000000000000033 /* DriverPerformanceEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000033 /* DriverPerformanceEngine.swift */; };
+		A10000000000000000000FC /* DriveStatusMessageEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000FC /* DriveStatusMessageEngine.swift */; };
 		A10000000000000000000034 /* RouteEvidenceCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000034 /* RouteEvidenceCard.swift */; };
 		A10000000000000000000035 /* DriveDetailViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000035 /* DriveDetailViews.swift */; };
 		A10000000000000000000036 /* ResultsSupportingViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000036 /* ResultsSupportingViews.swift */; };
@@ -187,6 +188,7 @@
 		A20000000000000000000031 /* ThemePickerSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThemePickerSheet.swift; sourceTree = "<group>"; };
 		A20000000000000000000032 /* LayoutResponsiveness.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LayoutResponsiveness.swift; sourceTree = "<group>"; };
 		A20000000000000000000033 /* DriverPerformanceEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriverPerformanceEngine.swift; sourceTree = "<group>"; };
+		A20000000000000000000FC /* DriveStatusMessageEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriveStatusMessageEngine.swift; sourceTree = "<group>"; };
 		A20000000000000000000034 /* RouteEvidenceCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RouteEvidenceCard.swift; sourceTree = "<group>"; };
 		A20000000000000000000035 /* DriveDetailViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriveDetailViews.swift; sourceTree = "<group>"; };
 		A20000000000000000000036 /* ResultsSupportingViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResultsSupportingViews.swift; sourceTree = "<group>"; };
@@ -316,6 +318,7 @@
 				A2000000000000000000001D /* DriveReplayEngine.swift */,
 				A2000000000000000000001E /* DriverProgressEngine.swift */,
 				A20000000000000000000033 /* DriverPerformanceEngine.swift */,
+				A20000000000000000000FC /* DriveStatusMessageEngine.swift */,
 				A2000000000000000000001F /* PhonePlacementAnalyzer.swift */,
 				A20000000000000000000019 /* DriverReadinessEngine.swift */,
 				A20000000000000000000037 /* DriverReadinessModels.swift */,
@@ -690,6 +693,7 @@
 				A10000000000000000000031 /* ThemePickerSheet.swift in Sources */,
 				A10000000000000000000032 /* LayoutResponsiveness.swift in Sources */,
 				A10000000000000000000033 /* DriverPerformanceEngine.swift in Sources */,
+				A10000000000000000000FC /* DriveStatusMessageEngine.swift in Sources */,
 				A10000000000000000000034 /* RouteEvidenceCard.swift in Sources */,
 				A10000000000000000000035 /* DriveDetailViews.swift in Sources */,
 				A10000000000000000000036 /* ResultsSupportingViews.swift in Sources */,

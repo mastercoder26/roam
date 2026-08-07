@@ -79,6 +79,8 @@ struct RoamApp: App {
 
         case .active:
             authSession.requestDriveHistorySync()
+            authSession.requestProfileSync()
+            driveSession.resumeRouteAnalysesIfNeeded()
             guard let leftAt = leftForegroundAt else { return }
             leftForegroundAt = nil
             guard LaunchIntroChoreography.shouldReplay(

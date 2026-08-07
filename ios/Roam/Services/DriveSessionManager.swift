@@ -118,7 +118,13 @@ final class DriveSessionManager: NSObject, ObservableObject {
         return formatter.string(from: elapsed) ?? "0m"
     }
 
-    override init() {
+    /// Route analysis is gated on a signed-in account, so the session needs to
+    /// read auth state. It is injectable only so the checks can drive the
+    /// signed-out path without a Clerk session.
+    private let authSession: AuthSessionStore
+
+    init(authSession: AuthSessionStore = .shared) {
+        self.authSession = authSession
         super.init()
         locationManager.delegate = self
         locationManager.activityType = .automotiveNavigation
@@ -371,7 +377,7 @@ final class DriveSessionManager: NSObject, ObservableObject {
         if didSuspendRecordingInBackground {
             statusMessage = "Drive saved. Roam was suspended in the background for part of it, so some distance is missing."
         } else if initialRouteAnalysis.status == .pending {
-            statusMessage = "Drive saved. Analyzing route difficulty."
+            statusMessage = DriveStatusMessageEngine.analyzing
         } else if finalPlacementQuality == .needsAdjustment {
             statusMessage = "Drive saved. Secure the phone when it is safe before your next drive."
         } else if motionSamples == 0 {
@@ -409,6 +415,7 @@ final class DriveSessionManager: NSObject, ObservableObject {
         // `replaceSavedDrive`'s existence guard when it completes.
         routeAnalysisTasks[id]?.cancel()
         routeAnalysisTasks[id] = nil
+        requestDriveHistorySync()
     }
 
     /// Analyzes only the start and destination of a completed drive after its
@@ -416,14 +423,44 @@ final class DriveSessionManager: NSObject, ObservableObject {
     /// result is recorded as analysis context; it never removes the drive.
     private func beginAutomaticRouteAnalysis(for drive: RecordedDrive) {
         guard routeAnalysisTasks[drive.id] == nil,
-              let currentAnalysis = drive.routeAnalysis,
-              currentAnalysis.shouldRetry() else {
+              let currentAnalysis = drive.routeAnalysis else {
+            return
+        }
+        guard currentAnalysis.shouldRetry() else {
+            // No task is in flight and no retry is left, so a drive still
+            // marked `.pending` here — killed mid-request, or out of retries —
+            // has nothing that can ever complete it. Resolve it rather than
+            // leaving the UI spinning "Analyzing route" indefinitely.
+            if currentAnalysis.isStalled() {
+                replaceSavedDrive(
+                    id: drive.id,
+                    routeAnalysis: .unavailable(
+                        "Route difficulty could not be analyzed for this drive. The drive and its coaching score are still saved."
+                    )
+                )
+            }
             return
         }
         guard let endpoints = DriveRouteAnalysisEngine.endpoints(for: drive) else {
             replaceSavedDrive(
                 id: drive.id,
                 routeAnalysis: .unavailable("Route difficulty needs a longer continuous GPS trace from start to destination.")
+            )
+            return
+        }
+
+        // Route analysis proxies a metered upstream API, so the backend only
+        // serves signed-in accounts. Signing in later should analyze this
+        // drive, so the attempt stays retry-eligible rather than being spent.
+        guard authSession.isSignedIn else {
+            replaceSavedDrive(
+                id: drive.id,
+                routeAnalysis: .unavailable(
+                    "Sign in to analyze this route's difficulty. The drive and its coaching score are still saved.",
+                    retryEligible: true,
+                    lastAttemptAt: currentAnalysis.lastAttemptAt,
+                    retryCount: currentAnalysis.retryCount ?? 0
+                )
             )
             return
         }
@@ -436,13 +473,15 @@ final class DriveSessionManager: NSObject, ObservableObject {
             guard let self else { return }
 
             do {
-                let response = try await APIClient().analyzeRoute(
-                    origin: endpoints.origin,
-                    destination: endpoints.destination,
-                    departureTime: Date(),
-                    includeAlternates: false,
-                    continuousDriveMinutes: drive.score.duration / 60
-                )
+                let response = try await self.authSession.performAuthenticated { token in
+                    try await APIClient().analyzeRoute(
+                        origin: endpoints.origin,
+                        destination: endpoints.destination,
+                        accessToken: token,
+                        includeAlternates: false,
+                        continuousDriveMinutes: drive.score.duration / 60
+                    )
+                }
                 guard !Task.isCancelled else { return }
                 self.replaceSavedDrive(
                     id: drive.id,
@@ -472,6 +511,15 @@ final class DriveSessionManager: NSObject, ObservableObject {
         recordedDrives = updatedDrives
         if lastCompletedDrive?.id == id {
             lastCompletedDrive = updatedDrives.first(where: { $0.id == id })
+            // The banner was set to "Analyzing route difficulty" when the drive
+            // was saved and nothing else retires it, so without this it reads
+            // as analyzing forever — long after the request succeeded or
+            // failed. Only that exact text is replaced: a banner about a
+            // background suspension or phone placement still matters more.
+            if statusMessage == DriveStatusMessageEngine.analyzing,
+               let resolved = DriveStatusMessageEngine.resolvedMessage(for: routeAnalysis) {
+                statusMessage = resolved
+            }
         }
         saveRecordedDrives()
         requestDriveHistorySync()
@@ -799,8 +847,14 @@ final class DriveSessionManager: NSObject, ObservableObject {
         saveRecordedDrives()
     }
 
-    private func resumeRouteAnalysesIfNeeded() {
-        for drive in recordedDrives where drive.routeAnalysis?.shouldRetry() == true {
+    /// Restarts analyses that outlived their request — a drive left `.pending`
+    /// by a terminated app, or one whose retry became due. Called at launch and
+    /// again on every foreground: waiting for a full relaunch was the
+    /// difference between "retries when you next open the app" and "stays on
+    /// Analyzing until the app is force-quit".
+    func resumeRouteAnalysesIfNeeded() {
+        for drive in recordedDrives where drive.routeAnalysis?.shouldRetry() == true
+            || drive.routeAnalysis?.isStalled() == true {
             beginAutomaticRouteAnalysis(for: drive)
         }
     }

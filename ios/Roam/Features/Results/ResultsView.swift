@@ -7,6 +7,7 @@ struct ResultsView: View {
 
     @Environment(\.openURL) private var openURL
     @EnvironmentObject private var driveSession: DriveSessionManager
+    @EnvironmentObject private var authSession: AuthSessionStore
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var selectedRoute: ScoredRoute
     @State private var readinessAssessment: DriverReadinessAssessment
@@ -404,11 +405,14 @@ struct ResultsView: View {
 
         Task {
             do {
-                let response = try await apiClient.compareDepartureTimes(
-                    origin: current.origin,
-                    destination: current.destination,
-                    selectedDeparture: current.departureTime
-                )
+                let response = try await authSession.performAuthenticated { token in
+                    try await apiClient.compareDepartureTimes(
+                        origin: current.origin,
+                        destination: current.destination,
+                        selectedDeparture: current.departureTime,
+                        accessToken: token
+                    )
+                }
                 guard result.origin == current.origin,
                       result.destination == current.destination,
                       result.departureTime == current.departureTime else {
@@ -440,12 +444,15 @@ struct ResultsView: View {
 
         Task {
             do {
-                let response = try await apiClient.analyzeRoute(
-                    origin: current.origin,
-                    destination: current.destination,
-                    departureTime: departure,
-                    includeAlternates: true
-                )
+                let response = try await authSession.performAuthenticated { token in
+                    try await apiClient.analyzeRoute(
+                        origin: current.origin,
+                        destination: current.destination,
+                        departureTime: departure,
+                        accessToken: token,
+                        includeAlternates: true
+                    )
+                }
                 let updated = RouteAnalysisResult(
                     origin: current.origin,
                     destination: current.destination,

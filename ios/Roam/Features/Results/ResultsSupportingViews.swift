@@ -293,7 +293,7 @@ struct BreakdownBarRow: View {
         switch displayedValue {
         case 0..<0.35: .green
         case 0.35..<0.65: AppDesign.safety
-        default: AppDesign.safety
+        default: AppDesign.danger
         }
     }
 }

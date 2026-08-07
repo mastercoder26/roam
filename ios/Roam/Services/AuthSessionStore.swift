@@ -56,6 +56,7 @@ final class AuthSessionStore: ObservableObject {
     private let client: ClerkBackendClient
     private var testAccessToken: String?
     private var hasStartedRestore = false
+    private var isProfileSyncInFlight = false
     private var driveHistorySyncRequest: (() -> Void)?
 
     init(
@@ -156,6 +157,23 @@ final class AuthSessionStore: ObservableObject {
     func requestDriveHistorySync() {
         guard isSignedIn else { return }
         driveHistorySyncRequest?()
+    }
+
+    /// Re-runs profile reconciliation outside the cold-launch path.
+    ///
+    /// `restoreIfNeeded()` runs once per process, so without this a profile
+    /// edit made in one session — advancing a learner stage, changing a display
+    /// name — stayed local until the app was fully killed and relaunched.
+    /// `syncProfile()` resolves conflicts in both directions, so repeating it
+    /// on foreground is safe and simply converges.
+    func requestProfileSync() {
+        guard isSignedIn, !isProfileSyncInFlight else { return }
+        isProfileSyncInFlight = true
+        Task { [weak self] in
+            guard let self else { return }
+            defer { self.isProfileSyncInFlight = false }
+            await self.syncProfile()
+        }
     }
 
     func configureDriveHistorySync(_ request: @escaping () -> Void) {

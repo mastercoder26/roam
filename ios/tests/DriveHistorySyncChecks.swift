@@ -4,11 +4,14 @@ import Foundation
 struct DriveHistorySyncChecks {
     @MainActor
     static func main() async {
+        setvbuf(stdout, nil, _IONBF, 0)
         mergeIsIdempotent()
         serverWinsOnConflict()
         await offlineDrivesStayQueuedAndRetry()
         await signedOutSyncMakesZeroNetworkCalls()
         await undecodablePayloadIsSkipped()
+        await deletingALocalDriveDeletesItRemotely()
+        await aFailedDeletionSurvivesRelaunchAndDoesNotResurrect()
 
         print("Drive history sync checks passed")
     }
@@ -112,6 +115,82 @@ struct DriveHistorySyncChecks {
         expect(service.state == .synced, "one bad payload must not fail the whole pull")
     }
 
+    @MainActor
+    private static func deletingALocalDriveDeletesItRemotely() async {
+        let user = AuthUser(id: "delete-user", email: "delete@example.com", displayName: nil)
+        let session = AuthSessionStore(automaticallyRestore: false)
+        session.setSignedInForTesting(user: user, accessToken: "access-token")
+        let transport = FakeDriveHistoryTransport()
+        let drive = makeDrive(score: 60)
+        transport.page = DriveHistoryPage(drives: [makeDTO(for: drive)], nextCursor: nil)
+        let defaults = isolatedDefaults()
+        let service = DriveHistorySyncService(
+            transport: transport,
+            authSession: session,
+            userDefaults: defaults,
+            retryDelaysNanoseconds: [0]
+        )
+
+        // First sync: the drive comes down from the server and is confirmed synced.
+        var applied: [RecordedDrive] = [drive]
+        service.sync(localDrives: [drive], applyLocalDrives: { applied = $0 })
+        await waitUntil { service.state == .synced }
+        expect(applied.contains { $0.id == drive.id }, "the drive should be present after the first sync")
+
+        // User deletes it locally, then a sync runs with the drive already removed.
+        service.sync(localDrives: [], applyLocalDrives: { applied = $0 })
+        await waitUntil { service.state == .synced }
+
+        expect(transport.deletedIDs == [drive.id.uuidString], "a locally removed drive must be deleted remotely")
+        expect(applied.isEmpty, "a deleted drive must not be re-merged back into local history")
+    }
+
+    @MainActor
+    private static func aFailedDeletionSurvivesRelaunchAndDoesNotResurrect() async {
+        let user = AuthUser(id: "delete-retry-user", email: "delete-retry@example.com", displayName: nil)
+        let session = AuthSessionStore(automaticallyRestore: false)
+        session.setSignedInForTesting(user: user, accessToken: "access-token")
+        let transport = FakeDriveHistoryTransport()
+        let drive = makeDrive(score: 55)
+        transport.page = DriveHistoryPage(drives: [makeDTO(for: drive)], nextCursor: nil)
+        let defaults = isolatedDefaults()
+        // No retries here: state flips to `.offline` on the first failed
+        // attempt, before any retry sleep, so an in-flight retry task could
+        // still be running (and could still succeed) after this returns.
+        // Using zero retries keeps the task's lifetime deterministic for
+        // the assertions below.
+        let service = DriveHistorySyncService(
+            transport: transport,
+            authSession: session,
+            userDefaults: defaults,
+            retryDelaysNanoseconds: []
+        )
+
+        var applied: [RecordedDrive] = [drive]
+        service.sync(localDrives: [drive], applyLocalDrives: { applied = $0 })
+        await waitUntil { service.state == .synced }
+
+        // The delete call fails (simulating no connectivity at delete time).
+        transport.shouldFail = true
+        service.sync(localDrives: [], applyLocalDrives: { applied = $0 })
+        await waitUntil { service.state == .offline }
+        expect(transport.deletedIDs.isEmpty, "a failed delete must not be recorded as sent")
+
+        // "Relaunch": a fresh service instance reads the same persisted metadata.
+        transport.shouldFail = false
+        let relaunched = DriveHistorySyncService(
+            transport: transport,
+            authSession: session,
+            userDefaults: defaults,
+            retryDelaysNanoseconds: [0]
+        )
+        relaunched.sync(localDrives: [], applyLocalDrives: { applied = $0 })
+        await waitUntil { relaunched.state == .synced }
+
+        expect(transport.deletedIDs == [drive.id.uuidString], "the pending deletion must survive relaunch and retry")
+        expect(applied.isEmpty, "the drive must stay deleted after the retried sync")
+    }
+
     private static func makeDrive(id: UUID = UUID(), score: Int) -> RecordedDrive {
         let quality = DriveDataQuality(
             acceptedLocationSamples: 1,
@@ -176,8 +255,9 @@ private final class FakeDriveHistoryTransport: DriveHistorySyncTransport {
     var page = DriveHistoryPage(drives: [], nextCursor: nil)
     private(set) var fetchCount = 0
     private(set) var uploadCount = 0
+    private(set) var deletedIDs: [String] = []
 
-    func fetchDrives(limit: Int, before: String?, accessToken: String) async throws -> DriveHistoryPage {
+    func fetchDrives(limit: Int, before: String?, beforeId: String?, accessToken: String) async throws -> DriveHistoryPage {
         fetchCount += 1
         if shouldFail { throw AuthError.offline }
         return page
@@ -201,5 +281,11 @@ private final class FakeDriveHistoryTransport: DriveHistorySyncTransport {
                 updatedAt: Date()
             )
         }
+    }
+
+    func deleteDrive(id: String, accessToken: String) async throws {
+        if shouldFail { throw AuthError.offline }
+        deletedIDs.append(id)
+        page = DriveHistoryPage(drives: page.drives.filter { $0.id != id }, nextCursor: page.nextCursor)
     }
 }

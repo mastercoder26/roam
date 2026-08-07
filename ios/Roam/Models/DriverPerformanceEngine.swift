@@ -120,6 +120,15 @@ struct DriveRouteAnalysis: Codable, Hashable {
         return date.timeIntervalSince(lastAttemptAt) >= delay
     }
 
+    /// A `.pending` analysis is only honest while a request is actually in
+    /// flight. Once the retry budget is spent — or the app was killed
+    /// mid-request and no task survived — nothing will ever move it off
+    /// `.pending`, so the UI would spin "Analyzing route" forever. Callers use
+    /// this to resolve those drives instead of leaving them stalled.
+    func isStalled(at date: Date = Date()) -> Bool {
+        status == .pending && !shouldRetry(at: date)
+    }
+
     func recordingAttempt(at date: Date = Date()) -> DriveRouteAnalysis {
         DriveRouteAnalysis(
             status: .pending,

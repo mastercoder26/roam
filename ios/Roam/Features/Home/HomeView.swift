@@ -3,6 +3,7 @@ import UIKit
 
 struct HomeView: View {
     @ObservedObject private var theme = ThemeManager.shared
+    @EnvironmentObject private var authSession: AuthSessionStore
     @ObservedObject var form: RoutePlanningFormModel
     @State private var isLoading = false
     @State private var isCompletingLoading = false
@@ -531,12 +532,15 @@ struct HomeView: View {
             isLoading = true
         }
         do {
-            let response = try await apiClient.analyzeRoute(
-                origin: form.origin,
-                destination: form.destination,
-                departureTime: form.departureTime,
-                includeAlternates: true
-            )
+            let response = try await authSession.performAuthenticated { token in
+                try await apiClient.analyzeRoute(
+                    origin: form.origin,
+                    destination: form.destination,
+                    departureTime: form.departureTime,
+                    accessToken: token,
+                    includeAlternates: true
+                )
+            }
             pendingResult = RouteAnalysisResult(
                 origin: form.origin,
                 destination: form.destination,

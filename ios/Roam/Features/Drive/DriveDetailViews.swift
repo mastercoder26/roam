@@ -6,7 +6,7 @@ import UIKit
 /// independently.
 struct DriveDetailView: View {
     @ObservedObject private var theme = ThemeManager.shared
-    let drive: RecordedDrive
+    private let initialDrive: RecordedDrive
     @EnvironmentObject private var session: DriveSessionManager
     @State private var selectedMomentID: UUID?
     @State private var confirmingDelete = false
@@ -14,8 +14,16 @@ struct DriveDetailView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     init(drive: RecordedDrive, initialSelectedMomentID: UUID? = nil) {
-        self.drive = drive
+        self.initialDrive = drive
         _selectedMomentID = State(initialValue: initialSelectedMomentID)
+    }
+
+    /// Read live from the session rather than rendering the value captured when
+    /// this screen was pushed. Route analysis finishes after navigation, so a
+    /// snapshot would show "Analyzing route" for as long as the screen stayed
+    /// open. Falls back to the pushed copy while a deletion dismisses us.
+    private var drive: RecordedDrive {
+        session.recordedDrives.first(where: { $0.id == initialDrive.id }) ?? initialDrive
     }
 
     private var replayMoments: [DriveReplayMoment] {
