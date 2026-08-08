@@ -31,7 +31,6 @@ struct RoamRootView: View {
     }
 
     @State private var selectedTab: AppTab = .routes
-    @State private var showingThemePicker = false
     @EnvironmentObject private var driveSession: DriveSessionManager
     @EnvironmentObject private var themeManager: ThemeManager
     @EnvironmentObject private var authSession: AuthSessionStore
@@ -76,10 +75,6 @@ struct RoamRootView: View {
         .tint(AppDesign.accent)
         .background(themeManager.palette.canvas.color.ignoresSafeArea())
         .preferredColorScheme(themeManager.preferredColorScheme)
-        .sheet(isPresented: $showingThemePicker) {
-            ThemePickerSheet(themeManager: themeManager)
-                .environmentObject(driveSession)
-        }
         .onChange(of: driveSession.practiceRoutePresentationRequest) { _, request in
             // The manager emits this only when a Results-screen action queues a
             // route for practice. Keeping the request separate from the route
@@ -115,7 +110,9 @@ struct RoamRootView: View {
     /// its occupied height explicit to every tab and prevents the active
     /// screen's title from disappearing behind a safe-area inset.
     private var topBrandBar: some View {
-        HStack(spacing: 10) {
+        HStack {
+            Spacer(minLength: 0)
+
             BrandWordmark(compact: true)
                 .background(
                     GeometryReader { proxy in
@@ -126,23 +123,7 @@ struct RoamRootView: View {
                     }
                 )
 
-            Spacer(minLength: 8)
-
-            Button {
-                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                showingThemePicker = true
-            } label: {
-                Image(systemName: "paintpalette.fill")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(AppDesign.Ink.secondary)
-                    .frame(width: 36, height: 36)
-                    .background(AppDesign.cardSurface, in: Circle())
-                    .frame(minWidth: 44, minHeight: 44)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(PressableScaleStyle())
-            .accessibilityLabel("Roam color schemes")
-            .accessibilityHint("Opens color scheme options without changing this screen")
+            Spacer(minLength: 0)
         }
         .frame(minHeight: 44)
         .padding(.horizontal, 20)

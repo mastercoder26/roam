@@ -1,22 +1,16 @@
 import Charts
 import SwiftUI
 
-// MARK: - Theme subscription
-//
-// `AppDesign` tokens are *static* reads off a cached palette, so SwiftUI
-// records no dependency on them. A view that paints with a token therefore
-// keeps its old colors after a theme switch unless it observes the manager
-// itself — that was the cause of half-recolored screens.
-//
-// Every view, view modifier, and button style that reads an `AppDesign` token
-// must declare:
+// AppDesign tokens are static reads off a cached palette, so SwiftUI records no
+// dependency on them and a view keeps its old colors after a theme switch.
+// Anything that paints with a token needs:
 //
 //     @ObservedObject private var theme = ThemeManager.shared
 //
-// The property is deliberately unread in most bodies; it exists purely to
-// register the invalidation dependency. Do not delete it as "unused".
+// It is unread in most bodies — it only registers the invalidation dependency.
+// Don't remove it as unused.
 
-// MARK: - Design tokens
+// MARK: - Tokens
 
 enum AppDesign {
     private static var palette: ThemePalette {
@@ -24,92 +18,106 @@ enum AppDesign {
     }
 
     static var accent: Color { palette.accent.color }
-    /// Adaptive black/white foreground for accent-filled controls.
+    /// Black or white, whichever reads on an accent-filled control.
     static var accentForeground: Color { palette.accentForeground.color }
     static var safety: Color { palette.safety.color }
-    /// Destructive actions — ending a drive, deleting history.
+    /// Ending a drive, deleting history.
     static var danger: Color { palette.danger.color }
-    /// Adaptive black/white foreground for danger-filled controls.
     static var dangerForeground: Color { palette.dangerForeground.color }
     static var positive: Color { palette.positive.color }
 
-    /// Soft canvas — theme-aware background for primary surfaces.
     static var canvas: Color { palette.canvas.color }
-    /// Raised surface for primary cards.
     static var cardSurface: Color { palette.cardSurface.color }
-    /// Slightly higher elevation for map / featured panels.
+    /// Map and featured panels, one step above `cardSurface`.
     static var cardSurfaceElevated: Color { palette.cardSurfaceElevated.color }
     static var cardStroke: Color { palette.cardStroke.color }
     static var cardStrokeStrong: Color { palette.cardStrokeStrong.color }
     static var cardShadow: Color { palette.cardShadow.color }
-    /// Fill for present-but-unavailable controls. Theme-aware, unlike the
-    /// `Color(.systemGray3)` it replaces.
+    /// Present-but-unavailable controls.
     static var disabledSurface: Color { palette.disabledSurface.color }
-    /// Unfilled portion of progress bars and meters, and inline chip fills that
-    /// sit directly on a card. Replaces `Color.primary.opacity(…)`, which
-    /// tracked only light/dark and so ignored every theme's own surfaces.
+    /// Unfilled portion of meters and progress bars, and chip fills sitting on a card.
     static var trackSurface: Color { palette.cardStroke.color }
     static var glassHighlight: Color { palette.glassHighlight.color }
-    /// Adaptive black/white foreground for controls filled with primary ink.
     static var primarySurfaceForeground: Color { palette.primarySurfaceForeground.color }
 
-    /// UIKit bridges for MapKit overlays and annotations, which cannot take a
-    /// SwiftUI `Color`.
+    /// MapKit overlays and annotations can't take a SwiftUI `Color`.
     enum UIKitColor {
         static var accent: UIColor { AppDesign.palette.accent.uiColor }
         static var safety: UIColor { AppDesign.palette.safety.uiColor }
         static var cardSurface: UIColor { AppDesign.palette.cardSurface.uiColor }
     }
 
+    static let space2: CGFloat = 2
     static let space4: CGFloat = 4
     static let space8: CGFloat = 8
     static let space12: CGFloat = 12
     static let space16: CGFloat = 16
     static let space20: CGFloat = 20
     static let space24: CGFloat = 24
-    /// Shared radius scale — keep cards, buttons, and pills on this ladder.
-    static let cornerRadius: CGFloat = 16
+    static let space32: CGFloat = 32
+
+    /// Radius ladder — keep cards, buttons and pills on these rungs.
+    static let cornerRadius: CGFloat = 18
     static let cornerRadiusSmall: CGFloat = 12
-    static let cornerRadiusLarge: CGFloat = 20
-    /// Icon tiles and other sub-32pt chips, which read as over-rounded on the
-    /// 12pt step. A real rung on the ladder, not an ad-hoc literal.
+    static let cornerRadiusLarge: CGFloat = 24
+    static let cornerRadiusHero: CGFloat = 28
+    /// Icon tiles and other sub-32pt chips, which read as over-rounded at 12.
     static let cornerRadiusTiny: CGFloat = 10
 
-    /// Elevation tiers. Every shadow derives from the theme's own shadow color,
-    /// so a dark scheme is never given a light scheme's near-invisible shadow.
+    /// Shadow tiers, all derived from the theme's own shadow color so a dark
+    /// scheme never inherits a light scheme's invisible shadow.
     enum Elevation {
-        /// Inline chips and rows sitting directly on a card.
-        static let low = (radius: CGFloat(12), y: CGFloat(6), opacity: 0.7)
-        /// Primary cards lifted off the canvas.
-        static let medium = (radius: CGFloat(14), y: CGFloat(8), opacity: 1.0)
-        /// Floating chrome — the tab bar and map panels.
-        static let high = (radius: CGFloat(18), y: CGFloat(9), opacity: 1.0)
+        /// Chips and rows sitting directly on a card.
+        static let low = (radius: CGFloat(10), y: CGFloat(4), opacity: 0.6)
+        /// Cards lifted off the canvas.
+        static let medium = (radius: CGFloat(18), y: CGFloat(8), opacity: 0.9)
+        /// Floating chrome — tab bar, map panels.
+        static let high = (radius: CGFloat(26), y: CGFloat(12), opacity: 1.0)
+        /// Hero surfaces that should read as the focal point of a screen.
+        static let hero = (radius: CGFloat(34), y: CGFloat(16), opacity: 1.0)
     }
-    static let cardPadding: CGFloat = 16
-    static let sectionSpacing: CGFloat = 20
-    static let contentPadding: CGFloat = 16
 
-    /// Material-style emphasis tiers (high / medium / low).
+    static let cardPadding: CGFloat = 18
+    static let sectionSpacing: CGFloat = 28
+    static let contentPadding: CGFloat = 20
+    /// Clearance below the last element on a scrolling tab so it clears the
+    /// floating tab bar.
+    static let tabBarClearance: CGFloat = 44
+
     enum Ink {
         static var primary: Color { AppDesign.palette.inkPrimary.color }
         static var secondary: Color { AppDesign.palette.inkSecondary.color }
         static var tertiary: Color { AppDesign.palette.inkTertiary.color }
-        /// Section micro-labels (FROM / TO).
+        /// Micro-labels (FROM / TO).
         static var label: Color { AppDesign.palette.inkLabel.color }
     }
 
     enum Typography {
+        /// Screen-opening statement. Tight and heavy, in the manner of a big
+        /// consumer app's first line of copy.
+        static let display = Font.system(size: 34, weight: .bold, design: .default)
         static let heroTitle = Font.system(.largeTitle, design: .rounded, weight: .bold)
-        static let sectionTitle = Font.headline
-        static let metricValue = Font.subheadline.weight(.semibold)
+        static let sectionTitle = Font.system(size: 20, weight: .semibold)
+        static let railTitle = Font.system(size: 17, weight: .semibold)
+        static let metricValue = Font.system(size: 22, weight: .semibold)
         static let metricLabel = Font.caption
-        /// Functional UI — addresses, buttons, field values.
         static let body = Font.system(.body, design: .default, weight: .regular)
         static let bodyEmphasized = Font.system(.body, design: .default, weight: .medium)
+        /// All-caps micro-label. Pair with `.tracking(1.1)`.
+        static let microLabel = Font.caption.weight(.bold)
+    }
+
+    /// Soft accent wash used behind hero surfaces and featured tiles.
+    static var accentWash: LinearGradient {
+        LinearGradient(
+            colors: [accent.opacity(0.22), accent.opacity(0.04)],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
     }
 }
 
-// MARK: - Difficulty color helper
+// MARK: - Difficulty color
 
 extension DifficultyLabel {
     private var step: DifficultyStep {
@@ -122,14 +130,12 @@ extension DifficultyLabel {
         }
     }
 
-    /// Theme-aware demand color. The old implementation used one fixed ramp,
-    /// which put a near-white yellow on the light and Goldfish canvases.
     var color: Color {
         ThemeManager.cachedPalette.difficultyColor(step).color
     }
 }
 
-// MARK: - Card surface
+// MARK: - Card surfaces
 
 struct PremiumCardModifier: ViewModifier {
     @ObservedObject private var theme = ThemeManager.shared
@@ -142,9 +148,35 @@ struct PremiumCardModifier: ViewModifier {
             .clipShape(RoundedRectangle(cornerRadius: AppDesign.cornerRadius, style: .continuous))
             .overlay {
                 RoundedRectangle(cornerRadius: AppDesign.cornerRadius, style: .continuous)
-                    .stroke(AppDesign.cardStroke, lineWidth: 1)
+                    .stroke(AppDesign.cardStroke, lineWidth: 0.75)
             }
             .elevation(AppDesign.Elevation.medium)
+    }
+}
+
+/// Featured surface: larger radius, accent wash, deeper shadow. For the one
+/// element on a screen that should be looked at first.
+struct HeroCardModifier: ViewModifier {
+    @ObservedObject private var theme = ThemeManager.shared
+
+    func body(content: Content) -> some View {
+        content
+            .padding(AppDesign.space20)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background {
+                RoundedRectangle(cornerRadius: AppDesign.cornerRadiusHero, style: .continuous)
+                    .fill(AppDesign.cardSurfaceElevated)
+                    .overlay {
+                        RoundedRectangle(cornerRadius: AppDesign.cornerRadiusHero, style: .continuous)
+                            .fill(AppDesign.accentWash)
+                    }
+            }
+            .clipShape(RoundedRectangle(cornerRadius: AppDesign.cornerRadiusHero, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: AppDesign.cornerRadiusHero, style: .continuous)
+                    .stroke(AppDesign.cardStrokeStrong, lineWidth: 0.75)
+            }
+            .elevation(AppDesign.Elevation.hero)
     }
 }
 
@@ -153,9 +185,12 @@ extension View {
         modifier(PremiumCardModifier())
     }
 
-    /// Applies a themed elevation tier. Use instead of a literal
-    /// `.shadow(color: .black.opacity(…))`, which cannot adapt to the
-    /// active theme and disappears entirely on dark schemes.
+    func heroCard() -> some View {
+        modifier(HeroCardModifier())
+    }
+
+    /// Themed shadow. Use instead of a literal `.shadow(color: .black…)`, which
+    /// can't adapt and vanishes on dark schemes.
     func elevation(_ tier: (radius: CGFloat, y: CGFloat, opacity: Double)) -> some View {
         shadow(
             color: AppDesign.cardShadow.opacity(tier.opacity),
@@ -163,9 +198,20 @@ extension View {
             y: tier.y
         )
     }
+
+    /// Rounded surface with a hairline edge, for content that supplies its own
+    /// padding — maps, charts, image panels.
+    func surfaceFrame(radius: CGFloat = AppDesign.cornerRadiusLarge, elevated: Bool = true) -> some View {
+        clipShape(RoundedRectangle(cornerRadius: radius, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: radius, style: .continuous)
+                    .stroke(AppDesign.cardStroke, lineWidth: 0.75)
+            }
+            .elevation(elevated ? AppDesign.Elevation.medium : AppDesign.Elevation.low)
+    }
 }
 
-// MARK: - Section header
+// MARK: - Headers
 
 struct SectionHeader: View {
     @ObservedObject private var theme = ThemeManager.shared
@@ -173,7 +219,7 @@ struct SectionHeader: View {
     var subtitle: String?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: AppDesign.space4) {
             Text(title)
                 .font(AppDesign.Typography.sectionTitle)
                 .foregroundStyle(AppDesign.Ink.primary)
@@ -181,69 +227,95 @@ struct SectionHeader: View {
                 Text(subtitle)
                     .font(.footnote)
                     .foregroundStyle(AppDesign.Ink.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
     }
 }
 
-/// Shared top-of-screen title geometry for tabs that present a visible title.
-/// Keeping this in the design system prevents one tab from inheriting a tall
-/// system navigation-bar inset while another starts directly under the brand.
+/// Shared top-of-screen title geometry. Keeping it here stops one tab from
+/// inheriting a tall navigation-bar inset while another starts under the brand.
 struct ScreenHeader: View {
     @ObservedObject private var theme = ThemeManager.shared
     let title: String
     let symbol: String
+    var subtitle: String?
 
     var body: some View {
-        HStack(alignment: .center, spacing: AppDesign.space16) {
-            Text(title)
-                .font(AppDesign.Typography.heroTitle)
-                .tracking(-0.8)
-                .foregroundStyle(AppDesign.Ink.primary)
-                .fixedSize(horizontal: false, vertical: true)
+        HStack(alignment: .top, spacing: AppDesign.space16) {
+            VStack(alignment: .leading, spacing: AppDesign.space4) {
+                Text(title)
+                    .font(AppDesign.Typography.display)
+                    .tracking(-0.9)
+                    .foregroundStyle(AppDesign.Ink.primary)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                if let subtitle {
+                    Text(subtitle)
+                        .font(.subheadline)
+                        .foregroundStyle(AppDesign.Ink.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
 
             Spacer(minLength: AppDesign.space8)
 
             Image(systemName: symbol)
-                .font(.system(size: 34, weight: .medium))
-                .foregroundStyle(AppDesign.Ink.primary.opacity(0.9))
-                .frame(width: 48, height: 48)
-                .background(AppDesign.Ink.primary.opacity(0.10), in: Circle())
+                .font(.system(size: 22, weight: .semibold))
+                .foregroundStyle(AppDesign.accent)
+                .frame(width: 46, height: 46)
+                .background(AppDesign.accent.opacity(0.14), in: Circle())
                 .accessibilityHidden(true)
         }
-        .frame(minHeight: 48)
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isHeader)
     }
 }
 
+/// Rail title with an optional trailing action, the pattern every large
+/// consumer app uses above a horizontal carousel.
+struct RailHeader<Trailing: View>: View {
+    @ObservedObject private var theme = ThemeManager.shared
+    let title: String
+    @ViewBuilder var trailing: Trailing
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline) {
+            Text(title)
+                .font(AppDesign.Typography.railTitle)
+                .foregroundStyle(AppDesign.Ink.primary)
+            Spacer(minLength: AppDesign.space8)
+            trailing
+        }
+    }
+}
+
+extension RailHeader where Trailing == EmptyView {
+    init(title: String) {
+        self.init(title: title) { EmptyView() }
+    }
+}
+
 struct BrandWordmark: View {
-    // Observe the shared manager directly. safeAreaInset content does not always
-    // inherit EnvironmentObject from the modified ancestor, which crashed launch.
+    // Observed directly: safeAreaInset content doesn't always inherit an
+    // EnvironmentObject from the modified ancestor, which crashed launch.
     @ObservedObject private var themeManager = ThemeManager.shared
     var compact = false
 
     var body: some View {
         Text("Roam")
             .font(wordmarkFont)
-            // Keep the compact wordmark at a stable optical size so an
-            // accessibility text setting reserves its space for route inputs.
+            // Hold the compact wordmark at a stable optical size so an
+            // accessibility text setting leaves room for the route inputs.
             .dynamicTypeSize(compact ? .large : .accessibility5)
             .tracking(compact ? -0.25 : -0.4)
-            .foregroundStyle(wordmarkColor)
+            .foregroundStyle(themeManager.palette.inkPrimary.color.opacity(0.92))
             .contentShape(Rectangle())
             .accessibilityLabel("Roam")
             .accessibilityAddTraits(.isHeader)
     }
 
-    /// High-contrast brand ink for the current canvas (never uses a stale palette).
-    private var wordmarkColor: Color {
-        themeManager.palette.inkPrimary.color.opacity(0.92)
-    }
-
     private var wordmarkFont: Font {
-        // Keep the compact form fixed so accessibility text enlarges task
-        // controls, not a persistent brand bar that would push them away.
         if compact {
             return .custom("Baskerville-SemiBoldItalic", size: 23)
         }
@@ -251,7 +323,7 @@ struct BrandWordmark: View {
     }
 }
 
-// MARK: - Press feedback (scale 0.97 on active)
+// MARK: - Buttons
 
 struct PressableScaleStyle: ButtonStyle {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -263,8 +335,6 @@ struct PressableScaleStyle: ButtonStyle {
             .animation(AppAnimation.press, value: configuration.isPressed)
     }
 }
-
-// MARK: - Primary CTA
 
 struct PrimaryActionButton: View {
     let title: String
@@ -286,11 +356,16 @@ struct PrimaryActionButton: View {
                     .contentTransition(.interpolate)
             }
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 16)
+            .padding(.vertical, 17)
             .foregroundStyle(isEnabled ? AppDesign.accentForeground : AppDesign.Ink.tertiary)
             .background(
                 RoundedRectangle(cornerRadius: AppDesign.cornerRadius, style: .continuous)
                     .fill(isEnabled ? AppDesign.accent : AppDesign.disabledSurface)
+            )
+            .shadow(
+                color: isEnabled ? AppDesign.accent.opacity(0.28) : .clear,
+                radius: 14,
+                y: 6
             )
         }
         .buttonStyle(PressableScaleStyle())
@@ -299,22 +374,121 @@ struct PrimaryActionButton: View {
     }
 }
 
+/// Secondary action: outlined, same height as the primary so the two can sit
+/// side by side without looking mismatched.
+struct SecondaryActionButton: View {
+    let title: String
+    var symbol: String?
+    let action: () -> Void
+    @ObservedObject private var theme = ThemeManager.shared
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: AppDesign.space8) {
+                if let symbol {
+                    Image(systemName: symbol)
+                }
+                Text(title)
+            }
+            .font(.body.weight(.semibold))
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 17)
+            .foregroundStyle(AppDesign.Ink.primary)
+            .background(
+                RoundedRectangle(cornerRadius: AppDesign.cornerRadius, style: .continuous)
+                    .fill(AppDesign.cardSurface)
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: AppDesign.cornerRadius, style: .continuous)
+                    .stroke(AppDesign.cardStrokeStrong, lineWidth: 1)
+            }
+        }
+        .buttonStyle(PressableScaleStyle())
+    }
+}
+
+// MARK: - Chips and tiles
+
 struct IconTile: View {
     let symbol: String
-    /// `nil` means "follow the theme accent", resolved at render time. A
-    /// default argument would freeze the accent at construction and survive a
-    /// theme switch.
+    /// `nil` follows the theme accent, resolved at render time. A default
+    /// argument would freeze the accent at construction and survive a theme
+    /// switch.
     var color: Color?
+    var size: CGFloat = 34
     @ObservedObject private var theme = ThemeManager.shared
 
     private var resolvedColor: Color { color ?? AppDesign.accent }
 
     var body: some View {
         Image(systemName: symbol)
-            .font(.subheadline.weight(.semibold))
+            .font(.system(size: size * 0.42, weight: .semibold))
             .foregroundStyle(resolvedColor)
-            .frame(width: 34, height: 34)
-            .background(resolvedColor.opacity(0.14), in: RoundedRectangle(cornerRadius: AppDesign.cornerRadiusTiny, style: .continuous))
+            .frame(width: size, height: size)
+            .background(
+                resolvedColor.opacity(0.14),
+                in: RoundedRectangle(cornerRadius: size * 0.3, style: .continuous)
+            )
+    }
+}
+
+/// Small status tag — "Preliminary", "Verified", a difficulty word.
+struct StatusBadge: View {
+    let text: String
+    var symbol: String?
+    var tint: Color?
+    @ObservedObject private var theme = ThemeManager.shared
+
+    private var resolvedTint: Color { tint ?? AppDesign.accent }
+
+    var body: some View {
+        HStack(spacing: AppDesign.space4) {
+            if let symbol {
+                Image(systemName: symbol)
+                    .font(.caption2.weight(.bold))
+            }
+            Text(text)
+                .font(.caption.weight(.semibold))
+        }
+        .foregroundStyle(resolvedTint)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 5)
+        .background(resolvedTint.opacity(0.14), in: Capsule())
+    }
+}
+
+/// Selectable pill, as used for filter rows.
+struct FilterChip: View {
+    let title: String
+    var symbol: String?
+    let isSelected: Bool
+    let action: () -> Void
+    @ObservedObject private var theme = ThemeManager.shared
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: AppDesign.space4) {
+                if let symbol {
+                    Image(systemName: symbol)
+                        .font(.caption.weight(.bold))
+                }
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+            }
+            .foregroundStyle(isSelected ? AppDesign.primarySurfaceForeground : AppDesign.Ink.secondary)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 9)
+            .background {
+                Capsule()
+                    .fill(isSelected ? AppDesign.Ink.primary : AppDesign.cardSurface)
+            }
+            .overlay {
+                Capsule()
+                    .stroke(isSelected ? .clear : AppDesign.cardStroke, lineWidth: 1)
+            }
+        }
+        .buttonStyle(PressableScaleStyle())
+        .animation(AppAnimation.selection, value: isSelected)
     }
 }
 
@@ -337,25 +511,124 @@ struct StatRow: View {
     }
 }
 
+/// Number-first tile for a metric grid. Value on top, label beneath, so a row
+/// of them scans as data rather than as prose.
+struct MetricTile: View {
+    let value: String
+    let label: String
+    var symbol: String?
+    var tint: Color?
+    @ObservedObject private var theme = ThemeManager.shared
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: AppDesign.space8) {
+            if let symbol {
+                Image(systemName: symbol)
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(tint ?? AppDesign.accent)
+            }
+            Text(value)
+                .font(AppDesign.Typography.metricValue)
+                .foregroundStyle(AppDesign.Ink.primary)
+                .monospacedDigit()
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+            Text(label)
+                .font(AppDesign.Typography.metricLabel)
+                .foregroundStyle(AppDesign.Ink.secondary)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(AppDesign.space16)
+        .background(AppDesign.cardSurface, in: RoundedRectangle(cornerRadius: AppDesign.cornerRadius, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: AppDesign.cornerRadius, style: .continuous)
+                .stroke(AppDesign.cardStroke, lineWidth: 0.75)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(label): \(value)")
+    }
+}
+
+/// Placeholder block for content that has not arrived. Pulses unless reduced
+/// motion is on.
+struct SkeletonBlock: View {
+    var height: CGFloat = 16
+    var cornerRadius: CGFloat = AppDesign.cornerRadiusTiny
+    @ObservedObject private var theme = ThemeManager.shared
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var isPulsing = false
+
+    var body: some View {
+        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+            .fill(AppDesign.Ink.primary.opacity(isPulsing ? 0.14 : 0.07))
+            .frame(height: height)
+            .onAppear {
+                guard !reduceMotion else { return }
+                withAnimation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true)) {
+                    isPulsing = true
+                }
+            }
+            .accessibilityHidden(true)
+    }
+}
+
+/// Illustrated empty state — icon, headline, explanation, optional action.
+struct EmptyStateView<Action: View>: View {
+    let symbol: String
+    let title: String
+    let message: String
+    @ViewBuilder var action: Action
+    @ObservedObject private var theme = ThemeManager.shared
+
+    var body: some View {
+        VStack(spacing: AppDesign.space12) {
+            Image(systemName: symbol)
+                .font(.system(size: 30, weight: .medium))
+                .foregroundStyle(AppDesign.accent)
+                .frame(width: 68, height: 68)
+                .background(AppDesign.accent.opacity(0.12), in: Circle())
+
+            Text(title)
+                .font(AppDesign.Typography.sectionTitle)
+                .foregroundStyle(AppDesign.Ink.primary)
+                .multilineTextAlignment(.center)
+
+            Text(message)
+                .font(.subheadline)
+                .foregroundStyle(AppDesign.Ink.secondary)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+
+            action
+                .padding(.top, AppDesign.space4)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, AppDesign.space32)
+        .padding(.horizontal, AppDesign.space20)
+    }
+}
+
+extension EmptyStateView where Action == EmptyView {
+    init(symbol: String, title: String, message: String) {
+        self.init(symbol: symbol, title: title, message: message) { EmptyView() }
+    }
+}
+
 // MARK: - Weekly miles chart
 
-/// The eight-week measured-miles bar chart shared by Progress and Profile.
-/// Both screens plot the same `DriverProgressWeek` series with the same marks
-/// and axes, so that shape lives here once; height is the only dimension a
-/// caller may vary.
+/// The eight-week measured-miles bar chart shared by Progress and Profile. Both
+/// screens plot the same `DriverProgressWeek` series with the same marks and
+/// axes; height is the only dimension a caller may vary.
 ///
-/// Deliberately *not* included: `.animation(…)` and `.accessibilityLabel(…)`.
-/// Both depend on call-site state (the screen's reduce-motion flag and its own
-/// spoken summary), so each call site keeps applying them to this view.
+/// `.animation(…)` and `.accessibilityLabel(…)` are left out on purpose: both
+/// depend on call-site state, so each screen applies its own.
 struct WeeklyMilesChart: View {
-    /// One source of truth for the chart height. Progress and Profile drifted
-    /// to 180 and 160 while the chart was copy-pasted; a caller that wants a
-    /// shorter chart must now say so explicitly.
     static let defaultHeight: CGFloat = 180
 
-    /// Bar caps, not the icon-tile rung. `cornerRadiusTiny` (10) is half the
-    /// width of a bar in an eight-week series, which rounds the cap into a
-    /// dome and visually shortens the smallest weeks.
+    /// Bar caps, not the icon-tile rung. At 10 the cap domes over and visually
+    /// shortens the smallest weeks in an eight-week series.
     static let barCornerRadius: CGFloat = 5
 
     let weeks: [DriverProgressWeek]
@@ -396,7 +669,7 @@ struct WeeklyMilesChart: View {
 // MARK: - Motion-aware appear
 
 extension View {
-    /// Hero-only entrance: opacity + subtle lift. Skips offset when reduced motion is on.
+    /// Hero entrance: fade plus a small lift. Drops the offset under reduced motion.
     func heroAppear(visible: Bool, delay: Double = 0) -> some View {
         modifier(HeroAppearModifier(visible: visible, delay: delay))
     }
