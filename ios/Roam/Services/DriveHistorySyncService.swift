@@ -230,16 +230,32 @@ enum DriveHistorySyncEngine {
                 continue
             }
             let remoteID = decoded.id
-            let drive = decoded.drive
+            let remoteDrive = decoded.drive
 
             if let index = indexes[remoteID] {
-                merged[index] = drive
+                merged[index] = reconciled(local: merged[index], remote: remoteDrive)
             } else {
                 indexes[remoteID] = merged.count
-                merged.append(drive)
+                merged.append(remoteDrive)
             }
         }
         return merged
+    }
+
+    /// A fetched remote payload can lag a device that already resolved this
+    /// drive's route analysis but has not re-uploaded it yet (the upload
+    /// happens later in the same sync cycle). Applying that stale remote
+    /// payload as-is would regress the analysis back to `.pending`, which is
+    /// exactly the "stuck analyzing" state this exists to prevent — so a
+    /// local analysis that is no longer pending always wins over a remote one
+    /// that still is.
+    private static func reconciled(local: RecordedDrive, remote: RecordedDrive) -> RecordedDrive {
+        guard let localAnalysis = local.routeAnalysis,
+              localAnalysis.status != .pending,
+              remote.routeAnalysis?.status == .pending else {
+            return remote
+        }
+        return remote.replacingRouteAnalysis(with: localAnalysis)
     }
 
     static func decodedRemoteDrive(from dto: DriveHistoryDTO) -> (id: UUID, drive: RecordedDrive)? {
@@ -265,22 +281,39 @@ final class DriveHistorySyncService: ObservableObject {
         /// the server, and checked on every sync so a remote copy already
         /// fetched before the delete confirms can't resurrect it.
         var pendingDeletionIDs: Set<String>
+        /// The `DriveRouteAnalysisStatus` raw value the server was last known
+        /// to hold for a synced drive. A drive is only marked "synced" for a
+        /// given route analysis snapshot — once the local status moves past
+        /// what's recorded here (e.g. `.pending` resolving to `.available`),
+        /// the drive is re-queued for upload rather than treated as up to
+        /// date. Without this, a drive uploaded once while still `.pending`
+        /// would never send its resolved analysis, and the next fetch would
+        /// keep re-merging the stale `.pending` server copy back over the
+        /// resolved local one.
+        var syncedRouteAnalysisStatus: [String: String]
         var lastSyncedAt: Date?
 
-        init(syncedDriveIDs: Set<String>, pendingDeletionIDs: Set<String> = [], lastSyncedAt: Date?) {
+        init(
+            syncedDriveIDs: Set<String>,
+            pendingDeletionIDs: Set<String> = [],
+            syncedRouteAnalysisStatus: [String: String] = [:],
+            lastSyncedAt: Date?
+        ) {
             self.syncedDriveIDs = syncedDriveIDs
             self.pendingDeletionIDs = pendingDeletionIDs
+            self.syncedRouteAnalysisStatus = syncedRouteAnalysisStatus
             self.lastSyncedAt = lastSyncedAt
         }
 
         private enum CodingKeys: String, CodingKey {
-            case syncedDriveIDs, pendingDeletionIDs, lastSyncedAt
+            case syncedDriveIDs, pendingDeletionIDs, syncedRouteAnalysisStatus, lastSyncedAt
         }
 
         init(from decoder: Decoder) throws {
             let values = try decoder.container(keyedBy: CodingKeys.self)
             syncedDriveIDs = try values.decode(Set<String>.self, forKey: .syncedDriveIDs)
             pendingDeletionIDs = try values.decodeIfPresent(Set<String>.self, forKey: .pendingDeletionIDs) ?? []
+            syncedRouteAnalysisStatus = try values.decodeIfPresent([String: String].self, forKey: .syncedRouteAnalysisStatus) ?? [:]
             lastSyncedAt = try values.decodeIfPresent(Date.self, forKey: .lastSyncedAt)
         }
     }
@@ -329,8 +362,17 @@ final class DriveHistorySyncService: ObservableObject {
         self.applyLocalDrives = applyLocalDrives
         let localIDs = Set(localDrives.map(\.id))
         pendingDrives = pendingDrives.filter { localIDs.contains($0.key) }
-        for drive in localDrives where !metadata.syncedDriveIDs.contains(drive.id.uuidString) {
-            pendingDrives[drive.id] = drive
+        for drive in localDrives {
+            let idString = drive.id.uuidString
+            let notYetSynced = !metadata.syncedDriveIDs.contains(idString)
+            // A drive already marked synced still needs re-upload if its route
+            // analysis has moved past what the server was last confirmed to
+            // hold (most commonly `.pending` resolving to `.available` or
+            // `.unavailable` after the drive's first, pending-state upload).
+            let routeAnalysisStale = metadata.syncedRouteAnalysisStatus[idString] != drive.routeAnalysis?.status.rawValue
+            if notYetSynced || routeAnalysisStale {
+                pendingDrives[drive.id] = drive
+            }
         }
 
         // A drive this device previously confirmed synced but that is no
@@ -435,15 +477,31 @@ final class DriveHistorySyncService: ObservableObject {
         latestLocalDrives = merged
         applyLocalDrives?(merged)
 
-        let remoteIDs = remoteDrives.compactMap {
-            DriveHistorySyncEngine.decodedRemoteDrive(from: $0)?.id.uuidString
+        let remoteStatusByID: [String: String?] = Dictionary(
+            uniqueKeysWithValues: remoteDrives.compactMap { dto -> (String, String?)? in
+                guard let decoded = DriveHistorySyncEngine.decodedRemoteDrive(from: dto) else { return nil }
+                return (decoded.id.uuidString, decoded.drive.routeAnalysis?.status.rawValue)
+            }
+        )
+        metadata.syncedDriveIDs.formUnion(remoteStatusByID.keys)
+        for (id, status) in remoteStatusByID {
+            metadata.syncedRouteAnalysisStatus[id] = status
         }
-        metadata.syncedDriveIDs.formUnion(remoteIDs)
-        pendingDrives = pendingDrives.filter { !metadata.syncedDriveIDs.contains($0.key.uuidString) }
+        // A drive can exist remotely and still need re-upload: it only counts
+        // as caught up once the server's confirmed route analysis status
+        // matches what's local right now. Otherwise a drive that was uploaded
+        // once while `.pending` would be dropped here just because *some*
+        // version of it already exists remotely, and its resolved analysis
+        // would never reach the server.
+        pendingDrives = pendingDrives.filter { id, drive in
+            let idString = id.uuidString
+            guard metadata.syncedDriveIDs.contains(idString) else { return true }
+            return metadata.syncedRouteAnalysisStatus[idString] != drive.routeAnalysis?.status.rawValue
+        }
 
         let pendingIDs = Set(pendingDrives.keys)
         let inputs = merged
-            .filter { pendingIDs.contains($0.id) && !metadata.syncedDriveIDs.contains($0.id.uuidString) }
+            .filter { pendingIDs.contains($0.id) }
             .map(Self.input(for:))
 
         for batchStart in stride(from: 0, to: inputs.count, by: 100) {
@@ -453,7 +511,11 @@ final class DriveHistorySyncService: ObservableObject {
             }
             let confirmedIDs = response.compactMap { UUID(uuidString: $0.id)?.uuidString }
             metadata.syncedDriveIDs.formUnion(confirmedIDs)
-            pendingDrives = pendingDrives.filter { !metadata.syncedDriveIDs.contains($0.key.uuidString) }
+            for idString in confirmedIDs {
+                guard let uuid = UUID(uuidString: idString) else { continue }
+                metadata.syncedRouteAnalysisStatus[idString] = pendingDrives[uuid]?.routeAnalysis?.status.rawValue
+            }
+            pendingDrives = pendingDrives.filter { !confirmedIDs.contains($0.key.uuidString) }
             persistMetadata()
         }
 

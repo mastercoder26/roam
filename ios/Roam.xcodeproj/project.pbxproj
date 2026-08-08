@@ -74,6 +74,7 @@
 		A10000000000000000000035 /* DriveDetailViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000035 /* DriveDetailViews.swift */; };
 		A10000000000000000000036 /* ResultsSupportingViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000036 /* ResultsSupportingViews.swift */; };
 		A10000000000000000000037 /* DriverReadinessModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000037 /* DriverReadinessModels.swift */; };
+		A10000000000000000000045 /* RouteAnalysisDebugInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000045 /* RouteAnalysisDebugInfo.swift */; };
 		A10000000000000000000038 /* DriverReadinessSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000038 /* DriverReadinessSupport.swift */; };
 		A10000000000000000000039 /* DriverReadinessConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000039 /* DriverReadinessConfiguration.swift */; };
 		A10000000000000000000040 /* DriverReadinessProfileBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000040 /* DriverReadinessProfileBuilder.swift */; };
@@ -193,6 +194,7 @@
 		A20000000000000000000035 /* DriveDetailViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriveDetailViews.swift; sourceTree = "<group>"; };
 		A20000000000000000000036 /* ResultsSupportingViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResultsSupportingViews.swift; sourceTree = "<group>"; };
 		A20000000000000000000037 /* DriverReadinessModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriverReadinessModels.swift; sourceTree = "<group>"; };
+		A20000000000000000000045 /* RouteAnalysisDebugInfo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RouteAnalysisDebugInfo.swift; sourceTree = "<group>"; };
 		A20000000000000000000038 /* DriverReadinessSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriverReadinessSupport.swift; sourceTree = "<group>"; };
 		A20000000000000000000039 /* DriverReadinessConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriverReadinessConfiguration.swift; sourceTree = "<group>"; };
 		A20000000000000000000040 /* DriverReadinessProfileBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriverReadinessProfileBuilder.swift; sourceTree = "<group>"; };
@@ -334,6 +336,7 @@
 				A20000000000000000000043 /* LaunchIntroChoreography.swift */,
 				A20000000000000000000027 /* SharedRouteImport.swift */,
 				A200000000000000000000F3 /* DriverProfileInsightsEngine.swift */,
+				A20000000000000000000045 /* RouteAnalysisDebugInfo.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -698,6 +701,7 @@
 				A10000000000000000000035 /* DriveDetailViews.swift in Sources */,
 				A10000000000000000000036 /* ResultsSupportingViews.swift in Sources */,
 				A10000000000000000000037 /* DriverReadinessModels.swift in Sources */,
+				A10000000000000000000045 /* RouteAnalysisDebugInfo.swift in Sources */,
 				A10000000000000000000038 /* DriverReadinessSupport.swift in Sources */,
 				A10000000000000000000039 /* DriverReadinessConfiguration.swift in Sources */,
 				A10000000000000000000040 /* DriverReadinessProfileBuilder.swift in Sources */,

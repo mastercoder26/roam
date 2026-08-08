@@ -47,6 +47,10 @@ final class DriveSessionManager: NSObject, ObservableObject {
     /// A distinct presentation event for the root view. The queued context
     /// remains available until the driver explicitly starts or cancels it.
     @Published private(set) var practiceRoutePresentationRequest: UUID?
+    /// The most recent `/api/route/difficulty` attempt per drive, kept only
+    /// for on-screen debugging when a drive is stuck `.pending` — see
+    /// `RouteAnalysisDebugInfo`.
+    @Published private(set) var routeAnalysisDebugInfo: [UUID: RouteAnalysisDebugInfo] = [:]
 
     private let locationManager = CLLocationManager()
     private let motionManager = CMMotionManager()
@@ -453,6 +457,13 @@ final class DriveSessionManager: NSObject, ObservableObject {
         // serves signed-in accounts. Signing in later should analyze this
         // drive, so the attempt stays retry-eligible rather than being spent.
         guard authSession.isSignedIn else {
+            routeAnalysisDebugInfo[drive.id] = RouteAnalysisDebugInfo(
+                endpointPath: "api/route/difficulty",
+                attemptedAt: Date(),
+                durationSeconds: 0,
+                retryCount: currentAnalysis.retryCount ?? 0,
+                outcome: .other("Not attempted — no signed-in account")
+            )
             replaceSavedDrive(
                 id: drive.id,
                 routeAnalysis: .unavailable(
@@ -468,6 +479,7 @@ final class DriveSessionManager: NSObject, ObservableObject {
         let attemptedAnalysis = currentAnalysis.recordingAttempt()
         replaceSavedDrive(id: drive.id, routeAnalysis: attemptedAnalysis)
 
+        let attemptStartedAt = Date()
         let task = Task { [weak self] in
             defer { self?.routeAnalysisTasks[drive.id] = nil }
             guard let self else { return }
@@ -483,12 +495,26 @@ final class DriveSessionManager: NSObject, ObservableObject {
                     )
                 }
                 guard !Task.isCancelled else { return }
+                self.routeAnalysisDebugInfo[drive.id] = RouteAnalysisDebugInfo(
+                    endpointPath: "api/route/difficulty",
+                    attemptedAt: attemptStartedAt,
+                    durationSeconds: Date().timeIntervalSince(attemptStartedAt),
+                    retryCount: attemptedAnalysis.retryCount ?? 1,
+                    outcome: .success
+                )
                 self.replaceSavedDrive(
                     id: drive.id,
                     routeAnalysis: DriveRouteAnalysisEngine.result(from: response.primaryRoute)
                 )
             } catch {
                 guard !Task.isCancelled else { return }
+                self.routeAnalysisDebugInfo[drive.id] = RouteAnalysisDebugInfo(
+                    endpointPath: "api/route/difficulty",
+                    attemptedAt: attemptStartedAt,
+                    durationSeconds: Date().timeIntervalSince(attemptStartedAt),
+                    retryCount: attemptedAnalysis.retryCount ?? 1,
+                    outcome: RouteAnalysisDebugInfo.outcome(for: error)
+                )
                 self.replaceSavedDrive(
                     id: drive.id,
                     routeAnalysis: .unavailable(

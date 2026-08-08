@@ -43,6 +43,14 @@ enum AppAnimation {
     /// well inside the one-second tick that triggers the next one.
     static let flip = Animation.spring(response: 0.26, dampingFraction: 0.72)
 
+    /// The outgoing half of a split-flap tile lifting off the stack before it
+    /// falls out of view. Real flap boards accelerate into this — a hinge
+    /// letting go under its own weight — so it eases in rather than matching
+    /// `flip`'s spring landing, and stays short enough that the two phases
+    /// together still land well inside the one-second tick.
+    static let flipLift = Animation.easeIn(duration: 0.13)
+    static let flipLiftDuration: TimeInterval = 0.13
+
     /// Root tab switch — a plain crossfade, deliberately not a spring since the
     /// destination view is a whole screen swap rather than an in-place element.
     static let tabSwitch = Animation.easeOut(duration: 0.18)

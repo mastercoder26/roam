@@ -478,12 +478,60 @@ struct FlipClock: View {
     }
 }
 
+/// One half — top or bottom — of a split-flap glyph. Both halves crop from an
+/// identically positioned full-height render of the digit, so the cut lines
+/// up exactly at the hinge with no vertical jump between the two pieces.
+private struct FlipDigitHalf: View {
+    enum Edge { case top, bottom }
+
+    let digit: String
+    let edge: Edge
+    let style: FlipClock.Style
+
+    var body: some View {
+        Text(digit)
+            .font(.system(size: style.digitFontSize, weight: .semibold, design: .rounded))
+            .monospacedDigit()
+            .foregroundStyle(AppDesign.Ink.primary)
+            .frame(width: style.digitWidth, height: style.digitHeight)
+            .frame(height: style.digitHeight / 2, alignment: edge == .top ? .top : .bottom)
+            .clipped()
+    }
+}
+
+/// A real split-flap tile: two static half-plates showing the settled digit,
+/// and — only while a change is in flight — two hinged flaps that flip in
+/// front of them. This mirrors the physical mechanism (a board of two-line
+/// cards rotating on a center axle) rather than sliding or fading a whole
+/// glyph, which is what made the previous version read as "a number
+/// appearing," not a flip clock.
 private struct FlipClockDigit: View {
     @ObservedObject private var theme = ThemeManager.shared
     let digit: String
     let style: FlipClock.Style
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    /// What the static plates show. Only ever the settled value — by the time
+    /// a flap finishes covering the half it's about to change, the plate
+    /// underneath has already swapped, so nothing is visible mid-swap.
+    @State private var settledDigit: String
+    /// The value shown on the lifting flap while it still faces the viewer.
+    @State private var outgoingDigit: String
+    @State private var isLifting = false
+    @State private var isLanding = false
+    /// 0 = flat against the tile (outgoing digit still fully visible).
+    /// -90 = edge-on to the viewer, i.e. gone.
+    @State private var liftAngle: Double = 0
+    /// 90 = edge-on (not yet visible). 0 = flat (new digit fully landed).
+    @State private var landAngle: Double = 90
+
+    init(digit: String, style: FlipClock.Style) {
+        self.digit = digit
+        self.style = style
+        _settledDigit = State(initialValue: digit)
+        _outgoingDigit = State(initialValue: digit)
+    }
 
     private var tile: RoundedRectangle {
         RoundedRectangle(cornerRadius: AppDesign.cornerRadiusTiny, style: .continuous)
@@ -493,35 +541,86 @@ private struct FlipClockDigit: View {
         ZStack {
             tile.fill(AppDesign.cardSurface)
 
-            // Keying on the value makes each tick an insertion plus a removal,
-            // which is what gives the flap something to animate. Without the
-            // id, SwiftUI reuses one Text and the glyph simply swaps.
-            Text(digit)
-                .font(.system(size: style.digitFontSize, weight: .semibold, design: .rounded))
-                .monospacedDigit()
-                .foregroundStyle(AppDesign.Ink.primary)
-                .id(digit)
-                .transition(flapTransition)
+            VStack(spacing: 0) {
+                FlipDigitHalf(digit: settledDigit, edge: .top, style: style)
+                FlipDigitHalf(digit: settledDigit, edge: .bottom, style: style)
+            }
 
-            // The hinge line sits above the glyph so a dropping flap passes
-            // behind it, the way a real split-flap board reads.
+            if isLifting {
+                FlipDigitHalf(digit: outgoingDigit, edge: .top, style: style)
+                    .background(AppDesign.cardSurface)
+                    // A card lifting off the stack catches the light at a
+                    // grazing angle right before it goes edge-on; the darker
+                    // it gets here is what sells the rotation in flat 2D.
+                    .overlay(Color.black.opacity(min(abs(liftAngle) / 90, 1) * 0.22))
+                    .frame(width: style.digitWidth, height: style.digitHeight / 2)
+                    .rotation3DEffect(
+                        .degrees(liftAngle),
+                        axis: (x: 1, y: 0, z: 0),
+                        anchor: .bottom,
+                        perspective: 0.45
+                    )
+                    .frame(maxHeight: .infinity, alignment: .top)
+            }
+
+            if isLanding {
+                FlipDigitHalf(digit: settledDigit, edge: .bottom, style: style)
+                    .background(AppDesign.cardSurface)
+                    .overlay(Color.black.opacity(min(abs(landAngle) / 90, 1) * 0.22))
+                    .frame(width: style.digitWidth, height: style.digitHeight / 2)
+                    .rotation3DEffect(
+                        .degrees(landAngle),
+                        axis: (x: 1, y: 0, z: 0),
+                        anchor: .top,
+                        perspective: 0.45
+                    )
+                    .frame(maxHeight: .infinity, alignment: .bottom)
+            }
+
+            // The hinge line sits above everything so both flaps visibly pass
+            // behind the axle, the way a real split-flap board reads.
             Rectangle().fill(AppDesign.cardStroke).frame(height: 1)
         }
         .frame(width: style.digitWidth, height: style.digitHeight)
-        // Clipping to the tile is what turns a vertical move into a flap:
-        // the outgoing glyph falls out of the card, the incoming one drops in.
         .clipShape(tile)
-        .animation(reduceMotion ? nil : AppAnimation.flip, value: digit)
+        .onChange(of: digit) { oldValue, newValue in
+            runFlip(from: oldValue, to: newValue)
+        }
     }
 
-    /// Reduced Motion keeps the digit legible and still — a timer must stay
-    /// readable, so this degrades to a plain cross-fade rather than nothing.
-    private var flapTransition: AnyTransition {
-        guard !reduceMotion else { return .opacity }
-        return .asymmetric(
-            insertion: .move(edge: .top).combined(with: .opacity),
-            removal: .move(edge: .bottom).combined(with: .opacity)
-        )
+    private func runFlip(from oldValue: String, to newValue: String) {
+        guard oldValue != newValue else { return }
+        guard !reduceMotion else {
+            settledDigit = newValue
+            return
+        }
+
+        outgoingDigit = oldValue
+        liftAngle = 0
+        landAngle = 90
+        isLifting = true
+        isLanding = true
+
+        withAnimation(AppAnimation.flipLift) {
+            liftAngle = -90
+        }
+
+        // The new digit takes over the static plates the instant the lifting
+        // flap has fully covered — then uncovers — that half, so the swap
+        // never shows through either flap.
+        DispatchQueue.main.asyncAfter(deadline: .now() + AppAnimation.flipLiftDuration) {
+            settledDigit = newValue
+            isLifting = false
+            withAnimation(AppAnimation.flip) {
+                landAngle = 0
+            }
+        }
+
+        DispatchQueue.main.asyncAfter(
+            deadline: .now() + AppAnimation.flipLiftDuration + 0.3
+        ) {
+            isLanding = false
+        }
     }
 }
 
