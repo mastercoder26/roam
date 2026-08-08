@@ -4,6 +4,7 @@ import UIKit
 struct HomeView: View {
     @ObservedObject private var theme = ThemeManager.shared
     @EnvironmentObject private var authSession: AuthSessionStore
+    @ObservedObject private var recentRoutes = RecentRouteStore.shared
     @ObservedObject var form: RoutePlanningFormModel
     @State private var isLoading = false
     @State private var isCompletingLoading = false
@@ -66,6 +67,11 @@ struct HomeView: View {
 
                         if let notice = form.importNotice {
                             importNoticeBanner(notice)
+                                .transition(progressiveReveal)
+                        }
+
+                        if !recentRoutes.entries.isEmpty {
+                            recentRoutesSection
                                 .transition(progressiveReveal)
                         }
 
@@ -339,6 +345,50 @@ struct HomeView: View {
         }
     }
 
+    private var recentRoutesSection: some View {
+        VStack(alignment: .leading, spacing: AppDesign.space12) {
+            RailHeader(title: "Recent routes") {
+                Button {
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    withAnimation(reduceMotion ? .easeOut(duration: 0.16) : AppAnimation.quick) {
+                        recentRoutes.clear()
+                    }
+                } label: {
+                    Text("Clear")
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(AppDesign.Ink.secondary)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Clear recent routes")
+            }
+
+            VStack(spacing: 0) {
+                ForEach(recentRoutes.entries) { entry in
+                    RecentRouteRow(entry: entry) {
+                        applyRecentRoute(entry)
+                    }
+
+                    if entry.id != recentRoutes.entries.last?.id {
+                        Divider()
+                            .overlay(AppDesign.Ink.tertiary.opacity(0.4))
+                            .padding(.leading, 46)
+                    }
+                }
+            }
+            .premiumCard()
+        }
+        .animation(reduceMotion ? .easeOut(duration: 0.16) : AppAnimation.content, value: recentRoutes.entries)
+    }
+
+    private func applyRecentRoute(_ entry: RecentRouteEntry) {
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        withAnimation(reduceMotion ? .easeOut(duration: 0.18) : AppAnimation.selection) {
+            form.usesCurrentLocation = false
+            form.origin = entry.origin
+            form.destination = entry.destination
+        }
+    }
+
     private var departureSection: some View {
         HStack(spacing: 10) {
             Image(systemName: "calendar")
@@ -534,6 +584,12 @@ struct HomeView: View {
                 departureTime: form.departureTime,
                 primaryRoute: response.primaryRoute,
                 alternateRoutes: response.alternateRoutes
+            )
+            recentRoutes.record(
+                origin: form.origin,
+                destination: form.destination,
+                departureTime: form.departureTime,
+                route: response.primaryRoute
             )
             UINotificationFeedbackGenerator().notificationOccurred(.success)
             withAnimation(reduceMotion ? .easeOut(duration: 0.12) : AppAnimation.quick) {
