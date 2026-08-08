@@ -127,12 +127,11 @@ struct ProfileView: View {
     }
 
     private var profileHeader: some View {
-        Text("Profile")
-            .font(AppDesign.Typography.heroTitle)
-            .tracking(-0.8)
-            .foregroundStyle(AppDesign.Ink.primary)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .accessibilityAddTraits(.isHeader)
+        ScreenHeader(
+            title: "Profile",
+            symbol: "person.crop.circle.fill",
+            subtitle: "Your record, driven by what you've measured."
+        )
     }
 
     // MARK: - Navigation
@@ -594,7 +593,9 @@ struct ProfileView: View {
             if insights.hasEvidence {
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
                     Text(String(format: "%.1f", insights.measuredMiles))
-                        .font(.title.weight(.bold).monospacedDigit())
+                        .font(.system(size: 34, weight: .bold, design: .rounded))
+                        .tracking(-0.6)
+                        .monospacedDigit()
                         .foregroundStyle(AppDesign.Ink.primary)
                     Text("measured miles")
                         .font(.subheadline.weight(.medium))
@@ -608,22 +609,41 @@ struct ProfileView: View {
                     .foregroundStyle(AppDesign.Ink.secondary)
             }
         }
-        .premiumCard()
+        .padding(AppDesign.space20)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background {
+            RoundedRectangle(cornerRadius: AppDesign.cornerRadiusHero, style: .continuous)
+                .fill(AppDesign.cardSurfaceElevated)
+                .overlay {
+                    RoundedRectangle(cornerRadius: AppDesign.cornerRadiusHero, style: .continuous)
+                        .fill(AppDesign.accentWash)
+                }
+        }
+        .clipShape(RoundedRectangle(cornerRadius: AppDesign.cornerRadiusHero, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: AppDesign.cornerRadiusHero, style: .continuous)
+                .stroke(AppDesign.cardStrokeStrong, lineWidth: 0.75)
+        }
+        .elevation(AppDesign.Elevation.hero)
     }
 
     private var monogram: some View {
         Group {
             if profile.monogram.isEmpty {
                 Image(systemName: "person.fill")
-                    .font(.title3.weight(.semibold))
+                    .font(.title2.weight(.semibold))
             } else {
                 Text(profile.monogram)
-                    .font(.title2.weight(.bold))
+                    .font(.title.weight(.bold))
             }
         }
         .foregroundStyle(AppDesign.accentForeground)
-        .frame(width: 52, height: 52)
+        .frame(width: 64, height: 64)
         .background(AppDesign.accent, in: Circle())
+        .overlay {
+            Circle().stroke(AppDesign.canvas, lineWidth: 3)
+        }
+        .elevation(AppDesign.Elevation.low)
         .accessibilityHidden(true)
     }
 

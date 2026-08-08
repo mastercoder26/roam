@@ -29,7 +29,11 @@ struct DriverProgressView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: AppDesign.sectionSpacing) {
-                    ScreenHeader(title: "Progress", symbol: "chart.line.uptrend.xyaxis")
+                    ScreenHeader(
+                        title: "Progress",
+                        symbol: "chart.line.uptrend.xyaxis",
+                        subtitle: "Coaching built from what you've actually driven."
+                    )
                     overallScoreCard
 
                     if summary.hasRecordedEvidence {

@@ -20,33 +20,40 @@ struct ScoreGaugeView: View {
     var body: some View {
         ZStack {
             Circle()
-                .stroke(AppDesign.cardStrokeStrong, lineWidth: 12)
+                .stroke(AppDesign.cardStrokeStrong, lineWidth: 14)
 
             Circle()
                 .trim(from: 0, to: animatedProgress)
                 .stroke(
-                    accentColor,
-                    style: StrokeStyle(lineWidth: 12, lineCap: .round)
+                    AngularGradient(
+                        colors: [accentColor.opacity(0.55), accentColor],
+                        center: .center,
+                        startAngle: .degrees(0),
+                        endAngle: .degrees(360 * max(animatedProgress, 0.001))
+                    ),
+                    style: StrokeStyle(lineWidth: 14, lineCap: .round)
                 )
                 .rotationEffect(.degrees(-90))
+                .shadow(color: accentColor.opacity(0.35), radius: 10, y: 3)
 
             VStack(spacing: 2) {
                 Text(String(format: "%.1f", score))
-                    .font(.system(size: 56, weight: .bold, design: .rounded))
-                    .tracking(-1)
+                    .font(.system(size: 64, weight: .bold, design: .rounded))
+                    .tracking(-1.5)
                     .monospacedDigit()
                     .foregroundStyle(AppDesign.Ink.primary)
                     .contentTransition(.numericText())
                     .animation(AppAnimation.spring, value: score)
 
-                Text("/ 10")
-                    .font(.caption.weight(.medium))
+                Text("OUT OF 10")
+                    .font(.caption2.weight(.bold))
+                    .tracking(1.2)
                     .foregroundStyle(AppDesign.Ink.tertiary)
             }
             .scaleEffect(hasAppeared ? 1 : 0.95)
             .opacity(hasAppeared ? 1 : 0)
         }
-        .frame(width: 180, height: 180)
+        .frame(width: 204, height: 204)
         .onAppear {
             withAnimation(reduceMotion ? .easeOut(duration: 0.25) : AppAnimation.reveal) {
                 animatedProgress = progress

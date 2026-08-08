@@ -125,8 +125,9 @@ struct DriveView: View {
 
     private var activeSpeed: some View {
         VStack(spacing: AppDesign.space8) {
-            Label("CURRENT SPEED", systemImage: "speedometer")
-                .font(.caption.weight(.bold))
+            Text("CURRENT SPEED")
+                .font(AppDesign.Typography.microLabel)
+                .tracking(1.1)
                 .foregroundStyle(AppDesign.Ink.secondary)
             HStack(alignment: .firstTextBaseline, spacing: 6) {
                 Text("\(session.currentSpeedMilesPerHour)")
@@ -144,12 +145,7 @@ struct DriveView: View {
     }
 
     private var compactPlacementWarning: some View {
-        Label("Secure the phone when it is safe", systemImage: "iphone.gen3.radiowaves.left.and.right")
-            .font(.footnote.weight(.semibold))
-            .foregroundStyle(AppDesign.safety)
-            .padding(.horizontal, 14)
-            .padding(.vertical, 10)
-            .background(AppDesign.safety.opacity(0.12), in: Capsule(style: .continuous))
+        StatusBadge(text: "Secure the phone when it is safe", symbol: "iphone.gen3.radiowaves.left.and.right", tint: AppDesign.safety)
             .accessibilityLabel("Sensor placement may be unstable. Secure the phone when it is safe.")
     }
 
@@ -191,8 +187,8 @@ struct DriveView: View {
         HStack(alignment: .top, spacing: AppDesign.space12) {
             VStack(alignment: .leading, spacing: AppDesign.space4) {
                 Text("Drive")
-                    .font(AppDesign.Typography.heroTitle)
-                    .tracking(-0.8)
+                    .font(AppDesign.Typography.display)
+                    .tracking(-0.9)
                     .foregroundStyle(AppDesign.Ink.primary)
                 Text("Record a drive or review your history.")
                     .font(.footnote)
@@ -207,10 +203,9 @@ struct DriveView: View {
             } label: {
                 Image(systemName: "lifepreserver.fill")
                     .font(.body.weight(.semibold))
-                    .foregroundStyle(AppDesign.Ink.primary.opacity(0.88))
-                    .frame(width: 36, height: 36)
-                    .background(AppDesign.Ink.primary.opacity(0.10), in: Circle())
-                    .frame(minWidth: 44, minHeight: 44)
+                    .foregroundStyle(AppDesign.accent)
+                    .frame(width: 44, height: 44)
+                    .background(AppDesign.accent.opacity(0.14), in: Circle())
                     .contentShape(Rectangle())
             }
             .buttonStyle(PressableScaleStyle())

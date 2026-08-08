@@ -61,7 +61,7 @@ struct HomeView: View {
         NavigationStack(path: $navigationPath) {
             ZStack {
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 20) {
+                    VStack(alignment: .leading, spacing: AppDesign.sectionSpacing) {
                         headerSection
 
                         if let notice = form.importNotice {
@@ -69,11 +69,11 @@ struct HomeView: View {
                                 .transition(progressiveReveal)
                         }
 
-                        routeCard
-
-                        mapPreviewSection
-
-                        departureContainer
+                        VStack(alignment: .leading, spacing: AppDesign.space16) {
+                            routeCard
+                            mapPreviewSection
+                            departureContainer
+                        }
 
                         if let errorMessage {
                             errorBanner(errorMessage)
@@ -83,10 +83,10 @@ struct HomeView: View {
                         analyzeButton
                         routeChecksSection
                     }
-                    .padding(.horizontal, 20)
-                    .padding(.top, 10)
+                    .padding(.horizontal, AppDesign.space20)
+                    .padding(.top, AppDesign.space8)
                     // Extra clearance so "What Roam checks" clears the floating tab bar.
-                    .padding(.bottom, 36)
+                    .padding(.bottom, AppDesign.tabBarClearance)
                 }
                 if isLoading {
                     RouteAnalysisLoadingView(isFinishing: isCompletingLoading) { completeLoading() }
@@ -122,7 +122,11 @@ struct HomeView: View {
     }
 
     private var headerSection: some View {
-        ScreenHeader(title: "Plan your route", symbol: "location.north.circle.fill")
+        ScreenHeader(
+            title: "Plan your route",
+            symbol: "location.north.circle.fill",
+            subtitle: "Know the difficulty before you leave."
+        )
     }
 
     private var routeCard: some View {
@@ -131,19 +135,23 @@ struct HomeView: View {
 
             if formPresentation.showsDestination {
                 Divider()
-                    .overlay(AppDesign.Ink.tertiary.opacity(0.55))
+                    .overlay(AppDesign.Ink.tertiary.opacity(0.4))
                     .padding(.leading, 68)
 
                 destinationRow
             }
         }
-        .padding(.vertical, 6)
-        .background(routeSurface, in: RoundedRectangle(cornerRadius: AppDesign.cornerRadiusLarge, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: AppDesign.cornerRadiusLarge, style: .continuous)
-                .stroke(AppDesign.cardStroke, lineWidth: 1)
+        .padding(.vertical, AppDesign.space8)
+        .background {
+            RoundedRectangle(cornerRadius: AppDesign.cornerRadiusHero, style: .continuous)
+                .fill(routeSurface)
+                .overlay {
+                    RoundedRectangle(cornerRadius: AppDesign.cornerRadiusHero, style: .continuous)
+                        .fill(AppDesign.accentWash)
+                }
         }
-        .elevation(AppDesign.Elevation.medium)
+        .clipShape(RoundedRectangle(cornerRadius: AppDesign.cornerRadiusHero, style: .continuous))
+        .elevation(AppDesign.Elevation.hero)
     }
 
     @ViewBuilder
@@ -283,7 +291,7 @@ struct HomeView: View {
 
     private func routeFieldLabel(_ value: String) -> some View {
         Text(value)
-            .font(.caption.weight(.bold))
+            .font(AppDesign.Typography.microLabel)
             .tracking(1.1)
             .foregroundStyle(AppDesign.Ink.label)
     }
@@ -304,26 +312,14 @@ struct HomeView: View {
     @ViewBuilder
     private var mapPreviewSection: some View {
         if mapPreviewStage == .locationPrompt {
-            VStack(alignment: .leading, spacing: AppDesign.space8) {
-                HStack(spacing: AppDesign.space12) {
-                    IconTile(symbol: "map")
-                    Text("Your route preview")
-                        .font(.headline)
-                        .foregroundStyle(AppDesign.Ink.primary)
-                }
-
-                Text("Choose a starting point to see the route take shape.")
-                    .font(.footnote)
-                    .foregroundStyle(AppDesign.Ink.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            .padding(AppDesign.cardPadding)
-            .frame(maxWidth: .infinity, minHeight: 124, alignment: .leading)
+            EmptyStateView(
+                symbol: "map",
+                title: "Your route preview",
+                message: "Choose a starting point to see the route take shape."
+            )
+            .frame(maxWidth: .infinity, minHeight: 160)
             .background(AppDesign.cardSurfaceElevated, in: RoundedRectangle(cornerRadius: AppDesign.cornerRadiusLarge, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: AppDesign.cornerRadiusLarge, style: .continuous)
-                    .stroke(AppDesign.cardStrokeStrong, lineWidth: 1)
-            }
+            .elevation(AppDesign.Elevation.medium)
             .accessibilityElement(children: .combine)
             .accessibilityLabel("Route preview. Choose a starting point to see the route take shape.")
         } else {
@@ -338,11 +334,6 @@ struct HomeView: View {
             .frame(height: 248)
             .background(AppDesign.cardSurfaceElevated)
             .clipShape(RoundedRectangle(cornerRadius: AppDesign.cornerRadiusLarge, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: AppDesign.cornerRadiusLarge, style: .continuous)
-                    .stroke(AppDesign.cardStrokeStrong, lineWidth: 1)
-            }
-            .shadow(color: AppDesign.accent.opacity(0.12), radius: 16, y: 8)
             .elevation(AppDesign.Elevation.high)
             .accessibilityLabel(mapPreview?.accessibilityLabel ?? "Route map")
         }
@@ -379,10 +370,7 @@ struct HomeView: View {
             AppDesign.cardSurface,
             in: RoundedRectangle(cornerRadius: AppDesign.cornerRadiusSmall, style: .continuous)
         )
-        .overlay {
-            RoundedRectangle(cornerRadius: AppDesign.cornerRadiusSmall, style: .continuous)
-                .stroke(AppDesign.cardStroke, lineWidth: 1)
-        }
+        .elevation(AppDesign.Elevation.low)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Departure time")
         .accessibilityHint("Double tap to change the date or time")
@@ -439,19 +427,17 @@ struct HomeView: View {
     }
 
     private var routeChecksSection: some View {
-        VStack(alignment: .leading, spacing: AppDesign.space12) {
-            Text("What Roam checks")
-                .font(AppDesign.Typography.sectionTitle)
-                .foregroundStyle(AppDesign.Ink.primary)
+        VStack(alignment: .leading, spacing: AppDesign.space16) {
+            RailHeader(title: "What Roam checks")
 
-            FlowLayout(spacing: 8) {
+            FlowLayout(spacing: AppDesign.space8) {
                 RouteCheckPill(symbol: "car.2.fill", title: "Traffic")
                 RouteCheckPill(symbol: "arrow.triangle.merge", title: "Merges")
                 RouteCheckPill(symbol: "cloud.sun.rain.fill", title: "Conditions")
             }
         }
-        .padding(.top, 4)
-        .padding(.bottom, 8)
+        .padding(.top, AppDesign.space4)
+        .padding(.bottom, AppDesign.space8)
     }
 
     private func errorBanner(_ message: String) -> some View {
@@ -469,6 +455,7 @@ struct HomeView: View {
             AppDesign.safety.opacity(0.12),
             in: RoundedRectangle(cornerRadius: AppDesign.cornerRadius, style: .continuous)
         )
+        .elevation(AppDesign.Elevation.low)
     }
 
     private func importNoticeBanner(_ notice: RouteImportNotice) -> some View {
@@ -592,20 +579,14 @@ private struct RouteCheckPill: View {
 
     var body: some View {
         Label(title, systemImage: symbol)
-            .font(.caption.weight(.semibold))
+            .font(.subheadline.weight(.semibold))
             .foregroundStyle(AppDesign.Ink.secondary)
             .lineLimit(2)
             .fixedSize(horizontal: false, vertical: true)
-            .padding(.horizontal, 11)
-            .padding(.vertical, 9)
-            .background(
-                AppDesign.Ink.primary.opacity(0.08),
-                in: RoundedRectangle(cornerRadius: AppDesign.cornerRadiusSmall, style: .continuous)
-            )
-            .overlay {
-                RoundedRectangle(cornerRadius: AppDesign.cornerRadiusSmall, style: .continuous)
-                    .stroke(AppDesign.cardStroke, lineWidth: 1)
-            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .background(AppDesign.cardSurface, in: Capsule())
+            .elevation(AppDesign.Elevation.low)
     }
 }
 

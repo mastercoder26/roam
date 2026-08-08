@@ -96,6 +96,9 @@ struct ResultsView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: AppDesign.sectionSpacing) {
+                tripRouteHeader
+                    .heroAppear(visible: heroAppeared)
+
                 scoreSection
                     .heroAppear(visible: heroAppeared)
 
@@ -150,6 +153,52 @@ struct ResultsView: View {
         }
     }
 
+    private var tripRouteHeader: some View {
+        HStack(alignment: .top, spacing: AppDesign.space12) {
+            VStack(spacing: 4) {
+                Circle()
+                    .fill(AppDesign.accent)
+                    .frame(width: 8, height: 8)
+                Rectangle()
+                    .fill(AppDesign.cardStrokeStrong)
+                    .frame(width: 2)
+                Circle()
+                    .fill(AppDesign.Ink.secondary)
+                    .frame(width: 8, height: 8)
+            }
+            .padding(.top, 4)
+            .accessibilityHidden(true)
+
+            VStack(alignment: .leading, spacing: 10) {
+                Text(result.origin)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(AppDesign.Ink.primary)
+                    .lineLimit(1)
+                Text(result.destination)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(AppDesign.Ink.primary)
+                    .lineLimit(1)
+            }
+
+            Spacer(minLength: 0)
+
+            Text(result.departureTime.formatted(date: .abbreviated, time: .shortened))
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(AppDesign.Ink.secondary)
+                .multilineTextAlignment(.trailing)
+                .fixedSize()
+        }
+        .padding(.horizontal, AppDesign.space16)
+        .padding(.vertical, AppDesign.space12)
+        .background(AppDesign.cardSurface, in: RoundedRectangle(cornerRadius: AppDesign.cornerRadius, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: AppDesign.cornerRadius, style: .continuous)
+                .stroke(AppDesign.cardStroke, lineWidth: 0.75)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Trip from \(result.origin) to \(result.destination), departing \(result.departureTime.formatted(date: .abbreviated, time: .shortened))")
+    }
+
     private var scoreSection: some View {
         VStack(spacing: AppDesign.space12) {
             ScoreGaugeView(score: selectedRoute.score, label: selectedRoute.label)
@@ -167,7 +216,28 @@ struct ResultsView: View {
                 .padding(.top, 2)
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 8)
+        .padding(.vertical, AppDesign.space12)
+        .background {
+            RoundedRectangle(cornerRadius: AppDesign.cornerRadiusHero, style: .continuous)
+                .fill(AppDesign.cardSurfaceElevated)
+                .overlay {
+                    RoundedRectangle(cornerRadius: AppDesign.cornerRadiusHero, style: .continuous)
+                        .fill(
+                            LinearGradient(
+                                colors: [labelColor.opacity(0.22), labelColor.opacity(0.03)],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                        )
+                }
+        }
+        .clipShape(RoundedRectangle(cornerRadius: AppDesign.cornerRadiusHero, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: AppDesign.cornerRadiusHero, style: .continuous)
+                .stroke(AppDesign.cardStrokeStrong, lineWidth: 0.75)
+        }
+        .elevation(AppDesign.Elevation.hero)
+        .animation(reduceMotion ? .easeOut(duration: 0.16) : AppAnimation.selection, value: selectedRoute.label)
     }
 
     private var readinessSection: some View {
