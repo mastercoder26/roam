@@ -23,10 +23,9 @@ interface OpenMeteoResult {
 }
 
 function clamp01(v: number): number {
-  // `Math.max(0, Math.min(1, NaN))` is `NaN`, not a clamped value, so a
-  // non-finite input has to be neutralized before the clamp rather than by it.
-  // Every caller below divides a provider-supplied number, which is exactly
-  // where a missing field would turn into `NaN` and poison `severity`.
+  // `Math.max(0, Math.min(1, NaN))` is `NaN`, not a clamped value — guard
+  // non-finite input before the clamp, since a missing provider field turns
+  // into NaN here and would poison `severity`.
   return Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : 0;
 }
 

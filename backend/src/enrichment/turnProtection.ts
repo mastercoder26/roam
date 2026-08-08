@@ -20,15 +20,14 @@ function metersBetween(a: LatLng, b: { lat: number; lng: number }): number {
  * Classifies each left turn as protected (a mapped traffic signal governs it)
  * or unprotected (the driver must judge a gap in oncoming traffic).
  *
- * The hard part is that a missing signal in OpenStreetMap means one of two very
- * different things: the turn really is unsignalized, or the area simply is not
- * mapped in detail. Guessing "unprotected" from unmapped data would invent
- * difficulty. So `areaIsMapped` gates the whole result: only when the Overpass
- * query actually resolved road data for this corridor is the absence of a
- * signal treated as evidence. Otherwise protection stays unknown.
+ * A missing signal in OpenStreetMap could mean the turn is really unsignalized,
+ * or that the area just isn't mapped in detail — guessing "unprotected" from
+ * unmapped data would invent difficulty. `areaIsMapped` gates the result:
+ * absence of a signal only counts as evidence once Overpass has actually
+ * resolved road data for the corridor.
  *
- * Stop signs and yields deliberately do not count as protection — they control
- * the turning driver, not the oncoming traffic being turned across.
+ * Stop signs and yields don't count as protection — they control the turning
+ * driver, not the oncoming traffic being turned across.
  */
 export function determineTurnProtection(
   turnPoints: LatLng[],

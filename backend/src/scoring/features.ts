@@ -314,10 +314,9 @@ function computeSpeedStats(
     if (!Number.isFinite(distanceMeters) || distanceMeters <= 0) return;
 
     const speed = stepSpeedMph(step, stepSpeedsMph?.get(index));
-    // A step with neither a supplied speed nor a usable static duration has no
-    // speed evidence at all. Counting it as 0 mph used to drag the mean down
-    // and shrink the 45+/60+ shares, understating fast-road exposure on routes
-    // with partial provider timing; describe only the measured portion instead.
+    // A step with no supplied speed and no usable static duration has no
+    // speed evidence. Skip it rather than counting it as 0 mph, which would
+    // drag the mean down and understate fast-road exposure.
     if (speed === undefined) return;
 
     measuredMeters += distanceMeters;
@@ -518,12 +517,9 @@ function deriveConditionFeatures(
   const unprotectedTurnShare = turns?.available ? turns.unprotectedTurnShare : 0;
 
   // A provider may return a partial/stale payload alongside `available: false`.
-  // Treat every derived field as unavailable in that case so missing data never
-  // turns into a difficulty penalty or an apparently factual reason.
-  //
-  // The weather sub-risks previously bypassed this check: an unavailable
-  // payload carrying a stale `snowRisk` still produced a "Snow or ice expected"
-  // reason, which reads as a verified forecast the lookup never returned.
+  // Treat every derived field as unavailable in that case — otherwise a stale
+  // `snowRisk` on an unavailable payload would produce a "Snow or ice
+  // expected" reason that reads as a verified forecast it never gave.
   const verifiedWeather = conditions?.weather?.available
     ? conditions.weather
     : undefined;

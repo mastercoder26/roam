@@ -88,8 +88,7 @@ export type ScoreEvidenceLevel = "limited" | "partial" | "wellSupported";
 
 /**
  * Data provenance for one route estimate. `inputCoverage` is not a probability
- * and is deliberately separate from any future, statistically validated
- * prediction interval.
+ * or a statistically validated prediction interval.
  */
 export interface ScoreEvidence {
   schemaVersion: "evidence-v1";
@@ -129,16 +128,12 @@ export type RouteDemandId = (typeof ROUTE_DEMAND_IDS)[number];
 export type RouteDemandLevel = "low" | "moderate" | "high";
 
 /**
- * A contiguous, ordered portion of the route expressed as a fraction of the
- * validated full-route overview-polyline's geometric length. `startFraction`
- * is inclusive and `endFraction` is exclusive, except that the final range
- * may end at 1. These values intentionally use the same overview geometry
- * that mobile clients decode for local GPS overlap.
- *
- * Ranges are intentionally omitted when the overview geometry or its ordered
- * step mapping cannot be validated. Aggregate enrichment (for example a
- * route-wide weather summary) must not pretend to know the exact section
- * where a condition occurs.
+ * A contiguous, ordered portion of the route as a fraction of the validated
+ * overview polyline's length (`startFraction` inclusive, `endFraction`
+ * exclusive, except the final range may end at 1). Uses the same overview
+ * geometry mobile clients decode, so it lines up with local GPS overlap.
+ * Omitted when the geometry can't be validated or a source only gives an
+ * aggregate route-wide condition rather than a location.
  */
 export interface RouteDemandCoverageRange {
   startFraction: number;
@@ -240,8 +235,8 @@ export interface DepartureComparisonRequest {
 }
 
 /**
- * Comparison candidates are deliberately independent. A provider or enrichment
- * failure for one window must not discard useful route data for the others.
+ * Comparison candidates are independent: a provider or enrichment failure for
+ * one window must not discard useful route data for the others.
  */
 export interface DepartureComparisonCandidateResult
   extends DepartureComparisonCandidate {

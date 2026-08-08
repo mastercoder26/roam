@@ -2,24 +2,15 @@ import type { RouteFeatures } from "./features.js";
 import type { ScoreEvidence, ScoreUncertainty } from "../types.js";
 
 /**
- * Coerce a possibly-dirty number to a usable one.
- *
- * Every scoring input ultimately comes from a third-party routing or weather
- * payload. A single `NaN` or `Infinity` slipping into an arithmetic chain
- * silently poisons the final score — `Math.max(0, Math.min(10, NaN))` is `NaN`,
- * not a clamped value — so non-finite inputs are neutralized at the boundary
- * rather than allowed to surface as a `NaN` difficulty on the client.
+ * Coerce a possibly-dirty number to a usable one. Scoring inputs come from
+ * third-party APIs, and a stray `NaN` or `Infinity` poisons any arithmetic
+ * chain it touches, so we neutralize it at the boundary.
  */
 export function finiteOr(value: number, fallback = 0): number {
   return Number.isFinite(value) ? value : fallback;
 }
 
-/**
- * Exact statute mile. The scoring modules previously carried three separate
- * copies of this (1609.34 twice, 1_609.344 once), so distance-derived metrics
- * disagreed in the fifth significant figure depending on which file produced
- * them. One definition keeps miles comparable across features and demands.
- */
+/** Exact statute mile, shared so distance-derived metrics agree across features and demands. */
 export const METERS_PER_MILE = 1_609.344;
 
 /** Hermite smoothstep: x² × (3 - 2x), clamped to [0, 1]. */
@@ -60,12 +51,9 @@ export function computeSustainedEffortFromHours(durationHours: number): {
 }
 
 /**
- * Width of the displayed band, in score points.
- *
- * These are deliberately coarse: the band communicates *how thin the inputs
- * are*, not a validated prediction interval (see `assessScoreEvidence`). Each
- * widening marks a route shape whose heuristic inputs are known to be less
- * stable, not a measured error rate.
+ * Width of the displayed band, in score points. Coarse by design: it
+ * communicates how thin the inputs are, not a validated prediction interval
+ * (see `assessScoreEvidence`).
  */
 const UNCERTAINTY_SPREAD = {
   /** Baseline width applied to every route. */
@@ -150,11 +138,9 @@ const CALIBRATION_KNOTS = [
 
 /**
  * Maps the heuristic workload to the product's 0–10 difficulty scale.
- *
- * The previous curve treated the upper half of the heuristic score as nearly
- * linear, which made ordinary dense-city trips and traffic delays read as
- * "Very Hard". This conservative curve keeps the ordering intact while
- * reserving 8–10 for routes with several severe, corroborated burdens.
+ * Compresses the upper half so ordinary dense-city trips and traffic delays
+ * don't read as "Very Hard" — 8-10 is reserved for routes with several
+ * severe, corroborated burdens.
  */
 export function calibrateScore(score: number): number {
   const knots = CALIBRATION_KNOTS;

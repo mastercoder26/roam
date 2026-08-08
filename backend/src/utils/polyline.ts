@@ -87,9 +87,8 @@ function normalizedLongitudeDelta(degrees: number): number {
 
 /**
  * Builds a usable distance index for an overview or step polyline. Invalid,
- * degenerate, and one-point payloads deliberately return `undefined`: callers
- * should omit location-specific claims instead of falling back to a different
- * distance basis.
+ * degenerate, and one-point payloads return `undefined` so callers omit
+ * location-specific claims instead of falling back to a different distance basis.
  */
 export function buildPolylineGeometry(
   encoded: string | undefined | null

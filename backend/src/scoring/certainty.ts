@@ -42,12 +42,10 @@ function levelFor(coverage: number): ScoreEvidenceLevel {
 }
 
 /**
- * Reports which route inputs were verified for a single estimate.
- *
- * This deliberately measures data completeness rather than the probability
- * that a route score or a driver outcome is correct. A prediction interval is
- * intentionally absent until the product has a held-out labeled dataset and a
- * versioned validation artifact for the declared target.
+ * Reports which route inputs were verified for a single estimate. This
+ * measures data completeness, not the probability that a score or driver
+ * outcome is correct — there's no prediction interval until we have a
+ * held-out labeled dataset and a versioned validation artifact.
  */
 export function assessScoreEvidence(input: ScoreEvidenceInput): ScoreEvidence {
   const signalCoverage = Object.fromEntries(
