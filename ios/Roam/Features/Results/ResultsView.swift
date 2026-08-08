@@ -216,27 +216,7 @@ struct ResultsView: View {
                 .padding(.top, 2)
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, AppDesign.space12)
-        .background {
-            RoundedRectangle(cornerRadius: AppDesign.cornerRadiusHero, style: .continuous)
-                .fill(AppDesign.cardSurfaceElevated)
-                .overlay {
-                    RoundedRectangle(cornerRadius: AppDesign.cornerRadiusHero, style: .continuous)
-                        .fill(
-                            LinearGradient(
-                                colors: [labelColor.opacity(0.22), labelColor.opacity(0.03)],
-                                startPoint: .top,
-                                endPoint: .bottom
-                            )
-                        )
-                }
-        }
-        .clipShape(RoundedRectangle(cornerRadius: AppDesign.cornerRadiusHero, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: AppDesign.cornerRadiusHero, style: .continuous)
-                .stroke(AppDesign.cardStrokeStrong, lineWidth: 0.75)
-        }
-        .elevation(AppDesign.Elevation.hero)
+        .padding(.vertical, 8)
         .animation(reduceMotion ? .easeOut(duration: 0.16) : AppAnimation.selection, value: selectedRoute.label)
     }
 

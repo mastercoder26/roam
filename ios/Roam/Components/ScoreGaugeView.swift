@@ -25,16 +25,10 @@ struct ScoreGaugeView: View {
             Circle()
                 .trim(from: 0, to: animatedProgress)
                 .stroke(
-                    AngularGradient(
-                        colors: [accentColor.opacity(0.55), accentColor],
-                        center: .center,
-                        startAngle: .degrees(0),
-                        endAngle: .degrees(360 * max(animatedProgress, 0.001))
-                    ),
+                    accentColor,
                     style: StrokeStyle(lineWidth: 14, lineCap: .round)
                 )
                 .rotationEffect(.degrees(-90))
-                .shadow(color: accentColor.opacity(0.35), radius: 10, y: 3)
 
             VStack(spacing: 2) {
                 Text(String(format: "%.1f", score))
