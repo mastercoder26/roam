@@ -271,10 +271,7 @@ export function enrichStepSpeeds(
   };
 }
 
-/**
- * Compatibility helper for scoring callers that only need blended speeds.
- * New pipeline code should use `enrichStepSpeeds` so it cannot lose provenance.
- */
+/** For callers that only need blended speeds; use `enrichStepSpeeds` to keep provenance. */
 export function applySpeedLimitsToSteps(
   route: ParsedRoute,
   speedLimits: SpeedLimitPoint[]

@@ -122,16 +122,12 @@ export function requireAuth(req: Request, res: Response, next: NextFunction): vo
 }
 
 /**
- * Proves the caller is a signed-in Roam account and stops there.
- *
- * The route-analysis endpoints proxy metered Google APIs, so they must not be
- * open to anonymous callers — but they take no user identity and read no user
- * data. `requireAuth` is the wrong tool for them: it provisions a local user
- * row, which would force a Postgres connection onto the stateless route
- * deployment purely as an authentication side effect.
- *
- * This verifies the Clerk token and nothing else, so the deployment that
- * serves route analysis needs `CLERK_SECRET_KEY` and no database at all.
+ * Proves the caller is a signed-in Roam account and stops there. Route
+ * analysis proxies metered Google APIs and can't be open to anonymous
+ * callers, but it doesn't need a user row — `requireAuth` provisions one and
+ * would force a Postgres connection onto this otherwise stateless deployment.
+ * This checks the Clerk token only, so the route-analysis deployment needs
+ * `CLERK_SECRET_KEY` and no database.
  */
 async function verifyIdentity(req: Request, res: Response, next: NextFunction): Promise<void> {
   const secretKey = process.env.CLERK_SECRET_KEY?.trim();

@@ -135,7 +135,7 @@ export function computeManeuverComplexity(
   const rateMiles = Math.max(distanceMiles, 10);
   const maneuversPer10Mi =
     rateMiles > 0 ? weightedCount / (rateMiles / 10) : 0;
-  // 6 weighted maneuvers per 10 miles = dense urban complexity (was 12, which under-scored urban routes)
+  // 6 weighted maneuvers per 10 miles marks dense urban complexity.
   const subscore = smoothstep(maneuversPer10Mi / 6);
 
   return { weightedCount, maneuversPer10Mi, subscore };

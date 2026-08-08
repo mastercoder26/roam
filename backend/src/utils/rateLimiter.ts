@@ -1,12 +1,7 @@
 /**
  * Minimal in-memory sliding-window rate limiter for the public route-analysis
- * endpoints. Each endpoint proxies to metered Google APIs (Routes, Roads),
- * so an unthrottled client can both run up billing and starve other callers.
- *
- * This is intentionally dependency-free (no `express-rate-limit`) since it
- * only needs to bound a single Node process; it is not shared across
- * instances. A multi-instance deployment would need a shared store (for
- * example Redis) instead — see the handoff notes for that follow-up.
+ * endpoints, which proxy metered Google APIs. Bounds a single Node process
+ * only — a multi-instance deployment needs a shared store (e.g. Redis).
  */
 
 export interface RateLimiterOptions {

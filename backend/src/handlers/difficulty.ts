@@ -168,10 +168,7 @@ export function validateDepartureComparisonRequest(
   return parseRequest(departureComparisonRequestSchema, body);
 }
 
-/**
- * The common routing, enrichment, and scoring pipeline. It intentionally
- * remains the only place that combines provider data into a scored route.
- */
+/** The common routing, enrichment, and scoring pipeline — the only place that combines provider data into a scored route. */
 export async function analyzeDifficultyRequest(
   request: DifficultyRequest,
   apiKey: string,
