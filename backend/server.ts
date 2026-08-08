@@ -161,15 +161,13 @@ app.get("/health", async (_req, res) => {
 });
 
 /**
- * Route analysis proxies metered Google APIs, so it is gated on a signed-in
- * account. The limiter is applied on both sides of the identity check on
- * purpose: the first pass sees no verified subject and so caps *anonymous*
- * traffic by address, which bounds how much token verification a flood can
- * force; the second pass sees `req.clerkUserId` and caps each account, which
- * an attacker cannot widen by rotating addresses.
+ * Route analysis proxies metered Google APIs, so it's gated on a signed-in
+ * account. The limiter runs on both sides of the identity check: first by
+ * address (bounds how much token verification a flood can force), then by
+ * `req.clerkUserId` (bounds each account regardless of address rotation).
  *
- * `requireVerifiedIdentity` (not `requireAuth`) keeps this deployment free of
- * any database dependency — see the note on that middleware.
+ * Uses `requireVerifiedIdentity`, not `requireAuth` — see the note on that
+ * middleware for why this keeps the deployment free of a database dependency.
  */
 app.post(
   "/api/route/difficulty",
