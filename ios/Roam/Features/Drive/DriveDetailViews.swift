@@ -458,14 +458,14 @@ struct FlipClock: View {
                 Text("\(Int(elapsed) / 60):\(String(format: "%02d", Int(elapsed) % 60))")
                     .font(.system(.largeTitle, design: .rounded, weight: .bold))
                     .monospacedDigit()
-                    .foregroundStyle(AppDesign.Ink.primary)
+                    .foregroundStyle(AppDesign.flipClockDigit)
             } else {
                 HStack(spacing: style.spacing) {
                     ForEach(Array(digits.enumerated()), id: \.offset) { index, digit in
                         if index == 2 {
                             Text(":")
                                 .font(.system(size: style.colonFontSize, weight: .bold, design: .rounded))
-                                .foregroundStyle(AppDesign.Ink.secondary)
+                                .foregroundStyle(AppDesign.flipClockDigit)
                                 .padding(.horizontal, 1)
                         }
                         FlipClockDigit(digit: digit, style: style)
@@ -492,7 +492,7 @@ private struct FlipDigitHalf: View {
         Text(digit)
             .font(.system(size: style.digitFontSize, weight: .semibold, design: .rounded))
             .monospacedDigit()
-            .foregroundStyle(AppDesign.Ink.primary)
+            .foregroundStyle(AppDesign.flipClockDigit)
             .frame(width: style.digitWidth, height: style.digitHeight)
             .frame(height: style.digitHeight / 2, alignment: edge == .top ? .top : .bottom)
             .clipped()

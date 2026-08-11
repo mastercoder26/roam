@@ -39,6 +39,12 @@ enum AppDesign {
     static var trackSurface: Color { palette.cardStroke.color }
     static var glassHighlight: Color { palette.glassHighlight.color }
     static var primarySurfaceForeground: Color { palette.primarySurfaceForeground.color }
+    /// High-contrast ink for the flip clock. The timer is rendered on its own
+    /// dark plate, so it must be chosen against that plate rather than the
+    /// surrounding canvas or a general text hierarchy.
+    static var flipClockDigit: Color {
+        RGBA.readableForeground(over: palette.cardSurface).color
+    }
 
     /// MapKit overlays and annotations can't take a SwiftUI `Color`.
     enum UIKitColor {
