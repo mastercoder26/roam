@@ -25,6 +25,7 @@
 		801F9F25AA779A9953455411 /* intro-midnight.mp4 in Resources */ = {isa = PBXBuildFile; fileRef = B68748C760C76C76BA63801D /* intro-midnight.mp4 */; };
 		A10000000000000000000001 /* RoamApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000001 /* RoamApp.swift */; };
 		A10000000000000000000002 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000002 /* HomeView.swift */; };
+		A100000000000000000000FD /* HowRoamWorksSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A200000000000000000000FD /* HowRoamWorksSheet.swift */; };
 		A10000000000000000000003 /* ResultsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000003 /* ResultsView.swift */; };
 		A10000000000000000000004 /* RouteDifficultyModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000004 /* RouteDifficultyModels.swift */; };
 		A10000000000000000000005 /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000005 /* APIClient.swift */; };
@@ -144,6 +145,7 @@
 		504414AC708735F35ECEC673 /* intro-sequoia.mp4 */ = {isa = PBXFileReference; includeInIndex = 1; path = "intro-sequoia.mp4"; sourceTree = "<group>"; };
 		A20000000000000000000001 /* RoamApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoamApp.swift; sourceTree = "<group>"; };
 		A20000000000000000000002 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
+		A200000000000000000000FD /* HowRoamWorksSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HowRoamWorksSheet.swift; sourceTree = "<group>"; };
 		A20000000000000000000003 /* ResultsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResultsView.swift; sourceTree = "<group>"; };
 		A20000000000000000000004 /* RouteDifficultyModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RouteDifficultyModels.swift; sourceTree = "<group>"; };
 		A20000000000000000000005 /* APIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClient.swift; sourceTree = "<group>"; };
@@ -391,6 +393,7 @@
 			isa = PBXGroup;
 			children = (
 				A20000000000000000000002 /* HomeView.swift */,
+				A200000000000000000000FD /* HowRoamWorksSheet.swift */,
 				A20000000000000000000028 /* RoutePlanningFormModel.swift */,
 			);
 			path = Home;
@@ -661,6 +664,7 @@
 				F38A1F7818134DBFA869E6BE /* AppIconPickerSheet.swift in Sources */,
 				A10000000000000000000001 /* RoamApp.swift in Sources */,
 				A10000000000000000000002 /* HomeView.swift in Sources */,
+				A100000000000000000000FD /* HowRoamWorksSheet.swift in Sources */,
 				A10000000000000000000003 /* ResultsView.swift in Sources */,
 				B13E761EC74FF647592495EE /* RecentRouteStore.swift in Sources */,
 				B394ED9480F5622A90F861C2 /* RecentRouteCard.swift in Sources */,

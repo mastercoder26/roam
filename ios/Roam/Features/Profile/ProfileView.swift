@@ -79,8 +79,8 @@ struct ProfileView: View {
                 .padding(.horizontal, AppDesign.space20)
                 .padding(.vertical, AppDesign.space16)
             }
-            .safeAreaPadding(.bottom, AppDesign.space24)
-            .background(AppDesign.canvas.ignoresSafeArea())
+            .safeAreaPadding(.bottom, AppDesign.tabBarClearance + AppDesign.space24)
+            .background(AppCanvasBackground())
             .navigationTitle("Profile")
             .toolbar(.hidden, for: .navigationBar)
         }
@@ -129,8 +129,7 @@ struct ProfileView: View {
     private var profileHeader: some View {
         ScreenHeader(
             title: "Profile",
-            symbol: "person.crop.circle.fill",
-            subtitle: "Your record, driven by what you've measured."
+            symbol: "person.crop.circle.fill"
         )
     }
 
@@ -145,10 +144,7 @@ struct ProfileView: View {
 
     private func profileFolderSection(_ section: ProfileHomeSection) -> some View {
         VStack(alignment: .leading, spacing: AppDesign.space12) {
-            SectionHeader(
-                title: section.title,
-                subtitle: section.subtitle
-            )
+            SectionHeader(title: section.title)
 
             VStack(spacing: 0) {
                 ForEach(section.folders) { folder in
@@ -172,10 +168,7 @@ struct ProfileView: View {
     @ViewBuilder
     private var accountSection: some View {
         VStack(alignment: .leading, spacing: AppDesign.space12) {
-            SectionHeader(
-                title: ProfileHomeSection.account.title,
-                subtitle: ProfileHomeSection.account.subtitle
-            )
+            SectionHeader(title: ProfileHomeSection.account.title)
 
             accountCard
 
@@ -498,6 +491,7 @@ struct ProfileView: View {
             .padding(.horizontal, AppDesign.contentPadding)
             .padding(.vertical, 12)
         }
+        .safeAreaPadding(.bottom, AppDesign.tabBarClearance)
         .background(AppDesign.canvas.ignoresSafeArea())
         .navigationTitle(folder.title)
         .navigationBarTitleDisplayMode(.inline)
@@ -614,10 +608,6 @@ struct ProfileView: View {
         .background {
             RoundedRectangle(cornerRadius: AppDesign.cornerRadiusHero, style: .continuous)
                 .fill(AppDesign.cardSurfaceElevated)
-                .overlay {
-                    RoundedRectangle(cornerRadius: AppDesign.cornerRadiusHero, style: .continuous)
-                        .fill(AppDesign.accentWash)
-                }
         }
         .clipShape(RoundedRectangle(cornerRadius: AppDesign.cornerRadiusHero, style: .continuous))
         .overlay {

@@ -32,9 +32,8 @@ enum RoutePlanningStage: Equatable {
 /// follows the same endpoint validation as the form so the map never invents
 /// a route before the user has supplied both endpoints.
 enum RoutePlanningMapPreviewStage: Equatable {
-    /// A neutral invitation shown until a real origin exists. MapKit is not
-    /// mounted in this state, so a fresh plan never opens on an irrelevant
-    /// continental overview.
+    /// A neutral Apple Maps viewport shown until a real origin exists. The
+    /// map remains mounted so planning always has geographic context.
     case locationPrompt
     case startingPoint
     case route

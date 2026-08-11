@@ -57,10 +57,10 @@ enum AppDesign {
     static let space32: CGFloat = 32
 
     /// Radius ladder — keep cards, buttons and pills on these rungs.
-    static let cornerRadius: CGFloat = 18
-    static let cornerRadiusSmall: CGFloat = 12
-    static let cornerRadiusLarge: CGFloat = 24
-    static let cornerRadiusHero: CGFloat = 28
+    static let cornerRadius: CGFloat = 16
+    static let cornerRadiusSmall: CGFloat = 11
+    static let cornerRadiusLarge: CGFloat = 20
+    static let cornerRadiusHero: CGFloat = 22
     /// Icon tiles and other sub-32pt chips, which read as over-rounded at 12.
     static let cornerRadiusTiny: CGFloat = 10
 
@@ -68,13 +68,13 @@ enum AppDesign {
     /// scheme never inherits a light scheme's invisible shadow.
     enum Elevation {
         /// Chips and rows sitting directly on a card.
-        static let low = (radius: CGFloat(10), y: CGFloat(4), opacity: 0.6)
+        static let low = (radius: CGFloat(5), y: CGFloat(2), opacity: 0.35)
         /// Cards lifted off the canvas.
-        static let medium = (radius: CGFloat(18), y: CGFloat(8), opacity: 0.9)
+        static let medium = (radius: CGFloat(10), y: CGFloat(4), opacity: 0.5)
         /// Floating chrome — tab bar, map panels.
-        static let high = (radius: CGFloat(26), y: CGFloat(12), opacity: 1.0)
+        static let high = (radius: CGFloat(16), y: CGFloat(7), opacity: 0.65)
         /// Hero surfaces that should read as the focal point of a screen.
-        static let hero = (radius: CGFloat(34), y: CGFloat(16), opacity: 1.0)
+        static let hero = (radius: CGFloat(18), y: CGFloat(8), opacity: 0.7)
     }
 
     static let cardPadding: CGFloat = 18
@@ -107,13 +107,17 @@ enum AppDesign {
         static let microLabel = Font.caption.weight(.bold)
     }
 
-    /// Soft accent wash used behind hero surfaces and featured tiles.
-    static var accentWash: LinearGradient {
-        LinearGradient(
-            colors: [accent.opacity(0.22), accent.opacity(0.04)],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
+}
+
+// MARK: - App atmosphere
+
+/// A stable canvas shared by every tab. Depth belongs to functional surfaces,
+/// not decorative light fields behind the content.
+struct AppCanvasBackground: View {
+    @ObservedObject private var theme = ThemeManager.shared
+
+    var body: some View {
+        AppDesign.canvas.ignoresSafeArea()
     }
 }
 
@@ -148,14 +152,13 @@ struct PremiumCardModifier: ViewModifier {
             .clipShape(RoundedRectangle(cornerRadius: AppDesign.cornerRadius, style: .continuous))
             .overlay {
                 RoundedRectangle(cornerRadius: AppDesign.cornerRadius, style: .continuous)
-                    .stroke(AppDesign.cardStroke, lineWidth: 0.75)
+                    .stroke(AppDesign.cardStroke, lineWidth: 0.5)
             }
-            .elevation(AppDesign.Elevation.medium)
+            .elevation(AppDesign.Elevation.low)
     }
 }
 
-/// Featured surface: larger radius, accent wash, deeper shadow. For the one
-/// element on a screen that should be looked at first.
+/// Featured surface. Hierarchy comes from scale and whitespace, not effects.
 struct HeroCardModifier: ViewModifier {
     @ObservedObject private var theme = ThemeManager.shared
 
@@ -163,18 +166,11 @@ struct HeroCardModifier: ViewModifier {
         content
             .padding(AppDesign.space20)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background {
-                RoundedRectangle(cornerRadius: AppDesign.cornerRadiusHero, style: .continuous)
-                    .fill(AppDesign.cardSurfaceElevated)
-                    .overlay {
-                        RoundedRectangle(cornerRadius: AppDesign.cornerRadiusHero, style: .continuous)
-                            .fill(AppDesign.accentWash)
-                    }
-            }
+            .background(AppDesign.cardSurfaceElevated)
             .clipShape(RoundedRectangle(cornerRadius: AppDesign.cornerRadiusHero, style: .continuous))
             .overlay {
                 RoundedRectangle(cornerRadius: AppDesign.cornerRadiusHero, style: .continuous)
-                    .stroke(AppDesign.cardStrokeStrong, lineWidth: 0.75)
+                    .stroke(AppDesign.cardStrokeStrong, lineWidth: 0.5)
             }
             .elevation(AppDesign.Elevation.hero)
     }
@@ -239,32 +235,21 @@ struct ScreenHeader: View {
     @ObservedObject private var theme = ThemeManager.shared
     let title: String
     let symbol: String
-    var subtitle: String?
 
     var body: some View {
-        HStack(alignment: .top, spacing: AppDesign.space16) {
-            VStack(alignment: .leading, spacing: AppDesign.space4) {
-                Text(title)
-                    .font(AppDesign.Typography.display)
-                    .tracking(-0.9)
-                    .foregroundStyle(AppDesign.Ink.primary)
-                    .fixedSize(horizontal: false, vertical: true)
-
-                if let subtitle {
-                    Text(subtitle)
-                        .font(.subheadline)
-                        .foregroundStyle(AppDesign.Ink.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
+        HStack(alignment: .center, spacing: AppDesign.space16) {
+            Text(title)
+                .font(AppDesign.Typography.display)
+                .tracking(-0.9)
+                .foregroundStyle(AppDesign.Ink.primary)
+                .fixedSize(horizontal: false, vertical: true)
 
             Spacer(minLength: AppDesign.space8)
 
             Image(systemName: symbol)
-                .font(.system(size: 22, weight: .semibold))
+                .font(.system(size: 19, weight: .semibold))
                 .foregroundStyle(AppDesign.accent)
-                .frame(width: 46, height: 46)
-                .background(AppDesign.accent.opacity(0.14), in: Circle())
+                .frame(width: 44, height: 44)
                 .accessibilityHidden(true)
         }
         .accessibilityElement(children: .combine)

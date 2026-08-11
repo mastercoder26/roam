@@ -550,7 +550,7 @@ struct ScoreUncertainty: Decodable {
     let evidence: ScoreEvidence?
 
     var formattedBand: String {
-        String(format: "%.1f – %.1f", low, high)
+        String(format: "%.1f to %.1f", low, high)
     }
 }
 

@@ -1,6 +1,22 @@
 import SwiftUI
 import UIKit
 
+private enum ResultsPage: String, CaseIterable, Identifiable {
+    case overview = "Overview"
+    case details = "Details"
+
+    var id: Self { self }
+
+    var accessibilityHint: String {
+        switch self {
+        case .overview:
+            return "Shows the route score, readiness, alternatives, and navigation"
+        case .details:
+            return "Shows trip facts, route demands, conditions, and score evidence"
+        }
+    }
+}
+
 struct ResultsView: View {
     @ObservedObject private var theme = ThemeManager.shared
     @State private var result: RouteAnalysisResult
@@ -18,8 +34,8 @@ struct ResultsView: View {
     @State private var departureComparisonError: String?
     @State private var isComparingDepartures = false
     @State private var isReanalyzingDeparture = false
-    @State private var heroAppeared = false
     @State private var showsAllReadinessEvidence = false
+    @State private var selectedPage: ResultsPage = .overview
 
     private let apiClient = APIClient()
 
@@ -97,29 +113,61 @@ struct ResultsView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: AppDesign.sectionSpacing) {
                 tripRouteHeader
-                    .heroAppear(visible: heroAppeared)
+                resultsPagePicker
+                selectedPageContent
+            }
+            .padding(.horizontal, AppDesign.contentPadding)
+            .padding(.vertical, 12)
+        }
+        .background(AppCanvasBackground())
+        .navigationTitle("Results")
+        .navigationBarTitleDisplayMode(.inline)
+        .onAppear {
+            refreshRouteChoices()
+            startDepartureComparison()
+        }
+        .onChange(of: selectedRoute.polyline) { _, _ in
+            refreshReadiness()
+        }
+        .onChange(of: driveHistoryIDs) { _, _ in
+            refreshRouteChoices()
+        }
+        .onChange(of: selectedPage) { _, _ in
+            UISelectionFeedbackGenerator().selectionChanged()
+        }
+    }
 
+    private var resultsPagePicker: some View {
+        Picker("Result view", selection: $selectedPage) {
+            ForEach(ResultsPage.allCases) { page in
+                Text(page.rawValue).tag(page)
+            }
+        }
+        .pickerStyle(.segmented)
+        .accessibilityHint(selectedPage.accessibilityHint)
+    }
+
+    @ViewBuilder
+    private var selectedPageContent: some View {
+        switch selectedPage {
+        case .overview:
+            VStack(alignment: .leading, spacing: AppDesign.sectionSpacing) {
                 scoreSection
-                    .heroAppear(visible: heroAppeared)
-
                 readinessSection
-                    .heroAppear(visible: heroAppeared, delay: AppAnimation.heroStagger)
-
                 departureComparisonSection
-                    .heroAppear(visible: heroAppeared, delay: AppAnimation.heroStagger * 2)
-
                 routeChoicesSection
-                    .heroAppear(visible: heroAppeared, delay: AppAnimation.heroStagger * 2)
-
                 mapSection
-                    .heroAppear(visible: heroAppeared, delay: AppAnimation.heroStagger * 3)
+                navigationSection
+            }
+            .transition(resultsPageTransition)
 
+        case .details:
+            VStack(alignment: .leading, spacing: AppDesign.sectionSpacing) {
                 tripDetailsSection
                 routeDemandsSection
                 if let conditions = selectedRoute.conditions, !conditions.sources.isEmpty {
                     RouteConditionsCard(conditions: conditions)
                 }
-                navigationSection
                 if let hotspots = selectedRoute.hotspots, !hotspots.isEmpty {
                     hotspotsSection(hotspots)
                 }
@@ -132,25 +180,13 @@ struct ResultsView: View {
                     }
                     reasonsSection
                 }
-
             }
-            .padding(.horizontal, AppDesign.contentPadding)
-            .padding(.vertical, 12)
+            .transition(resultsPageTransition)
         }
-        .background(AppDesign.canvas)
-        .navigationTitle("Results")
-        .navigationBarTitleDisplayMode(.inline)
-        .onAppear {
-            heroAppeared = true
-            refreshRouteChoices()
-            startDepartureComparison()
-        }
-        .onChange(of: selectedRoute.polyline) { _, _ in
-            refreshReadiness()
-        }
-        .onChange(of: driveHistoryIDs) { _, _ in
-            refreshRouteChoices()
-        }
+    }
+
+    private var resultsPageTransition: AnyTransition {
+        reduceMotion ? .opacity : .opacity.combined(with: .move(edge: .trailing))
     }
 
     private var tripRouteHeader: some View {
@@ -811,7 +847,7 @@ struct ResultsView: View {
                             id: "afterDark",
                             intensity: 0.85,
                             level: .high,
-                            evidence: "Most of the drive falls in the 8 PM–6 AM window.",
+                            evidence: "Most of the drive falls in the 8 PM to 6 AM window.",
                             available: true
                         ),
                         RouteDemand(

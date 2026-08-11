@@ -6,7 +6,7 @@ struct RoutePlanningPresentationChecks {
         destinationIsVisibleBeforeAnOriginIsResolved()
         analyzeBecomesAvailableOnlyAfterBothEndpointsExist()
         mapPreviewProgressesFromStartPinToRouteLine()
-        freshPlansUseACompactLocationPromptInsteadOfAWorldMap()
+        freshPlansKeepTheAppleMapsPreviewVisible()
         freshPlansWaitForAnExplicitOriginChoice()
 
         print("Route planning presentation checks passed")
@@ -65,14 +65,14 @@ struct RoutePlanningPresentationChecks {
         )
     }
 
-    private static func freshPlansUseACompactLocationPromptInsteadOfAWorldMap() {
+    private static func freshPlansKeepTheAppleMapsPreviewVisible() {
         expect(
             RoutePlanningMapPreviewStage(
                 origin: "",
                 destination: "",
                 usesCurrentLocation: false
             ) == .locationPrompt,
-            "a fresh plan should focus on choosing a location instead of showing a world overview"
+            "a fresh plan should keep Apple Maps in its neutral preview state"
         )
     }
 

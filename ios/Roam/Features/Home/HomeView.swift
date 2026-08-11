@@ -12,9 +12,9 @@ struct HomeView: View {
     @State private var errorMessage: String?
     @State private var navigationPath = NavigationPath()
     @State private var mapPreview: RoutePlanningMapSummary?
+    @State private var showingHowRoamWorks = false
     @StateObject private var locationCoordinator = RoutePlanningLocationCoordinator()
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     private let apiClient = APIClient()
 
@@ -30,8 +30,19 @@ struct HomeView: View {
         formPresentation.stage
     }
 
+    private var mapPreviewAccessibilityLabel: String {
+        mapPreview?.accessibilityLabel ?? "Apple Maps route preview"
+    }
+
     private var canAnalyze: Bool {
         planningStage == .readyToAnalyze && !isLoading
+    }
+
+    private var canSwapEndpoints: Bool {
+        !form.usesCurrentLocation &&
+            !form.origin.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+            !form.destination.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+            !isLoading
     }
 
     /// A shared Maps route may prefer the current location when no explicit
@@ -46,10 +57,6 @@ struct HomeView: View {
         case .awaitingOrigin, .manualEntry:
             return false
         }
-    }
-
-    private var mapPreviewStage: RoutePlanningMapPreviewStage {
-        formPresentation.mapPreviewStage
     }
 
     private var progressiveReveal: AnyTransition {
@@ -70,14 +77,13 @@ struct HomeView: View {
                                 .transition(progressiveReveal)
                         }
 
-                        if !recentRoutes.entries.isEmpty {
-                            recentRoutesSection
-                                .transition(progressiveReveal)
-                        }
-
                         VStack(alignment: .leading, spacing: AppDesign.space16) {
                             routeCard
                             mapPreviewSection
+                            if let mapPreview {
+                                mapSummaryRow(mapPreview)
+                                    .transition(.opacity)
+                            }
                             departureContainer
                         }
 
@@ -87,6 +93,12 @@ struct HomeView: View {
                         }
 
                         analyzeButton
+
+                        if !recentRoutes.entries.isEmpty {
+                            recentRoutesSection
+                                .transition(progressiveReveal)
+                        }
+
                         routeChecksSection
                     }
                     .padding(.horizontal, AppDesign.space20)
@@ -94,13 +106,14 @@ struct HomeView: View {
                     // Extra clearance so "What Roam checks" clears the floating tab bar.
                     .padding(.bottom, AppDesign.tabBarClearance)
                 }
+                .scrollDismissesKeyboard(.interactively)
                 if isLoading {
                     RouteAnalysisLoadingView(isFinishing: isCompletingLoading) { completeLoading() }
                         .transition(.opacity)
                         .zIndex(1)
                 }
             }
-            .background(AppDesign.canvas.ignoresSafeArea())
+            .background(AppCanvasBackground())
             .toolbar(.hidden, for: .navigationBar)
             .navigationDestination(for: RouteAnalysisResult.self) { ResultsView(result: $0) }
             .onChange(of: locationCoordinator.state) { _, state in
@@ -121,17 +134,19 @@ struct HomeView: View {
                 mapPreview = nil
             }
         }
+        .sheet(isPresented: $showingHowRoamWorks) {
+            HowRoamWorksSheet()
+        }
     }
 
     private var routeSurface: Color {
-        reduceTransparency ? AppDesign.cardSurfaceElevated : AppDesign.cardSurface
+        AppDesign.cardSurface
     }
 
     private var headerSection: some View {
         ScreenHeader(
-            title: "Plan your route",
-            symbol: "location.north.circle.fill",
-            subtitle: "Know the difficulty before you leave."
+            title: "Where to?",
+            symbol: "location.north.circle.fill"
         )
     }
 
@@ -148,16 +163,45 @@ struct HomeView: View {
             }
         }
         .padding(.vertical, AppDesign.space8)
-        .background {
-            RoundedRectangle(cornerRadius: AppDesign.cornerRadiusHero, style: .continuous)
-                .fill(routeSurface)
-                .overlay {
-                    RoundedRectangle(cornerRadius: AppDesign.cornerRadiusHero, style: .continuous)
-                        .fill(AppDesign.accentWash)
-                }
+        .background(routeSurface)
+        .clipShape(RoundedRectangle(cornerRadius: AppDesign.cornerRadiusLarge, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: AppDesign.cornerRadiusLarge, style: .continuous)
+                .stroke(AppDesign.cardStrokeStrong, lineWidth: 0.5)
         }
-        .clipShape(RoundedRectangle(cornerRadius: AppDesign.cornerRadiusHero, style: .continuous))
-        .elevation(AppDesign.Elevation.hero)
+        .overlay(alignment: .trailing) {
+            if canSwapEndpoints {
+                Button(action: swapEndpoints) {
+                    Image(systemName: "arrow.up.arrow.down")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(AppDesign.Ink.primary)
+                        .frame(width: 36, height: 36)
+                        .background(AppDesign.cardSurfaceElevated, in: Circle())
+                        .overlay {
+                            Circle().stroke(AppDesign.cardStrokeStrong, lineWidth: 0.75)
+                        }
+                        .frame(minWidth: 44, minHeight: 44)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(PressableScaleStyle())
+                .padding(.trailing, 10)
+                .transition(progressiveReveal)
+                .accessibilityLabel("Swap starting location and destination")
+            }
+        }
+        .elevation(AppDesign.Elevation.low)
+        .animation(reduceMotion ? .easeOut(duration: 0.16) : AppAnimation.selection, value: canSwapEndpoints)
+    }
+
+    private func swapEndpoints() {
+        guard canSwapEndpoints else { return }
+        let previousOrigin = form.origin
+        UISelectionFeedbackGenerator().selectionChanged()
+        withAnimation(reduceMotion ? .easeOut(duration: 0.16) : AppAnimation.selection) {
+            form.origin = form.destination
+            form.destination = previousOrigin
+            mapPreview = nil
+        }
     }
 
     @ViewBuilder
@@ -315,34 +359,42 @@ struct HomeView: View {
         }
     }
 
-    @ViewBuilder
     private var mapPreviewSection: some View {
-        if mapPreviewStage == .locationPrompt {
-            EmptyStateView(
-                symbol: "map",
-                title: "Your route preview",
-                message: "Choose a starting point to see the route take shape."
-            )
-            .frame(maxWidth: .infinity, minHeight: 160)
-            .background(AppDesign.cardSurfaceElevated, in: RoundedRectangle(cornerRadius: AppDesign.cornerRadiusLarge, style: .continuous))
-            .elevation(AppDesign.Elevation.medium)
-            .accessibilityElement(children: .combine)
-            .accessibilityLabel("Route preview. Choose a starting point to see the route take shape.")
-        } else {
-            RoutePlanningMapPreview(
-                origin: form.origin,
-                destination: form.destination,
-                usesCurrentLocation: form.usesCurrentLocation,
-                showsCurrentLocation: shouldShowCurrentLocationOnMap,
-                summary: $mapPreview
-            )
-            .allowsHitTesting(false)
-            .frame(height: 248)
-            .background(AppDesign.cardSurfaceElevated)
-            .clipShape(RoundedRectangle(cornerRadius: AppDesign.cornerRadiusLarge, style: .continuous))
-            .elevation(AppDesign.Elevation.high)
-            .accessibilityLabel(mapPreview?.accessibilityLabel ?? "Route map")
+        RoutePlanningMapPreview(
+            origin: form.origin,
+            destination: form.destination,
+            usesCurrentLocation: form.usesCurrentLocation,
+            showsCurrentLocation: shouldShowCurrentLocationOnMap,
+            summary: $mapPreview
+        )
+        .allowsHitTesting(mapPreview != nil)
+        .frame(height: 250)
+        .background(AppDesign.cardSurfaceElevated)
+        .clipShape(RoundedRectangle(cornerRadius: AppDesign.cornerRadiusLarge, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: AppDesign.cornerRadiusLarge, style: .continuous)
+                .stroke(AppDesign.cardStroke, lineWidth: 0.5)
         }
+        .elevation(AppDesign.Elevation.medium)
+        .accessibilityLabel(mapPreviewAccessibilityLabel)
+        .accessibilityHint(mapPreview == nil ? "Enter a route to preview it" : "Pan or zoom to inspect the route")
+    }
+
+    private func mapSummaryRow(_ summary: RoutePlanningMapSummary) -> some View {
+        HStack(spacing: AppDesign.space8) {
+            Image(systemName: "car.fill")
+                .foregroundStyle(AppDesign.accent)
+            Text(summary.displayText)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(AppDesign.Ink.primary)
+            Spacer(minLength: AppDesign.space8)
+            Text("Apple Maps estimate")
+                .font(.caption)
+                .foregroundStyle(AppDesign.Ink.secondary)
+        }
+        .padding(.horizontal, AppDesign.space4)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(summary.accessibilityLabel)
     }
 
     private var recentRoutesSection: some View {
@@ -477,17 +529,43 @@ struct HomeView: View {
     }
 
     private var routeChecksSection: some View {
-        VStack(alignment: .leading, spacing: AppDesign.space16) {
-            RailHeader(title: "What Roam checks")
+        Button {
+            showingHowRoamWorks = true
+        } label: {
+            HStack(spacing: AppDesign.space12) {
+                Image(systemName: "info.circle")
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(AppDesign.accent)
+                    .frame(width: 36, height: 36)
+                    .background(AppDesign.accent.opacity(0.12), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
 
-            FlowLayout(spacing: AppDesign.space8) {
-                RouteCheckPill(symbol: "car.2.fill", title: "Traffic")
-                RouteCheckPill(symbol: "arrow.triangle.merge", title: "Merges")
-                RouteCheckPill(symbol: "cloud.sun.rain.fill", title: "Conditions")
+                Text("How Roam works")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(AppDesign.Ink.primary)
+
+                Spacer(minLength: AppDesign.space8)
+
+                Text("8 factors")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(AppDesign.Ink.secondary)
+
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(AppDesign.Ink.tertiary)
             }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 11)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(PressableScaleStyle())
+        .background(AppDesign.cardSurface, in: RoundedRectangle(cornerRadius: AppDesign.cornerRadius, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: AppDesign.cornerRadius, style: .continuous)
+                .stroke(AppDesign.cardStroke, lineWidth: 0.75)
         }
         .padding(.top, AppDesign.space4)
         .padding(.bottom, AppDesign.space8)
+        .accessibilityHint("Shows route inputs, scoring, privacy, and limitations")
     }
 
     private func errorBanner(_ message: String) -> some View {
@@ -625,24 +703,6 @@ private struct RoutePlanningFieldIcon: View {
             .foregroundStyle(tint)
             .frame(width: 36, height: 44)
             .accessibilityHidden(true)
-    }
-}
-
-private struct RouteCheckPill: View {
-    @ObservedObject private var theme = ThemeManager.shared
-    let symbol: String
-    let title: String
-
-    var body: some View {
-        Label(title, systemImage: symbol)
-            .font(.subheadline.weight(.semibold))
-            .foregroundStyle(AppDesign.Ink.secondary)
-            .lineLimit(2)
-            .fixedSize(horizontal: false, vertical: true)
-            .padding(.horizontal, 14)
-            .padding(.vertical, 10)
-            .background(AppDesign.cardSurface, in: Capsule())
-            .elevation(AppDesign.Elevation.low)
     }
 }
 

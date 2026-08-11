@@ -462,7 +462,7 @@ final class DriveSessionManager: NSObject, ObservableObject {
                 attemptedAt: Date(),
                 durationSeconds: 0,
                 retryCount: currentAnalysis.retryCount ?? 0,
-                outcome: .other("Not attempted — no signed-in account")
+                outcome: .other("Not attempted: no signed-in account")
             )
             replaceSavedDrive(
                 id: drive.id,

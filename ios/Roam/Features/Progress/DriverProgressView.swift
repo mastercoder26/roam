@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 /// A private view of measured driving evidence and a route-adjusted coaching
 /// score. It is never a safety guarantee, driving permission, or ranking.
@@ -6,6 +7,8 @@ struct DriverProgressView: View {
     @ObservedObject private var theme = ThemeManager.shared
     @EnvironmentObject private var session: DriveSessionManager
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.showDriveTab) private var showDriveTab
+    @State private var showsMeasurementDetails = false
 
     private var summary: DriverProgressSummary {
         DriverProgressEngine.makeSummary(from: session.recordedDrives)
@@ -31,19 +34,16 @@ struct DriverProgressView: View {
                 VStack(alignment: .leading, spacing: AppDesign.sectionSpacing) {
                     ScreenHeader(
                         title: "Progress",
-                        symbol: "chart.line.uptrend.xyaxis",
-                        subtitle: "Coaching built from what you've actually driven."
+                        symbol: "chart.line.uptrend.xyaxis"
                     )
                     overallScoreCard
 
                     if summary.hasRecordedEvidence {
-                        evidenceSummary
+                        progressOverview
                         if hasThinRecordedHistory {
                             thinEvidenceState
                         }
-                        weeklyChart
-                        coverageSection
-                        measurementNote
+                        measurementDetailsDisclosure
                     } else {
                         emptyEvidenceState
                     }
@@ -55,7 +55,7 @@ struct DriverProgressView: View {
                 .padding(.horizontal, AppDesign.contentPadding)
                 .padding(.vertical, 12)
             }
-            .background(AppDesign.canvas)
+            .background(AppCanvasBackground())
             .toolbar(.hidden, for: .navigationBar)
         }
     }
@@ -114,18 +114,12 @@ struct DriverProgressView: View {
         }
         .padding(AppDesign.cardPadding)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            LinearGradient(
-                colors: [AppDesign.accent.opacity(0.16), AppDesign.cardSurface],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            ),
-            in: RoundedRectangle(cornerRadius: AppDesign.cornerRadiusLarge, style: .continuous)
-        )
+        .background(AppDesign.cardSurfaceElevated, in: RoundedRectangle(cornerRadius: AppDesign.cornerRadiusLarge, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: AppDesign.cornerRadiusLarge, style: .continuous)
                 .stroke(AppDesign.accent.opacity(0.24), lineWidth: 1)
         }
+        .elevation(AppDesign.Elevation.hero)
     }
 
     @ViewBuilder
@@ -160,13 +154,27 @@ struct DriverProgressView: View {
                 .font(.footnote)
                 .foregroundStyle(AppDesign.Ink.secondary)
                 .fixedSize(horizontal: false, vertical: true)
+
+            Button {
+                UISelectionFeedbackGenerator().selectionChanged()
+                showDriveTab()
+            } label: {
+                Label("Record your first drive", systemImage: "steeringwheel")
+                    .font(.subheadline.weight(.semibold))
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .foregroundStyle(AppDesign.primarySurfaceForeground)
+                    .background(AppDesign.Ink.primary, in: RoundedRectangle(cornerRadius: AppDesign.cornerRadiusSmall, style: .continuous))
+            }
+            .buttonStyle(PressableScaleStyle())
+            .accessibilityHint("Opens the Drive tab")
         }
         .premiumCard()
     }
 
-    private var evidenceSummary: some View {
+    private var progressOverview: some View {
         VStack(alignment: .leading, spacing: AppDesign.space12) {
-            SectionHeader(title: "Recorded evidence", subtitle: "Only qualifying local drives are included.")
+            SectionHeader(title: "Measured miles")
 
             ViewThatFits(in: .horizontal) {
                 HStack(spacing: 12) {
@@ -176,6 +184,13 @@ struct DriverProgressView: View {
                     metrics
                 }
             }
+
+            Divider()
+
+            WeeklyMilesChart(weeks: summary.weeklyMeasuredMiles)
+                .animation(reduceMotion ? .easeOut(duration: 0.16) : AppAnimation.content, value: summary.weeklyMeasuredMiles)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(chartAccessibilitySummary)
         }
         .premiumCard()
     }
@@ -200,21 +215,9 @@ struct DriverProgressView: View {
         .background(AppDesign.accent.opacity(0.08), in: RoundedRectangle(cornerRadius: AppDesign.cornerRadiusSmall, style: .continuous))
     }
 
-    private var weeklyChart: some View {
-        VStack(alignment: .leading, spacing: AppDesign.space12) {
-            SectionHeader(title: "Measured miles", subtitle: "The last eight calendar weeks.")
-
-            WeeklyMilesChart(weeks: summary.weeklyMeasuredMiles)
-                .animation(reduceMotion ? .easeOut(duration: 0.16) : AppAnimation.content, value: summary.weeklyMeasuredMiles)
-                .accessibilityElement(children: .ignore)
-                .accessibilityLabel(chartAccessibilitySummary)
-        }
-        .premiumCard()
-    }
-
     private var coverageSection: some View {
         VStack(alignment: .leading, spacing: AppDesign.space12) {
-            SectionHeader(title: "Measurement coverage", subtitle: "What the qualifying GPS trace has actually captured.")
+            SectionHeader(title: "Measurement coverage")
 
             ProgressCoverageRow(
                 title: "After-dark miles",
@@ -237,7 +240,59 @@ struct DriverProgressView: View {
                 symbol: "point.3.connected.trianglepath.dotted"
             )
         }
-        .premiumCard()
+    }
+
+    private var measurementDetailsDisclosure: some View {
+        VStack(alignment: .leading, spacing: showsMeasurementDetails ? AppDesign.space12 : 0) {
+            Button {
+                withAnimation(reduceMotion ? .easeOut(duration: 0.16) : AppAnimation.content) {
+                    showsMeasurementDetails.toggle()
+                }
+            } label: {
+                HStack(spacing: AppDesign.space12) {
+                    Image(systemName: "scope")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(AppDesign.Ink.secondary)
+                        .frame(width: 34, height: 34)
+                        .background(AppDesign.trackSurface, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Measurement details")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(AppDesign.Ink.primary)
+                        Text("Night, speed, continuity, and privacy")
+                            .font(.caption)
+                            .foregroundStyle(AppDesign.Ink.secondary)
+                    }
+
+                    Spacer(minLength: AppDesign.space8)
+
+                    Image(systemName: "chevron.down")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(AppDesign.Ink.tertiary)
+                        .rotationEffect(.degrees(showsMeasurementDetails ? 180 : 0))
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(PressableScaleStyle())
+            .accessibilityLabel("Measurement details")
+            .accessibilityValue(showsMeasurementDetails ? "Expanded" : "Collapsed")
+            .accessibilityHint(showsMeasurementDetails ? "Hides measurement coverage" : "Shows measurement coverage")
+
+            if showsMeasurementDetails {
+                Divider()
+                coverageSection
+                    .transition(reduceMotion ? .opacity : .opacity.combined(with: .move(edge: .top)))
+                measurementNote
+                    .transition(.opacity)
+            }
+        }
+        .padding(14)
+        .background(AppDesign.cardSurface, in: RoundedRectangle(cornerRadius: AppDesign.cornerRadius, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: AppDesign.cornerRadius, style: .continuous)
+                .stroke(AppDesign.cardStroke, lineWidth: 0.75)
+        }
     }
 
     private var measurementNote: some View {

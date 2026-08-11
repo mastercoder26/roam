@@ -5,6 +5,7 @@ struct DriveView: View {
     @EnvironmentObject private var session: DriveSessionManager
     @EnvironmentObject private var authSession: AuthSessionStore
     @State private var showingHelp = false
+    @State private var showingBreakPlanner = false
     @State private var presentationState = DrivePresentationState()
     @State private var transitionToken = UUID()
     @State private var routeOrigin = ""
@@ -40,7 +41,7 @@ struct DriveView: View {
                         .id("drive-recording-surface")
 
                     if showsSupportingContent {
-                        breakPlanningCard
+                        breakPlanningEntry
                         if session.queuedPracticeRoute != nil {
                             practiceRouteReadyCard
                                 .transition(reduceMotion ? .opacity : .opacity.combined(with: .move(edge: .top)))
@@ -53,8 +54,6 @@ struct DriveView: View {
                                     .transition(reduceMotion ? .opacity : .opacity.combined(with: .move(edge: .top)))
                             }
                             DriveScoreCard(score: score)
-                        } else {
-                            howItWorksCard
                         }
 
                         if !session.recordedDrives.isEmpty {
@@ -73,7 +72,7 @@ struct DriveView: View {
             .scrollDisabled(isTransitioningDriveSurface)
             // Avoid wrapping ScrollView in GeometryReader — that ignores the
             // top wordmark safe-area inset and clips the start-drive card.
-            .background(AppDesign.canvas)
+            .background(AppCanvasBackground())
             .background {
                 GeometryReader { geometry in
                     Color.clear
@@ -110,6 +109,27 @@ struct DriveView: View {
             DriveHelpSheet()
                 .presentationDetents([.medium])
                 .presentationDragIndicator(.visible)
+        }
+        .sheet(isPresented: $showingBreakPlanner) {
+            NavigationStack {
+                ScrollView {
+                    breakPlanningCard
+                        .padding(.horizontal, AppDesign.contentPadding)
+                        .padding(.vertical, AppDesign.space16)
+                }
+                .scrollDismissesKeyboard(.interactively)
+                .background(AppCanvasBackground())
+                .navigationTitle("Recovery stop")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Done") { showingBreakPlanner = false }
+                            .fontWeight(.semibold)
+                    }
+                }
+            }
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
         }
         .onAppear {
             if usesCurrentRouteOrigin, routeOrigin.isEmpty {
@@ -190,10 +210,6 @@ struct DriveView: View {
                     .font(AppDesign.Typography.display)
                     .tracking(-0.9)
                     .foregroundStyle(AppDesign.Ink.primary)
-                Text("Record a drive or review your history.")
-                    .font(.footnote)
-                    .foregroundStyle(AppDesign.Ink.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
             }
 
             Spacer(minLength: AppDesign.space8)
@@ -217,13 +233,69 @@ struct DriveView: View {
     }
 
 
+    private var breakPlanningEntry: some View {
+        Button {
+            showingBreakPlanner = true
+        } label: {
+            HStack(spacing: AppDesign.space12) {
+                Image(systemName: "cup.and.saucer")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(AppDesign.Ink.secondary)
+                    .frame(width: 34, height: 34)
+                    .background(AppDesign.trackSurface, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Plan a recovery stop")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(AppDesign.Ink.primary)
+                    Text(plannedBreakRoute == nil ? "Optional for longer drives" : "Recommendation ready")
+                        .font(.caption)
+                        .foregroundStyle(plannedBreakRoute == nil ? AppDesign.Ink.secondary : AppDesign.positive)
+                }
+
+                Spacer(minLength: AppDesign.space8)
+
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(AppDesign.Ink.tertiary)
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 11)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(PressableScaleStyle())
+        .background(AppDesign.cardSurface, in: RoundedRectangle(cornerRadius: AppDesign.cornerRadius, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: AppDesign.cornerRadius, style: .continuous)
+                .stroke(AppDesign.cardStroke, lineWidth: 0.75)
+        }
+        .accessibilityLabel("Plan a recovery stop")
+        .accessibilityValue(plannedBreakRoute == nil ? "Optional" : "Recommendation ready")
+        .accessibilityHint("Opens break timing options")
+    }
+
     private var breakPlanningCard: some View {
         VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .top, spacing: AppDesign.space12) {
+                IconTile(symbol: "cup.and.saucer.fill", color: AppDesign.safety, size: 42)
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Plan a recovery stop")
+                        .font(AppDesign.Typography.sectionTitle)
+                        .foregroundStyle(AppDesign.Ink.primary)
+                    Text("Preview a sensible place to pause before a longer drive.")
+                        .font(.footnote)
+                        .foregroundStyle(AppDesign.Ink.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+
             AddressSearchField(
                 title: "Break-plan destination",
                 placeholder: "Where are you driving?",
                 systemImage: "magnifyingglass",
                 iconColor: .secondary,
+                maximumSuggestions: 1,
                 text: $routeDestination
             )
             .padding(.horizontal, 14)
@@ -264,6 +336,7 @@ struct DriveView: View {
                         placeholder: "Enter starting address",
                         systemImage: "circle.fill",
                         iconColor: AppDesign.accent,
+                        maximumSuggestions: 1,
                         text: $routeOrigin
                     )
                     .transition(reduceMotion ? .opacity : .opacity.combined(with: .move(edge: .top)))
@@ -497,6 +570,11 @@ struct DriveView: View {
                     .padding(.horizontal, AppDesign.contentPadding)
                     .padding(.bottom, CGFloat(DrivePresentationEngine.activeButtonBottomInset))
             } else {
+                Text(actionShowsEnd ? "FINISHING DRIVE" : "READY TO RECORD")
+                    .font(AppDesign.Typography.microLabel)
+                    .tracking(1.1)
+                    .foregroundStyle(AppDesign.Ink.label)
+
                 FlipClock(elapsed: session.elapsed, style: .preview)
                     .matchedGeometryEffect(id: DriveTransitionID.clock, in: driveTransition)
 
@@ -519,13 +597,14 @@ struct DriveView: View {
         // back to the compact position. That keeps the reverse path vertical.
         .frame(height: keepsFocusedCanvas ? expandedHeight : nil, alignment: .top)
         .background(
-            RoundedRectangle(cornerRadius: keepsFocusedCanvas ? 0 : 24, style: .continuous)
+            RoundedRectangle(cornerRadius: keepsFocusedCanvas ? 0 : AppDesign.cornerRadiusLarge, style: .continuous)
                 .fill(isFocusedCanvas ? AppDesign.canvas : AppDesign.cardSurfaceElevated)
         )
         .overlay {
-            RoundedRectangle(cornerRadius: keepsFocusedCanvas ? 0 : 24, style: .continuous)
-                .stroke(isFocusedCanvas ? .clear : AppDesign.cardStroke, lineWidth: 1)
+            RoundedRectangle(cornerRadius: keepsFocusedCanvas ? 0 : AppDesign.cornerRadiusLarge, style: .continuous)
+                .stroke(isFocusedCanvas ? .clear : AppDesign.cardStroke, lineWidth: 0.5)
         }
+        .elevation(keepsFocusedCanvas ? (radius: 0, y: 0, opacity: 0) : AppDesign.Elevation.medium)
         .accessibilityElement(children: .contain)
         .accessibilityLabel(actionShowsEnd ? "Drive in progress" : "Manual drive")
     }
@@ -646,20 +725,9 @@ struct DriveView: View {
         }
     }
 
-    private var howItWorksCard: some View {
-        VStack(alignment: .leading, spacing: AppDesign.space12) {
-            SectionHeader(title: "What gets measured", subtitle: "A first-pass, on-device drive score.")
-            Label("GPS speed changes flag hard braking and rapid acceleration.", systemImage: "location.fill")
-            Label("Flags sustained motion and rotation while driving.", systemImage: "waveform.path.ecg")
-        }
-        .font(.footnote)
-        .foregroundStyle(AppDesign.Ink.secondary)
-        .premiumCard()
-    }
-
     private var driveHistory: some View {
         VStack(alignment: .leading, spacing: AppDesign.space12) {
-            SectionHeader(title: "Past drives", subtitle: "Touch and hold to delete.")
+            SectionHeader(title: "Past drives")
             ForEach(session.recordedDrives) { drive in
                 NavigationLink {
                     DriveDetailView(drive: drive)

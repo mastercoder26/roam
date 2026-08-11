@@ -169,31 +169,12 @@ struct LaunchIntroView: View {
     /// depth without becoming a recognizable shape that competes with the
     /// wordmark.
     private var atmosphere: some View {
-        ZStack {
-            MapGridTexture()
-            glow(color: AppDesign.accent, offset: CGSize(width: -90, height: -140), size: 300)
-            glow(color: AppDesign.safety, offset: CGSize(width: 110, height: 170), size: 340)
-        }
+        MapGridTexture()
         .opacity(isLockupVisible ? 1 : 0.35)
         .scaleEffect(isLockupVisible ? 1 : 0.9)
         .animation(reduceMotion ? .easeOut(duration: 0.3) : AppAnimation.reveal, value: isLockupVisible)
         .ignoresSafeArea()
         .accessibilityHidden(true)
-    }
-
-    private func glow(color: Color, offset: CGSize, size: CGFloat) -> some View {
-        Circle()
-            .fill(
-                RadialGradient(
-                    colors: [color.opacity(0.28), color.opacity(0)],
-                    center: .center,
-                    startRadius: 0,
-                    endRadius: size / 2
-                )
-            )
-            .frame(width: size, height: size)
-            .offset(offset)
-            .blur(radius: 24)
     }
 
     private var lockup: some View {
@@ -347,11 +328,7 @@ private struct RoadTrace: View {
             roadPath
                 .trim(from: 0, to: traceProgress)
                 .stroke(
-                    LinearGradient(
-                        colors: [AppDesign.accent, AppDesign.safety],
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    ),
+                    AppDesign.accent,
                     style: StrokeStyle(lineWidth: 8, lineCap: .round)
                 )
                 .shadow(color: AppDesign.accent.opacity(0.45), radius: 12)
@@ -472,69 +449,10 @@ private struct SweptWordmark: View {
     let sweepProgress: Double
     let reduceMotion: Bool
 
-    @State private var shineProgress: Double = -0.4
-
     var body: some View {
-        ZStack {
-            BrandWordmark()
-                .opacity(0.16)
-
-            BrandWordmark()
-                .overlay {
-                    LinearGradient(
-                        colors: [AppDesign.accent, AppDesign.safety],
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    )
-                    .blendMode(.overlay)
-                    .allowsHitTesting(false)
-                }
-                .mask(alignment: .center) { litMask }
-                .overlay { shine }
-        }
+        BrandWordmark()
+            .opacity(0.16 + (0.84 * sweepProgress))
         .scaleEffect(reduceMotion ? 1 : 0.98 + 0.02 * sweepProgress)
-        .onChange(of: sweepProgress) { _, progress in
-            guard progress >= 1, !reduceMotion else { return }
-            withAnimation(.easeIn(duration: LaunchIntroChoreography.shineDuration)) {
-                shineProgress = 1.4
-            }
-        }
-    }
-
-    /// A narrow, brighter glint that crosses the now-lit wordmark once —
-    /// the specular pass that reads as polish rather than a flat fill.
-    private var shine: some View {
-        LinearGradient(
-            stops: [
-                .init(color: .white.opacity(0), location: 0),
-                .init(color: .white.opacity(0.55), location: 0.5),
-                .init(color: .white.opacity(0), location: 1)
-            ],
-            startPoint: .leading,
-            endPoint: .trailing
-        )
-        .rotationEffect(.degrees(18))
-        .offset(x: shineProgress * 220)
-        .blendMode(.plusLighter)
-        .mask(alignment: .center) { litMask }
-        .allowsHitTesting(false)
-    }
-
-    /// Opaque behind the band, transparent ahead of it, with a soft edge
-    /// between. `sweepEdges` keeps the stops ordered and inside 0...1.
-    private var litMask: some View {
-        let edges = LaunchIntroChoreography.sweepEdges(progress: sweepProgress)
-
-        return LinearGradient(
-            stops: [
-                .init(color: .black, location: edges.trailing),
-                .init(color: .black.opacity(0.35), location: (edges.trailing + edges.leading) / 2),
-                .init(color: .clear, location: edges.leading),
-                .init(color: .clear, location: 1)
-            ],
-            startPoint: .leading,
-            endPoint: .trailing
-        )
     }
 }
 

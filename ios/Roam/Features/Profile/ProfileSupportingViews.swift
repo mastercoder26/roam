@@ -104,10 +104,7 @@ struct MilestonesSection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: AppDesign.space12) {
-            SectionHeader(
-                title: "Goals",
-                subtitle: "Progress toward your current stage."
-            )
+            SectionHeader(title: "Goals")
 
             ForEach(milestones) { milestone in
                 MilestoneRow(milestone: milestone)
@@ -165,10 +162,7 @@ struct ExperienceBreakdownSection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: AppDesign.space12) {
-            SectionHeader(
-                title: "Measured experience",
-                subtitle: "From qualifying drives recorded on this device."
-            )
+            SectionHeader(title: "Measured experience")
 
             if insights.hasEvidence {
                 StatRow(title: "Measured miles", value: String(format: "%.1f mi", insights.measuredMiles), symbol: "road.lanes")
@@ -200,10 +194,7 @@ struct BehaviorSignalsSection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: AppDesign.space12) {
-            SectionHeader(
-                title: "Driving behavior",
-                subtitle: "Signals from analyzed drives."
-            )
+            SectionHeader(title: "Driving behavior")
 
             StatRow(title: "Overall driving score", value: formattedWholeScore(insights.performanceScore), symbol: "gauge.with.dots.needle.50percent")
             StatRow(title: "Recent average score", value: formattedAverageScore(insights.recentAverageScore), symbol: "chart.line.uptrend.xyaxis")
@@ -245,10 +236,7 @@ struct WeeklyTrendSection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: AppDesign.space12) {
-            SectionHeader(
-                title: "Weekly trend",
-                subtitle: "Measured miles across the last eight calendar weeks."
-            )
+            SectionHeader(title: "Weekly trend")
 
             if insights.hasEvidence {
                 weeklyChart

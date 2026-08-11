@@ -8,6 +8,7 @@ struct AddressSearchField: View {
     let systemImage: String
     var iconColor: Color = .secondary
     var showsIcon = true
+    var maximumSuggestions = 2
     @Binding var text: String
     var onSuggestionsVisibilityChanged: ((Bool) -> Void)?
 
@@ -46,7 +47,7 @@ struct AddressSearchField: View {
                     .padding(.leading, showsIcon ? 32 : 0)
                     .transition(.opacity)
 
-                ForEach(Array(completer.suggestions.prefix(4).enumerated()), id: \.offset) { _, suggestion in
+                ForEach(Array(completer.suggestions.prefix(maximumSuggestions).enumerated()), id: \.offset) { _, suggestion in
                     Button {
                         text = suggestion.title + (suggestion.subtitle.isEmpty ? "" : ", \(suggestion.subtitle)")
                         completer.clear()
@@ -63,7 +64,7 @@ struct AddressSearchField: View {
                             }
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.vertical, 8)
+                        .padding(.vertical, 7)
                         .padding(.leading, showsIcon ? 32 : 0)
                     }
                     .buttonStyle(.plain)

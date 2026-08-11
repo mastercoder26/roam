@@ -18,13 +18,13 @@ struct RouteAnalysisDebugInfo: Equatable {
             case .success:
                 return "200 OK"
             case let .httpError(statusCode, message):
-                return "HTTP \(statusCode)" + (message.map { " — \($0)" } ?? "")
+                return "HTTP \(statusCode)" + (message.map { ": \($0)" } ?? "")
             case let .unauthorized(message):
-                return "Unauthorized — \(message)"
+                return "Unauthorized: \(message)"
             case let .networkError(message):
-                return "Network error — \(message)"
+                return "Network error: \(message)"
             case let .decodingError(message):
-                return "Decode error — \(message)"
+                return "Decode error: \(message)"
             case let .other(message):
                 return message
             }

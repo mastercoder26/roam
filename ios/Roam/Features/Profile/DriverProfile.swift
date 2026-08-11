@@ -55,14 +55,6 @@ enum ProfileHomeSection: String, CaseIterable, Identifiable {
         }
     }
 
-    var subtitle: String? {
-        switch self {
-        case .explore: "Your progress and driving patterns."
-        case .appearance: "Make Roam feel like yours."
-        case .account: "Sync and security."
-        }
-    }
-
     var folders: [ProfileFolder] {
         switch self {
         case .explore: [.progress, .drivingInsights]

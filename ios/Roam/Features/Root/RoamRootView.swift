@@ -2,6 +2,25 @@ import SwiftUI
 import UIKit
 import ClerkKit
 
+struct ShowDriveTabAction {
+    let perform: () -> Void
+
+    func callAsFunction() {
+        perform()
+    }
+}
+
+private struct ShowDriveTabActionKey: EnvironmentKey {
+    static let defaultValue = ShowDriveTabAction(perform: {})
+}
+
+extension EnvironmentValues {
+    var showDriveTab: ShowDriveTabAction {
+        get { self[ShowDriveTabActionKey.self] }
+        set { self[ShowDriveTabActionKey.self] = newValue }
+    }
+}
+
 struct RoamRootView: View {
     @ObservedObject private var theme = ThemeManager.shared
     private enum AppTab: String, CaseIterable, Identifiable {
@@ -45,11 +64,10 @@ struct RoamRootView: View {
                 topBrandBar
             }
 
-            // The system TabView on iOS 26 already renders a genuine Liquid
-            // Glass bar and minimizes it to a compact capsule on scroll —
-            // `tabBarMinimizeBehavior` is Apple's own "stash while reading"
-            // affordance, so there's no hand-rolled glass shape or scroll
-            // tracker left to fight with it.
+            // Keep the four destinations stable. The minimized iOS 26 bar can
+            // retain only the selected icon while a nested NavigationStack is
+            // scrolling, which obscures content and makes switching tabs much
+            // harder precisely when someone is reading a detail screen.
             TabView(selection: $selectedTab) {
                 Tab(AppTab.routes.title, systemImage: AppTab.routes.symbol, value: AppTab.routes) {
                     HomeView(form: routeForm)
@@ -64,8 +82,16 @@ struct RoamRootView: View {
                     ProfileView()
                 }
             }
-            .tabBarMinimizeBehavior(.onScrollDown)
+            .tabBarMinimizeBehavior(.never)
             .toolbar(driveSession.isRecording ? .hidden : .visible, for: .tabBar)
+            .environment(
+                \.showDriveTab,
+                ShowDriveTabAction {
+                    withAnimation(AppAnimation.tabSwitch) {
+                        selectedTab = .drive
+                    }
+                }
+            )
         }
         .environmentObject(driveSession)
         .environmentObject(themeManager)
