@@ -7,6 +7,8 @@ struct LayoutResponsivenessChecks {
         inlineControlsStackForNarrowOrLargeTextLayouts()
         routePlanningTitleUsesItsCompactTextStyleAtAccessibilitySizes()
         loadingSceneNeverOutgrowsTheAvailableWidth()
+        dashboardMetricsStackBeforeTheyBecomeUnreadable()
+        cadenceDaysKeepUsableTapTargets()
 
         print("Layout responsiveness checks passed")
     }
@@ -54,6 +56,32 @@ struct LayoutResponsivenessChecks {
         expect(
             LayoutResponsiveness.loadingSceneWidth(availableWidth: 430, horizontalPadding: 28) == 320,
             "the loading illustration should preserve its intended maximum size on regular phones"
+        )
+    }
+
+    private static func dashboardMetricsStackBeforeTheyBecomeUnreadable() {
+        expect(
+            LayoutResponsiveness.stacksDashboardMetrics(availableWidth: 300, usesLargeText: false),
+            "number-first dashboard metrics should stack on narrow phones"
+        )
+        expect(
+            !LayoutResponsiveness.stacksDashboardMetrics(availableWidth: 390, usesLargeText: false),
+            "dashboard metrics should retain their compact horizontal strip at regular widths"
+        )
+        expect(
+            LayoutResponsiveness.stacksDashboardMetrics(availableWidth: 390, usesLargeText: true),
+            "large Dynamic Type should stack dashboard metrics"
+        )
+    }
+
+    private static func cadenceDaysKeepUsableTapTargets() {
+        expect(
+            LayoutResponsiveness.cadenceDayWidth(availableWidth: 320) == 40,
+            "the seven-day cadence should preserve a 40-point visual target on narrow phones"
+        )
+        expect(
+            LayoutResponsiveness.cadenceDayWidth(availableWidth: 430) == 44,
+            "the cadence should grow to the standard 44-point target when space allows"
         )
     }
 
