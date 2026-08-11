@@ -20,6 +20,7 @@ struct ProfileView: View {
 
     @State private var showingThemePicker = false
     @State private var showingAppIconPicker = false
+    @State private var showingFeatureWalkthrough = false
     @State private var showingDeleteConfirmation = false
     @State private var authIsPresented = false
     @State private var accountError: String?
@@ -103,6 +104,9 @@ struct ProfileView: View {
         }
         .sheet(isPresented: $showingAppIconPicker) {
             AppIconPickerSheet(iconManager: appIcon)
+        }
+        .sheet(isPresented: $showingFeatureWalkthrough) {
+            FeatureWalkthroughSheet()
         }
         .sheet(isPresented: $authIsPresented) {
             AuthView()
@@ -702,12 +706,46 @@ struct ProfileView: View {
 
     private var preferencesCard: some View {
         VStack(spacing: 0) {
+            walkthroughCard
+            Divider()
+                .padding(.leading, 46)
             appearanceCard
             Divider()
                 .padding(.leading, 46)
             appIconCard
         }
         .premiumCard()
+    }
+
+    private var walkthroughCard: some View {
+        Button {
+            showingFeatureWalkthrough = true
+        } label: {
+            HStack(spacing: AppDesign.space12) {
+                IconTile(symbol: "sparkles")
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Explore Roam")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(AppDesign.Ink.primary)
+                    Text("A quick guide to every feature")
+                        .font(.caption)
+                        .foregroundStyle(AppDesign.Ink.secondary)
+                }
+
+                Spacer(minLength: 8)
+
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(AppDesign.Ink.tertiary)
+            }
+            .frame(minHeight: 44)
+        }
+        .buttonStyle(PressableScaleStyle())
+        .padding(.vertical, AppDesign.space8)
+        .accessibilityLabel("Explore Roam")
+        .accessibilityHint("Opens a quick guide to every Roam feature")
+        .accessibilityIdentifier("settings.startWalkthrough")
     }
 
     private var appearanceCard: some View {

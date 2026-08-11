@@ -89,6 +89,8 @@
 		A100000000000000000000F2 /* ProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A200000000000000000000F2 /* ProfileView.swift */; };
 		A100000000000000000000F3 /* DriverProfileInsightsEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = A200000000000000000000F3 /* DriverProfileInsightsEngine.swift */; };
 		A100000000000000000000F4 /* ProfileSupportingViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = A200000000000000000000F4 /* ProfileSupportingViews.swift */; };
+		A100000000000000000000F5 /* FeatureWalkthroughSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A200000000000000000000F5 /* FeatureWalkthroughSheet.swift */; };
+		A100000000000000000000F6 /* FeatureWalkthrough.swift in Sources */ = {isa = PBXBuildFile; fileRef = A200000000000000000000F6 /* FeatureWalkthrough.swift */; };
 		A100000000000000000000F8 /* AuthSessionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A200000000000000000000F8 /* AuthSessionStore.swift */; };
 		A100000000000000000000FB /* DriveHistorySyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A200000000000000000000FB /* DriveHistorySyncService.swift */; };
 		C10000000000000000000001 /* ClerkBackendClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000001 /* ClerkBackendClient.swift */; };
@@ -212,6 +214,8 @@
 		A200000000000000000000F2 /* ProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileView.swift; sourceTree = "<group>"; };
 		A200000000000000000000F3 /* DriverProfileInsightsEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriverProfileInsightsEngine.swift; sourceTree = "<group>"; };
 		A200000000000000000000F4 /* ProfileSupportingViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileSupportingViews.swift; sourceTree = "<group>"; };
+		A200000000000000000000F5 /* FeatureWalkthroughSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeatureWalkthroughSheet.swift; sourceTree = "<group>"; };
+		A200000000000000000000F6 /* FeatureWalkthrough.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeatureWalkthrough.swift; sourceTree = "<group>"; };
 		A200000000000000000000F8 /* AuthSessionStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthSessionStore.swift; sourceTree = "<group>"; };
 		A200000000000000000000FB /* DriveHistorySyncService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriveHistorySyncService.swift; sourceTree = "<group>"; };
 		C20000000000000000000001 /* ClerkBackendClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClerkBackendClient.swift; sourceTree = "<group>"; };
@@ -343,6 +347,7 @@
 				A20000000000000000000027 /* SharedRouteImport.swift */,
 				A200000000000000000000F3 /* DriverProfileInsightsEngine.swift */,
 				A20000000000000000000045 /* RouteAnalysisDebugInfo.swift */,
+				A200000000000000000000F6 /* FeatureWalkthrough.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -473,6 +478,7 @@
 				A200000000000000000000F1 /* DriverProfile.swift */,
 				A200000000000000000000F2 /* ProfileView.swift */,
 				A200000000000000000000F4 /* ProfileSupportingViews.swift */,
+				A200000000000000000000F5 /* FeatureWalkthroughSheet.swift */,
 			);
 			path = Profile;
 			sourceTree = "<group>";
@@ -700,6 +706,8 @@
 				A100000000000000000000F2 /* ProfileView.swift in Sources */,
 				A100000000000000000000F3 /* DriverProfileInsightsEngine.swift in Sources */,
 				A100000000000000000000F4 /* ProfileSupportingViews.swift in Sources */,
+				A100000000000000000000F5 /* FeatureWalkthroughSheet.swift in Sources */,
+				A100000000000000000000F6 /* FeatureWalkthrough.swift in Sources */,
 				C10000000000000000000001 /* ClerkBackendClient.swift in Sources */,
 				A100000000000000000000F8 /* AuthSessionStore.swift in Sources */,
 				A100000000000000000000FB /* DriveHistorySyncService.swift in Sources */,
