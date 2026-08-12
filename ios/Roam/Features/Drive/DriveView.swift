@@ -557,6 +557,13 @@ struct DriveView: View {
 
                     activeSpeed
 
+                    DashboardMetricStrip(metrics: [
+                        DashboardMetric(value: String(format: "%.1f", session.distanceMeters / 1_609.344), label: "miles"),
+                        DashboardMetric(value: "\(session.acceptedLocationSamples)", label: "GPS samples"),
+                        DashboardMetric(value: "\(session.motionSamples)", label: "motion samples")
+                    ])
+                    .padding(.horizontal, AppDesign.contentPadding)
+
                     if session.phonePlacementAssessment == .needsAdjustment {
                         compactPlacementWarning
                             .transition(.opacity)
@@ -635,11 +642,12 @@ struct DriveView: View {
             .font(.headline)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 18)
-            .foregroundStyle(showsEnd ? AppDesign.dangerForeground : AppDesign.accentForeground)
+            .foregroundStyle(showsEnd ? AppDesign.dangerForeground : AppDesign.primarySurfaceForeground)
             .background(
-                RoundedRectangle(cornerRadius: AppDesign.cornerRadius, style: .continuous)
-                    .fill(showsEnd ? AppDesign.danger : AppDesign.accent)
+                Capsule()
+                    .fill(showsEnd ? AppDesign.danger : AppDesign.Ink.primary)
             )
+            .shadow(color: AppDesign.cardShadow.opacity(0.55), radius: 16, y: 7)
             // The fill is animated here rather than inherited so the accent →
             // red crossfade tracks the same spring as the travel downward.
             .animation(driveModeAnimation, value: showsEnd)

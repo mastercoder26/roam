@@ -70,6 +70,12 @@ struct ProfileView: View {
                     profileHeader
                     identityCard
 
+                    WeekCadenceStrip(
+                        title: "Driving rhythm",
+                        days: CadenceDay.recentWeek(completedDates: driveSession.recordedDrives.map(\.startedAt))
+                    )
+                    .animation(reduceMotion ? .easeOut(duration: 0.16) : AppAnimation.selection, value: driveSession.recordedDrives.map(\.id))
+
                     if driveSession.isRecording {
                         LiveDriveBanner(driveSession: driveSession)
                     }
@@ -526,13 +532,13 @@ struct ProfileView: View {
                     if isEditingIdentity {
                         TextField("Add your name", text: $profile.displayName)
                             .font(AppDesign.Typography.bodyEmphasized)
-                            .foregroundStyle(AppDesign.Ink.primary)
+                            .foregroundStyle(AppDesign.primarySurfaceForeground)
                             .padding(.horizontal, 10)
                             .padding(.vertical, 8)
-                            .background(AppDesign.cardSurfaceElevated, in: RoundedRectangle(cornerRadius: AppDesign.cornerRadiusSmall, style: .continuous))
+                            .background(AppDesign.primarySurfaceForeground.opacity(0.10), in: RoundedRectangle(cornerRadius: AppDesign.cornerRadiusSmall, style: .continuous))
                             .overlay {
                                 RoundedRectangle(cornerRadius: AppDesign.cornerRadiusSmall, style: .continuous)
-                                    .stroke(AppDesign.cardStrokeStrong, lineWidth: 1)
+                                    .stroke(AppDesign.primarySurfaceForeground.opacity(0.18), lineWidth: 1)
                             }
                             .textInputAutocapitalization(.words)
                             .submitLabel(.done)
@@ -545,12 +551,12 @@ struct ProfileView: View {
                     } else {
                         Text(profile.displayName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Add your name" : profile.resolvedDisplayName)
                             .font(.title3.weight(.semibold))
-                            .foregroundStyle(AppDesign.Ink.primary)
+                            .foregroundStyle(AppDesign.primarySurfaceForeground)
                     }
 
                     Text(profile.stage.title)
                         .font(.footnote)
-                        .foregroundStyle(AppDesign.Ink.secondary)
+                        .foregroundStyle(AppDesign.primarySurfaceForeground.opacity(0.64))
                 }
 
                 Spacer(minLength: 8)
@@ -570,9 +576,9 @@ struct ProfileView: View {
                     Image(systemName: isEditingIdentity ? "checkmark" : "pencil")
                         .font(.subheadline.weight(.semibold))
                         .contentTransition(.symbolEffect(.replace))
-                        .foregroundStyle(AppDesign.Ink.primary.opacity(0.88))
+                        .foregroundStyle(AppDesign.primarySurfaceForeground.opacity(0.88))
                         .frame(width: 36, height: 36)
-                        .background(AppDesign.Ink.primary.opacity(0.10), in: Circle())
+                        .background(AppDesign.primarySurfaceForeground.opacity(0.12), in: Circle())
                         .frame(minWidth: 44, minHeight: 44)
                         .contentShape(Rectangle())
                 }
@@ -586,7 +592,7 @@ struct ProfileView: View {
 
             persistenceErrorNote
 
-            Divider()
+            Divider().overlay(AppDesign.primarySurfaceForeground.opacity(0.18))
 
             if insights.hasEvidence {
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
@@ -594,29 +600,29 @@ struct ProfileView: View {
                         .font(.system(size: 34, weight: .bold, design: .rounded))
                         .tracking(-0.6)
                         .monospacedDigit()
-                        .foregroundStyle(AppDesign.Ink.primary)
+                        .foregroundStyle(AppDesign.primarySurfaceForeground)
                     Text("measured miles")
                         .font(.subheadline.weight(.medium))
-                        .foregroundStyle(AppDesign.Ink.secondary)
+                        .foregroundStyle(AppDesign.primarySurfaceForeground.opacity(0.64))
                 }
                 .accessibilityElement(children: .combine)
                 .accessibilityLabel("\(String(format: "%.1f", insights.measuredMiles)) measured miles")
             } else {
                 Text("No measured miles yet")
                     .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(AppDesign.Ink.secondary)
+                    .foregroundStyle(AppDesign.primarySurfaceForeground.opacity(0.64))
             }
         }
         .padding(AppDesign.space20)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background {
             RoundedRectangle(cornerRadius: AppDesign.cornerRadiusHero, style: .continuous)
-                .fill(AppDesign.cardSurfaceElevated)
+                .fill(AppDesign.Ink.primary)
         }
         .clipShape(RoundedRectangle(cornerRadius: AppDesign.cornerRadiusHero, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: AppDesign.cornerRadiusHero, style: .continuous)
-                .stroke(AppDesign.cardStrokeStrong, lineWidth: 0.75)
+                .stroke(AppDesign.primarySurfaceForeground.opacity(0.10), lineWidth: 0.75)
         }
         .elevation(AppDesign.Elevation.hero)
     }
@@ -631,9 +637,9 @@ struct ProfileView: View {
                     .font(.title.weight(.bold))
             }
         }
-        .foregroundStyle(AppDesign.accentForeground)
+        .foregroundStyle(AppDesign.Ink.primary)
         .frame(width: 64, height: 64)
-        .background(AppDesign.accent, in: Circle())
+        .background(AppDesign.primarySurfaceForeground, in: Circle())
         .overlay {
             Circle().stroke(AppDesign.canvas, lineWidth: 3)
         }
@@ -649,7 +655,7 @@ struct ProfileView: View {
         if let message = profile.lastPersistenceError {
             Label("Not saved on this device: \(message)", systemImage: "exclamationmark.circle")
                 .font(.caption2)
-                .foregroundStyle(AppDesign.Ink.tertiary)
+                .foregroundStyle(AppDesign.primarySurfaceForeground.opacity(0.58))
                 .accessibilityLabel("Your profile changes could not be saved. \(message)")
         }
     }

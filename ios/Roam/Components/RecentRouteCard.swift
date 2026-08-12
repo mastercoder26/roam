@@ -18,20 +18,12 @@ struct RecentRouteRow: View {
 
     var body: some View {
         Button(action: action) {
-            HStack(alignment: .top, spacing: AppDesign.space12) {
-                VStack(spacing: 3) {
-                    Circle()
-                        .fill(AppDesign.accent)
-                        .frame(width: 6, height: 6)
-                    Rectangle()
-                        .fill(AppDesign.cardStrokeStrong)
-                        .frame(width: 1.5)
-                    Circle()
-                        .fill(AppDesign.Ink.secondary)
-                        .frame(width: 6, height: 6)
-                }
-                .padding(.top, 5)
-                .frame(height: 34)
+            HStack(alignment: .center, spacing: AppDesign.space12) {
+                Text(entry.formattedScore)
+                    .font(.system(.title2, design: .rounded, weight: .bold))
+                    .monospacedDigit()
+                    .foregroundStyle(AppDesign.Ink.primary)
+                    .frame(width: 44, alignment: .leading)
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text(entry.origin)
@@ -51,22 +43,21 @@ struct RecentRouteRow: View {
 
                 Spacer(minLength: AppDesign.space8)
 
-                VStack(spacing: 2) {
-                    Text(entry.formattedScore)
-                        .font(.title3.weight(.bold))
-                        .monospacedDigit()
-                        .foregroundStyle(labelColor)
-                    Text(entry.label.rawValue)
-                        .font(.caption2.weight(.semibold))
-                        .foregroundStyle(AppDesign.Ink.secondary)
-                        .lineLimit(1)
-                }
-                .frame(width: 64)
-                .padding(.vertical, 8)
-                .background(labelColor.opacity(0.12), in: RoundedRectangle(cornerRadius: AppDesign.cornerRadiusTiny, style: .continuous))
+                Text(entry.label.rawValue)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(labelColor)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(labelColor.opacity(0.12), in: Capsule())
             }
             .padding(.horizontal, AppDesign.space16)
             .padding(.vertical, AppDesign.space12)
+            .background(AppDesign.cardSurface, in: RoundedRectangle(cornerRadius: AppDesign.cornerRadius, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: AppDesign.cornerRadius, style: .continuous)
+                    .stroke(AppDesign.cardStroke, lineWidth: 0.5)
+            }
+            .elevation(AppDesign.Elevation.low)
             .contentShape(Rectangle())
         }
         .buttonStyle(PressableScaleStyle())

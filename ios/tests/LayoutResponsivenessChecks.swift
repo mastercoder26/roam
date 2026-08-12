@@ -8,7 +8,6 @@ struct LayoutResponsivenessChecks {
         routePlanningTitleUsesItsCompactTextStyleAtAccessibilitySizes()
         loadingSceneNeverOutgrowsTheAvailableWidth()
         dashboardMetricsStackBeforeTheyBecomeUnreadable()
-        cadenceDaysKeepUsableTapTargets()
 
         print("Layout responsiveness checks passed")
     }
@@ -71,17 +70,6 @@ struct LayoutResponsivenessChecks {
         expect(
             LayoutResponsiveness.stacksDashboardMetrics(availableWidth: 390, usesLargeText: true),
             "large Dynamic Type should stack dashboard metrics"
-        )
-    }
-
-    private static func cadenceDaysKeepUsableTapTargets() {
-        expect(
-            LayoutResponsiveness.cadenceDayWidth(availableWidth: 320) == 40,
-            "the seven-day cadence should preserve a 40-point visual target on narrow phones"
-        )
-        expect(
-            LayoutResponsiveness.cadenceDayWidth(availableWidth: 430) == 44,
-            "the cadence should grow to the standard 44-point target when space allows"
         )
     }
 

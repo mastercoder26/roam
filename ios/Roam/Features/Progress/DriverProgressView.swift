@@ -38,6 +38,12 @@ struct DriverProgressView: View {
                     )
                     overallScoreCard
 
+                    WeekCadenceStrip(
+                        title: "This week",
+                        days: CadenceDay.recentWeek(completedDates: session.recordedDrives.map(\.startedAt))
+                    )
+                    .animation(reduceMotion ? .easeOut(duration: 0.16) : AppAnimation.selection, value: session.recordedDrives.map(\.id))
+
                     if summary.hasRecordedEvidence {
                         progressOverview
                         if hasThinRecordedHistory {
@@ -65,16 +71,17 @@ struct DriverProgressView: View {
             HStack(alignment: .top, spacing: 12) {
                 Image(systemName: "steeringwheel.and.heat.waves")
                     .font(.title3.weight(.semibold))
-                    .foregroundStyle(AppDesign.accent)
+                    .foregroundStyle(AppDesign.primarySurfaceForeground)
                     .frame(width: 42, height: 42)
-                    .background(AppDesign.accent.opacity(0.14), in: RoundedRectangle(cornerRadius: AppDesign.cornerRadiusSmall, style: .continuous))
+                    .background(AppDesign.primarySurfaceForeground.opacity(0.14), in: RoundedRectangle(cornerRadius: AppDesign.cornerRadiusSmall, style: .continuous))
 
                 VStack(alignment: .leading, spacing: 3) {
                     Text("Overall driving score")
                         .font(.headline)
+                        .foregroundStyle(AppDesign.primarySurfaceForeground)
                     Text(performance.evidence.title)
                         .font(.footnote.weight(.semibold))
-                        .foregroundStyle(AppDesign.accent)
+                        .foregroundStyle(AppDesign.primarySurfaceForeground.opacity(0.7))
                 }
                 Spacer(minLength: 8)
 
@@ -84,9 +91,10 @@ struct DriverProgressView: View {
                             .font(.system(size: 40, weight: .bold, design: .rounded))
                             .tracking(-1)
                             .monospacedDigit()
+                            .foregroundStyle(AppDesign.primarySurfaceForeground)
                         Text("/100")
                             .font(.caption.weight(.medium))
-                            .foregroundStyle(AppDesign.Ink.secondary)
+                            .foregroundStyle(AppDesign.primarySurfaceForeground.opacity(0.62))
                     }
                     .accessibilityLabel("Overall driving score \(score) out of 100")
                 }
@@ -94,7 +102,7 @@ struct DriverProgressView: View {
 
             if let score = performance.score {
                 ProgressView(value: Double(score), total: 100)
-                    .tint(score >= 78 ? AppDesign.positive : AppDesign.safety)
+                    .tint(AppDesign.primarySurfaceForeground)
                     .accessibilityHidden(true)
 
                 ViewThatFits(in: .horizontal) {
@@ -109,16 +117,12 @@ struct DriverProgressView: View {
 
             Text(performance.detail)
                 .font(.footnote)
-                .foregroundStyle(AppDesign.Ink.secondary)
+                .foregroundStyle(AppDesign.primarySurfaceForeground.opacity(0.68))
                 .fixedSize(horizontal: false, vertical: true)
         }
         .padding(AppDesign.cardPadding)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(AppDesign.cardSurfaceElevated, in: RoundedRectangle(cornerRadius: AppDesign.cornerRadiusLarge, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: AppDesign.cornerRadiusLarge, style: .continuous)
-                .stroke(AppDesign.accent.opacity(0.24), lineWidth: 1)
-        }
+        .background(AppDesign.Ink.primary, in: RoundedRectangle(cornerRadius: AppDesign.cornerRadiusLarge, style: .continuous))
         .elevation(AppDesign.Elevation.hero)
     }
 
@@ -176,14 +180,11 @@ struct DriverProgressView: View {
         VStack(alignment: .leading, spacing: AppDesign.space12) {
             SectionHeader(title: "Measured miles")
 
-            ViewThatFits(in: .horizontal) {
-                HStack(spacing: 12) {
-                    metrics
-                }
-                VStack(alignment: .leading, spacing: 14) {
-                    metrics
-                }
-            }
+            DashboardMetricStrip(metrics: [
+                DashboardMetric(value: String(format: "%.1f", summary.validatedMiles), label: "validated miles"),
+                DashboardMetric(value: "\(summary.qualifyingDriveCount)", label: "qualifying drives"),
+                DashboardMetric(value: "\(summary.qualifyingDriveDayCount)", label: "recorded days")
+            ])
 
             Divider()
 
@@ -193,13 +194,6 @@ struct DriverProgressView: View {
                 .accessibilityLabel(chartAccessibilitySummary)
         }
         .premiumCard()
-    }
-
-    @ViewBuilder
-    private var metrics: some View {
-        ProgressMetric(value: String(format: "%.1f", summary.validatedMiles), label: "validated miles", symbol: "location.fill")
-        ProgressMetric(value: "\(summary.qualifyingDriveCount)", label: "qualifying drives", symbol: "steeringwheel")
-        ProgressMetric(value: "\(summary.qualifyingDriveDayCount)", label: "recorded days", symbol: "calendar")
     }
 
     private var thinEvidenceState: some View {
@@ -366,14 +360,15 @@ private struct ProgressScoreSignal: View {
         VStack(alignment: .leading, spacing: 2) {
             Text(value)
                 .font(.caption.weight(.bold).monospacedDigit())
+                .foregroundStyle(AppDesign.primarySurfaceForeground)
             Text(label)
                 .font(.caption2)
-                .foregroundStyle(AppDesign.Ink.secondary)
+                .foregroundStyle(AppDesign.primarySurfaceForeground.opacity(0.62))
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
-        .background(AppDesign.cardSurfaceElevated, in: RoundedRectangle(cornerRadius: AppDesign.cornerRadiusTiny, style: .continuous))
+        .background(AppDesign.primarySurfaceForeground.opacity(0.10), in: RoundedRectangle(cornerRadius: AppDesign.cornerRadiusTiny, style: .continuous))
         .accessibilityElement(children: .combine)
     }
 }

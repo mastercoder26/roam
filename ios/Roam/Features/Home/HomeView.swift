@@ -414,20 +414,13 @@ struct HomeView: View {
                 .accessibilityLabel("Clear recent routes")
             }
 
-            VStack(spacing: 0) {
+            VStack(spacing: AppDesign.space8) {
                 ForEach(recentRoutes.entries) { entry in
                     RecentRouteRow(entry: entry) {
                         applyRecentRoute(entry)
                     }
-
-                    if entry.id != recentRoutes.entries.last?.id {
-                        Divider()
-                            .overlay(AppDesign.Ink.tertiary.opacity(0.4))
-                            .padding(.leading, 46)
-                    }
                 }
             }
-            .premiumCard()
         }
         .animation(reduceMotion ? .easeOut(duration: 0.16) : AppAnimation.content, value: recentRoutes.entries)
     }
@@ -507,8 +500,9 @@ struct HomeView: View {
             .foregroundStyle(canAnalyze ? AppDesign.primarySurfaceForeground : AppDesign.Ink.tertiary)
             .background(
                 canAnalyze ? AppDesign.Ink.primary : AppDesign.Ink.primary.opacity(0.10),
-                in: RoundedRectangle(cornerRadius: AppDesign.cornerRadiusLarge, style: .continuous)
+                in: Capsule()
             )
+            .shadow(color: canAnalyze ? AppDesign.cardShadow.opacity(0.5) : .clear, radius: 16, y: 7)
         }
         .buttonStyle(PressableScaleStyle())
         .disabled(!canAnalyze)

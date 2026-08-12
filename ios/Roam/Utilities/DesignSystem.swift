@@ -243,19 +243,19 @@ struct ScreenHeader: View {
     let symbol: String
 
     var body: some View {
-        HStack(alignment: .center, spacing: AppDesign.space16) {
+        HStack(alignment: .firstTextBaseline, spacing: AppDesign.space12) {
             Text(title)
-                .font(AppDesign.Typography.display)
-                .tracking(-0.9)
+                .font(.system(size: 31, weight: .bold, design: .rounded))
+                .tracking(-1.1)
                 .foregroundStyle(AppDesign.Ink.primary)
                 .fixedSize(horizontal: false, vertical: true)
 
             Spacer(minLength: AppDesign.space8)
 
             Image(systemName: symbol)
-                .font(.system(size: 19, weight: .semibold))
-                .foregroundStyle(AppDesign.accent)
-                .frame(width: 44, height: 44)
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(AppDesign.Ink.tertiary)
+                .frame(width: 32, height: 32)
                 .accessibilityHidden(true)
         }
         .accessibilityElement(children: .combine)
@@ -350,7 +350,7 @@ struct PrimaryActionButton: View {
             .padding(.vertical, 17)
             .foregroundStyle(isEnabled ? AppDesign.accentForeground : AppDesign.Ink.tertiary)
             .background(
-                RoundedRectangle(cornerRadius: AppDesign.cornerRadius, style: .continuous)
+                Capsule()
                     .fill(isEnabled ? AppDesign.accent : AppDesign.disabledSurface)
             )
             .shadow(
@@ -386,11 +386,11 @@ struct SecondaryActionButton: View {
             .padding(.vertical, 17)
             .foregroundStyle(AppDesign.Ink.primary)
             .background(
-                RoundedRectangle(cornerRadius: AppDesign.cornerRadius, style: .continuous)
+                Capsule()
                     .fill(AppDesign.cardSurface)
             )
             .overlay {
-                RoundedRectangle(cornerRadius: AppDesign.cornerRadius, style: .continuous)
+                Capsule()
                     .stroke(AppDesign.cardStrokeStrong, lineWidth: 1)
             }
         }
@@ -539,6 +539,160 @@ struct MetricTile: View {
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(label): \(value)")
+    }
+}
+
+/// Number-first dashboard data, inspired by fitness summaries: the value does
+/// the talking and the label stays quiet. Used across Drive, Progress and
+/// Profile so those screens scan as one product.
+struct DashboardMetric: Identifiable {
+    let id: String
+    let value: String
+    let label: String
+
+    init(id: String? = nil, value: String, label: String) {
+        self.id = id ?? label
+        self.value = value
+        self.label = label
+    }
+}
+
+struct DashboardMetricStrip: View {
+    @ObservedObject private var theme = ThemeManager.shared
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    let metrics: [DashboardMetric]
+
+    private var usesStackedLayout: Bool {
+        LayoutResponsiveness.stacksDashboardMetrics(
+            availableWidth: .greatestFiniteMagnitude,
+            usesLargeText: dynamicTypeSize.isAccessibilitySize
+        )
+    }
+
+    var body: some View {
+        Group {
+            if usesStackedLayout {
+                VStack(spacing: AppDesign.space8) { metricViews }
+            } else {
+                ViewThatFits(in: .horizontal) {
+                    HStack(alignment: .top, spacing: AppDesign.space8) { metricViews }
+                    VStack(spacing: AppDesign.space8) { metricViews }
+                }
+            }
+        }
+        .accessibilityElement(children: .contain)
+    }
+
+    @ViewBuilder
+    private var metricViews: some View {
+        ForEach(metrics) { metric in
+            VStack(alignment: .leading, spacing: 2) {
+                Text(metric.value)
+                    .font(.system(.title3, design: .rounded, weight: .bold))
+                    .tracking(-0.45)
+                    .monospacedDigit()
+                    .contentTransition(reduceMotion ? .identity : .numericText())
+                    .foregroundStyle(AppDesign.Ink.primary)
+                Text(metric.label)
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(AppDesign.Ink.secondary)
+                    .lineLimit(2)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, AppDesign.space12)
+            .padding(.vertical, AppDesign.space12)
+            .background(AppDesign.trackSurface.opacity(0.72), in: RoundedRectangle(cornerRadius: AppDesign.cornerRadiusSmall, style: .continuous))
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("\(metric.label): \(metric.value)")
+        }
+    }
+}
+
+struct CadenceDay: Identifiable {
+    let id: Date
+    let shortLabel: String
+    let accessibilityLabel: String
+    let isComplete: Bool
+    let isToday: Bool
+
+    static func recentWeek(
+        completedDates: [Date],
+        now: Date = Date(),
+        calendar: Calendar = .current
+    ) -> [CadenceDay] {
+        let today = calendar.startOfDay(for: now)
+        let completed = Set(completedDates.map { calendar.startOfDay(for: $0) })
+        let weekdaySymbols = calendar.veryShortWeekdaySymbols
+
+        return (-6...0).compactMap { offset in
+            guard let date = calendar.date(byAdding: .day, value: offset, to: today) else { return nil }
+            let weekday = calendar.component(.weekday, from: date)
+            return CadenceDay(
+                id: date,
+                shortLabel: weekdaySymbols[weekday - 1],
+                accessibilityLabel: date.formatted(.dateTime.weekday(.wide).month(.wide).day()),
+                isComplete: completed.contains(date),
+                isToday: calendar.isDate(date, inSameDayAs: today)
+            )
+        }
+    }
+}
+
+/// A compact seven-day rhythm strip. Completed days use the product ink while
+/// today keeps an accent ring, allowing the state to survive every theme.
+struct WeekCadenceStrip: View {
+    @ObservedObject private var theme = ThemeManager.shared
+    let title: String
+    let days: [CadenceDay]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: AppDesign.space12) {
+            HStack {
+                Text(title)
+                    .font(AppDesign.Typography.railTitle)
+                    .foregroundStyle(AppDesign.Ink.primary)
+                Spacer(minLength: AppDesign.space8)
+                Text("\(days.filter(\.isComplete).count) days")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(AppDesign.Ink.secondary)
+            }
+
+            HStack(spacing: AppDesign.space4) {
+                ForEach(days) { day in
+                    VStack(spacing: AppDesign.space4) {
+                        ZStack {
+                            Circle()
+                                .fill(day.isComplete ? AppDesign.Ink.primary : AppDesign.trackSurface)
+                            if day.isComplete {
+                                Image(systemName: "checkmark")
+                                    .font(.caption2.weight(.black))
+                                    .foregroundStyle(AppDesign.primarySurfaceForeground)
+                            }
+                        }
+                        .frame(width: 34, height: 34)
+                        .overlay {
+                            if day.isToday {
+                                Circle().stroke(AppDesign.accent, lineWidth: 2)
+                            }
+                        }
+
+                        Text(day.shortLabel)
+                            .font(.caption2.weight(day.isToday ? .bold : .medium))
+                            .foregroundStyle(day.isToday ? AppDesign.Ink.primary : AppDesign.Ink.secondary)
+                    }
+                    .frame(maxWidth: .infinity, minHeight: 44)
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel("\(day.accessibilityLabel), \(day.isComplete ? "drive recorded" : "no recorded drive")\(day.isToday ? ", today" : "")")
+                }
+            }
+        }
+        .padding(AppDesign.cardPadding)
+        .background(AppDesign.cardSurface, in: RoundedRectangle(cornerRadius: AppDesign.cornerRadius, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: AppDesign.cornerRadius, style: .continuous)
+                .stroke(AppDesign.cardStroke, lineWidth: 0.75)
+        }
     }
 }
 
