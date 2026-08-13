@@ -46,6 +46,7 @@ struct LaunchIntroView: View {
     @State private var isGlobeWordmarkVisible = false
     @State private var isWordmarkDocked = false
     @State private var wordmarkWidth: CGFloat = 0
+    @State private var wordmarkSliceProgress: Double = 0
 
     private var choreography: LaunchIntroChoreography.Type { LaunchIntroChoreography.self }
 
@@ -145,14 +146,13 @@ struct LaunchIntroView: View {
     /// stutter; it also means the mark that lands in the corner was rendered
     /// large and shrunk, never blown up.
     private var introWordmark: some View {
-        Text("Roam")
-            .font(.custom("Baskerville-SemiBoldItalic", size: choreography.wordmarkHeroFontSize))
-            // Tracking is pre-divided so that, once scaled down, it matches
-            // the compact wordmark's -0.25 exactly.
-            .tracking(CGFloat(-0.25 / choreography.wordmarkDockedScale))
-            .foregroundStyle(theme.palette.inkPrimary.color.opacity(0.92))
+        RoamWordmark(
+            fontSize: choreography.wordmarkHeroFontSize,
+            foreground: theme.palette.inkPrimary.color.opacity(0.92),
+            sliceProgress: wordmarkSliceProgress,
+            reduceMotion: reduceMotion
+        )
             .fixedSize()
-            .drawingGroup()
             .background(wordmarkWidthReader)
     }
 
@@ -210,6 +210,9 @@ struct LaunchIntroView: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + choreography.videoWordmarkDelay) {
             withAnimation(.easeOut(duration: choreography.videoWordmarkFadeDuration)) {
                 isGlobeWordmarkVisible = true
+            }
+            withAnimation(AppAnimation.wordmarkResolve) {
+                wordmarkSliceProgress = 1
             }
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + choreography.wordmarkDockDelay) {

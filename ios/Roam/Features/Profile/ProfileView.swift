@@ -596,11 +596,11 @@ struct ProfileView: View {
 
             if insights.hasEvidence {
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
-                    Text(String(format: "%.1f", insights.measuredMiles))
-                        .font(.system(size: 34, weight: .bold, design: .rounded))
-                        .tracking(-0.6)
-                        .monospacedDigit()
-                        .foregroundStyle(AppDesign.primarySurfaceForeground)
+                    KineticMetricText(
+                        value: String(format: "%.1f", insights.measuredMiles),
+                        fontSize: 34,
+                        foreground: AppDesign.primarySurfaceForeground
+                    )
                     Text("measured miles")
                         .font(.subheadline.weight(.medium))
                         .foregroundStyle(AppDesign.primarySurfaceForeground.opacity(0.64))

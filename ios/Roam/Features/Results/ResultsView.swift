@@ -115,6 +115,12 @@ struct ResultsView: View {
                 tripRouteHeader
                 resultsPagePicker
                 selectedPageContent
+                    .animation(
+                        reduceMotion
+                            ? .easeOut(duration: PremiumMotionSpec.reducedFocusTransition.duration)
+                            : AppAnimation.focus,
+                        value: selectedPage
+                    )
             }
             .padding(.horizontal, AppDesign.contentPadding)
             .padding(.vertical, 12)
@@ -186,7 +192,7 @@ struct ResultsView: View {
     }
 
     private var resultsPageTransition: AnyTransition {
-        reduceMotion ? .opacity : .opacity.combined(with: .move(edge: .trailing))
+        .premiumFocus(reduceMotion: reduceMotion)
     }
 
     private var tripRouteHeader: some View {

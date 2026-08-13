@@ -31,6 +31,29 @@ enum AppAnimation {
     /// High-frequency UI (search suggestions, error fade)
     static let quick = Animation.easeOut(duration: 0.18)
 
+    /// A strong ease-out for rare, high-salience content swaps. The incoming
+    /// state resolves almost immediately, then settles without overshoot.
+    static let focus = Animation.timingCurve(
+        0.23,
+        1,
+        0.32,
+        1,
+        duration: PremiumMotionSpec.focusTransition.duration
+    )
+
+    /// Result numerals use a short odometer-style resolve. Kept separate from
+    /// live drive motion so safety-critical values never inherit the effect.
+    static let kineticMetric = Animation.timingCurve(
+        0.23,
+        1,
+        0.32,
+        1,
+        duration: PremiumMotionSpec.heroMetric.settleDuration
+    )
+
+    /// The launch wordmark's slices pull into their permanent offsets once.
+    static let wordmarkResolve = Animation.timingCurve(0.23, 1, 0.32, 1, duration: 0.42)
+
     /// Route / map camera — on-screen movement
     static let mapDuration: TimeInterval = 0.28
     static let map = Animation.easeInOut(duration: mapDuration)

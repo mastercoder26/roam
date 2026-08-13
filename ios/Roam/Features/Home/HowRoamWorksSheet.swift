@@ -9,7 +9,7 @@ struct HowRoamWorksSheet: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: AppDesign.space24) {
+                VStack(alignment: .leading, spacing: CGFloat(HowRoamWorksLayoutSpec.sectionSpacing)) {
                     introduction
                     processSection
                     factorsSection
@@ -20,8 +20,10 @@ struct HowRoamWorksSheet: View {
                     limitsSection
                 }
                 .padding(.horizontal, AppDesign.contentPadding)
-                .padding(.top, AppDesign.space12)
-                .padding(.bottom, 36)
+                .padding(.top, CGFloat(HowRoamWorksLayoutSpec.topPadding))
+                .padding(.bottom, CGFloat(HowRoamWorksLayoutSpec.bottomPadding))
+                .frame(maxWidth: CGFloat(HowRoamWorksLayoutSpec.maximumContentWidth))
+                .frame(maxWidth: .infinity)
             }
             .background(AppCanvasBackground())
             .navigationTitle("How Roam works")
@@ -55,6 +57,7 @@ struct HowRoamWorksSheet: View {
                 .foregroundStyle(AppDesign.Ink.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
+        .padding(.bottom, AppDesign.space4)
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
@@ -99,7 +102,7 @@ struct HowRoamWorksSheet: View {
 
     private var evidenceSection: some View {
         HowItWorksSection(title: "How confidence is shown") {
-            VStack(alignment: .leading, spacing: AppDesign.space12) {
+            VStack(alignment: .leading, spacing: 0) {
                 EvidenceLevelRow(
                     title: "Well supported",
                     detail: "The important route inputs were available and agree strongly enough to support the explanation.",
@@ -127,7 +130,7 @@ struct HowRoamWorksSheet: View {
 
     private var scoreSection: some View {
         HowItWorksSection(title: "What the score means") {
-            VStack(alignment: .leading, spacing: AppDesign.space16) {
+            VStack(alignment: .leading, spacing: AppDesign.space12) {
                 ScoreMeaningRow(range: "0 to 1.9", label: "Very easy", color: AppDesign.positive)
                 ScoreMeaningRow(range: "2 to 3.9", label: "Easy", color: AppDesign.positive)
                 ScoreMeaningRow(range: "4 to 5.9", label: "Moderate", color: AppDesign.safety)
@@ -222,7 +225,7 @@ private struct HowItWorksSection<Content: View>: View {
     @ViewBuilder var content: Content
 
     var body: some View {
-        VStack(alignment: .leading, spacing: AppDesign.space12) {
+        VStack(alignment: .leading, spacing: CGFloat(HowRoamWorksLayoutSpec.titleContentSpacing)) {
             Text(title)
                 .font(AppDesign.Typography.sectionTitle)
                 .foregroundStyle(AppDesign.Ink.primary)
@@ -254,7 +257,7 @@ private struct RecordedSignalRow: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
-        .padding(.vertical, 7)
+        .padding(.vertical, CGFloat(HowRoamWorksLayoutSpec.rowVerticalPadding))
         .accessibilityElement(children: .combine)
     }
 }
@@ -282,7 +285,7 @@ private struct ProcessStepRow: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
-        .padding(.vertical, AppDesign.space8)
+        .padding(.vertical, CGFloat(HowRoamWorksLayoutSpec.rowVerticalPadding))
         .accessibilityElement(children: .combine)
     }
 }
@@ -326,7 +329,7 @@ private struct RouteFactorRow: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
-        .padding(.vertical, 7)
+        .padding(.vertical, CGFloat(HowRoamWorksLayoutSpec.rowVerticalPadding))
         .accessibilityElement(children: .combine)
     }
 }
@@ -350,6 +353,7 @@ private struct EvidenceLevelRow: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
+        .padding(.vertical, CGFloat(HowRoamWorksLayoutSpec.rowVerticalPadding))
         .accessibilityElement(children: .combine)
     }
 }

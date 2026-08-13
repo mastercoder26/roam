@@ -94,6 +94,9 @@
 		A100000000000000000000F8 /* AuthSessionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A200000000000000000000F8 /* AuthSessionStore.swift */; };
 		A100000000000000000000FB /* DriveHistorySyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A200000000000000000000FB /* DriveHistorySyncService.swift */; };
 		C10000000000000000000001 /* ClerkBackendClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000001 /* ClerkBackendClient.swift */; };
+		D10000000000000000000001 /* PremiumMotionSpec.swift in Sources */ = {isa = PBXBuildFile; fileRef = D20000000000000000000001 /* PremiumMotionSpec.swift */; };
+		D10000000000000000000002 /* PremiumMotion.swift in Sources */ = {isa = PBXBuildFile; fileRef = D20000000000000000000002 /* PremiumMotion.swift */; };
+		D10000000000000000000003 /* HowRoamWorksLayoutSpec.swift in Sources */ = {isa = PBXBuildFile; fileRef = D20000000000000000000003 /* HowRoamWorksLayoutSpec.swift */; };
 		F6FF09CA970740C1E2A01644 /* intro-goldfish.mp4 in Resources */ = {isa = PBXBuildFile; fileRef = 2B9DF49B43552A1481D5ECFD /* intro-goldfish.mp4 */; };
 /* End PBXBuildFile section */
 
@@ -163,6 +166,9 @@
 		A2000000000000000000000F /* Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Release.xcconfig; sourceTree = "<group>"; };
 		A20000000000000000000010 /* AnimationConstants.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnimationConstants.swift; sourceTree = "<group>"; };
 		A20000000000000000000011 /* DesignSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem.swift; sourceTree = "<group>"; };
+		D20000000000000000000001 /* PremiumMotionSpec.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PremiumMotionSpec.swift; sourceTree = "<group>"; };
+		D20000000000000000000002 /* PremiumMotion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PremiumMotion.swift; sourceTree = "<group>"; };
+		D20000000000000000000003 /* HowRoamWorksLayoutSpec.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HowRoamWorksLayoutSpec.swift; sourceTree = "<group>"; };
 		A20000000000000000000012 /* RoamRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoamRootView.swift; sourceTree = "<group>"; };
 		A20000000000000000000013 /* DriveView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriveView.swift; sourceTree = "<group>"; };
 		A20000000000000000000014 /* DriveSessionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriveSessionManager.swift; sourceTree = "<group>"; };
@@ -348,6 +354,8 @@
 				A200000000000000000000F3 /* DriverProfileInsightsEngine.swift */,
 				A20000000000000000000045 /* RouteAnalysisDebugInfo.swift */,
 				A200000000000000000000F6 /* FeatureWalkthrough.swift */,
+				D20000000000000000000001 /* PremiumMotionSpec.swift */,
+				D20000000000000000000003 /* HowRoamWorksLayoutSpec.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -419,6 +427,7 @@
 				A20000000000000000000010 /* AnimationConstants.swift */,
 				A20000000000000000000011 /* DesignSystem.swift */,
 				A20000000000000000000032 /* LayoutResponsiveness.swift */,
+				D20000000000000000000002 /* PremiumMotion.swift */,
 			);
 			path = Utilities;
 			sourceTree = "<group>";
@@ -682,6 +691,9 @@
 				A1000000000000000000000B /* AddressSearchField.swift in Sources */,
 				A1000000000000000000000D /* AnimationConstants.swift in Sources */,
 				A1000000000000000000000E /* DesignSystem.swift in Sources */,
+				D10000000000000000000001 /* PremiumMotionSpec.swift in Sources */,
+				D10000000000000000000002 /* PremiumMotion.swift in Sources */,
+				D10000000000000000000003 /* HowRoamWorksLayoutSpec.swift in Sources */,
 				A10000000000000000000012 /* RoamRootView.swift in Sources */,
 				A10000000000000000000013 /* DriveView.swift in Sources */,
 				A10000000000000000000014 /* DriveSessionManager.swift in Sources */,

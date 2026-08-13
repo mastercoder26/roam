@@ -109,7 +109,7 @@ struct HomeView: View {
                 .scrollDismissesKeyboard(.interactively)
                 if isLoading {
                     RouteAnalysisLoadingView(isFinishing: isCompletingLoading) { completeLoading() }
-                        .transition(.opacity)
+                        .transition(.premiumFocus(reduceMotion: reduceMotion))
                         .zIndex(1)
                 }
             }
@@ -526,12 +526,12 @@ struct HomeView: View {
         Button {
             showingHowRoamWorks = true
         } label: {
-            HStack(spacing: AppDesign.space12) {
+            HStack(spacing: 14) {
                 Image(systemName: "info.circle")
                     .font(.body.weight(.semibold))
                     .foregroundStyle(AppDesign.accent)
-                    .frame(width: 36, height: 36)
-                    .background(AppDesign.accent.opacity(0.12), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    .frame(width: 40, height: 40)
+                    .background(AppDesign.accent.opacity(0.12), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
 
                 Text("How Roam works")
                     .font(.subheadline.weight(.semibold))
@@ -547,8 +547,8 @@ struct HomeView: View {
                     .font(.caption.weight(.bold))
                     .foregroundStyle(AppDesign.Ink.tertiary)
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 11)
+            .padding(.horizontal, AppDesign.space16)
+            .padding(.vertical, CGFloat(HowRoamWorksLayoutSpec.entryRowVerticalPadding))
             .contentShape(Rectangle())
         }
         .buttonStyle(PressableScaleStyle())

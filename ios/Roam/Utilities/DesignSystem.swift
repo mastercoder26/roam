@@ -294,23 +294,14 @@ struct BrandWordmark: View {
     var compact = false
 
     var body: some View {
-        Text("Roam")
-            .font(wordmarkFont)
+        RoamWordmark(
+            fontSize: compact ? 23 : 36,
+            foreground: themeManager.palette.inkPrimary.color.opacity(0.92)
+        )
             // Hold the compact wordmark at a stable optical size so an
             // accessibility text setting leaves room for the route inputs.
             .dynamicTypeSize(compact ? .large : .accessibility5)
-            .tracking(compact ? -0.25 : -0.4)
-            .foregroundStyle(themeManager.palette.inkPrimary.color.opacity(0.92))
             .contentShape(Rectangle())
-            .accessibilityLabel("Roam")
-            .accessibilityAddTraits(.isHeader)
-    }
-
-    private var wordmarkFont: Font {
-        if compact {
-            return .custom("Baskerville-SemiBoldItalic", size: 23)
-        }
-        return .custom("Baskerville-SemiBoldItalic", size: 36, relativeTo: .largeTitle)
     }
 }
 
