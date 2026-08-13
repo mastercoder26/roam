@@ -637,7 +637,7 @@ struct HomeView: View {
 
     private func analyzeRoute() async {
         withAnimation(AppAnimation.quick) { errorMessage = nil }
-        withAnimation(reduceMotion ? .easeOut(duration: 0.12) : AppAnimation.quick) {
+        withAnimation(loadingTransitionAnimation) {
             isLoading = true
         }
         do {
@@ -671,6 +671,8 @@ struct HomeView: View {
             UINotificationFeedbackGenerator().notificationOccurred(.error)
             withAnimation(AppAnimation.quick) {
                 errorMessage = error.localizedDescription
+            }
+            withAnimation(loadingTransitionAnimation) {
                 isLoading = false
             }
         }
@@ -678,12 +680,18 @@ struct HomeView: View {
 
     private func completeLoading() {
         guard let pendingResult else { return }
-        withAnimation(reduceMotion ? .easeOut(duration: 0.12) : AppAnimation.quick) {
+        withAnimation(loadingTransitionAnimation) {
             isCompletingLoading = false
             isLoading = false
             self.pendingResult = nil
         }
         navigationPath.append(pendingResult)
+    }
+
+    private var loadingTransitionAnimation: Animation {
+        reduceMotion
+            ? .easeOut(duration: PremiumMotionSpec.reducedFocusTransition.duration)
+            : AppAnimation.focus
     }
 }
 

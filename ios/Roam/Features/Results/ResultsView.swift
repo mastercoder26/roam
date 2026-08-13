@@ -192,7 +192,9 @@ struct ResultsView: View {
     }
 
     private var resultsPageTransition: AnyTransition {
-        .premiumFocus(reduceMotion: reduceMotion)
+        // The page can contain an interactive map; opacity/scale retains the
+        // focus-pull character without blurring that expensive subtree.
+        .premiumFocus(reduceMotion: reduceMotion, includesBlur: false)
     }
 
     private var tripRouteHeader: some View {

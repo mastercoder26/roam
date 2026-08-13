@@ -595,14 +595,16 @@ struct ProfileView: View {
             Divider().overlay(AppDesign.primarySurfaceForeground.opacity(0.18))
 
             if insights.hasEvidence {
-                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                VStack(alignment: .leading, spacing: 0) {
                     KineticMetricText(
                         value: String(format: "%.1f", insights.measuredMiles),
                         fontSize: 34,
-                        foreground: AppDesign.primarySurfaceForeground
+                        foreground: AppDesign.primarySurfaceForeground,
+                        context: .completedDrive
                     )
-                    Text("measured miles")
-                        .font(.subheadline.weight(.medium))
+                    Text("MEASURED MILES")
+                        .font(.caption2.weight(.bold))
+                        .tracking(1.1)
                         .foregroundStyle(AppDesign.primarySurfaceForeground.opacity(0.64))
                 }
                 .accessibilityElement(children: .combine)

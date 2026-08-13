@@ -59,6 +59,7 @@ struct KineticMetricText: View {
     let value: String
     let fontSize: CGFloat
     let foreground: Color
+    let context: KineticMetricContext
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var blurRadius: CGFloat = 0
@@ -70,7 +71,6 @@ struct KineticMetricText: View {
 
             metricText
                 .scaleEffect(x: 1, y: -0.42, anchor: .center)
-                .offset(y: fontSize * 0.72)
                 .mask {
                     LinearGradient(
                         colors: [.white.opacity(0.48), .clear],
@@ -78,11 +78,14 @@ struct KineticMetricText: View {
                         endPoint: .bottom
                     )
                 }
-                .opacity(reduceMotion ? 0 : PremiumMotionSpec.heroMetric.reflectionOpacity)
+                .offset(y: fontSize * 0.72)
+                .opacity(allowsKineticTreatment ? PremiumMotionSpec.heroMetric.reflectionOpacity : 0)
                 .accessibilityHidden(true)
         }
-        .padding(.bottom, fontSize * 0.10)
-        .animation(reduceMotion ? nil : AppAnimation.kineticMetric, value: value)
+        // Offset transforms do not participate in layout. Reserve enough
+        // height for the reflected band so adjacent labels can never overlap.
+        .frame(height: fontSize * (allowsKineticTreatment ? 1.60 : 1.20), alignment: .top)
+        .animation(allowsKineticTreatment ? AppAnimation.kineticMetric : nil, value: value)
         .onChange(of: value) { _, _ in
             resolveMetricBlur()
         }
@@ -94,11 +97,15 @@ struct KineticMetricText: View {
             .tracking(fontSize * -0.023)
             .monospacedDigit()
             .foregroundStyle(foreground)
-            .contentTransition(reduceMotion ? .identity : .numericText())
+            .contentTransition(allowsKineticTreatment ? .numericText() : .identity)
+    }
+
+    private var allowsKineticTreatment: Bool {
+        !reduceMotion && PremiumMotionSpec.allowsKineticTreatment(in: context)
     }
 
     private func resolveMetricBlur() {
-        guard !reduceMotion else {
+        guard allowsKineticTreatment else {
             blurRadius = 0
             return
         }
@@ -129,10 +136,17 @@ private struct PremiumFocusModifier: ViewModifier {
 extension AnyTransition {
     /// A short focus pull for consequential state changes. It is symmetric and
     /// interruptible, so a quick reversal does not snap or finish stale motion.
-    static func premiumFocus(reduceMotion: Bool) -> AnyTransition {
-        let active = reduceMotion
+    static func premiumFocus(reduceMotion: Bool, includesBlur: Bool = true) -> AnyTransition {
+        let base = reduceMotion
             ? PremiumMotionSpec.reducedFocusTransition
             : PremiumMotionSpec.focusTransition
+        let active = FocusTransitionSpec(
+            opacity: base.opacity,
+            scale: base.scale,
+            verticalOffset: base.verticalOffset,
+            blurRadius: includesBlur ? base.blurRadius : 0,
+            duration: base.duration
+        )
 
         return .modifier(
             active: PremiumFocusModifier(spec: active),

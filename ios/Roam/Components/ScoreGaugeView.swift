@@ -34,7 +34,8 @@ struct ScoreGaugeView: View {
                 KineticMetricText(
                     value: String(format: "%.1f", score),
                     fontSize: 64,
-                    foreground: AppDesign.Ink.primary
+                    foreground: AppDesign.Ink.primary,
+                    context: .routeResult
                 )
 
                 Text("OUT OF 10")
