@@ -79,7 +79,7 @@ const allowedOrigins = getAllowedOrigins();
 const rateLimiter = createRateLimiter(getRateLimitConfig());
 const authRateLimiter = createRateLimiter({ windowMs: 15 * 60_000, maxRequests: 10 });
 
-app.use(express.json());
+app.use(express.json({ limit: "2mb" }));
 
 app.use((req, res, next) => {
   const origin = req.headers.origin ?? "";

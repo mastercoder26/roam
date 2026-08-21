@@ -525,11 +525,19 @@ final class DriveHistorySyncService: ObservableObject {
 
     private func pushPendingDeletions() async throws {
         guard !metadata.pendingDeletionIDs.isEmpty else { return }
-        for id in metadata.pendingDeletionIDs {
+        // Snapshot the set before iterating — the loop removes confirmed IDs
+        // from the live set, and iterating a collection while mutating it is
+        // fragile even when Swift's value semantics make it safe today.
+        let idsToDelete = metadata.pendingDeletionIDs
+        for id in idsToDelete {
             try await authSession.performAuthenticated { token in
                 try await self.transport.deleteDrive(id: id, accessToken: token)
             }
             metadata.pendingDeletionIDs.remove(id)
+            // Also scrub the synced status so a re-uploaded drive with the same
+            // UUID (unlikely but possible after a sign-out/sign-in cycle) is
+            // not incorrectly treated as already synced.
+            metadata.syncedRouteAnalysisStatus.removeValue(forKey: id)
             persistMetadata()
         }
     }

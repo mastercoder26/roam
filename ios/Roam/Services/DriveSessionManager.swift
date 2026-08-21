@@ -4,27 +4,6 @@ import Combine
 import Foundation
 import UIKit
 
-/// Everything needed to reconstruct a `RecordedDrive` if the app is
-/// terminated mid-drive. Deliberately mirrors only measured quantities —
-/// recovery never fabricates data the way a live session's normal end-of-drive
-/// summarization would not.
-private struct InProgressDriveSnapshot: Codable {
-    let startedAt: Date
-    let recordingTimeZoneIdentifier: String?
-    let route: [DriveRoutePoint]
-    let events: [DrivingEvent]
-    let motionSamples: Int
-    let acceptedLocationSamples: Int
-    let rejectedLocationSamples: Int
-    let distanceMeters: CLLocationDistance
-    let topSpeedMetersPerSecond: CLLocationSpeed
-    let plannedRouteContext: PlannedRouteContext?
-    let lastUpdatedAt: Date
-    /// Optional so snapshots written before this field existed still decode —
-    /// an undecodable snapshot is a lost drive, not a lost flag.
-    let recordingSuspendedInBackground: Bool?
-}
-
 @MainActor
 final class DriveSessionManager: NSObject, ObservableObject {
     /// The app, CarPlay scene, and Live Activity all reflect this one manual
@@ -47,10 +26,13 @@ final class DriveSessionManager: NSObject, ObservableObject {
     /// A distinct presentation event for the root view. The queued context
     /// remains available until the driver explicitly starts or cancels it.
     @Published private(set) var practiceRoutePresentationRequest: UUID?
+
     /// The most recent `/api/route/difficulty` attempt per drive, kept only
     /// for on-screen debugging when a drive is stuck `.pending` — see
     /// `RouteAnalysisDebugInfo`.
-    @Published private(set) var routeAnalysisDebugInfo: [UUID: RouteAnalysisDebugInfo] = [:]
+    var routeAnalysisDebugInfo: [UUID: RouteAnalysisDebugInfo] {
+        routeAnalysisCoordinator.debugInfo
+    }
 
     private let locationManager = CLLocationManager()
     private let motionManager = CMMotionManager()
@@ -74,25 +56,7 @@ final class DriveSessionManager: NSObject, ObservableObject {
     // polyline, or other planned-route geometry.
     private var queuedPracticeRoutePolyline: String?
     private var activePracticeRoutePolyline: String?
-    private let historyKey = "recorded-drives-v1"
-    /// Holds a history blob this build could not decode, so it survives for a
-    /// later build to recover instead of being overwritten with an empty list.
-    private let quarantinedHistoryKey = "recorded-drives-v1-quarantined"
-    /// Set when `loadRecordedDrives` could not read the stored history. While
-    /// true, `saveRecordedDrives` refuses to write — an in-memory list that is
-    /// empty only because decoding failed must never replace the real one.
-    private var isHistoryUnreadable = false
-    /// A throttled, incremental snapshot of the drive in progress. Without
-    /// this, a background termination (low memory, force quit, or a crash)
-    /// mid-drive would lose every sample the driver has already produced —
-    /// the worst failure mode for this feature. `endDrive()` removes this key
-    /// on a normal finish; only an interrupted session leaves it behind for
-    /// `recoverInterruptedDriveIfNeeded()` to find on the next launch.
-    private let inProgressDriveKey = "in-progress-drive-v1"
-    /// Holds an interrupted-drive snapshot this build could not decode, so it
-    /// survives for a later build instead of being erased on first read.
-    private let quarantinedInProgressDriveKey = "in-progress-drive-v1-quarantined"
-    private var lastProgressPersistAt: Date?
+
     /// Set when location authorization is withdrawn while recording, so the
     /// saved drive can state that its distance stops short of the real trip.
     private var didLoseLocationMidDrive = false
@@ -110,7 +74,13 @@ final class DriveSessionManager: NSObject, ObservableObject {
     /// garage, a stop at a light). Only a sustained silence is evidence that
     /// the app itself stopped being scheduled.
     private static let backgroundSuspensionGapSeconds: TimeInterval = 60
-    private var routeAnalysisTasks: [UUID: Task<Void, Never>] = [:]
+
+    // MARK: - Extracted Helpers
+
+    /// Set when `DriveHistoryStore` could not decode the stored history.
+    private var isHistoryUnreadable = false
+    private var snapshotPersistence = DriveSnapshotPersistence()
+    private let routeAnalysisCoordinator: DriveRouteAnalysisCoordinator
 
     var currentDistanceMiles: Double { distanceMeters / 1_609.344 }
     var currentSpeedMilesPerHour: Int { Int((max(currentSpeedMetersPerSecond, 0) * 2.23694).rounded()) }
@@ -129,12 +99,21 @@ final class DriveSessionManager: NSObject, ObservableObject {
 
     init(authSession: AuthSessionStore = .shared) {
         self.authSession = authSession
+        self.routeAnalysisCoordinator = DriveRouteAnalysisCoordinator(authSession: authSession)
         super.init()
         locationManager.delegate = self
         locationManager.activityType = .automotiveNavigation
         locationManager.desiredAccuracy = kCLLocationAccuracyBestForNavigation
         locationManager.distanceFilter = 5
         locationManager.pausesLocationUpdatesAutomatically = false
+
+        routeAnalysisCoordinator.onDriveUpdated = { [weak self] id, analysis in
+            self?.replaceSavedDrive(id: id, routeAnalysis: analysis)
+        }
+        routeAnalysisCoordinator.onSyncRequested = { [weak self] in
+            self?.requestDriveHistorySync()
+        }
+
         loadRecordedDrives()
         recoverInterruptedDriveIfNeeded()
         resumeRouteAnalysesIfNeeded()
@@ -143,6 +122,8 @@ final class DriveSessionManager: NSObject, ObservableObject {
         DriveLiveActivityManager.shared.endOrphanedActivities()
         observeBackgroundEntry()
     }
+
+    // MARK: - Background Observation
 
     /// Notes that the app left the screen while a drive was recording. This is
     /// the precondition for calling a later GPS gap a background suspension
@@ -160,6 +141,8 @@ final class DriveSessionManager: NSObject, ObservableObject {
         }
     }
 
+    // MARK: - Drive Lifecycle
+
     func startDrive() {
         guard !isRecording else { return }
 
@@ -173,8 +156,7 @@ final class DriveSessionManager: NSObject, ObservableObject {
         // Defensive: a snapshot should never survive to a new drive (endDrive
         // clears it, and startup recovery clears it too), but never let a
         // stale one leak into this drive's saved history if it somehow did.
-        UserDefaults.standard.removeObject(forKey: inProgressDriveKey)
-        lastProgressPersistAt = nil
+        snapshotPersistence.clearSnapshot()
         resetCurrentDrive()
         let driveStart = Date()
         recordingTimeZoneIdentifier = TimeZone.autoupdatingCurrent.identifier
@@ -236,8 +218,7 @@ final class DriveSessionManager: NSObject, ObservableObject {
             // gap lost the drive entirely — the snapshot was already gone and
             // the record had not been written yet. Clearing last means the
             // recovery path stays armed until the drive is durably saved.
-            UserDefaults.standard.removeObject(forKey: inProgressDriveKey)
-            lastProgressPersistAt = nil
+            snapshotPersistence.clearSnapshot()
             activePracticeRoute = nil
             activePracticeRoutePolyline = nil
             recordingTimeZoneIdentifier = nil
@@ -400,9 +381,11 @@ final class DriveSessionManager: NSObject, ObservableObject {
             status: "Drive saved"
         )
         if initialRouteAnalysis.status == .pending {
-            beginAutomaticRouteAnalysis(for: drive)
+            routeAnalysisCoordinator.beginAnalysis(for: drive)
         }
     }
+
+    // MARK: - Drive History
 
     /// Removes a saved drive from on-device history. No-ops when the id is absent.
     func deleteDrive(id: UUID) {
@@ -417,116 +400,8 @@ final class DriveSessionManager: NSObject, ObservableObject {
         // Deleting a drive whose route analysis is still in flight should not
         // leave a network request running only to be discarded by
         // `replaceSavedDrive`'s existence guard when it completes.
-        routeAnalysisTasks[id]?.cancel()
-        routeAnalysisTasks[id] = nil
+        routeAnalysisCoordinator.cancelAnalysis(for: id)
         requestDriveHistorySync()
-    }
-
-    /// Analyzes only the start and destination of a completed drive after its
-    /// local record is safely persisted. Any unavailable network or provider
-    /// result is recorded as analysis context; it never removes the drive.
-    private func beginAutomaticRouteAnalysis(for drive: RecordedDrive) {
-        guard routeAnalysisTasks[drive.id] == nil,
-              let currentAnalysis = drive.routeAnalysis else {
-            return
-        }
-        guard currentAnalysis.shouldRetry() else {
-            // No task is in flight and no retry is left, so a drive still
-            // marked `.pending` here — killed mid-request, or out of retries —
-            // has nothing that can ever complete it. Resolve it rather than
-            // leaving the UI spinning "Analyzing route" indefinitely.
-            if currentAnalysis.isStalled() {
-                replaceSavedDrive(
-                    id: drive.id,
-                    routeAnalysis: .unavailable(
-                        "Route difficulty could not be analyzed for this drive. The drive and its coaching score are still saved."
-                    )
-                )
-            }
-            return
-        }
-        guard let endpoints = DriveRouteAnalysisEngine.endpoints(for: drive) else {
-            replaceSavedDrive(
-                id: drive.id,
-                routeAnalysis: .unavailable("Route difficulty needs a longer continuous GPS trace from start to destination.")
-            )
-            return
-        }
-
-        // Route analysis proxies a metered upstream API, so the backend only
-        // serves signed-in accounts. Signing in later should analyze this
-        // drive, so the attempt stays retry-eligible rather than being spent.
-        guard authSession.isSignedIn else {
-            routeAnalysisDebugInfo[drive.id] = RouteAnalysisDebugInfo(
-                endpointPath: "api/route/difficulty",
-                attemptedAt: Date(),
-                durationSeconds: 0,
-                retryCount: currentAnalysis.retryCount ?? 0,
-                outcome: .other("Not attempted: no signed-in account")
-            )
-            replaceSavedDrive(
-                id: drive.id,
-                routeAnalysis: .unavailable(
-                    "Sign in to analyze this route's difficulty. The drive and its coaching score are still saved.",
-                    retryEligible: true,
-                    lastAttemptAt: currentAnalysis.lastAttemptAt,
-                    retryCount: currentAnalysis.retryCount ?? 0
-                )
-            )
-            return
-        }
-
-        let attemptedAnalysis = currentAnalysis.recordingAttempt()
-        replaceSavedDrive(id: drive.id, routeAnalysis: attemptedAnalysis)
-
-        let attemptStartedAt = Date()
-        let task = Task { [weak self] in
-            defer { self?.routeAnalysisTasks[drive.id] = nil }
-            guard let self else { return }
-
-            do {
-                let response = try await self.authSession.performAuthenticated { token in
-                    try await APIClient().analyzeRoute(
-                        origin: endpoints.origin,
-                        destination: endpoints.destination,
-                        accessToken: token,
-                        includeAlternates: false,
-                        continuousDriveMinutes: drive.score.duration / 60
-                    )
-                }
-                guard !Task.isCancelled else { return }
-                self.routeAnalysisDebugInfo[drive.id] = RouteAnalysisDebugInfo(
-                    endpointPath: "api/route/difficulty",
-                    attemptedAt: attemptStartedAt,
-                    durationSeconds: Date().timeIntervalSince(attemptStartedAt),
-                    retryCount: attemptedAnalysis.retryCount ?? 1,
-                    outcome: .success
-                )
-                self.replaceSavedDrive(
-                    id: drive.id,
-                    routeAnalysis: DriveRouteAnalysisEngine.result(from: response.primaryRoute)
-                )
-            } catch {
-                guard !Task.isCancelled else { return }
-                self.routeAnalysisDebugInfo[drive.id] = RouteAnalysisDebugInfo(
-                    endpointPath: "api/route/difficulty",
-                    attemptedAt: attemptStartedAt,
-                    durationSeconds: Date().timeIntervalSince(attemptStartedAt),
-                    retryCount: attemptedAnalysis.retryCount ?? 1,
-                    outcome: RouteAnalysisDebugInfo.outcome(for: error)
-                )
-                self.replaceSavedDrive(
-                    id: drive.id,
-                    routeAnalysis: .unavailable(
-                        "Route difficulty could not be analyzed right now. The drive and its coaching score are still saved.",
-                        retryEligible: true,
-                        lastAttemptAt: attemptedAnalysis.lastAttemptAt,
-                        retryCount: attemptedAnalysis.retryCount ?? 1
-                    )
-                )
-            }
-        }
-        routeAnalysisTasks[drive.id] = task
     }
 
     private func replaceSavedDrive(id: UUID, routeAnalysis: DriveRouteAnalysis) {
@@ -572,6 +447,15 @@ final class DriveSessionManager: NSObject, ObservableObject {
         )
     }
 
+    /// Restarts analyses that outlived their request — a drive left `.pending`
+    /// by a terminated app, or one whose retry became due. Called at launch and
+    /// again on every foreground.
+    func resumeRouteAnalysesIfNeeded() {
+        routeAnalysisCoordinator.resumeIfNeeded(for: recordedDrives)
+    }
+
+    // MARK: - Practice Routes
+
     /// Queues a locally generated route context for the next manually started
     /// drive. The route geometry stays in memory solely to verify GPS overlap
     /// when the drive ends; this deliberately never calls `startDrive()`.
@@ -592,6 +476,8 @@ final class DriveSessionManager: NSObject, ObservableObject {
         queuedPracticeRoutePolyline = nil
         practiceRoutePresentationRequest = nil
     }
+
+    // MARK: - Private — Drive State
 
     private func resetCurrentDrive() {
         startDate = nil
@@ -637,6 +523,8 @@ final class DriveSessionManager: NSObject, ObservableObject {
             }
         }
     }
+
+    // MARK: - Private — Motion Recording
 
     private func startMotionUpdates() {
         guard motionManager.isDeviceMotionAvailable else {
@@ -708,6 +596,8 @@ final class DriveSessionManager: NSObject, ObservableObject {
             )
         }
     }
+
+    // MARK: - Private — Location Recording
 
     private func record(location: CLLocation) {
         let sample = DriveLocationSample(
@@ -838,79 +728,45 @@ final class DriveSessionManager: NSObject, ObservableObject {
         )
     }
 
+    // MARK: - Private — Persistence Delegation
+
     private func loadRecordedDrives() {
-        guard let data = UserDefaults.standard.data(forKey: historyKey) else { return }
-        do {
-            recordedDrives = try JSONDecoder().decode([RecordedDrive].self, from: data)
-        } catch {
-            // Decoding `[RecordedDrive]` is all-or-nothing, so one unreadable
-            // element — or one added non-optional field in a new build — used to
-            // present as "no history". The next save then wrote that empty list
-            // straight over an intact blob, permanently destroying every drive.
-            // Keep the original bytes, refuse to write over them, and say so.
-            UserDefaults.standard.set(data, forKey: quarantinedHistoryKey)
-            isHistoryUnreadable = true
-            recordedDrives = []
-            statusMessage = "Saved drives could not be opened in this version. They are kept on the device and are not being overwritten."
-            return
-        }
-        backfillHistoricalRouteAnalysis()
-    }
-
-    /// Older drives are assessed locally from their saved trace. This gives
-    /// existing history a transparent score contribution without uploading past
-    /// endpoints simply because the app was updated.
-    private func backfillHistoricalRouteAnalysis() {
-        let updated = recordedDrives.map { drive -> RecordedDrive in
-            guard drive.routeAnalysis == nil,
-                  let localEstimate = DriveRouteAnalysisEngine.estimated(from: drive) else {
-                return drive
-            }
-            return drive.replacingRouteAnalysis(with: localEstimate)
-        }
-        guard zip(recordedDrives, updated).contains(where: { $0.routeAnalysis != $1.routeAnalysis }) else { return }
-        recordedDrives = updated
-        saveRecordedDrives()
-    }
-
-    /// Restarts analyses that outlived their request — a drive left `.pending`
-    /// by a terminated app, or one whose retry became due. Called at launch and
-    /// again on every foreground: waiting for a full relaunch was the
-    /// difference between "retries when you next open the app" and "stays on
-    /// Analyzing until the app is force-quit".
-    func resumeRouteAnalysesIfNeeded() {
-        for drive in recordedDrives where drive.routeAnalysis?.shouldRetry() == true
-            || drive.routeAnalysis?.isStalled() == true {
-            beginAutomaticRouteAnalysis(for: drive)
+        let result = DriveHistoryStore.loadRecordedDrives()
+        recordedDrives = result.drives
+        isHistoryUnreadable = result.isUnreadable
+        if let message = result.statusMessage {
+            statusMessage = message
         }
     }
 
     private func saveRecordedDrives() {
-        // Never overwrite a history this build could not read. `recordedDrives`
-        // is empty in that case only because decoding failed, and writing it
-        // back would destroy every stored drive irreversibly.
-        guard !isHistoryUnreadable else { return }
-        guard let data = try? JSONEncoder().encode(recordedDrives) else { return }
-        UserDefaults.standard.set(data, forKey: historyKey)
+        DriveHistoryStore.saveRecordedDrives(recordedDrives, isHistoryUnreadable: isHistoryUnreadable)
     }
 
-    /// Writes a throttled, incremental snapshot of the drive in progress so a
-    /// background termination loses at most a few seconds of the newest
-    /// samples instead of the entire session. Silent encoding failure is
-    /// intentional here — a snapshot write is a best-effort safety net, not a
-    /// requirement for `endDrive()`'s own, authoritative save path.
-    private func persistInProgressSnapshot(force: Bool = false) {
-        guard isRecording, let startDate else { return }
-        let now = Date()
-        if !force, let last = lastProgressPersistAt, now.timeIntervalSince(last) < 10 {
+    private func recoverInterruptedDriveIfNeeded() {
+        if isHistoryUnreadable {
+            statusMessage = "Recovered drive is waiting, but saved drives could not be opened in this version. Update Roam before recording another drive."
             return
         }
-        lastProgressPersistAt = now
+        guard let recovery = DriveSnapshotPersistence.recoverInterruptedSnapshot(isHistoryUnreadable: isHistoryUnreadable) else {
+            return
+        }
+        recordedDrives = Array(([recovery.drive] + recordedDrives).prefix(50))
+        saveRecordedDrives()
+        lastCompletedDrive = recovery.drive
+        lastScore = recovery.drive.score
+        statusMessage = recovery.statusMessage
+        if recovery.drive.routeAnalysis?.status == .pending {
+            routeAnalysisCoordinator.beginAnalysis(for: recovery.drive)
+        }
+    }
 
-        let snapshot = InProgressDriveSnapshot(
-            startedAt: startDate,
+    private func persistInProgressSnapshot(force: Bool = false) {
+        snapshotPersistence.persistInProgressSnapshot(
+            isRecording: isRecording,
+            startDate: startDate,
             recordingTimeZoneIdentifier: recordingTimeZoneIdentifier,
-            route: routePoints,
+            routePoints: routePoints,
             events: events,
             motionSamples: motionSamples,
             acceptedLocationSamples: acceptedLocationSamples,
@@ -918,97 +774,13 @@ final class DriveSessionManager: NSObject, ObservableObject {
             distanceMeters: distanceMeters,
             topSpeedMetersPerSecond: topSpeed,
             plannedRouteContext: activePracticeRoute,
-            lastUpdatedAt: now,
-            recordingSuspendedInBackground: didSuspendRecordingInBackground ? true : nil
+            didSuspendRecordingInBackground: didSuspendRecordingInBackground,
+            force: force
         )
-        guard let data = try? JSONEncoder().encode(snapshot) else { return }
-        UserDefaults.standard.set(data, forKey: inProgressDriveKey)
-    }
-
-    /// Recovers a drive that never reached `endDrive()` because the app was
-    /// terminated while recording. This is the difference between silently
-    /// losing an entire drive and saving everything measured up to the last
-    /// persisted snapshot. Recovery reuses the same scoring and summarization
-    /// path as a normal end-of-drive save; it never fabricates a duration or
-    /// distance beyond what was actually recorded, and a placement assessment
-    /// is not available because the drive never reached a normal `finish`.
-    private func recoverInterruptedDriveIfNeeded() {
-        guard let data = UserDefaults.standard.data(forKey: inProgressDriveKey) else { return }
-        // Decode before clearing. Removing the key first meant any decode
-        // failure — a new build adding a required field, a partial write —
-        // destroyed the only copy of the interrupted drive with no retry.
-        guard let snapshot = try? JSONDecoder().decode(InProgressDriveSnapshot.self, from: data) else {
-            // Keep the bytes for a future build, but move them off the live key
-            // so an undecodable payload is not re-read on every launch.
-            UserDefaults.standard.set(data, forKey: quarantinedInProgressDriveKey)
-            UserDefaults.standard.removeObject(forKey: inProgressDriveKey)
-            return
-        }
-        guard !isHistoryUnreadable else {
-            statusMessage = "Recovered drive is waiting, but saved drives could not be opened in this version. Update Roam before recording another drive."
-            return
-        }
-        UserDefaults.standard.removeObject(forKey: inProgressDriveKey)
-
-        let duration = snapshot.lastUpdatedAt.timeIntervalSince(snapshot.startedAt)
-        guard duration > 0, DriveHistoryPolicy.shouldSave(duration: duration) else { return }
-
-        let result = DriveScoringEngine.score(
-            duration: duration,
-            distanceMeters: snapshot.distanceMeters,
-            events: snapshot.events,
-            acceptedLocationSamples: snapshot.acceptedLocationSamples,
-            rejectedLocationSamples: snapshot.rejectedLocationSamples,
-            motionSamples: snapshot.motionSamples,
-            usableTraceDuration: usableTraceDuration(for: snapshot.route)
-        )
-        let dataQuality = DriveDataQuality(
-            acceptedLocationSamples: result.quality.acceptedLocationSamples,
-            rejectedLocationSamples: result.quality.rejectedLocationSamples,
-            motionSamples: result.quality.motionSamples,
-            confidence: result.quality.confidence,
-            placementQuality: nil,
-            recordingSuspendedInBackground: snapshot.recordingSuspendedInBackground
-        )
-        let score = DrivingScore(
-            score: result.score,
-            duration: duration,
-            distanceMeters: snapshot.distanceMeters,
-            topSpeedMetersPerSecond: snapshot.topSpeedMetersPerSecond,
-            events: snapshot.events,
-            motionSamples: snapshot.motionSamples,
-            dataQuality: dataQuality
-        )
-        let unsummarizedDrive = RecordedDrive(
-            startedAt: snapshot.startedAt,
-            score: score,
-            route: snapshot.route,
-            recordingTimeZoneIdentifier: snapshot.recordingTimeZoneIdentifier,
-            plannedRouteContext: snapshot.plannedRouteContext
-        )
-        let initialRouteAnalysis: DriveRouteAnalysis = DriveRouteAnalysisEngine.endpoints(for: unsummarizedDrive) == nil
-            ? .unavailable("Route difficulty needs a longer continuous GPS trace from start to destination.")
-            : .pending
-        let recoveredDrive = RecordedDrive(
-            id: unsummarizedDrive.id,
-            startedAt: snapshot.startedAt,
-            score: score,
-            route: snapshot.route,
-            recordingTimeZoneIdentifier: snapshot.recordingTimeZoneIdentifier,
-            experienceSummary: DriveExperienceEngine.summarize(drive: unsummarizedDrive),
-            plannedRouteContext: snapshot.plannedRouteContext,
-            routeAnalysis: initialRouteAnalysis
-        )
-        recordedDrives = Array(([recoveredDrive] + recordedDrives).prefix(50))
-        saveRecordedDrives()
-        lastCompletedDrive = recoveredDrive
-        lastScore = score
-        statusMessage = "Recovered a drive that was interrupted before it could finish saving normally."
-        if initialRouteAnalysis.status == .pending {
-            beginAutomaticRouteAnalysis(for: recoveredDrive)
-        }
     }
 }
+
+// MARK: - CLLocationManagerDelegate
 
 extension DriveSessionManager: CLLocationManagerDelegate {
     nonisolated func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
