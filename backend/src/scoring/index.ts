@@ -6,7 +6,7 @@ import type {
   ScoringOptions,
 } from "../types.js";
 import { MODEL_VERSION } from "../types.js";
-import { scoreSegmentLocal, aggregateSegmentScores } from "./segments.js";
+import { aggregateSegmentScores } from "./segments.js";
 import { buildFeaturesFromRoute } from "./features.js";
 import { buildRouteDemands } from "./demands.js";
 import { computeBaseScore } from "./baseScore.js";

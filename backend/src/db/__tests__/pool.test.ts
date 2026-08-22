@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { DatabaseUnavailableError, isDatabaseConfigured } from "../../errors.js";
-import { getPool } from "../pool.js";
+import { DatabaseUnavailableError } from "../../errors.js";
+import { getPool, isDatabaseConfigured } from "../pool.js";
 
 describe("database configuration", () => {
   it("reports an unconfigured database and throws a typed error lazily", () => {

@@ -1,8 +1,15 @@
 # macOS
 .DS_Store
+._*
+.Spotlight-V100
+.Trashes
 
-# Node
+# Node & Build Outputs
 node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+*.log
 
 # Environment / secrets
 .env
@@ -15,9 +22,13 @@ node_modules/
 .cursor/
 .agents/
 skills-lock.json
+.vscode/
+.idea/
 
-# Screen recordings and other local capture
+# Screen recordings and local captures
 *.mov
+Screen Recording *
+Screen Shot *
 
 # Regeneratable render output
 tools/intro-render/out/

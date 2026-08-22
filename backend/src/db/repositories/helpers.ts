@@ -12,11 +12,3 @@ export async function queryDatabase<Row extends Record<string, unknown>>(
     throw new DatabaseOperationError(error);
   }
 }
-
-export function isUniqueViolation(error: unknown): boolean {
-  if (error instanceof DatabaseOperationError) {
-    const original = error.originalError as { code?: unknown };
-    return original?.code === "23505";
-  }
-  return false;
-}

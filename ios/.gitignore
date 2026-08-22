@@ -1,11 +1,17 @@
 # Build artefacts
 .derivedData/
+DerivedData/
 build/
+.build/
 
 # Xcode per-user state
 *.xcuserstate
 xcuserdata/
 *.xcworkspace/xcuserdata/
+*.xcbkptlist
+*.mode1v3
+*.mode2v3
+*.perspectivev3
 
 # IDE workspace checks (machine-generated on first open)
 xcshareddata/IDEWorkspaceChecks.plist
@@ -23,3 +29,4 @@ Roam/Config/Release.local.xcconfig
 
 # macOS
 .DS_Store
+._*

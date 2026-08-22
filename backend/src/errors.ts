@@ -11,10 +11,6 @@ export type PublicErrorCode =
   | "SERVICE_UNAVAILABLE"
   | "INTERNAL_ERROR";
 
-export function isDatabaseConfigured(): boolean {
-  return Boolean(process.env.DATABASE_URL?.trim());
-}
-
 export class RequestValidationError extends Error {
   constructor(message: string) {
     super(message);

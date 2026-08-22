@@ -149,10 +149,7 @@ export async function upsertDrives(userId: string, drives: DriveInputRecord[]): 
   }).join(",\n");
 
   const result = await queryDatabase<DriveRow>(getPool(), `
-    INSERT INTO drives (
-      id, user_id, started_at, duration_seconds, distance_meters, score,
-      top_speed_meters_per_second, event_count, recording_time_zone_identifier, payload
-    )
+    INSERT INTO drives (\n      id, user_id, started_at, duration_seconds, distance_meters, score,\n      top_speed_meters_per_second, event_count, recording_time_zone_identifier, payload\n    )
     VALUES ${placeholders}
     ON CONFLICT (id) DO UPDATE SET
       started_at = EXCLUDED.started_at,
@@ -177,15 +174,6 @@ export async function softDeleteDrive(userId: string, driveId: string): Promise<
     WHERE user_id = $1 AND id = $2 AND deleted_at IS NULL
   `, [userId, driveId]);
   return (result.rowCount ?? 0) > 0;
-}
-
-export async function countDrives(userId: string): Promise<number> {
-  const result = await queryDatabase<{ count: number | string }>(getPool(), `
-    SELECT COUNT(*)::int AS count
-    FROM drives
-    WHERE user_id = $1 AND deleted_at IS NULL
-  `, [userId]);
-  return Number(result.rows[0]?.count ?? 0);
 }
 
 export async function aggregateDriveStats(userId: string): Promise<DriveStats> {
