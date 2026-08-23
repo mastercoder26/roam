@@ -152,7 +152,7 @@ export function RouteResults({
       </div>
 
       <div>
-        <SectionHeader title="Route preview" subtitle="Projected from the returned polyline — no map tiles or API key needed." />
+        <SectionHeader title="Route map" subtitle="Explore the surrounding roads with the scored route highlighted." />
         <Card className="!p-0 overflow-hidden">
           <div className="h-[220px] w-full bg-card-elevated">
             <RoutePolylinePreview

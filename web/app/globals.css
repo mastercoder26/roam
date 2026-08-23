@@ -67,3 +67,30 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 .roam-spin {
   animation: roam-spin 0.9s linear infinite;
 }
+
+.route-map {
+  isolation: isolate;
+  background: var(--card-elevated);
+  font-family: inherit;
+}
+
+.route-map .leaflet-control-zoom a {
+  border-color: var(--card-stroke);
+  background: rgba(30, 30, 30, 0.94);
+  color: var(--ink-primary);
+}
+
+.route-map .leaflet-control-zoom a:hover {
+  background: rgb(42, 42, 42);
+  color: white;
+}
+
+.route-map .leaflet-control-attribution {
+  background: rgba(18, 18, 18, 0.78);
+  color: var(--ink-secondary);
+  font-size: 9px;
+}
+
+.route-map .leaflet-control-attribution a {
+  color: rgb(123, 181, 255);
+}
