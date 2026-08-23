@@ -1,24 +1,53 @@
 # Roam
+
 <img width="386" height="784" alt="image" src="https://github.com/user-attachments/assets/80156598-fa92-4164-9c1e-fb3df10d2bfd" />
 
 Roam is an iPhone driving coach for families helping a new driver build real experience. It gives them a clearer view of a route before leaving, then turns recorded practice drives into feedback they can actually use.
 
-The repo includes the native iOS app, a web route-planning demo, and the backend route analysis service that powers difficulty scoring.
-
-## How it works
-
-Pick a start, destination, and departure time. Roam analyzes the route shape, maneuvers, traffic-aware timing, daylight, weather, and available road data, then returns a difficulty score with the reasons behind it.
-
-The iOS app keeps the main experience in four tabs: Routes, Drive, Progress, and Profile. Routes handles planning and practice routes. Drive records a session only after the driver starts it. Progress turns qualifying drives into measured miles, coverage, and route-adjusted coaching history.
-
-Drive recording is local-first. The app uses CoreLocation and CoreMotion to filter weak GPS, measure speed changes, and flag events like hard braking, rapid acceleration, sharp cornering, and unstable phone movement. Signed-in users can sync profile and drive history through the data API.
+The project includes the native iOS app, a web route-planning demo, and the backend services that power route scoring and account sync.
 
 ## Features
 
-- Route difficulty scores with reasons, hotspots, alternates, and confidence
-- Departure-time comparison for the same trip
-- Guided practice plans based on route demands
-- Manual drive recording with GPS and motion-based events
-- Progress tracking for measured miles, after-dark driving, faster roads, and weekly history
-- Shared route import from Apple Maps and Google Maps
-- Live Activity and CarPlay views for an active drive
+The iPhone app is organized into four tabs:
+
+- **Routes** is where a driver plans a trip. It scores the route, explains the difficult parts, compares alternatives and departure times, checks the route against recorded experience, and can queue it for practice.
+- **Drive** runs a manually started driving session. It shows live speed, time, and distance, records GPS and phone motion, flags events such as hard braking or sharp cornering, and keeps past drives available for review.
+- **Progress** turns qualifying drives into a longer-term view of the driver's experience. It tracks measured miles, after-dark driving, faster-road exposure, weekly activity, and a route-adjusted coaching score.
+- **Profile** holds the driver's name and licensing stage, driving insights, appearance settings, and account controls. Signed-in users can also back up their profile, saved routes, and drive history.
+
+Roam also supports shared routes from Apple Maps and Google Maps, a Live Activity during an active drive, and a CarPlay dashboard for viewing the current session.
+
+## How it works
+
+For route planning, Roam sends the start, destination, and departure time to its route-analysis service. The service combines route geometry, maneuvers, traffic-aware timing, daylight, weather, and available road data. It returns a difficulty score along with the reasons, hotspots, confidence, and alternate routes behind it.
+
+Drive recording stays local-first. The iOS app uses CoreLocation and CoreMotion to reject weak GPS readings, measure changes in speed and direction, and identify coaching events. Qualifying drives feed the Progress and readiness views, while signed-in users can sync their saved data through the separate data API.
+
+## Tech and deployment
+
+The iOS app is built with SwiftUI. The web demo uses Next.js, and the backend is an Express and TypeScript service. That backend is deployed twice with different responsibilities:
+
+```mermaid
+flowchart TB
+    PHONE["iPhone GPS and motion"]
+    IOS["iOS app<br/>SwiftUI"]
+    WEB["Web demo<br/>Next.js"]
+    LOCAL["On-device scoring<br/>Local-first drive history"]
+    CLOUD["Cloud Run<br/>roam-backend"]
+    SOURCES["Google Routes and Roads<br/>Open-Meteo<br/>OpenStreetMap"]
+    CLERK["Clerk authentication"]
+    RENDER["Render<br/>roam-data-api"]
+    DB[("Render Postgres<br/>roam-db")]
+
+    PHONE -->|GPS and motion| IOS
+    IOS -->|manual drive processing| LOCAL
+    IOS <-->|route requests and results| CLOUD
+    WEB <-->|route requests and results| CLOUD
+    CLOUD <-->|routing and live context| SOURCES
+    CLERK -->|token verification| CLOUD
+    CLERK -->|token verification| RENDER
+    IOS <-->|profile, drives, and saved routes| RENDER
+    RENDER <-->|reads and writes| DB
+```
+
+Cloud Run handles route difficulty and departure comparisons without a database. Render is created from `render.yaml`; it runs database migrations when the service starts and connects `roam-data-api` to the managed `roam-db` Postgres instance. Keeping the two deployments separate lets route scoring stay stateless while account data remains behind an authenticated API.
