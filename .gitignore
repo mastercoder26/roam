@@ -6,6 +6,9 @@
 
 # Node & Build Outputs
 node_modules/
+.next/
+.vercel/
+.npm-cache/
 dist/
 coverage/
 *.tsbuildinfo
