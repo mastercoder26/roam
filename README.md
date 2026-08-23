@@ -1,7 +1,7 @@
 # Roam
 <img width="386" height="784" alt="image" src="https://github.com/user-attachments/assets/80156598-fa92-4164-9c1e-fb3df10d2bfd" />
 
-Roam helps families plan for a drive and practise safer driving. Four tabs:
+Roam helps families plan for a drive and practice safer driving. Four tabs:
 
 - **Routes** scores a planned route's driving difficulty, compares the returned
   choices against privately recorded experience, offers guided practice plans,
@@ -18,8 +18,6 @@ Roam helps families plan for a drive and practise safer driving. Four tabs:
   and stores only the display name and licensing stage, both self-declared and
   excluded from every score.
 
-This is a prototype, not a safety system or an emergency service. A drive score
-is coaching feedback, not a guarantee that a person or route is safe.
 
 ## How scoring uses data
 
