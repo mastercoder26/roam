@@ -30,6 +30,22 @@ export default function RootLayout({
     >
       <html lang="en" className="dark">
         <body className="min-h-screen bg-canvas font-sans text-ink-primary antialiased">
+          <aside className="border-b border-accent/25 bg-accent/[0.09] px-5 py-3">
+            <div className="mx-auto flex max-w-4xl flex-col items-start justify-between gap-2.5 sm:flex-row sm:items-center">
+              <p className="max-w-2xl text-[13px] leading-relaxed text-ink-secondary">
+                <strong className="font-semibold text-ink-primary">Basic web demo:</strong>{" "}
+                This is an extremely basic version of Roam. The full app is optimized for iOS and could not be deployed here. Watch the walkthrough to see every feature and the complete iOS experience.
+              </p>
+              <a
+                href="https://youtu.be/4EA2f0rQKrM"
+                target="_blank"
+                rel="noreferrer"
+                className="shrink-0 rounded-full bg-accent px-3.5 py-2 text-[12px] font-semibold text-white transition-transform hover:scale-[1.02] active:scale-[0.98]"
+              >
+                Watch all features ↗
+              </a>
+            </div>
+          </aside>
           <NavBar />
           <main className="mx-auto w-full max-w-4xl px-5 pb-24 pt-6">
             {children}
