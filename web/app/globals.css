@@ -1,0 +1,69 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --canvas: rgb(18, 18, 18);
+  --card: rgb(30, 30, 30);
+  --card-elevated: rgb(36, 36, 36);
+  --accent: rgb(5, 107, 235);
+  --safety: rgb(255, 148, 0);
+  --danger: rgb(209, 46, 43);
+  --positive: rgb(51, 199, 89);
+  --ink-primary: rgb(241, 241, 241);
+  --ink-secondary: rgba(255, 255, 255, 0.6);
+  --ink-tertiary: rgba(255, 255, 255, 0.38);
+  --ink-label: rgba(255, 255, 255, 0.64);
+  --card-stroke: rgba(255, 255, 255, 0.1);
+  --card-stroke-strong: rgba(255, 255, 255, 0.16);
+  --difficulty-very-easy: rgb(77, 209, 115);
+  --difficulty-easy: rgb(122, 219, 107);
+  --difficulty-moderate: rgb(247, 199, 56);
+  --difficulty-hard: rgb(255, 153, 64);
+  --difficulty-very-hard: rgb(255, 107, 82);
+}
+
+html,
+body {
+  background-color: rgb(18, 18, 18);
+  color: rgb(241, 241, 241);
+}
+
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+::selection {
+  background-color: rgba(5, 107, 235, 0.35);
+}
+
+input[type="datetime-local"]::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+  opacity: 0.7;
+  cursor: pointer;
+}
+
+@keyframes roam-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.roam-reveal {
+  animation: roam-fade-up 0.36s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes roam-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.roam-spin {
+  animation: roam-spin 0.9s linear infinite;
+}
