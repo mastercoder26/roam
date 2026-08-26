@@ -6,6 +6,7 @@ import {
   handleDepartureComparison,
   handleDifficulty,
 } from "./src/handlers/difficulty.js";
+import { handleAddressAutocomplete } from "./src/handlers/places.js";
 import { createRequestId, logInternalFailure, logRateLimited } from "./src/errors.js";
 import { createRateLimiter } from "./src/utils/rateLimiter.js";
 import {
@@ -183,6 +184,14 @@ app.post(
   requireVerifiedIdentity,
   rateLimit("departure-comparison"),
   asyncHandler(handleDepartureComparison)
+);
+
+app.get(
+  "/api/places/autocomplete",
+  rateLimit("places-autocomplete"),
+  requireVerifiedIdentity,
+  rateLimit("places-autocomplete"),
+  asyncHandler(handleAddressAutocomplete)
 );
 
 app.get("/api/auth/me", authRateLimit, requireAuth, asyncHandler(handleMe));

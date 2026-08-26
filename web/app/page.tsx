@@ -2,25 +2,25 @@ import { RouteForm } from "@/components/route/RouteForm";
 
 export default function HomePage() {
   return (
-    <div className="flex flex-col gap-24 sm:gap-32">
-      <section className="relative isolate min-h-[760px] lg:min-h-[720px]">
+    <div className="flex flex-col gap-20 sm:gap-24">
+      <section className="relative isolate min-h-[720px] lg:min-h-[680px]">
         <div className="roam-enter relative z-10 flex items-center justify-between border-t-2 border-ink-primary pt-3 text-[10px] font-bold uppercase tracking-[0.18em] text-ink-label">
           <span>Roam / Route intelligence</span>
           <span>Web edition · 01</span>
         </div>
 
-        <div className="relative z-10 mt-10 lg:mt-14">
-          <h1 className="roam-enter roam-enter-delay-1 max-w-5xl text-[clamp(4.2rem,12.5vw,9.6rem)] font-black leading-[0.78] tracking-[-0.075em] text-ink-primary">
+        <div className="relative z-10 mt-9 lg:mt-12">
+          <h1 className="roam-enter roam-enter-delay-1 max-w-5xl text-[clamp(4.1rem,11.5vw,8.8rem)] font-black leading-[0.82] tracking-[-0.068em] text-ink-primary">
             Read the road.
             <span className="block text-accent">Own the drive.</span>
           </h1>
         </div>
 
-        <div className="roam-enter roam-enter-delay-2 mt-10 lg:absolute lg:right-0 lg:top-10 lg:z-0 lg:mt-0 lg:w-[58%]">
+        <div className="roam-enter roam-enter-delay-2 mt-9 lg:absolute lg:right-0 lg:top-9 lg:z-0 lg:mt-0 lg:w-[57%]">
           <RouteSketch />
         </div>
 
-        <div className="relative z-10 mt-9 grid gap-6 border-t border-ink-primary/20 pt-5 sm:grid-cols-[1fr_auto] lg:absolute lg:bottom-0 lg:left-0 lg:w-[46%]">
+        <div className="relative z-10 mt-8 grid gap-5 border-t border-ink-primary/20 pt-5 sm:grid-cols-[1fr_auto] lg:absolute lg:bottom-0 lg:left-0 lg:w-[46%]">
           <p className="roam-enter roam-enter-delay-3 max-w-md text-[17px] leading-7 text-ink-secondary">
             Traffic, weather, turns, speed, and road complexity—read before
             you leave, then explained without the mystery.

@@ -34,8 +34,8 @@ export default function RootLayout({
       <html lang="en" data-scroll-behavior="smooth">
         <body className="min-h-screen bg-canvas font-sans text-ink-primary antialiased">
           <aside className="border-b border-white/10 bg-ink-primary px-5 py-2.5 text-white">
-            <div className="mx-auto flex max-w-6xl items-center justify-center gap-2 text-center text-xs sm:text-sm">
-              <span className="hidden text-white/70 sm:inline">See the complete Roam experience.</span>
+            <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-center gap-x-2 gap-y-1 text-center text-xs sm:text-sm">
+              <span className="text-white/70">This is an extremely basic web demo. See the complete Roam experience.</span>
               <a
                 href="https://youtu.be/4EA2f0rQKrM"
                 target="_blank"

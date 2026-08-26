@@ -24,6 +24,30 @@ export interface AnalyzeRouteParams {
   includeAlternates?: boolean;
 }
 
+export interface AddressSuggestion {
+  placeId: string;
+  label: string;
+}
+
+export async function suggestAddresses(
+  input: string,
+  accessToken: string,
+  signal?: AbortSignal,
+): Promise<AddressSuggestion[]> {
+  const response = await fetch(
+    `${API_BASE_URL}/api/places/autocomplete?input=${encodeURIComponent(input.trim())}`,
+    {
+      headers: { Authorization: `Bearer ${accessToken}` },
+      signal,
+    }
+  );
+
+  if (!response.ok) return [];
+
+  const body = await response.json() as { suggestions?: AddressSuggestion[] };
+  return Array.isArray(body.suggestions) ? body.suggestions : [];
+}
+
 /**
  * Calls the same deployed Cloud Run route-analysis backend the iOS app uses
  * (`roam-backend`). It verifies only a Clerk session token

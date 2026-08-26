@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useAuth, SignedIn, SignedOut, SignInButton } from "@clerk/nextjs";
 import { Card, MicroLabel } from "@/components/ui/Card";
 import { RouteResults } from "@/components/route/RouteResults";
-import { analyzeRoute, RoamApiError } from "@/lib/roamApi";
+import { analyzeRoute, RoamApiError, suggestAddresses } from "@/lib/roamApi";
 import {
   defaultDepartureDate,
   fromDateTimeLocalValue,
@@ -48,6 +48,16 @@ export function RouteForm() {
   const addressSuggestions = useMemo(
     () => Array.from(new Set([...recentAddresses, ...EXAMPLE_ROUTES.flatMap((route) => [route.origin, route.destination])])),
     [recentAddresses]
+  );
+  const originMatches = useAddressSuggestions(origin, Boolean(isSignedIn), getToken);
+  const destinationMatches = useAddressSuggestions(destination, Boolean(isSignedIn), getToken);
+  const originSuggestions = useMemo(
+    () => Array.from(new Set([...originMatches, ...addressSuggestions])),
+    [originMatches, addressSuggestions]
+  );
+  const destinationSuggestions = useMemo(
+    () => Array.from(new Set([...destinationMatches, ...addressSuggestions])),
+    [destinationMatches, addressSuggestions]
   );
 
   const canAnalyze =
@@ -137,7 +147,7 @@ export function RouteForm() {
             placeholder="Street address, city, or landmark"
             iconColor="var(--accent)"
             listId="origin-addresses"
-            suggestions={addressSuggestions}
+            suggestions={originSuggestions}
             autoComplete="section-origin street-address"
             action={
               <button
@@ -158,7 +168,7 @@ export function RouteForm() {
             placeholder="Street address, city, or landmark"
             iconColor="var(--ink-secondary)"
             listId="destination-addresses"
-            suggestions={addressSuggestions}
+            suggestions={destinationSuggestions}
             autoComplete="section-destination street-address"
           />
           {origin.trim() && destination.trim() ? (
@@ -264,6 +274,46 @@ export function RouteForm() {
   );
 }
 
+function useAddressSuggestions(
+  value: string,
+  enabled: boolean,
+  getToken: () => Promise<string | null>,
+): string[] {
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+
+  useEffect(() => {
+    const input = value.trim();
+    if (!enabled || input.length < 3) {
+      setSuggestions([]);
+      return;
+    }
+
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => {
+      void getToken()
+        .then((token) => token
+          ? suggestAddresses(input, token, controller.signal)
+          : []
+        )
+        .then((matches) => {
+          if (!controller.signal.aborted) {
+            setSuggestions(matches.map((match) => match.label));
+          }
+        })
+        .catch(() => {
+          if (!controller.signal.aborted) setSuggestions([]);
+        });
+    }, 250);
+
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [enabled, getToken, value]);
+
+  return suggestions;
+}
+
 function FieldRow({
   label,
   value,
@@ -285,6 +335,26 @@ function FieldRow({
   autoComplete: string;
   action?: React.ReactNode;
 }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(-1);
+  const normalizedValue = value.trim().toLowerCase();
+  const visibleSuggestions = normalizedValue.length >= 3
+    ? suggestions
+      .filter((suggestion) => {
+        const normalizedSuggestion = suggestion.toLowerCase();
+        return normalizedSuggestion.includes(normalizedValue)
+          && normalizedSuggestion !== normalizedValue;
+      })
+      .slice(0, 5)
+    : [];
+  const listboxId = `${listId}-listbox`;
+
+  function chooseSuggestion(suggestion: string) {
+    onChange(suggestion);
+    setIsOpen(false);
+    setActiveIndex(-1);
+  }
+
   return (
     <div className="flex items-start gap-3.5 px-[18px] py-[17px] pr-14">
       <span
@@ -296,18 +366,71 @@ function FieldRow({
           <MicroLabel>{label}</MicroLabel>
           {action}
         </div>
-        <input
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
-          placeholder={placeholder}
-          list={listId}
-          autoComplete={autoComplete}
-          enterKeyHint="next"
-          className="w-full bg-transparent text-[16px] font-medium text-ink-primary placeholder:text-ink-tertiary outline-none"
-        />
-        <datalist id={listId}>
-          {suggestions.map((suggestion) => <option key={suggestion} value={suggestion} />)}
-        </datalist>
+        <div className="relative">
+          <input
+            value={value}
+            onChange={(event) => {
+              onChange(event.target.value);
+              setIsOpen(true);
+              setActiveIndex(-1);
+            }}
+            onFocus={() => setIsOpen(true)}
+            onBlur={() => window.setTimeout(() => setIsOpen(false), 100)}
+            onKeyDown={(event) => {
+              if (visibleSuggestions.length === 0) return;
+              if (event.key === "ArrowDown") {
+                event.preventDefault();
+                setIsOpen(true);
+                setActiveIndex((index) => (index + 1) % visibleSuggestions.length);
+              } else if (event.key === "ArrowUp") {
+                event.preventDefault();
+                setIsOpen(true);
+                setActiveIndex((index) => index <= 0 ? visibleSuggestions.length - 1 : index - 1);
+              } else if (event.key === "Enter" && activeIndex >= 0) {
+                event.preventDefault();
+                chooseSuggestion(visibleSuggestions[activeIndex]);
+              } else if (event.key === "Escape") {
+                setIsOpen(false);
+                setActiveIndex(-1);
+              }
+            }}
+            placeholder={placeholder}
+            autoComplete={autoComplete}
+            enterKeyHint="next"
+            role="combobox"
+            aria-autocomplete="list"
+            aria-expanded={isOpen && visibleSuggestions.length > 0}
+            aria-controls={listboxId}
+            aria-activedescendant={activeIndex >= 0 ? `${listboxId}-${activeIndex}` : undefined}
+            className="w-full bg-transparent text-[16px] font-medium text-ink-primary placeholder:text-ink-tertiary outline-none"
+          />
+          {isOpen && visibleSuggestions.length > 0 ? (
+            <div
+              id={listboxId}
+              role="listbox"
+              className="absolute left-0 right-0 top-full z-40 mt-3 border border-ink-primary/20 bg-card py-1 shadow-roam-lg"
+            >
+              {visibleSuggestions.map((suggestion, index) => (
+                <button
+                  id={`${listboxId}-${index}`}
+                  key={suggestion}
+                  type="button"
+                  role="option"
+                  aria-selected={index === activeIndex}
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={() => chooseSuggestion(suggestion)}
+                  className={`block w-full px-3 py-2.5 text-left text-sm leading-5 transition-colors ${
+                    index === activeIndex
+                      ? "bg-accent text-white"
+                      : "text-ink-primary hover:bg-accent/[0.08]"
+                  }`}
+                >
+                  {suggestion}
+                </button>
+              ))}
+            </div>
+          ) : null}
+        </div>
       </div>
     </div>
   );
