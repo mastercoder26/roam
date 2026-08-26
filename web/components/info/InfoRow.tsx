@@ -78,5 +78,5 @@ export function NumberedStep({
 }
 
 export function Divider() {
-  return <div className="border-t border-white/[0.06]" />;
+  return <div className="border-t border-card" />;
 }

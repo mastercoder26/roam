@@ -8,6 +8,7 @@ import {
   SignInButton,
   UserButton,
 } from "@clerk/nextjs";
+import { BrandLogo } from "@/components/BrandLogo";
 
 const TABS = [
   { href: "/", label: "Routes", icon: RoutesIcon },
@@ -19,21 +20,11 @@ export function NavBar() {
   const pathname = usePathname();
 
   return (
-    <header className="sticky top-0 z-30 border-b border-card bg-canvas/85 backdrop-blur-lg">
-      <div className="mx-auto flex max-w-4xl items-center justify-between gap-3 px-5 py-3">
-        <Link href="/" className="flex items-center gap-2 shrink-0">
-          <span
-            className="flex h-8 w-8 items-center justify-center rounded-full text-[15px] font-bold text-white"
-            style={{ background: "linear-gradient(145deg, rgb(5,107,235), rgb(20,60,150))" }}
-          >
-            R
-          </span>
-          <span className="text-[17px] font-bold tracking-[-0.3px] text-ink-primary">
-            Roam
-          </span>
-        </Link>
+    <header className="sticky top-0 z-30 border-b border-card bg-canvas/90 backdrop-blur-xl">
+      <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-5 py-3.5 sm:px-8">
+        <BrandLogo compact />
 
-        <nav className="flex flex-1 items-center justify-center gap-1 rounded-full border border-card bg-card p-1">
+        <nav aria-label="Primary navigation" className="flex items-center justify-center gap-0.5 rounded-full border border-card bg-card/85 p-1 shadow-roam">
           {TABS.map((tab) => {
             const active =
               tab.href === "/" ? pathname === "/" : pathname?.startsWith(tab.href);
@@ -42,10 +33,12 @@ export function NavBar() {
               <Link
                 key={tab.href}
                 href={tab.href}
-                className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[13px] font-semibold transition-colors ${
+                aria-label={tab.label}
+                aria-current={active ? "page" : undefined}
+                className={`flex items-center gap-1.5 rounded-full px-3 py-2 text-[13px] font-semibold transition-all ${
                   active
                     ? "bg-accent text-white"
-                    : "text-ink-secondary hover:text-ink-primary"
+                    : "text-ink-secondary hover:bg-card-elevated hover:text-ink-primary"
                 }`}
               >
                 <Icon className="h-4 w-4 shrink-0" />
@@ -58,7 +51,7 @@ export function NavBar() {
         <div className="flex shrink-0 items-center gap-3">
           <SignedOut>
             <SignInButton mode="modal">
-              <button className="rounded-full bg-ink-primary px-4 py-2 text-[13px] font-semibold text-canvas transition-transform active:scale-95">
+              <button className="rounded-full bg-ink-primary px-4 py-2.5 text-[13px] font-semibold text-white transition-transform hover:-translate-y-0.5 active:translate-y-0">
                 Sign in
               </button>
             </SignInButton>

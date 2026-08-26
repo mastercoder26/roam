@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useAuth, SignedIn, SignedOut, SignInButton } from "@clerk/nextjs";
 import { Card, MicroLabel } from "@/components/ui/Card";
 import { RouteResults } from "@/components/route/RouteResults";
@@ -13,10 +13,12 @@ import {
 import type { DifficultyResponse } from "@/lib/types";
 
 const EXAMPLE_ROUTES = [
-  { origin: "Austin, TX", destination: "Dallas, TX" },
-  { origin: "San Francisco, CA", destination: "San Jose, CA" },
-  { origin: "Boston, MA", destination: "New York, NY" },
+  { origin: "Austin, TX", destination: "Dallas, TX", label: "Austin → Dallas" },
+  { origin: "San Francisco, CA", destination: "San Jose, CA", label: "SF → San Jose" },
+  { origin: "Boston, MA", destination: "New York, NY", label: "Boston → New York" },
 ];
+
+const RECENT_ADDRESSES_KEY = "roam.recent-addresses";
 
 export function RouteForm() {
   const { isSignedIn, isLoaded, getToken } = useAuth();
@@ -28,6 +30,25 @@ export function RouteForm() {
   const [result, setResult] = useState<DifficultyResponse | null>(null);
   const [submittedOrigin, setSubmittedOrigin] = useState("");
   const [submittedDestination, setSubmittedDestination] = useState("");
+  const [recentAddresses, setRecentAddresses] = useState<string[]>([]);
+  const [isLocating, setIsLocating] = useState(false);
+
+  useEffect(() => {
+    try {
+      const stored = window.localStorage.getItem(RECENT_ADDRESSES_KEY);
+      const parsed: unknown = stored ? JSON.parse(stored) : [];
+      if (Array.isArray(parsed)) {
+        setRecentAddresses(parsed.filter((value): value is string => typeof value === "string").slice(0, 6));
+      }
+    } catch {
+      // Route planning still works when storage is unavailable or malformed.
+    }
+  }, []);
+
+  const addressSuggestions = useMemo(
+    () => Array.from(new Set([...recentAddresses, ...EXAMPLE_ROUTES.flatMap((route) => [route.origin, route.destination])])),
+    [recentAddresses]
+  );
 
   const canAnalyze =
     origin.trim().length > 0 && destination.trim().length > 0 && !isLoading;
@@ -40,6 +61,39 @@ export function RouteForm() {
   function applyExample(example: { origin: string; destination: string }) {
     setOrigin(example.origin);
     setDestination(example.destination);
+  }
+
+  function rememberAddresses(values: string[]) {
+    const next = Array.from(new Set([...values.map((value) => value.trim()), ...recentAddresses]))
+      .filter(Boolean)
+      .slice(0, 6);
+    setRecentAddresses(next);
+    try {
+      window.localStorage.setItem(RECENT_ADDRESSES_KEY, JSON.stringify(next));
+    } catch {
+      // Recent suggestions are a convenience, not a requirement.
+    }
+  }
+
+  function useCurrentLocation() {
+    if (!navigator.geolocation) {
+      setError("This browser does not support current-location autofill. Enter your starting address instead.");
+      return;
+    }
+
+    setIsLocating(true);
+    setError(null);
+    navigator.geolocation.getCurrentPosition(
+      ({ coords }) => {
+        setOrigin(`${coords.latitude.toFixed(6)}, ${coords.longitude.toFixed(6)}`);
+        setIsLocating(false);
+      },
+      () => {
+        setError("Roam could not access your location. Check browser permission or enter your starting address.");
+        setIsLocating(false);
+      },
+      { enableHighAccuracy: true, timeout: 10_000, maximumAge: 60_000 }
+    );
   }
 
   async function handleSubmit(event: React.FormEvent) {
@@ -60,6 +114,7 @@ export function RouteForm() {
       setResult(response);
       setSubmittedOrigin(origin.trim());
       setSubmittedDestination(destination.trim());
+      rememberAddresses([origin, destination]);
     } catch (err) {
       setResult(null);
       setError(
@@ -72,108 +127,127 @@ export function RouteForm() {
 
   return (
     <div className="flex flex-col gap-6">
-      <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-        <Card className="relative flex flex-col divide-y divide-white/[0.06] !p-0">
+      <form onSubmit={handleSubmit} className="rounded-[28px] border border-card bg-card p-4 shadow-roam-md sm:p-6">
+        <div className="grid gap-4 lg:grid-cols-[1fr_280px]">
+          <Card className="relative flex flex-col divide-y divide-card !rounded-[22px] !p-0 !shadow-none">
           <FieldRow
             label="FROM"
             value={origin}
             onChange={setOrigin}
-            placeholder="Enter a starting location"
-            iconColor="rgb(5,107,235)"
+            placeholder="Street address, city, or landmark"
+            iconColor="var(--accent)"
+            listId="origin-addresses"
+            suggestions={addressSuggestions}
+            autoComplete="section-origin street-address"
+            action={
+              <button
+                type="button"
+                onClick={useCurrentLocation}
+                disabled={isLocating}
+                className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-accent/[0.08] px-2.5 py-1.5 text-[11px] font-bold text-accent transition-colors hover:bg-accent/[0.14] disabled:opacity-60"
+              >
+                <LocationArrowIcon className="h-3.5 w-3.5" />
+                {isLocating ? "Locating…" : "Use my location"}
+              </button>
+            }
           />
           <FieldRow
             label="TO"
             value={destination}
             onChange={setDestination}
-            placeholder="Enter a destination"
+            placeholder="Street address, city, or landmark"
             iconColor="var(--ink-secondary)"
+            listId="destination-addresses"
+            suggestions={addressSuggestions}
+            autoComplete="section-destination street-address"
           />
           {origin.trim() && destination.trim() ? (
             <button
               type="button"
               onClick={swap}
               aria-label="Swap starting location and destination"
-              className="absolute right-2.5 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border border-card-strong bg-card-elevated text-ink-primary transition-transform active:scale-90"
+              className="absolute right-3 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-card-strong bg-card text-ink-primary shadow-roam transition-transform hover:rotate-180 active:scale-90"
             >
               <SwapIcon className="h-4 w-4" />
             </button>
           ) : null}
-        </Card>
+          </Card>
 
-        <Card className="flex items-center gap-2.5">
-          <CalendarIcon className="h-5 w-5 shrink-0 text-ink-secondary" />
-          <input
-            type="datetime-local"
-            value={toDateTimeLocalValue(departure)}
-            onChange={(event) => {
-              const parsed = fromDateTimeLocalValue(event.target.value);
-              if (parsed) setDeparture(parsed);
-            }}
-            className="w-full bg-transparent text-[15px] font-medium text-ink-primary outline-none [color-scheme:dark]"
-          />
-        </Card>
+          <div className="flex flex-col gap-3">
+            <label className="flex flex-1 items-center gap-3 rounded-[20px] border border-card bg-card-elevated px-4 py-3.5">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-card text-accent shadow-roam">
+                <CalendarIcon className="h-[18px] w-[18px]" />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="mb-1 block text-[10px] font-bold uppercase tracking-[0.12em] text-ink-label">Leave around</span>
+                <input
+                  type="datetime-local"
+                  value={toDateTimeLocalValue(departure)}
+                  onChange={(event) => {
+                    const parsed = fromDateTimeLocalValue(event.target.value);
+                    if (parsed) setDeparture(parsed);
+                  }}
+                  className="w-full bg-transparent text-[13px] font-bold text-ink-primary outline-none"
+                />
+              </span>
+            </label>
+
+            <SignedIn>
+              <button
+                type="submit"
+                disabled={!canAnalyze}
+                className={`flex min-h-14 items-center justify-center gap-2 rounded-[18px] px-5 text-[15px] font-bold transition-all active:scale-[0.98] ${
+                  canAnalyze
+                    ? "bg-accent text-white shadow-roam-lg hover:-translate-y-0.5"
+                    : "cursor-not-allowed bg-disabled text-ink-tertiary"
+                }`}
+              >
+                {isLoading ? (
+                  <><span className="roam-spin h-4 w-4 rounded-full border-2 border-white/30 border-t-white" />Analyzing route</>
+                ) : (
+                  <><SparkleIcon className="h-4 w-4" />Analyze difficulty</>
+                )}
+              </button>
+            </SignedIn>
+            <SignedOut>
+              <SignInButton mode="modal">
+                <button type="button" className="flex min-h-14 items-center justify-center gap-2 rounded-[18px] bg-accent px-5 text-[15px] font-bold text-white shadow-roam-lg transition-all hover:-translate-y-0.5 active:translate-y-0">
+                  Sign in to analyze
+                </button>
+              </SignInButton>
+            </SignedOut>
+          </div>
+        </div>
 
         {!origin && !destination ? (
-          <div className="flex flex-wrap gap-2">
+          <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-card pt-4">
+            <span className="mr-1 text-[11px] font-bold uppercase tracking-[0.1em] text-ink-label">Try a route</span>
             {EXAMPLE_ROUTES.map((example) => (
               <button
                 key={example.origin}
                 type="button"
                 onClick={() => applyExample(example)}
-                className="rounded-full border border-card bg-card px-3 py-1.5 text-xs font-medium text-ink-secondary transition-colors hover:border-card-strong hover:text-ink-primary"
+                className="rounded-full border border-card bg-card-elevated px-3 py-1.5 text-xs font-semibold text-ink-secondary transition-colors hover:border-accent/30 hover:text-accent"
               >
-                {example.origin} → {example.destination}
+                {example.label}
               </button>
             ))}
           </div>
         ) : null}
 
         {error ? (
-          <div className="flex items-start gap-2.5 rounded-roam bg-safety/10 px-4 py-3.5 text-sm text-ink-primary">
+          <div className="mt-4 flex items-start gap-2.5 rounded-2xl border border-safety/20 bg-safety/[0.07] px-4 py-3.5 text-sm text-ink-primary">
             <WarningIcon className="h-4 w-4 shrink-0 translate-y-0.5 text-safety" />
             <span>{error}</span>
           </div>
         ) : null}
 
-        <SignedIn>
-          <button
-            type="submit"
-            disabled={!canAnalyze}
-            className={`flex items-center justify-center gap-2 rounded-full py-[17px] text-[16px] font-semibold transition-transform active:scale-[0.98] ${
-              canAnalyze
-                ? "bg-ink-primary text-canvas shadow-roam-lg"
-                : "cursor-not-allowed bg-white/10 text-ink-tertiary"
-            }`}
-          >
-            {isLoading ? (
-              <>
-                <span className="roam-spin h-4 w-4 rounded-full border-2 border-canvas/30 border-t-canvas" />
-                Analyzing route
-              </>
-            ) : (
-              <>
-                <SparkleIcon className="h-4 w-4" />
-                Analyze difficulty
-              </>
-            )}
-          </button>
-        </SignedIn>
-        <SignedOut>
-          <SignInButton mode="modal">
-            <button
-              type="button"
-              className="flex items-center justify-center gap-2 rounded-full bg-ink-primary py-[17px] text-[16px] font-semibold text-canvas shadow-roam-lg transition-transform active:scale-[0.98]"
-            >
-              Sign in to analyze this route
-            </button>
-          </SignInButton>
-        </SignedOut>
         {!isLoaded ? (
-          <p className="text-center text-xs text-ink-tertiary">
+          <p className="mt-3 text-center text-xs text-ink-tertiary">
             Loading your session…
           </p>
         ) : !isSignedIn ? (
-          <p className="text-center text-xs text-ink-tertiary">
+          <p className="mt-3 text-center text-xs leading-5 text-ink-tertiary">
             Roam scores routes with the same live backend as the iOS app,
             which requires a signed-in session to call Google&apos;s routing
             APIs responsibly.
@@ -198,29 +272,54 @@ function FieldRow({
   onChange,
   placeholder,
   iconColor,
+  listId,
+  suggestions,
+  autoComplete,
+  action,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   placeholder: string;
   iconColor: string;
+  listId: string;
+  suggestions: string[];
+  autoComplete: string;
+  action?: React.ReactNode;
 }) {
   return (
-    <div className="flex items-start gap-3.5 px-[18px] py-[15px]">
+    <div className="flex items-start gap-3.5 px-[18px] py-[17px] pr-14">
       <span
         className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full"
         style={{ backgroundColor: iconColor }}
       />
-      <div className="flex flex-1 flex-col gap-1">
-        <MicroLabel>{label}</MicroLabel>
+      <div className="min-w-0 flex flex-1 flex-col gap-1">
+        <div className="flex items-center justify-between gap-3">
+          <MicroLabel>{label}</MicroLabel>
+          {action}
+        </div>
         <input
           value={value}
           onChange={(event) => onChange(event.target.value)}
           placeholder={placeholder}
+          list={listId}
+          autoComplete={autoComplete}
+          enterKeyHint="next"
           className="w-full bg-transparent text-[16px] font-medium text-ink-primary placeholder:text-ink-tertiary outline-none"
         />
+        <datalist id={listId}>
+          {suggestions.map((suggestion) => <option key={suggestion} value={suggestion} />)}
+        </datalist>
       </div>
     </div>
+  );
+}
+
+function LocationArrowIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
+      <path d="m20 4-7.1 16-2.2-6.7L4 11.1 20 4Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+    </svg>
   );
 }
 

@@ -53,7 +53,7 @@ export function RouteDemandRow({ demand }: { demand: RouteDemand }) {
           </p>
         </div>
       </div>
-      <div className="h-[5px] w-full overflow-hidden rounded-full bg-white/10">
+      <div className="h-[5px] w-full overflow-hidden rounded-full bg-black/[0.07]">
         <div
           className="h-full rounded-full transition-all duration-700 ease-out"
           style={{

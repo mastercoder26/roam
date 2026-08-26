@@ -307,7 +307,7 @@ function VerdictChip({
   const toneClass: Record<string, string> = {
     positive: "bg-positive/12 text-positive",
     safety: "bg-safety/12 text-safety",
-    secondary: "bg-white/10 text-ink-secondary",
+    secondary: "bg-black/5 text-ink-secondary",
   };
   return (
     <span

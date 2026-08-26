@@ -3,30 +3,31 @@
 @tailwind utilities;
 
 :root {
-  --canvas: rgb(18, 18, 18);
-  --card: rgb(30, 30, 30);
-  --card-elevated: rgb(36, 36, 36);
-  --accent: rgb(5, 107, 235);
-  --safety: rgb(255, 148, 0);
-  --danger: rgb(209, 46, 43);
-  --positive: rgb(51, 199, 89);
-  --ink-primary: rgb(241, 241, 241);
-  --ink-secondary: rgba(255, 255, 255, 0.6);
-  --ink-tertiary: rgba(255, 255, 255, 0.38);
-  --ink-label: rgba(255, 255, 255, 0.64);
-  --card-stroke: rgba(255, 255, 255, 0.1);
-  --card-stroke-strong: rgba(255, 255, 255, 0.16);
-  --difficulty-very-easy: rgb(77, 209, 115);
-  --difficulty-easy: rgb(122, 219, 107);
-  --difficulty-moderate: rgb(247, 199, 56);
-  --difficulty-hard: rgb(255, 153, 64);
-  --difficulty-very-hard: rgb(255, 107, 82);
+  --canvas: #f7f4ec;
+  --card: #fffefa;
+  --card-elevated: #efecdf;
+  --accent: #2557f5;
+  --safety: #e77b12;
+  --danger: #c83e3a;
+  --positive: #198a62;
+  --ink-primary: #18233c;
+  --ink-secondary: #626a78;
+  --ink-tertiary: #9297a0;
+  --ink-label: #717887;
+  --card-stroke: #ded9cc;
+  --card-stroke-strong: #c8c1b1;
+  --difficulty-very-easy: #198a62;
+  --difficulty-easy: #55a766;
+  --difficulty-moderate: #d49a16;
+  --difficulty-hard: #e77b12;
+  --difficulty-very-hard: #d44c42;
 }
 
 html,
 body {
-  background-color: rgb(18, 18, 18);
-  color: rgb(241, 241, 241);
+  background-color: var(--canvas);
+  color: var(--ink-primary);
+  scroll-behavior: smooth;
 }
 
 * {
@@ -34,13 +35,30 @@ body {
 }
 
 ::selection {
-  background-color: rgba(5, 107, 235, 0.35);
+  background-color: rgba(37, 87, 245, 0.22);
 }
 
 input[type="datetime-local"]::-webkit-calendar-picker-indicator {
-  filter: invert(1);
   opacity: 0.7;
   cursor: pointer;
+}
+
+button,
+a,
+input {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.route-grid {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='28' viewBox='0 0 28 28'%3E%3Cpath d='M0 0H28M0 0V28' fill='none' stroke='%2318233C' stroke-opacity='.055'/%3E%3C/svg%3E");
+  background-size: 28px 28px;
 }
 
 @keyframes roam-fade-up {
@@ -76,21 +94,26 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 
 .route-map .leaflet-control-zoom a {
   border-color: var(--card-stroke);
-  background: rgba(30, 30, 30, 0.94);
+  background: rgba(255, 254, 250, 0.94);
   color: var(--ink-primary);
 }
 
 .route-map .leaflet-control-zoom a:hover {
-  background: rgb(42, 42, 42);
-  color: white;
+  background: var(--card-elevated);
+  color: var(--ink-primary);
 }
 
 .route-map .leaflet-control-attribution {
-  background: rgba(18, 18, 18, 0.78);
+  background: rgba(255, 254, 250, 0.82);
   color: var(--ink-secondary);
   font-size: 9px;
 }
 
 .route-map .leaflet-control-attribution a {
-  color: rgb(123, 181, 255);
+  color: var(--accent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .roam-reveal { animation: none; }
 }

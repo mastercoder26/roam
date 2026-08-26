@@ -57,7 +57,7 @@ export function Pill({
   tone?: "neutral" | "accent" | "positive" | "safety" | "danger";
 }) {
   const toneClasses: Record<string, string> = {
-    neutral: "bg-white/10 text-ink-secondary",
+    neutral: "bg-black/5 text-ink-secondary",
     accent: "bg-accent/15 text-accent",
     positive: "bg-positive/15 text-positive",
     safety: "bg-safety/15 text-safety",
