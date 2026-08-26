@@ -21,6 +21,8 @@
   --difficulty-moderate: #d49a16;
   --difficulty-hard: #e77b12;
   --difficulty-very-hard: #d44c42;
+  --motion-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --motion-ease-soft: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 html,
@@ -64,7 +66,7 @@ input:focus-visible {
 @keyframes roam-fade-up {
   from {
     opacity: 0;
-    transform: translateY(6px);
+    transform: translateY(12px);
   }
   to {
     opacity: 1;
@@ -73,7 +75,78 @@ input:focus-visible {
 }
 
 .roam-reveal {
-  animation: roam-fade-up 0.36s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: roam-fade-up 0.52s var(--motion-ease-out) both;
+}
+
+.roam-enter {
+  animation: roam-fade-up 0.72s var(--motion-ease-soft) both;
+}
+
+.roam-enter-delay-1 { animation-delay: 80ms; }
+.roam-enter-delay-2 { animation-delay: 150ms; }
+.roam-enter-delay-3 { animation-delay: 220ms; }
+.roam-enter-delay-4 { animation-delay: 300ms; }
+
+@keyframes roam-wiggle {
+  0%, 100% { transform: rotate(0deg) translateZ(0); }
+  20% { transform: rotate(-2deg) translateZ(0); }
+  40% { transform: rotate(2deg) translateZ(0); }
+  60% { transform: rotate(-1.4deg) translateZ(0); }
+  80% { transform: rotate(1.4deg) translateZ(0); }
+}
+
+@keyframes roam-route-draw {
+  from { stroke-dashoffset: 430; }
+  to { stroke-dashoffset: 0; }
+}
+
+@keyframes roam-pop-in {
+  0% { opacity: 0; transform: scale(0.6); }
+  70% { opacity: 1; transform: scale(1.08); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+@keyframes roam-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.roam-route-line {
+  stroke-dasharray: 430;
+  stroke-dashoffset: 430;
+  animation: roam-route-draw 1.15s var(--motion-ease-soft) 360ms forwards;
+}
+
+.roam-route-start,
+.roam-route-end {
+  opacity: 0;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: roam-pop-in 0.48s var(--motion-ease-out) forwards;
+}
+
+.roam-route-start { animation-delay: 240ms; }
+.roam-route-end { animation-delay: 1.08s; }
+
+.roam-route-dots {
+  opacity: 0;
+  animation: roam-fade-in 0.4s ease-out 1.02s forwards;
+}
+
+.roam-hover-lift {
+  transition: transform 260ms var(--motion-ease-out), box-shadow 260ms var(--motion-ease-out);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .roam-jiggle:hover {
+    animation: roam-wiggle 420ms ease-in-out;
+    will-change: transform;
+  }
+
+  .roam-hover-lift:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 34px 90px rgba(24, 35, 60, 0.18);
+  }
 }
 
 @keyframes roam-spin {
@@ -111,9 +184,4 @@ input:focus-visible {
 
 .route-map .leaflet-control-attribution a {
   color: var(--accent);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  html { scroll-behavior: auto; }
-  .roam-reveal { animation: none; }
 }

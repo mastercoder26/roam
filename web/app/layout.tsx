@@ -40,7 +40,7 @@ export default function RootLayout({
                 href="https://youtu.be/4EA2f0rQKrM"
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex items-center gap-1 font-bold text-white underline decoration-white/40 underline-offset-4 transition-colors hover:decoration-white"
+                className="roam-jiggle inline-flex items-center gap-1 font-bold text-white underline decoration-white/40 underline-offset-4 transition-colors hover:decoration-white"
               >
                 Watch the iOS walkthrough
                 <span aria-hidden="true">↗</span>

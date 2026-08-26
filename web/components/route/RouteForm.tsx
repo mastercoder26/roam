@@ -127,9 +127,9 @@ export function RouteForm() {
 
   return (
     <div className="flex flex-col gap-6">
-      <form onSubmit={handleSubmit} className="rounded-[28px] border border-card bg-card p-4 shadow-roam-md sm:p-6">
+      <form onSubmit={handleSubmit} className="border-y-2 border-ink-primary bg-transparent py-5 sm:py-7">
         <div className="grid gap-4 lg:grid-cols-[1fr_280px]">
-          <Card className="relative flex flex-col divide-y divide-card !rounded-[22px] !p-0 !shadow-none">
+          <Card className="relative flex flex-col divide-y divide-card !rounded-none !border-ink-primary/20 !p-0 !shadow-none">
           <FieldRow
             label="FROM"
             value={origin}
@@ -144,7 +144,7 @@ export function RouteForm() {
                 type="button"
                 onClick={useCurrentLocation}
                 disabled={isLocating}
-                className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-accent/[0.08] px-2.5 py-1.5 text-[11px] font-bold text-accent transition-colors hover:bg-accent/[0.14] disabled:opacity-60"
+                className="roam-jiggle inline-flex shrink-0 items-center gap-1.5 border-b border-accent/40 px-0.5 py-1 text-[10px] font-bold uppercase tracking-[0.08em] text-accent transition-colors hover:border-accent disabled:opacity-60"
               >
                 <LocationArrowIcon className="h-3.5 w-3.5" />
                 {isLocating ? "Locating…" : "Use my location"}
@@ -166,7 +166,7 @@ export function RouteForm() {
               type="button"
               onClick={swap}
               aria-label="Swap starting location and destination"
-              className="absolute right-3 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-card-strong bg-card text-ink-primary shadow-roam transition-transform hover:rotate-180 active:scale-90"
+              className="absolute right-3 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center border border-ink-primary/20 bg-card text-ink-primary transition-transform hover:rotate-180 active:scale-90"
             >
               <SwapIcon className="h-4 w-4" />
             </button>
@@ -174,7 +174,7 @@ export function RouteForm() {
           </Card>
 
           <div className="flex flex-col gap-3">
-            <label className="flex flex-1 items-center gap-3 rounded-[20px] border border-card bg-card-elevated px-4 py-3.5">
+            <label className="flex flex-1 items-center gap-3 border border-ink-primary/20 bg-card-elevated px-4 py-3.5">
               <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-card text-accent shadow-roam">
                 <CalendarIcon className="h-[18px] w-[18px]" />
               </span>
@@ -196,9 +196,9 @@ export function RouteForm() {
               <button
                 type="submit"
                 disabled={!canAnalyze}
-                className={`flex min-h-14 items-center justify-center gap-2 rounded-[18px] px-5 text-[15px] font-bold transition-all active:scale-[0.98] ${
+                className={`roam-jiggle flex min-h-14 items-center justify-center gap-2 px-5 text-[13px] font-bold uppercase tracking-[0.08em] transition-[color,background-color,box-shadow,transform] duration-200 active:scale-[0.97] ${
                   canAnalyze
-                    ? "bg-accent text-white shadow-roam-lg hover:-translate-y-0.5"
+                    ? "bg-accent text-white shadow-roam-lg"
                     : "cursor-not-allowed bg-disabled text-ink-tertiary"
                 }`}
               >
@@ -211,7 +211,7 @@ export function RouteForm() {
             </SignedIn>
             <SignedOut>
               <SignInButton mode="modal">
-                <button type="button" className="flex min-h-14 items-center justify-center gap-2 rounded-[18px] bg-accent px-5 text-[15px] font-bold text-white shadow-roam-lg transition-all hover:-translate-y-0.5 active:translate-y-0">
+                <button type="button" className="roam-jiggle flex min-h-14 items-center justify-center gap-2 bg-accent px-5 text-[13px] font-bold uppercase tracking-[0.08em] text-white shadow-roam-lg transition-transform active:scale-[0.97]">
                   Sign in to analyze
                 </button>
               </SignInButton>
@@ -227,7 +227,7 @@ export function RouteForm() {
                 key={example.origin}
                 type="button"
                 onClick={() => applyExample(example)}
-                className="rounded-full border border-card bg-card-elevated px-3 py-1.5 text-xs font-semibold text-ink-secondary transition-colors hover:border-accent/30 hover:text-accent"
+                className="roam-jiggle border border-ink-primary/20 bg-transparent px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.06em] text-ink-secondary transition-colors hover:border-accent hover:text-accent"
               >
                 {example.label}
               </button>
@@ -236,7 +236,7 @@ export function RouteForm() {
         ) : null}
 
         {error ? (
-          <div className="mt-4 flex items-start gap-2.5 rounded-2xl border border-safety/20 bg-safety/[0.07] px-4 py-3.5 text-sm text-ink-primary">
+          <div className="mt-4 flex items-start gap-2.5 border border-safety/30 bg-safety/[0.07] px-4 py-3.5 text-sm text-ink-primary">
             <WarningIcon className="h-4 w-4 shrink-0 translate-y-0.5 text-safety" />
             <span>{error}</span>
           </div>
@@ -248,9 +248,7 @@ export function RouteForm() {
           </p>
         ) : !isSignedIn ? (
           <p className="mt-3 text-center text-xs leading-5 text-ink-tertiary">
-            Roam scores routes with the same live backend as the iOS app,
-            which requires a signed-in session to call Google&apos;s routing
-            APIs responsibly.
+            Sign in to use live route scoring and compare alternate routes.
           </p>
         ) : null}
       </form>

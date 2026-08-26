@@ -6,7 +6,7 @@ export function BrandLogo({ compact = false }: { compact?: boolean }) {
     <Link
       href="/"
       aria-label="Roam home"
-      className="inline-flex shrink-0 items-center rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-4"
+      className="roam-jiggle inline-flex shrink-0 items-center rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-4"
     >
       <Image
         src="/brand/roam-wordmark.png"

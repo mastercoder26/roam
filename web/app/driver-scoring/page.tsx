@@ -7,7 +7,7 @@ export const metadata = {
 
 export default function DriverScoringPage() {
   return (
-    <div className="flex flex-col gap-9">
+    <div className="roam-reveal flex flex-col gap-9">
       <header className="flex flex-col gap-3">
         <div className="flex h-[52px] w-[52px] items-center justify-center rounded-roam-sm bg-accent/12 text-accent">
           <SteeringWheelIcon className="h-6 w-6" />

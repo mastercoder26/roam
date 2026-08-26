@@ -20,11 +20,11 @@ export function NavBar() {
   const pathname = usePathname();
 
   return (
-    <header className="sticky top-0 z-30 border-b border-card bg-canvas/90 backdrop-blur-xl">
-      <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-5 py-3.5 sm:px-8">
+    <header className="sticky top-0 z-30 border-b border-ink-primary/10 bg-canvas/90 backdrop-blur-xl">
+      <div className="mx-auto flex max-w-6xl items-center justify-between gap-5 px-5 py-4 sm:px-8">
         <BrandLogo compact />
 
-        <nav aria-label="Primary navigation" className="flex items-center justify-center gap-0.5 rounded-full border border-card bg-card/85 p-1 shadow-roam">
+        <nav aria-label="Primary navigation" className="ml-auto flex items-center justify-center gap-1 sm:gap-7">
           {TABS.map((tab) => {
             const active =
               tab.href === "/" ? pathname === "/" : pathname?.startsWith(tab.href);
@@ -35,13 +35,13 @@ export function NavBar() {
                 href={tab.href}
                 aria-label={tab.label}
                 aria-current={active ? "page" : undefined}
-                className={`flex items-center gap-1.5 rounded-full px-3 py-2 text-[13px] font-semibold transition-all ${
+                className={`roam-jiggle relative flex items-center gap-1.5 px-2 py-2 text-[11px] font-bold uppercase tracking-[0.1em] transition-colors duration-200 sm:px-0 ${
                   active
-                    ? "bg-accent text-white"
-                    : "text-ink-secondary hover:bg-card-elevated hover:text-ink-primary"
+                    ? "text-accent after:absolute after:inset-x-0 after:-bottom-0.5 after:h-0.5 after:bg-accent"
+                    : "text-ink-primary hover:text-accent"
                 }`}
               >
-                <Icon className="h-4 w-4 shrink-0" />
+                <Icon className="h-4 w-4 shrink-0 sm:hidden" />
                 <span className="hidden sm:inline">{tab.label}</span>
               </Link>
             );
@@ -51,7 +51,7 @@ export function NavBar() {
         <div className="flex shrink-0 items-center gap-3">
           <SignedOut>
             <SignInButton mode="modal">
-              <button className="rounded-full bg-ink-primary px-4 py-2.5 text-[13px] font-semibold text-white transition-transform hover:-translate-y-0.5 active:translate-y-0">
+              <button className="roam-jiggle border border-ink-primary bg-ink-primary px-3.5 py-2.5 text-[11px] font-bold uppercase tracking-[0.08em] text-white transition-colors hover:bg-accent hover:border-accent active:scale-[0.97] sm:px-5">
                 Sign in
               </button>
             </SignInButton>
