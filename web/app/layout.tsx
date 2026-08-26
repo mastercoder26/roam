@@ -33,6 +33,20 @@ export default function RootLayout({
     >
       <html lang="en" data-scroll-behavior="smooth">
         <body className="min-h-screen bg-canvas font-sans text-ink-primary antialiased">
+          <aside className="border-b border-white/10 bg-ink-primary px-5 py-2.5 text-white">
+            <div className="mx-auto flex max-w-6xl items-center justify-center gap-2 text-center text-xs sm:text-sm">
+              <span className="hidden text-white/70 sm:inline">See the complete Roam experience.</span>
+              <a
+                href="https://youtu.be/4EA2f0rQKrM"
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1 font-bold text-white underline decoration-white/40 underline-offset-4 transition-colors hover:decoration-white"
+              >
+                Watch the iOS walkthrough
+                <span aria-hidden="true">↗</span>
+              </a>
+            </div>
+          </aside>
           <NavBar />
           <main className="mx-auto w-full max-w-6xl px-5 pb-20 pt-8 sm:px-8 sm:pt-12">
             {children}
@@ -44,9 +58,6 @@ export default function RootLayout({
                 <span className="hidden h-5 w-px bg-card-strong sm:block" />
                 <p className="text-xs text-ink-secondary">Route planning and coaching, not a safety guarantee.</p>
               </div>
-              <a href="https://youtu.be/4EA2f0rQKrM" target="_blank" rel="noreferrer" className="text-sm font-semibold text-accent hover:underline">
-                Watch the iOS walkthrough ↗
-              </a>
             </div>
           </footer>
         </body>
