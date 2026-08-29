@@ -198,13 +198,62 @@ struct APIClientDriveHistoryTransport: DriveHistorySyncTransport {
 }
 
 enum DriveHistoryPayloadCodec {
+    /// Increment when the shape or privacy guarantees of the cloud payload
+    /// change. Sync metadata uses this value to replace legacy server copies
+    /// once instead of leaving older, more revealing payloads in storage.
+    static let currentVersion = 2
+    private static let versionKey = "_roamCloudPayloadVersion"
+
     static func payload(for drive: RecordedDrive) -> [String: JSONValue] {
-        guard let data = try? APIClient.makeDateEncoder().encode(drive),
+        let redactedEvents = drive.score.events.map { event in
+            DrivingEvent(
+                id: event.id,
+                kind: event.kind,
+                timestamp: event.timestamp,
+                source: event.source,
+                coordinate: nil
+            )
+        }
+        let redactedScore = DrivingScore(
+            score: drive.score.score,
+            duration: drive.score.duration,
+            distanceMeters: drive.score.distanceMeters,
+            topSpeedMetersPerSecond: drive.score.topSpeedMetersPerSecond,
+            events: redactedEvents,
+            motionSamples: drive.score.motionSamples,
+            dataQuality: drive.score.dataQuality
+        )
+        let cloudDrive = RecordedDrive(
+            id: drive.id,
+            startedAt: drive.startedAt,
+            score: redactedScore,
+            route: [],
+            recordingTimeZoneIdentifier: drive.recordingTimeZoneIdentifier,
+            experienceSummary: drive.experienceSummary ?? DriveExperienceEngine.summarize(drive: drive),
+            plannedRouteContext: drive.plannedRouteContext,
+            routeAnalysis: drive.routeAnalysis
+        )
+
+        guard let data = try? APIClient.makeDateEncoder().encode(cloudDrive),
               let value = try? JSONDecoder().decode(JSONValue.self, from: data),
-              case let .object(payload) = value else {
+              case let .object(encodedPayload) = value else {
             return [:]
         }
+        // Keep this metadata outside `RecordedDrive`: synthesized decoding
+        // ignores unknown keys, while the sync layer can inspect the version
+        // without making it part of the on-device history model.
+        var payload = encodedPayload
+        payload[versionKey] = .number(Double(currentVersion))
         return payload
+    }
+
+    static func version(in payload: [String: JSONValue]) -> Int {
+        guard case let .number(value)? = payload[versionKey],
+              value.isFinite,
+              value.rounded() == value else {
+            return 0
+        }
+        return Int(exactly: value) ?? 0
     }
 
     static func drive(from payload: [String: JSONValue]) -> RecordedDrive? {
@@ -255,12 +304,51 @@ enum DriveHistorySyncEngine {
     /// local analysis that is no longer pending always wins over a remote one
     /// that still is.
     private static func reconciled(local: RecordedDrive, remote: RecordedDrive) -> RecordedDrive {
-        guard let localAnalysis = local.routeAnalysis,
-              localAnalysis.status != .pending,
-              remote.routeAnalysis?.status == .pending else {
-            return remote
+        let routeAnalysis: DriveRouteAnalysis?
+        if let localAnalysis = local.routeAnalysis,
+           localAnalysis.status != .pending,
+           remote.routeAnalysis?.status == .pending {
+            routeAnalysis = localAnalysis
+        } else {
+            routeAnalysis = remote.routeAnalysis
         }
-        return remote.replacingRouteAnalysis(with: localAnalysis)
+
+        // Server payloads intentionally contain no coordinates. A response
+        // for a drive that already exists on this phone may update its shared
+        // fields, but it must never replace the device-only trace or erase the
+        // coordinates used by local replay.
+        let localEventCoordinates = local.score.events.reduce(into: [UUID: DriveCoordinate]()) { coordinates, event in
+            if let coordinate = event.coordinate {
+                coordinates[event.id] = coordinate
+            }
+        }
+        let reconciledScore = DrivingScore(
+            score: remote.score.score,
+            duration: remote.score.duration,
+            distanceMeters: remote.score.distanceMeters,
+            topSpeedMetersPerSecond: remote.score.topSpeedMetersPerSecond,
+            events: remote.score.events.map { event in
+                DrivingEvent(
+                    id: event.id,
+                    kind: event.kind,
+                    timestamp: event.timestamp,
+                    source: event.source,
+                    coordinate: localEventCoordinates[event.id]
+                )
+            },
+            motionSamples: remote.score.motionSamples,
+            dataQuality: remote.score.dataQuality
+        )
+        return RecordedDrive(
+            id: remote.id,
+            startedAt: remote.startedAt,
+            score: reconciledScore,
+            route: local.route,
+            recordingTimeZoneIdentifier: remote.recordingTimeZoneIdentifier,
+            experienceSummary: remote.experienceSummary ?? local.experienceSummary,
+            plannedRouteContext: remote.plannedRouteContext,
+            routeAnalysis: routeAnalysis
+        )
     }
 
     static func decodedRemoteDrive(from dto: DriveHistoryDTO) -> (id: UUID, drive: RecordedDrive)? {
@@ -296,22 +384,27 @@ final class DriveHistorySyncService: ObservableObject {
         /// keep re-merging the stale `.pending` server copy back over the
         /// resolved local one.
         var syncedRouteAnalysisStatus: [String: String]
+        /// Cloud payload schema last confirmed for each drive. A missing value
+        /// means a pre-redaction payload and schedules a one-time replacement.
+        var syncedPayloadVersions: [String: Int]
         var lastSyncedAt: Date?
 
         init(
             syncedDriveIDs: Set<String>,
             pendingDeletionIDs: Set<String> = [],
             syncedRouteAnalysisStatus: [String: String] = [:],
+            syncedPayloadVersions: [String: Int] = [:],
             lastSyncedAt: Date?
         ) {
             self.syncedDriveIDs = syncedDriveIDs
             self.pendingDeletionIDs = pendingDeletionIDs
             self.syncedRouteAnalysisStatus = syncedRouteAnalysisStatus
+            self.syncedPayloadVersions = syncedPayloadVersions
             self.lastSyncedAt = lastSyncedAt
         }
 
         private enum CodingKeys: String, CodingKey {
-            case syncedDriveIDs, pendingDeletionIDs, syncedRouteAnalysisStatus, lastSyncedAt
+            case syncedDriveIDs, pendingDeletionIDs, syncedRouteAnalysisStatus, syncedPayloadVersions, lastSyncedAt
         }
 
         init(from decoder: Decoder) throws {
@@ -319,6 +412,7 @@ final class DriveHistorySyncService: ObservableObject {
             syncedDriveIDs = try values.decode(Set<String>.self, forKey: .syncedDriveIDs)
             pendingDeletionIDs = try values.decodeIfPresent(Set<String>.self, forKey: .pendingDeletionIDs) ?? []
             syncedRouteAnalysisStatus = try values.decodeIfPresent([String: String].self, forKey: .syncedRouteAnalysisStatus) ?? [:]
+            syncedPayloadVersions = try values.decodeIfPresent([String: Int].self, forKey: .syncedPayloadVersions) ?? [:]
             lastSyncedAt = try values.decodeIfPresent(Date.self, forKey: .lastSyncedAt)
         }
     }
@@ -401,7 +495,8 @@ final class DriveHistorySyncService: ObservableObject {
             // hold (most commonly `.pending` resolving to `.available` or
             // `.unavailable` after the drive's first, pending-state upload).
             let routeAnalysisStale = metadata.syncedRouteAnalysisStatus[idString] != drive.routeAnalysis?.status.rawValue
-            if notYetSynced || routeAnalysisStale {
+            let payloadStale = metadata.syncedPayloadVersions[idString] != DriveHistoryPayloadCodec.currentVersion
+            if notYetSynced || routeAnalysisStale || payloadStale {
                 pendingDrives[drive.id] = drive
             }
         }
@@ -431,6 +526,7 @@ final class DriveHistorySyncService: ObservableObject {
         metadata.pendingDeletionIDs.insert(idString)
         metadata.syncedDriveIDs.remove(idString)
         metadata.syncedRouteAnalysisStatus.removeValue(forKey: idString)
+        metadata.syncedPayloadVersions.removeValue(forKey: idString)
         pendingDrives.removeValue(forKey: id)
         persistMetadata()
     }
@@ -551,6 +647,9 @@ final class DriveHistorySyncService: ObservableObject {
         for (id, status) in remoteStatusByID {
             metadata.syncedRouteAnalysisStatus[id] = status
         }
+        for dto in remoteDrives {
+            metadata.syncedPayloadVersions[dto.id] = DriveHistoryPayloadCodec.version(in: dto.payload)
+        }
         // A drive can exist remotely and still need re-upload: it only counts
         // as caught up once the server's confirmed route analysis status
         // matches what's local right now. Otherwise a drive that was uploaded
@@ -561,6 +660,7 @@ final class DriveHistorySyncService: ObservableObject {
             let idString = id.uuidString
             guard metadata.syncedDriveIDs.contains(idString) else { return true }
             return metadata.syncedRouteAnalysisStatus[idString] != drive.routeAnalysis?.status.rawValue
+                || metadata.syncedPayloadVersions[idString] != DriveHistoryPayloadCodec.currentVersion
         }
 
         let pendingIDs = Set(pendingDrives.keys)
@@ -578,6 +678,7 @@ final class DriveHistorySyncService: ObservableObject {
             for idString in confirmedIDs {
                 guard let uuid = UUID(uuidString: idString) else { continue }
                 metadata.syncedRouteAnalysisStatus[idString] = pendingDrives[uuid]?.routeAnalysis?.status.rawValue
+                metadata.syncedPayloadVersions[idString] = DriveHistoryPayloadCodec.currentVersion
             }
             pendingDrives = pendingDrives.filter { !confirmedIDs.contains($0.key.uuidString) }
             persistMetadata()
@@ -602,6 +703,7 @@ final class DriveHistorySyncService: ObservableObject {
             // UUID (unlikely but possible after a sign-out/sign-in cycle) is
             // not incorrectly treated as already synced.
             metadata.syncedRouteAnalysisStatus.removeValue(forKey: id)
+            metadata.syncedPayloadVersions.removeValue(forKey: id)
             persistMetadata()
         }
     }
