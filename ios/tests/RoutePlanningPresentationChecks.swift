@@ -8,6 +8,7 @@ struct RoutePlanningPresentationChecks {
         mapPreviewProgressesFromStartPinToRouteLine()
         freshPlansKeepTheAppleMapsPreviewVisible()
         freshPlansWaitForAnExplicitOriginChoice()
+        completedRoutesOfferTheCorrectAccountAction()
 
         print("Route planning presentation checks passed")
     }
@@ -80,6 +81,38 @@ struct RoutePlanningPresentationChecks {
         expect(
             RoutePlanningFormState().originMode == .manual,
             "a fresh plan should wait for a typed start or an explicit current-location choice"
+        )
+    }
+
+    private static func completedRoutesOfferTheCorrectAccountAction() {
+        let stage = RoutePlanningStage(origin: "Austin, TX", destination: "Dallas, TX")
+
+        expect(
+            RoutePlanningPrimaryAction(
+                stage: stage,
+                isSignedIn: false,
+                isAccountRestoring: false,
+                isLoading: false
+            ) == .signIn,
+            "a signed-out completed route should offer sign-in instead of failing after a tap"
+        )
+        expect(
+            RoutePlanningPrimaryAction(
+                stage: stage,
+                isSignedIn: false,
+                isAccountRestoring: true,
+                isLoading: false
+            ) == .waitingForAccount,
+            "a route should not open sign-in while Clerk is still restoring its session"
+        )
+        expect(
+            RoutePlanningPrimaryAction(
+                stage: stage,
+                isSignedIn: true,
+                isAccountRestoring: false,
+                isLoading: false
+            ) == .analyze,
+            "a signed-in completed route should remain ready to analyze"
         )
     }
 
