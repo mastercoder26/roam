@@ -7,6 +7,7 @@ struct DriveHistorySyncChecks {
         setvbuf(stdout, nil, _IONBF, 0)
         mergeIsIdempotent()
         serverWinsOnConflict()
+        mergedHistoryIsNewestFirst()
         await offlineDrivesStayQueuedAndRetry()
         await signedOutSyncMakesZeroNetworkCalls()
         await undecodablePayloadIsSkipped()
@@ -38,6 +39,24 @@ struct DriveHistorySyncChecks {
 
         expect(merged.count == 1, "a conflict should still produce one drive")
         expect(merged.first?.score.score == 91, "the server payload should win a drive conflict")
+    }
+
+    @MainActor
+    private static func mergedHistoryIsNewestFirst() {
+        let olderLocal = makeDrive(
+            score: 62,
+            startedAt: Date(timeIntervalSince1970: 1_700_000_000)
+        )
+        let newerRemote = makeDrive(
+            score: 81,
+            startedAt: Date(timeIntervalSince1970: 1_800_000_000)
+        )
+        let merged = DriveHistorySyncEngine.merge(
+            local: [olderLocal],
+            remote: [makeDTO(for: newerRemote)]
+        )
+
+        expect(merged.map(\.id) == [newerRemote.id, olderLocal.id], "synced history should always present the newest drive first")
     }
 
     @MainActor
@@ -317,7 +336,11 @@ struct DriveHistorySyncChecks {
         expect(applied.first?.score.score == 88, "the second account's remote drive must remain intact")
     }
 
-    private static func makeDrive(id: UUID = UUID(), score: Int) -> RecordedDrive {
+    private static func makeDrive(
+        id: UUID = UUID(),
+        score: Int,
+        startedAt: Date = Date(timeIntervalSince1970: 1_700_000_000)
+    ) -> RecordedDrive {
         let quality = DriveDataQuality(
             acceptedLocationSamples: 1,
             rejectedLocationSamples: 0,
@@ -333,7 +356,7 @@ struct DriveHistorySyncChecks {
             motionSamples: 1,
             dataQuality: quality
         )
-        return RecordedDrive(id: id, startedAt: Date(timeIntervalSince1970: 1_700_000_000), score: drivingScore, route: [])
+        return RecordedDrive(id: id, startedAt: startedAt, score: drivingScore, route: [])
     }
 
     private static func makeDTO(for drive: RecordedDrive) -> DriveHistoryDTO {
