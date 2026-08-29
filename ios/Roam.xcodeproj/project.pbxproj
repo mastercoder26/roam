@@ -93,6 +93,7 @@
 		D10000000000000000000001 /* PremiumMotionSpec.swift in Sources */ = {isa = PBXBuildFile; fileRef = D20000000000000000000001 /* PremiumMotionSpec.swift */; };
 		D10000000000000000000002 /* PremiumMotion.swift in Sources */ = {isa = PBXBuildFile; fileRef = D20000000000000000000002 /* PremiumMotion.swift */; };
 		D10000000000000000000003 /* HowRoamWorksLayoutSpec.swift in Sources */ = {isa = PBXBuildFile; fileRef = D20000000000000000000003 /* HowRoamWorksLayoutSpec.swift */; };
+		E10000000000000000000001 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000001 /* PrivacyInfo.xcprivacy */; };
 		D9D36F5330327C4E00AB29F8 /* ClerkKit in Frameworks */ = {isa = PBXBuildFile; productRef = C30000000000000000000001 /* ClerkKit */; };
 		D9D36F5430327C4E00AB29F8 /* ClerkKitUI in Frameworks */ = {isa = PBXBuildFile; productRef = C30000000000000000000002 /* ClerkKitUI */; };
 		F12F741FFF4B406383961998 /* AppIconAlt-20x20@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = 9AFE5C0E53A840129B30EA00 /* AppIconAlt-20x20@2x.png */; };
@@ -225,6 +226,7 @@
 		D20000000000000000000001 /* PremiumMotionSpec.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PremiumMotionSpec.swift; sourceTree = "<group>"; };
 		D20000000000000000000002 /* PremiumMotion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PremiumMotion.swift; sourceTree = "<group>"; };
 		D20000000000000000000003 /* HowRoamWorksLayoutSpec.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HowRoamWorksLayoutSpec.swift; sourceTree = "<group>"; };
+		E20000000000000000000001 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		D74B14B7666A4BE9BDED45FE /* AppIconAlt-29x29@3x.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "AppIconAlt-29x29@3x.png"; sourceTree = "<group>"; };
 		F4B7F709301E7D5F003C2863 /* Debug.local.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Debug.local.xcconfig; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -294,6 +296,7 @@
 				A2000000000000000000000C /* Assets.xcassets */,
 				825F10D7936841F4BE8AA4CD /* AlternateAppIcons */,
 				A2000000000000000000000D /* Info.plist */,
+				E20000000000000000000001 /* PrivacyInfo.xcprivacy */,
 				A2000000000000000000002C /* Roam.entitlements */,
 			);
 			path = Roam;
@@ -622,6 +625,7 @@
 				70FDA62F7B8C44DBA86A4DAE /* AppIconAlt-60x60@2x.png in Resources */,
 				63A5E297A33C464B9853C815 /* AppIconAlt-60x60@3x.png in Resources */,
 				A1000000000000000000000C /* Assets.xcassets in Resources */,
+				E10000000000000000000001 /* PrivacyInfo.xcprivacy in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
