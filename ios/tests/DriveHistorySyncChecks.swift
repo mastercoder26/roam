@@ -1,3 +1,4 @@
+import CoreLocation
 import Foundation
 
 @main
@@ -8,6 +9,7 @@ struct DriveHistorySyncChecks {
         mergeIsIdempotent()
         serverWinsOnConflict()
         mergedHistoryIsNewestFirst()
+        cloudPayloadNeverContainsCoordinates()
         await offlineDrivesStayQueuedAndRetry()
         await signedOutSyncMakesZeroNetworkCalls()
         await undecodablePayloadIsSkipped()
@@ -57,6 +59,73 @@ struct DriveHistorySyncChecks {
         )
 
         expect(merged.map(\.id) == [newerRemote.id, olderLocal.id], "synced history should always present the newest drive first")
+    }
+
+    @MainActor
+    private static func cloudPayloadNeverContainsCoordinates() {
+        let startedAt = Date(timeIntervalSince1970: 1_700_000_000)
+        let coordinate = DriveCoordinate(
+            CLLocationCoordinate2D(latitude: 30.2672, longitude: -97.7431)
+        )
+        let quality = DriveDataQuality(
+            acceptedLocationSamples: 2,
+            rejectedLocationSamples: 0,
+            motionSamples: 1,
+            confidence: .medium
+        )
+        let score = DrivingScore(
+            score: 84,
+            duration: 10,
+            distanceMeters: 42,
+            topSpeedMetersPerSecond: 8,
+            events: [DrivingEvent(
+                kind: .hardBrake,
+                timestamp: startedAt.addingTimeInterval(5),
+                source: .fused,
+                coordinate: coordinate
+            )],
+            motionSamples: 1,
+            dataQuality: quality
+        )
+        let local = RecordedDrive(
+            startedAt: startedAt,
+            score: score,
+            route: [
+                DriveRoutePoint(timestamp: startedAt, coordinate: coordinate, speedMetersPerSecond: 6),
+                DriveRoutePoint(
+                    timestamp: startedAt.addingTimeInterval(5),
+                    coordinate: DriveCoordinate(
+                        CLLocationCoordinate2D(latitude: 30.2676, longitude: -97.7427)
+                    ),
+                    speedMetersPerSecond: 8
+                )
+            ]
+        )
+
+        let payload = DriveHistoryPayloadCodec.payload(for: local)
+        guard let restored = DriveHistoryPayloadCodec.drive(from: payload) else {
+            fail("a privacy-preserving cloud payload should remain decodable")
+        }
+
+        expect(restored.route.isEmpty, "precise GPS traces must never enter the cloud payload")
+        expect(
+            restored.score.events.allSatisfy { $0.coordinate == nil },
+            "coaching-event coordinates must never enter the cloud payload"
+        )
+        expect(
+            restored.experienceSummary != nil,
+            "the cloud copy should retain a coordinate-free experience summary"
+        )
+
+        let merged = DriveHistorySyncEngine.merge(local: [local], remote: [makeDTO(for: local)])
+        expect(
+            merged.first?.route == local.route,
+            "syncing a redacted cloud copy must not erase the device's private route trace"
+        )
+        expect(
+            merged.first?.score.events.first?.coordinate == coordinate,
+            "syncing a redacted cloud copy must preserve local event coordinates"
+        )
     }
 
     @MainActor
