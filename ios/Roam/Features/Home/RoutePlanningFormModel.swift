@@ -28,6 +28,47 @@ enum RoutePlanningStage: Equatable {
     }
 }
 
+/// The primary route-planning action, including the account boundary required
+/// by the authenticated analysis API. Keeping this decision pure prevents a
+/// completed signed-out form from looking actionable only to fail afterward.
+enum RoutePlanningPrimaryAction: Equatable {
+    case chooseOrigin
+    case chooseDestination
+    case waitingForAccount
+    case signIn
+    case analyze
+    case analyzing
+
+    init(
+        stage: RoutePlanningStage,
+        isSignedIn: Bool,
+        isAccountRestoring: Bool,
+        isLoading: Bool
+    ) {
+        if isLoading {
+            self = .analyzing
+            return
+        }
+
+        switch stage {
+        case .chooseOrigin:
+            self = .chooseOrigin
+        case .chooseDestination:
+            self = .chooseDestination
+        case .readyToAnalyze where isAccountRestoring:
+            self = .waitingForAccount
+        case .readyToAnalyze where !isSignedIn:
+            self = .signIn
+        case .readyToAnalyze:
+            self = .analyze
+        }
+    }
+
+    var isEnabled: Bool {
+        self == .signIn || self == .analyze
+    }
+}
+
 /// The visual state for the Apple Maps planning preview. It deliberately
 /// follows the same endpoint validation as the form so the map never invents
 /// a route before the user has supplied both endpoints.

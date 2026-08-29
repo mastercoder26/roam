@@ -1,5 +1,6 @@
 import SwiftUI
 import UIKit
+import ClerkKitUI
 
 struct HomeView: View {
     @ObservedObject private var theme = ThemeManager.shared
@@ -13,6 +14,7 @@ struct HomeView: View {
     @State private var navigationPath = NavigationPath()
     @State private var mapPreview: RoutePlanningMapSummary?
     @State private var showingHowRoamWorks = false
+    @State private var authIsPresented = false
     @StateObject private var locationCoordinator = RoutePlanningLocationCoordinator()
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -34,8 +36,20 @@ struct HomeView: View {
         mapPreview?.accessibilityLabel ?? "Apple Maps route preview"
     }
 
-    private var canAnalyze: Bool {
-        planningStage == .readyToAnalyze && !isLoading
+    private var primaryAction: RoutePlanningPrimaryAction {
+        RoutePlanningPrimaryAction(
+            stage: planningStage,
+            isSignedIn: authSession.isSignedIn,
+            isAccountRestoring: isAccountRestoring,
+            isLoading: isLoading
+        )
+    }
+
+    private var isAccountRestoring: Bool {
+        switch authSession.state {
+        case .restoring, .authenticating: true
+        case .signedOut, .signedIn, .signedInOffline: false
+        }
     }
 
     private var canSwapEndpoints: Bool {
@@ -136,6 +150,17 @@ struct HomeView: View {
         }
         .sheet(isPresented: $showingHowRoamWorks) {
             HowRoamWorksSheet()
+        }
+        .sheet(isPresented: $authIsPresented) {
+            AuthView()
+        }
+        .onChange(of: authSession.state) { _, state in
+            switch state {
+            case .signedIn, .signedInOffline:
+                authIsPresented = false
+            case .restoring, .signedOut, .authenticating:
+                break
+            }
         }
     }
 
@@ -483,42 +508,78 @@ struct HomeView: View {
 
     private var analyzeButton: some View {
         Button {
-            Task { await analyzeRoute() }
+            switch primaryAction {
+            case .signIn:
+                authIsPresented = true
+            case .analyze:
+                Task { await analyzeRoute() }
+            case .chooseOrigin, .chooseDestination, .waitingForAccount, .analyzing:
+                break
+            }
         } label: {
             HStack(spacing: 10) {
                 if isLoading {
                     ProgressView()
-                        .tint(canAnalyze ? AppDesign.primarySurfaceForeground : AppDesign.Ink.tertiary)
+                        .tint(AppDesign.Ink.tertiary)
                 } else {
-                    Image(systemName: "sparkles")
+                    Image(systemName: primaryActionSymbol)
                 }
-                Text(isLoading ? "Analyzing route" : analyzeButtonTitle)
+                Text(primaryActionTitle)
                     .font(.headline.weight(.semibold))
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 17)
-            .foregroundStyle(canAnalyze ? AppDesign.primarySurfaceForeground : AppDesign.Ink.tertiary)
+            .foregroundStyle(primaryAction.isEnabled ? AppDesign.primarySurfaceForeground : AppDesign.Ink.tertiary)
             .background(
-                canAnalyze ? AppDesign.Ink.primary : AppDesign.Ink.primary.opacity(0.10),
+                primaryAction.isEnabled ? AppDesign.Ink.primary : AppDesign.Ink.primary.opacity(0.10),
                 in: Capsule()
             )
-            .shadow(color: canAnalyze ? AppDesign.cardShadow.opacity(0.5) : .clear, radius: 16, y: 7)
+            .shadow(color: primaryAction.isEnabled ? AppDesign.cardShadow.opacity(0.5) : .clear, radius: 16, y: 7)
         }
         .buttonStyle(PressableScaleStyle())
-        .disabled(!canAnalyze)
-        .animation(AppAnimation.quick, value: canAnalyze)
+        .disabled(!primaryAction.isEnabled)
+        .animation(AppAnimation.quick, value: primaryAction)
         .animation(AppAnimation.quick, value: isLoading)
-        .accessibilityHint(canAnalyze ? "Analyzes road conditions and route difficulty" : "Complete your start and destination first")
+        .accessibilityHint(primaryActionAccessibilityHint)
     }
 
-    private var analyzeButtonTitle: String {
-        switch planningStage {
+    private var primaryActionTitle: String {
+        switch primaryAction {
         case .chooseOrigin:
             "Choose a starting location"
         case .chooseDestination:
             "Choose a destination"
-        case .readyToAnalyze:
+        case .waitingForAccount:
+            "Preparing your account"
+        case .signIn:
+            "Sign in to analyze"
+        case .analyze:
             "Analyze difficulty"
+        case .analyzing:
+            "Analyzing route"
+        }
+    }
+
+    private var primaryActionSymbol: String {
+        switch primaryAction {
+        case .signIn: "person.crop.circle.badge.plus"
+        case .waitingForAccount: "person.crop.circle"
+        case .chooseOrigin, .chooseDestination, .analyze, .analyzing: "sparkles"
+        }
+    }
+
+    private var primaryActionAccessibilityHint: String {
+        switch primaryAction {
+        case .signIn:
+            "Opens sign in and keeps this route ready"
+        case .analyze:
+            "Analyzes road conditions and route difficulty"
+        case .waitingForAccount:
+            "Waits for your existing sign-in session"
+        case .chooseOrigin, .chooseDestination:
+            "Complete your start and destination first"
+        case .analyzing:
+            "Route analysis is in progress"
         }
     }
 
