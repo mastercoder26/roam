@@ -3,6 +3,7 @@ import Foundation
 @main
 struct SharedRouteImportChecks {
     static func main() async {
+        bothTargetsDeclareTheSharedAppGroup()
         appleDrivingDirectionsDecodeBothEndpoints()
         destinationOnlyAppleLinkUsesCurrentLocation()
         googleDirectionsDecodeRouteAndWaypoints()
@@ -26,6 +27,32 @@ struct SharedRouteImportChecks {
         await anUnreadableInboxIsReportedInsteadOfShowingNothing()
 
         print("Shared route import checks passed")
+    }
+
+    private static func bothTargetsDeclareTheSharedAppGroup() {
+        let iosDirectory = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let entitlementURLs = [
+            iosDirectory.appendingPathComponent("Roam/Roam.entitlements"),
+            iosDirectory.appendingPathComponent("RoamRouteShareExtension/RoamRouteShareExtension.entitlements")
+        ]
+
+        for url in entitlementURLs {
+            guard
+                let data = try? Data(contentsOf: url),
+                let plist = try? PropertyListSerialization.propertyList(from: data, format: nil),
+                let entitlements = plist as? [String: Any],
+                let appGroups = entitlements["com.apple.security.application-groups"] as? [String]
+            else {
+                fail("\(url.lastPathComponent) should be a readable entitlements property list")
+            }
+
+            expect(
+                appGroups.contains(SharedRouteInbox.appGroupIdentifier),
+                "\(url.lastPathComponent) must declare \(SharedRouteInbox.appGroupIdentifier)"
+            )
+        }
     }
 
     private static func appleDrivingDirectionsDecodeBothEndpoints() {
