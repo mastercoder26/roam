@@ -239,7 +239,12 @@ enum DriveHistorySyncEngine {
                 merged.append(remoteDrive)
             }
         }
-        return merged
+        return merged.sorted { left, right in
+            if left.startedAt != right.startedAt {
+                return left.startedAt > right.startedAt
+            }
+            return left.id.uuidString < right.id.uuidString
+        }
     }
 
     /// A fetched remote payload can lag a device that already resolved this
