@@ -10,6 +10,7 @@ struct DriveHistorySyncChecks {
         await offlineDrivesStayQueuedAndRetry()
         await signedOutSyncMakesZeroNetworkCalls()
         await undecodablePayloadIsSkipped()
+        await missingLocalHistoryNeverDeletesRemoteRecords()
         await deletingALocalDriveDeletesItRemotely()
         await aFailedDeletionSurvivesRelaunchAndDoesNotResurrect()
 
@@ -113,6 +114,35 @@ struct DriveHistorySyncChecks {
         await waitUntil { service.state == .synced }
         expect(applied.isEmpty, "an undecodable server payload should be skipped")
         expect(service.state == .synced, "one bad payload must not fail the whole pull")
+    }
+
+    @MainActor
+    private static func missingLocalHistoryNeverDeletesRemoteRecords() async {
+        let user = AuthUser(id: "missing-local-user", email: "missing-local@example.com", displayName: nil)
+        let session = AuthSessionStore(automaticallyRestore: false)
+        session.setSignedInForTesting(user: user, accessToken: "access-token")
+        let transport = FakeDriveHistoryTransport()
+        let drive = makeDrive(score: 64)
+        transport.page = DriveHistoryPage(drives: [makeDTO(for: drive)], nextCursor: nil)
+        let service = DriveHistorySyncService(
+            transport: transport,
+            authSession: session,
+            userDefaults: isolatedDefaults(),
+            retryDelaysNanoseconds: [0]
+        )
+
+        var applied: [RecordedDrive] = [drive]
+        service.sync(localDrives: [drive], applyLocalDrives: { applied = $0 })
+        await waitUntil { service.state == .synced }
+
+        // An empty or incomplete local snapshot can mean unreadable storage,
+        // retention, or an interrupted load. Only an explicit user delete is
+        // allowed to remove the server backup.
+        service.sync(localDrives: [], applyLocalDrives: { applied = $0 })
+        await waitUntil { service.state == .synced }
+
+        expect(transport.deletedIDs.isEmpty, "a drive missing locally without an explicit tombstone must stay on the server")
+        expect(applied.contains { $0.id == drive.id }, "the server copy should restore a drive that was only missing locally")
     }
 
     @MainActor
