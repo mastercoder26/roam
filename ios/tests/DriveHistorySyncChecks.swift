@@ -13,6 +13,7 @@ struct DriveHistorySyncChecks {
         await missingLocalHistoryNeverDeletesRemoteRecords()
         await deletingALocalDriveDeletesItRemotely()
         await aFailedDeletionSurvivesRelaunchAndDoesNotResurrect()
+        await aFailedDeletionSurvivesSignOutAndSameAccountReturn()
 
         print("Drive history sync checks passed")
     }
@@ -221,6 +222,52 @@ struct DriveHistorySyncChecks {
 
         expect(transport.deletedIDs == [drive.id.uuidString], "the pending deletion must survive relaunch and retry")
         expect(applied.isEmpty, "the drive must stay deleted after the retried sync")
+    }
+
+    @MainActor
+    private static func aFailedDeletionSurvivesSignOutAndSameAccountReturn() async {
+        let user = AuthUser(id: "delete-sign-out-user", email: "delete-sign-out@example.com", displayName: nil)
+        let session = AuthSessionStore(automaticallyRestore: false)
+        session.setSignedInForTesting(user: user, accessToken: "access-token")
+        let transport = FakeDriveHistoryTransport()
+        let drive = makeDrive(score: 58)
+        transport.page = DriveHistoryPage(drives: [makeDTO(for: drive)], nextCursor: nil)
+        let defaults = isolatedDefaults()
+        let service = DriveHistorySyncService(
+            transport: transport,
+            authSession: session,
+            userDefaults: defaults,
+            retryDelaysNanoseconds: []
+        )
+
+        var applied: [RecordedDrive] = [drive]
+        service.sync(localDrives: [drive], applyLocalDrives: { applied = $0 })
+        await waitUntil { service.state == .synced }
+
+        transport.shouldFail = true
+        service.markDriveDeleted(id: drive.id)
+        service.sync(localDrives: [], applyLocalDrives: { applied = $0 })
+        await waitUntil { service.state == .offline }
+
+        // The network request is still pending when the user signs out. That
+        // must stop in-flight work without erasing the user's explicit delete.
+        service.didSignOut()
+
+        transport.shouldFail = false
+        let returnedToSameAccount = DriveHistorySyncService(
+            transport: transport,
+            authSession: session,
+            userDefaults: defaults,
+            retryDelaysNanoseconds: [0]
+        )
+        returnedToSameAccount.sync(localDrives: [], applyLocalDrives: { applied = $0 })
+        await waitUntil { returnedToSameAccount.state == .synced }
+
+        expect(
+            transport.deletedIDs == [drive.id.uuidString],
+            "signing out must not erase an offline deletion queued for the same account"
+        )
+        expect(applied.isEmpty, "returning to the same account must not resurrect the deleted drive")
     }
 
     private static func makeDrive(id: UUID = UUID(), score: Int) -> RecordedDrive {
