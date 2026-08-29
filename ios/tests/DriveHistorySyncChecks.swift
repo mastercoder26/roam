@@ -14,6 +14,7 @@ struct DriveHistorySyncChecks {
         await deletingALocalDriveDeletesItRemotely()
         await aFailedDeletionSurvivesRelaunchAndDoesNotResurrect()
         await aFailedDeletionSurvivesSignOutAndSameAccountReturn()
+        await pendingDeletionsNeverCrossAccounts()
 
         print("Drive history sync checks passed")
     }
@@ -268,6 +269,52 @@ struct DriveHistorySyncChecks {
             "signing out must not erase an offline deletion queued for the same account"
         )
         expect(applied.isEmpty, "returning to the same account must not resurrect the deleted drive")
+    }
+
+    @MainActor
+    private static func pendingDeletionsNeverCrossAccounts() async {
+        let firstUser = AuthUser(id: "first-account", email: "first@example.com", displayName: nil)
+        let session = AuthSessionStore(automaticallyRestore: false)
+        session.setSignedInForTesting(user: firstUser, accessToken: "first-token")
+        let transport = FakeDriveHistoryTransport()
+        let sharedID = UUID()
+        let firstDrive = makeDrive(id: sharedID, score: 52)
+        transport.page = DriveHistoryPage(drives: [makeDTO(for: firstDrive)], nextCursor: nil)
+        let defaults = isolatedDefaults()
+        let firstService = DriveHistorySyncService(
+            transport: transport,
+            authSession: session,
+            userDefaults: defaults,
+            retryDelaysNanoseconds: []
+        )
+
+        firstService.sync(localDrives: [firstDrive], applyLocalDrives: { _ in })
+        await waitUntil { firstService.state == .synced }
+        transport.shouldFail = true
+        firstService.markDriveDeleted(id: sharedID)
+        firstService.sync(localDrives: [], applyLocalDrives: { _ in })
+        await waitUntil { firstService.state == .offline }
+        firstService.didSignOut()
+
+        // A UUID collision is extraordinarily unlikely, but using one here
+        // proves that isolation comes from the account boundary, not the ID.
+        let secondUser = AuthUser(id: "second-account", email: "second@example.com", displayName: nil)
+        session.setSignedInForTesting(user: secondUser, accessToken: "second-token")
+        let secondDrive = makeDrive(id: sharedID, score: 88)
+        transport.page = DriveHistoryPage(drives: [makeDTO(for: secondDrive)], nextCursor: nil)
+        transport.shouldFail = false
+        let secondService = DriveHistorySyncService(
+            transport: transport,
+            authSession: session,
+            userDefaults: defaults,
+            retryDelaysNanoseconds: [0]
+        )
+        var applied: [RecordedDrive] = []
+        secondService.sync(localDrives: [], applyLocalDrives: { applied = $0 })
+        await waitUntil { secondService.state == .synced }
+
+        expect(transport.deletedIDs.isEmpty, "one account's pending deletion must never be sent to another account")
+        expect(applied.first?.score.score == 88, "the second account's remote drive must remain intact")
     }
 
     private static func makeDrive(id: UUID = UUID(), score: Int) -> RecordedDrive {

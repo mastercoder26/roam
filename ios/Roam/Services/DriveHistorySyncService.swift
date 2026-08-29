@@ -318,12 +318,25 @@ final class DriveHistorySyncService: ObservableObject {
         }
     }
 
+    /// Remote confirmations belong to the Clerk account that produced them.
+    /// Keeping one metadata record per account preserves offline work across
+    /// sign-out without letting a later account inherit another account's
+    /// tombstones or "already uploaded" markers.
+    private struct AccountMetadataStore: Codable {
+        var accounts: [String: SyncMetadata]
+        var lastActiveAccountID: String?
+    }
+
     private let transport: any DriveHistorySyncTransport
     private let authSession: AuthSessionStore
     private let userDefaults: UserDefaults
-    private let metadataKey = "drive-history-sync-v1"
+    private let legacyMetadataKey = "drive-history-sync-v1"
+    private let accountMetadataKey = "drive-history-sync-v2"
     private let retryDelaysNanoseconds: [UInt64]
 
+    private var accountMetadataStore: AccountMetadataStore
+    private var activeAccountID: String?
+    private var legacyMetadata: SyncMetadata?
     private var metadata: SyncMetadata
     private var pendingDrives: [UUID: RecordedDrive] = [:]
     private var latestLocalDrives: [RecordedDrive] = []
@@ -341,11 +354,23 @@ final class DriveHistorySyncService: ObservableObject {
         self.authSession = authSession
         self.userDefaults = userDefaults
         self.retryDelaysNanoseconds = retryDelaysNanoseconds
-        if let data = userDefaults.data(forKey: metadataKey),
-           let saved = try? APIClient.makeDateDecoder().decode(SyncMetadata.self, from: data) {
-            metadata = saved
+        if let data = userDefaults.data(forKey: accountMetadataKey),
+           let saved = try? APIClient.makeDateDecoder().decode(AccountMetadataStore.self, from: data) {
+            accountMetadataStore = saved
+            activeAccountID = saved.lastActiveAccountID
+            metadata = saved.lastActiveAccountID
+                .flatMap { saved.accounts[$0] }
+                ?? SyncMetadata(syncedDriveIDs: [], lastSyncedAt: nil)
+            legacyMetadata = nil
         } else {
+            accountMetadataStore = AccountMetadataStore(accounts: [:], lastActiveAccountID: nil)
+            activeAccountID = nil
             metadata = SyncMetadata(syncedDriveIDs: [], lastSyncedAt: nil)
+            if let data = userDefaults.data(forKey: legacyMetadataKey) {
+                legacyMetadata = try? APIClient.makeDateDecoder().decode(SyncMetadata.self, from: data)
+            } else {
+                legacyMetadata = nil
+            }
         }
     }
 
@@ -356,7 +381,8 @@ final class DriveHistorySyncService: ObservableObject {
         localDrives: [RecordedDrive],
         applyLocalDrives: @escaping ([RecordedDrive]) -> Void
     ) {
-        guard authSession.isSignedIn else { return }
+        guard authSession.isSignedIn, let accountID = authSession.currentUser?.id else { return }
+        activateAccount(accountID)
 
         latestLocalDrives = localDrives
         self.applyLocalDrives = applyLocalDrives
@@ -388,6 +414,14 @@ final class DriveHistorySyncService: ObservableObject {
     /// temporarily empty because persistence is unreadable, a load was
     /// interrupted, or the on-device retention window was trimmed.
     func markDriveDeleted(id: UUID) {
+        if let accountID = authSession.currentUser?.id {
+            activateAccount(accountID)
+        }
+        // A drive created and deleted before any account has ever been active
+        // has no remote copy to delete. Once an account has been active, the
+        // last account remains selected so an offline signed-out deletion can
+        // still be delivered when that same account returns.
+        guard activeAccountID != nil else { return }
         let idString = id.uuidString
         metadata.pendingDeletionIDs.insert(idString)
         metadata.syncedDriveIDs.remove(idString)
@@ -396,8 +430,10 @@ final class DriveHistorySyncService: ObservableObject {
         persistMetadata()
     }
 
-    /// Clears only the remote confirmation metadata. Local history intentionally
-    /// remains available on the device after sign-out.
+    /// Stops account work without erasing it. Local history intentionally
+    /// remains available after sign-out, and account-scoped metadata must also
+    /// remain so offline uploads and explicit deletions resume if that account
+    /// returns later.
     func didSignOut() {
         syncTask?.cancel()
         syncTask = nil
@@ -405,9 +441,30 @@ final class DriveHistorySyncService: ObservableObject {
         pendingDrives = [:]
         latestLocalDrives = []
         applyLocalDrives = nil
-        metadata = SyncMetadata(syncedDriveIDs: [], lastSyncedAt: nil)
-        userDefaults.removeObject(forKey: metadataKey)
+        persistMetadata()
         state = .idle
+    }
+
+    private func activateAccount(_ accountID: String) {
+        guard activeAccountID != accountID else { return }
+
+        // Save the previous account before switching the in-memory view.
+        persistMetadata()
+        activeAccountID = accountID
+        accountMetadataStore.lastActiveAccountID = accountID
+
+        if let saved = accountMetadataStore.accounts[accountID] {
+            metadata = saved
+        } else if let legacyMetadata {
+            // The v1 format had no owner. Assign it once to the first account
+            // that becomes active after upgrading, then remove the legacy key
+            // only after the account-scoped store has been written.
+            metadata = legacyMetadata
+            self.legacyMetadata = nil
+        } else {
+            metadata = SyncMetadata(syncedDriveIDs: [], lastSyncedAt: nil)
+        }
+        persistMetadata()
     }
 
     private func runSyncLoop() async {
@@ -559,8 +616,12 @@ final class DriveHistorySyncService: ObservableObject {
     }
 
     private func persistMetadata() {
-        guard let data = try? APIClient.makeDateEncoder().encode(metadata) else { return }
-        userDefaults.set(data, forKey: metadataKey)
+        guard let activeAccountID else { return }
+        accountMetadataStore.accounts[activeAccountID] = metadata
+        accountMetadataStore.lastActiveAccountID = activeAccountID
+        guard let data = try? APIClient.makeDateEncoder().encode(accountMetadataStore) else { return }
+        userDefaults.set(data, forKey: accountMetadataKey)
+        userDefaults.removeObject(forKey: legacyMetadataKey)
     }
 
     private func state(for error: Error) -> DriveHistorySyncState {
