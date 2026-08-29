@@ -375,23 +375,25 @@ final class DriveHistorySyncService: ObservableObject {
             }
         }
 
-        // A drive this device previously confirmed synced but that is no
-        // longer in the local list was removed by the user; the server
-        // needs to hear about it too, or the next fetch would bring it back.
-        let localIDStrings = Set(localIDs.map(\.uuidString))
-        let removedIDs = metadata.syncedDriveIDs.subtracting(localIDStrings)
-        if !removedIDs.isEmpty {
-            metadata.pendingDeletionIDs.formUnion(removedIDs)
-            metadata.syncedDriveIDs.subtract(removedIDs)
-            persistMetadata()
-        }
-
         needsSync = true
         guard syncTask == nil else { return }
 
         syncTask = Task { @MainActor [weak self] in
             await self?.runSyncLoop()
         }
+    }
+
+    /// Records an intentional user deletion independently of the current
+    /// local snapshot. Absence alone is not a deletion signal: history can be
+    /// temporarily empty because persistence is unreadable, a load was
+    /// interrupted, or the on-device retention window was trimmed.
+    func markDriveDeleted(id: UUID) {
+        let idString = id.uuidString
+        metadata.pendingDeletionIDs.insert(idString)
+        metadata.syncedDriveIDs.remove(idString)
+        metadata.syncedRouteAnalysisStatus.removeValue(forKey: idString)
+        pendingDrives.removeValue(forKey: id)
+        persistMetadata()
     }
 
     /// Clears only the remote confirmation metadata. Local history intentionally

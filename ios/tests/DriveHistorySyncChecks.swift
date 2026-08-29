@@ -168,6 +168,7 @@ struct DriveHistorySyncChecks {
         expect(applied.contains { $0.id == drive.id }, "the drive should be present after the first sync")
 
         // User deletes it locally, then a sync runs with the drive already removed.
+        service.markDriveDeleted(id: drive.id)
         service.sync(localDrives: [], applyLocalDrives: { applied = $0 })
         await waitUntil { service.state == .synced }
 
@@ -202,6 +203,7 @@ struct DriveHistorySyncChecks {
 
         // The delete call fails (simulating no connectivity at delete time).
         transport.shouldFail = true
+        service.markDriveDeleted(id: drive.id)
         service.sync(localDrives: [], applyLocalDrives: { applied = $0 })
         await waitUntil { service.state == .offline }
         expect(transport.deletedIDs.isEmpty, "a failed delete must not be recorded as sent")

@@ -397,6 +397,7 @@ final class DriveSessionManager: NSObject, ObservableObject {
             lastCompletedDrive = nil
             lastScore = nil
         }
+        DriveHistorySyncService.shared.markDriveDeleted(id: id)
         // Deleting a drive whose route analysis is still in flight should not
         // leave a network request running only to be discarded by
         // `replaceSavedDrive`'s existence guard when it completes.
