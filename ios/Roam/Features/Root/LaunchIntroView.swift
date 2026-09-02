@@ -1,16 +1,16 @@
 import SwiftUI
 import UIKit
 
-/// Coordinate space the launch intro and the real header share, so the
-/// header's wordmark frame (captured via `HeaderWordmarkFrameKey`) can be
-/// read directly as a docking target instead of an inset kept in sync by hand.
+/// Coordinate space the launch intro and the real header share. If the root
+/// has already supplied a preference, the intro can dock to that exact frame;
+/// cold launch uses the authored inset until the preference exists.
 enum LaunchIntroDockSpace {
     static let name = "launchIntroDock"
 }
 
-/// The real header wordmark's on-screen frame, published from `RoamRootView`
-/// — which sits behind the intro for its entire run, just invisible — so the
-/// intro's docked wordmark can land in its exact usual spot.
+/// The real header wordmark's on-screen frame, when the root has supplied it.
+/// During cold launch this is `.zero`, and the choreography's safe authored
+/// inset keeps the docking pose stable before root preferences exist.
 struct HeaderWordmarkFrameKey: PreferenceKey {
     static let defaultValue: CGRect = .zero
 
@@ -30,18 +30,22 @@ struct HeaderWordmarkFrameKey: PreferenceKey {
 /// theme, so the intro is a different piece of art on each of the six schemes.
 struct LaunchIntroView: View {
     @ObservedObject private var theme = ThemeManager.shared
-    let onFinish: () -> Void
-    /// The real header wordmark's live on-screen frame, read by `RoamApp`
-    /// from `RoamRootView` (which sits behind the intro the whole time) and
-    /// handed down here so the docked mark lands exactly where the header's
-    /// own wordmark already sits, rather than an inset kept in sync by hand.
+    /// Signals that this visual generation has completed (or was skipped).
+    /// Readiness and root handoff belong to `RoamApp`'s launch gate.
+    let onVisualComplete: () -> Void
+    /// The real header wordmark's live on-screen frame, when available. On a
+    /// cold launch it is `.zero`, so docking uses the same authored safe inset
+    /// as the header until its preference data exists.
     let dockTargetFrame: CGRect
+    /// The intro remains on screen after its authored beat when services are
+    /// still bootstrapping. This state is also exposed to VoiceOver.
+    let isWaitingForBootstrap: Bool
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var traceProgress: Double = 0
     @State private var sweepProgress: Double = 0
     @State private var isLockupVisible = false
-    @State private var hasHandedOff = false
+    @State private var hasSignaledVisualCompletion = false
     @State private var isGlobeIntroActive = false
     @State private var isGlobeWordmarkVisible = false
     @State private var isWordmarkDocked = false
@@ -93,7 +97,8 @@ struct LaunchIntroView: View {
         .contentShape(Rectangle())
         .onTapGesture(perform: handOff)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Roam")
+        .accessibilityLabel(isWaitingForBootstrap ? "Roam, loading" : "Roam")
+        .accessibilityValue(isWaitingForBootstrap ? "Preparing your driving workspace" : "Ready")
         .accessibilityAddTraits(.isImage)
         .onPreferenceChange(WordmarkWidthKey.self) { width in
             guard wordmarkWidth == 0, width > 0 else { return }
@@ -265,11 +270,13 @@ struct LaunchIntroView: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: handOff)
     }
 
-    /// Idempotent: tap-to-skip and the scheduled finish can both arrive.
+    /// Idempotent: tap-to-skip and the scheduled finish can both arrive. The
+    /// callback is visual-complete only; the launch gate decides when the app
+    /// is allowed to construct and reveal its root.
     private func handOff() {
-        guard !hasHandedOff else { return }
-        hasHandedOff = true
-        onFinish()
+        guard !hasSignaledVisualCompletion else { return }
+        hasSignaledVisualCompletion = true
+        onVisualComplete()
     }
 }
 
@@ -460,6 +467,10 @@ private struct SweptWordmark: View {
 }
 
 #Preview {
-    LaunchIntroView(onFinish: {}, dockTargetFrame: .zero)
+    LaunchIntroView(
+        onVisualComplete: {},
+        dockTargetFrame: .zero,
+        isWaitingForBootstrap: false
+    )
         .environmentObject(ThemeManager.shared)
 }

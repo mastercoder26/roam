@@ -81,6 +81,10 @@ final class DriveSessionManager: NSObject, ObservableObject {
     private var isHistoryUnreadable = false
     private var snapshotPersistence = DriveSnapshotPersistence()
     private let routeAnalysisCoordinator: DriveRouteAnalysisCoordinator
+    /// The launch bootstrap is shared by concurrent callers so recovery and
+    /// pending-analysis resumption happen at most once per manager instance.
+    private var bootstrapTask: Task<Void, Never>?
+    private var didBootstrap = false
 
     var currentDistanceMiles: Double { distanceMeters / 1_609.344 }
     var currentSpeedMilesPerHour: Int { Int((max(currentSpeedMetersPerSecond, 0) * 2.23694).rounded()) }
@@ -114,13 +118,41 @@ final class DriveSessionManager: NSObject, ObservableObject {
             self?.requestDriveHistorySync()
         }
 
-        loadRecordedDrives()
-        recoverInterruptedDriveIfNeeded()
-        resumeRouteAnalysesIfNeeded()
-        // Nothing is recording at launch, so any Live Activity still on screen
-        // is a leftover from a drive that was terminated before it could end.
-        DriveLiveActivityManager.shared.endOrphanedActivities()
         observeBackgroundEntry()
+    }
+
+    /// Completes the persisted-drive startup work after the initial view has
+    /// had a chance to render. The operation is idempotent and concurrent
+    /// callers await the same in-flight task rather than repeating recovery or
+    /// starting duplicate route analyses.
+    func bootstrap() async {
+        guard !didBootstrap else { return }
+        if let bootstrapTask {
+            await bootstrapTask.value
+            return
+        }
+
+        let task = Task { @MainActor [weak self] in
+            guard let self else { return }
+
+            // Let the launch intro render before any synchronous history work
+            // begins, then yield between each independent local phase so no
+            // one phase monopolizes the main actor back-to-back.
+            await Task.yield()
+            self.loadRecordedDrives()
+            await Task.yield()
+            self.recoverInterruptedDriveIfNeeded()
+            await Task.yield()
+            self.resumeRouteAnalysesIfNeeded()
+            await Task.yield()
+            // Nothing is recording at launch, so any Live Activity still on
+            // screen is a leftover from a drive terminated before it ended.
+            DriveLiveActivityManager.shared.endOrphanedActivities()
+        }
+        bootstrapTask = task
+        await task.value
+        didBootstrap = true
+        bootstrapTask = nil
     }
 
     // MARK: - Background Observation

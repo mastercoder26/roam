@@ -127,9 +127,6 @@ struct RoamRootView: View {
         .onChange(of: clerk.user?.id, initial: true) { _, _ in
             Task { await authSession.synchronizeWithClerk() }
         }
-        .onOpenURL { url in
-            Task { try? await Clerk.shared.handle(url) }
-        }
     }
 
     /// A compact, ordinary layout element rather than an overlay. That makes
