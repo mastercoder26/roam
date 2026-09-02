@@ -51,13 +51,3 @@ flowchart TB
 ```
 
 Cloud Run handles route difficulty and departure comparisons without a database. Render is created from `render.yaml`; it runs database migrations when the service starts and connects `roam-data-api` to the managed `roam-db` Postgres instance. Keeping the two deployments separate lets route scoring stay stateless while account data remains behind an authenticated API.
-
-## ROAM Sense hardware prototype — bill of materials
-
-ROAM Sense is a planned Tier 2 hardware extension: a fixed IMU and dedicated GNSS receiver would stream measurements over Bluetooth LE to the iPhone app. The goal is to compare fixed-sensor measurements with phone-only recording. Hardware assembly, firmware, iOS integration, calibration, and any accuracy improvement still need implementation and validation.
-
-The separate **[BOM.csv](BOM.csv)** lists the parts for one USB-powered prototype, with purchase quantities, exact product links, USD unit prices, line totals, and sourcing notes. The parts subtotal is **$136.58**, using prices checked on **September 2, 2026**. A **$180 planning budget** leaves $43.42 for tax, shipping, and price changes; that allowance is an estimate, not a checkout quote. Full retail packs are included for fasteners and mounting tape. Tools, an iPhone, and a development computer are outside this materials budget.
-
-The selected [ESP32 Feather V2](https://www.adafruit.com/product/5400), [ISM330DHCX](https://www.adafruit.com/product/4502), and [PA1010D](https://www.adafruit.com/product/4415) support a shared 3.3 V STEMMA QT/I2C connection using the two listed cables. Firmware must enable the Feather's switched sensor power supply. The GPS and Bluetooth antennas are included on their respective boards. USB power comes through the listed car adapter and USB-C cable. This prototype does not require a battery, OBD-II connection, or custom PCB.
-
-The enclosure needs a cable opening and matching board mounting holes; its existing M4 mounting bosses do not match the M2.5 hardware. Final fit, mounting security, cable routing, and GNSS reception need physical checks. Keep the device clear of airbags and the driver's view. The GPS antenna needs a clear sky-facing position, and a dedicated receiver alone does not establish better accuracy than an iPhone.
