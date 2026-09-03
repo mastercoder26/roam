@@ -13,23 +13,23 @@ enum FeatureWalkthroughStep: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .plan: "Plan with context"
-        case .understand: "Understand the road ahead"
-        case .drive: "Keep a quiet record"
-        case .grow: "Build confidence over time"
+        case .plan: "Plan your route"
+        case .understand: "Know what to expect"
+        case .drive: "Record the drive"
+        case .grow: "Build experience"
         }
     }
 
     var detail: String {
         switch self {
         case .plan:
-            "Routes starts with where you are going, then compares options before you leave."
+            "In Routes, enter your destination and compare options before you leave."
         case .understand:
-            "See what may make each route demanding, from turns and traffic to conditions."
+            "See what may make a route demanding, including turns, traffic, and weather."
         case .drive:
-            "Drive records when you choose, while keeping the live view focused on the road."
+            "Drive records your trip when you choose and keeps the live view focused on the road."
         case .grow:
-            "Progress turns completed drives into useful patterns and practice ideas. Profile keeps your settings and milestones close."
+            "Progress turns completed drives into practice goals. Profile keeps your settings and milestones in one place."
         }
     }
 
@@ -43,7 +43,7 @@ enum FeatureWalkthroughStep: String, CaseIterable, Identifiable {
     }
 
     var actionTitle: String {
-        self == .grow ? "Start exploring" : "Continue"
+        self == .grow ? "Open Roam" : "Next"
     }
 
     var progressLabel: String {

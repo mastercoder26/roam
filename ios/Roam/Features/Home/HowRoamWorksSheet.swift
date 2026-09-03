@@ -47,12 +47,12 @@ struct HowRoamWorksSheet: View {
                 .frame(width: 52, height: 52)
                 .background(AppDesign.accent.opacity(0.12), in: RoundedRectangle(cornerRadius: 15, style: .continuous))
 
-            Text("A clearer picture of the drive")
+            Text("Know what to expect")
                 .font(.title2.weight(.bold))
                 .tracking(-0.4)
                 .foregroundStyle(AppDesign.Ink.primary)
 
-            Text("Roam evaluates the route and departure time, then explains which parts may require more attention. It does not decide whether someone is safe or legally allowed to drive.")
+            Text("Roam evaluates the route and departure time, then shows which parts may need more attention. It does not decide whether someone is safe or allowed to drive.")
                 .font(.subheadline)
                 .foregroundStyle(AppDesign.Ink.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -62,24 +62,24 @@ struct HowRoamWorksSheet: View {
     }
 
     private var processSection: some View {
-        HowItWorksSection(title: "From route to result") {
+        HowItWorksSection(title: "How a route is scored") {
             VStack(spacing: 0) {
                 ProcessStepRow(
                     number: 1,
                     title: "Build the route",
-                    detail: "Routing data supplies the route shape, distance, expected duration, maneuvers, and available alternatives."
+                    detail: "Roam maps the route, distance, travel time, maneuvers, and available alternatives."
                 )
                 Divider().padding(.leading, 52)
                 ProcessStepRow(
                     number: 2,
-                    title: "Add route context",
-                    detail: "Roam checks the selected departure time against traffic, daylight, weather, road details, and mapped turn controls when those sources are available."
+                    title: "Add context",
+                    detail: "Roam checks traffic, daylight, weather, road details, and mapped turn controls for your departure time."
                 )
                 Divider().padding(.leading, 52)
                 ProcessStepRow(
                     number: 3,
                     title: "Explain the demand",
-                    detail: "The result shows an overall difficulty score, the strongest contributing factors, route hotspots, and calmer alternatives when available."
+                    detail: "The result shows the difficulty score, its main factors, route hotspots, and calmer alternatives when available."
                 )
             }
             .premiumCard()
@@ -105,21 +105,21 @@ struct HowRoamWorksSheet: View {
             VStack(alignment: .leading, spacing: 0) {
                 EvidenceLevelRow(
                     title: "Well supported",
-                    detail: "The important route inputs were available and agree strongly enough to support the explanation.",
+                    detail: "The key route inputs were available and support the explanation.",
                     symbol: "checkmark.seal.fill",
                     color: AppDesign.positive
                 )
                 Divider()
                 EvidenceLevelRow(
                     title: "Partial evidence",
-                    detail: "Some live or mapped inputs were unavailable. Roam still shows the result and identifies the missing coverage.",
+                    detail: "Some live or mapped inputs were unavailable. Roam shows the result and identifies what is missing.",
                     symbol: "circle.lefthalf.filled",
                     color: AppDesign.safety
                 )
                 Divider()
                 EvidenceLevelRow(
                     title: "Limited evidence",
-                    detail: "The score relies on a smaller set of route facts. Treat the explanation as an early estimate.",
+                    detail: "The score relies on fewer route facts. Treat the explanation as an early estimate.",
                     symbol: "exclamationmark.circle.fill",
                     color: AppDesign.Ink.secondary
                 )
@@ -139,7 +139,7 @@ struct HowRoamWorksSheet: View {
 
                 Divider()
 
-                Text("Scores compare route demand, not driver quality. A higher number means the route contains more demanding conditions or a greater concentration of them.")
+                Text("Scores compare route demand, not driver quality. A higher number means more demanding conditions or more of them.")
                     .font(.footnote)
                     .foregroundStyle(AppDesign.Ink.secondary)
                     .fixedSize(horizontal: false, vertical: true)

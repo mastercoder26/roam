@@ -16,11 +16,11 @@ struct FeatureWalkthroughChecks {
             "the walkthrough should follow the product journey from planning through growth"
         )
         expect(
-            FeatureWalkthroughStep.plan.title == "Plan with context",
+            FeatureWalkthroughStep.plan.title == "Plan your route",
             "the first step should introduce route planning"
         )
         expect(
-            FeatureWalkthroughStep.grow.actionTitle == "Start exploring",
+            FeatureWalkthroughStep.grow.actionTitle == "Open Roam",
             "the final step should finish with a clear return-to-app action"
         )
     }
