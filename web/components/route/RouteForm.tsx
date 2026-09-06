@@ -338,15 +338,21 @@ function FieldRow({
   const [isOpen, setIsOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
   const normalizedValue = value.trim().toLowerCase();
-  const visibleSuggestions = normalizedValue.length >= 3
-    ? suggestions
+  const visibleSuggestions = useMemo(() => {
+    if (normalizedValue.length === 0) {
+      return suggestions.slice(0, 5);
+    }
+    return suggestions
       .filter((suggestion) => {
         const normalizedSuggestion = suggestion.toLowerCase();
-        return normalizedSuggestion.includes(normalizedValue)
-          && normalizedSuggestion !== normalizedValue;
+        if (normalizedSuggestion === normalizedValue) return false;
+        if (normalizedValue.length < 3) {
+          return normalizedSuggestion.includes(normalizedValue);
+        }
+        return true;
       })
-      .slice(0, 5)
-    : [];
+      .slice(0, 5);
+  }, [normalizedValue, suggestions]);
   const listboxId = `${listId}-listbox`;
 
   function chooseSuggestion(suggestion: string) {
@@ -410,6 +416,11 @@ function FieldRow({
               role="listbox"
               className="absolute left-0 right-0 top-full z-40 mt-3 border border-ink-primary/20 bg-card py-1 shadow-roam-lg"
             >
+              {normalizedValue.length === 0 ? (
+                <div className="border-b border-ink-primary/10 px-3 py-1.5 text-[9px] font-bold uppercase tracking-[0.14em] text-ink-label">
+                  Recent & Suggested
+                </div>
+              ) : null}
               {visibleSuggestions.map((suggestion, index) => (
                 <button
                   id={`${listboxId}-${index}`}

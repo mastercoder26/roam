@@ -482,7 +482,12 @@ struct SharedRouteInbox {
         guard pruneExpiredEntries(now: now) else { return nil }
         return readEntries()
             .filter { $0.expiresAt > now && $0.item != nil }
-            .sorted { $0.receivedAt < $1.receivedAt }
+            .sorted { left, right in
+                if left.receivedAt != right.receivedAt {
+                    return left.receivedAt < right.receivedAt
+                }
+                return left.id.uuidString < right.id.uuidString
+            }
             .first?.item
     }
 
@@ -490,7 +495,7 @@ struct SharedRouteInbox {
     /// is kept rather than deleted, so the app can explain the gap instead of
     /// showing an empty inbox that looks like nothing was ever shared.
     var hasUnreadableEntries: Bool {
-        guard let directory = preparedStorageDirectory() else { print("no directory in mutate"); return false }
+        guard let directory = preparedStorageDirectory() else { return false }
 
         let coordinator = NSFileCoordinator(filePresenter: nil)
         var coordinationError: NSError?
@@ -565,14 +570,17 @@ struct SharedRouteInbox {
             var entries = stored.filter { $0.expiresAt > now && $0.item != nil }
             guard transform(&entries) else { return }
 
-            entries.sort { $0.receivedAt < $1.receivedAt }
+            entries.sort { left, right in
+                if left.receivedAt != right.receivedAt {
+                    return left.receivedAt < right.receivedAt
+                }
+                return left.id.uuidString < right.id.uuidString
+            }
             didPersist = persist(
                 Array(entries.suffix(Self.maximumEntries)),
                 in: coordinatedDirectory
             )
         }
-        if let coordinationError { print("coordination error: \(coordinationError)") }
-        print("didPersist: \(didPersist)")
         return coordinationError == nil && didPersist
     }
 
@@ -606,7 +614,6 @@ struct SharedRouteInbox {
             )
             return storageDirectory
         } catch {
-            print("prepare directory error: \(error)")
             return nil
         }
     }

@@ -1,0 +1,29 @@
+# Cloud Build configuration for roam-backend
+# Runs the automated test suite first; aborts deployment if tests fail.
+
+steps:
+  # 1. Install backend dependencies for testing
+  - name: 'node:22'
+    id: 'install-deps'
+    entrypoint: 'npm'
+    args: ['ci', '--prefix', 'backend']
+
+  # 2. Run backend test suite
+  - name: 'node:22'
+    id: 'run-tests'
+    entrypoint: 'npm'
+    args: ['test', '--prefix', 'backend']
+
+  # 3. Deploy to Cloud Run only if tests pass
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: 'deploy-cloud-run'
+    entrypoint: 'gcloud'
+    args:
+      - 'run'
+      - 'deploy'
+      - 'roam-backend'
+      - '--source=backend'
+      - '--region=us-central1'
+
+options:
+  logging: CLOUD_LOGGING_ONLY

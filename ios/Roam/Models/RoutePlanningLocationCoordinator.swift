@@ -1,6 +1,7 @@
 import CoreLocation
 import Combine
 import Foundation
+import MapKit
 
 enum RoutePlanningOriginState: Equatable {
     case awaitingOrigin
@@ -70,7 +71,6 @@ final class RoutePlanningLocationCoordinator: NSObject, ObservableObject {
     @Published private(set) var accuracyNotice: String?
 
     private let locationManager = CLLocationManager()
-    private let geocoder = CLGeocoder()
     /// The most accurate coarse fix seen so far. It is used only if nothing
     /// better arrives before the deadline.
     private var bestDegradedFix: CLLocation?
@@ -181,8 +181,13 @@ final class RoutePlanningLocationCoordinator: NSObject, ObservableObject {
 
     private func resolve(_ location: CLLocation, notice: String?) async {
         do {
-            let placemark = try await geocoder.reverseGeocodeLocation(location).first
-            guard let address = Self.address(from: placemark) else {
+            guard let request = MKReverseGeocodingRequest(location: location) else {
+                useManualEntry(message: "We couldn't turn that location into an address. Enter one instead.")
+                return
+            }
+            let mapItems = try await request.mapItems
+            guard let firstItem = mapItems.first,
+                  let address = Self.address(from: firstItem) else {
                 useManualEntry(message: "We couldn't turn that location into an address. Enter one instead.")
                 return
             }
@@ -191,6 +196,20 @@ final class RoutePlanningLocationCoordinator: NSObject, ObservableObject {
         } catch {
             useManualEntry(message: "We couldn't confirm your address. Enter it manually instead.")
         }
+    }
+
+    static func address(from mapItem: MKMapItem?) -> String? {
+        guard let mapItem else { return nil }
+        if let full = mapItem.address?.fullAddress.trimmingCharacters(in: .whitespacesAndNewlines), !full.isEmpty {
+            return full
+        }
+        if let short = mapItem.address?.shortAddress?.trimmingCharacters(in: .whitespacesAndNewlines), !short.isEmpty {
+            return short
+        }
+        if let name = mapItem.name?.trimmingCharacters(in: .whitespacesAndNewlines), !name.isEmpty {
+            return name
+        }
+        return nil
     }
 
     static func address(from placemark: CLPlacemark?) -> String? {
