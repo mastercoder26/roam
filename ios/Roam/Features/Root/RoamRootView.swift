@@ -22,7 +22,6 @@ extension EnvironmentValues {
 }
 
 struct RoamRootView: View {
-    @ObservedObject private var theme = ThemeManager.shared
     private enum AppTab: String, CaseIterable, Identifiable {
         case routes
         case drive
@@ -62,6 +61,7 @@ struct RoamRootView: View {
         VStack(spacing: 0) {
             if !driveSession.isRecording {
                 topBrandBar
+                    .transition(.move(edge: .top).combined(with: .opacity))
             }
 
             // Keep the four destinations stable. The minimized iOS 26 bar can
@@ -93,6 +93,7 @@ struct RoamRootView: View {
                 }
             )
         }
+        .animation(AppAnimation.driveMode, value: driveSession.isRecording)
         .environmentObject(driveSession)
         .environmentObject(themeManager)
         // System chrome — tab bar selection, toolbar buttons, text carets —
@@ -134,8 +135,6 @@ struct RoamRootView: View {
     /// screen's title from disappearing behind a safe-area inset.
     private var topBrandBar: some View {
         HStack {
-            Spacer(minLength: 0)
-
             BrandWordmark(compact: true)
                 .background(
                     GeometryReader { proxy in

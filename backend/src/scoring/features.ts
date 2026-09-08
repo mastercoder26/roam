@@ -523,7 +523,11 @@ function deriveConditionFeatures(
   const verifiedWeather = conditions?.weather?.available
     ? conditions.weather
     : undefined;
-  const verifiedRoad = conditions?.road?.available ? conditions.road : undefined;
+  const roadAvailable = Boolean(
+    conditions?.road?.available ||
+    (conditions?.sources?.includes("google-route-warnings") && (conditions?.road?.constructionZones ?? 0) > 0)
+  );
+  const verifiedRoad = roadAvailable ? conditions?.road : undefined;
   const constructionZones = verifiedRoad?.constructionZones ?? 0;
 
   return {

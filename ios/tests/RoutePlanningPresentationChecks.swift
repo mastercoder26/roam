@@ -9,6 +9,7 @@ struct RoutePlanningPresentationChecks {
         freshPlansKeepTheAppleMapsPreviewVisible()
         freshPlansWaitForAnExplicitOriginChoice()
         completedRoutesOfferTheCorrectAccountAction()
+        breakRecommendationScoreGateGatesAtSevenScore()
 
         print("Route planning presentation checks passed")
     }
@@ -114,6 +115,30 @@ struct RoutePlanningPresentationChecks {
             ) == .analyze,
             "a signed-in completed route should remain ready to analyze"
         )
+    }
+
+    private static func breakRecommendationScoreGateGatesAtSevenScore() {
+        // Below 7.0 and without demands: low-demand 90-minute interval
+        let easyRoute = ScoredRoute.stub(score: 6.9, durationSeconds: 7200)
+        let easyPlan = StopBreakPlan(route: easyRoute, continuousMinutes: 0)
+        expect(!easyPlan.highDemand, "score 6.9 must not be classified as high demand without explicit demands")
+        expect(easyPlan.interval == 90, "low demand route must use 90 minute interval")
+        expect(easyPlan.stops.count > 0, "a 120-minute drive should recommend stops")
+        expect(easyPlan.stops.allSatisfy { $0.reason.contains("fatigue") }, "low demand stops should mention fatigue")
+
+        // At or above 7.0: high-demand 60-minute interval even without demands
+        let hardRoute = ScoredRoute.stub(score: 7.0, durationSeconds: 7200)
+        let hardPlan = StopBreakPlan(route: hardRoute, continuousMinutes: 0)
+        expect(hardPlan.highDemand, "score 7.0 must trigger high demand")
+        expect(hardPlan.interval == 60, "high demand route must use 60 minute interval")
+        expect(hardPlan.title == "Breaks recommended", "high demand plan must use 'Breaks recommended' title")
+        expect(hardPlan.stops.allSatisfy { $0.reason.contains("Reset attention") }, "high demand stops must advise resetting attention")
+
+        // Higher difficulty (8.5): high-demand 60-minute interval
+        let veryHardRoute = ScoredRoute.stub(score: 8.5, durationSeconds: 7200)
+        let veryHardPlan = StopBreakPlan(route: veryHardRoute, continuousMinutes: 0)
+        expect(veryHardPlan.highDemand, "score 8.5 must trigger high demand")
+        expect(veryHardPlan.interval == 60, "very hard route must use 60 minute interval")
     }
 
     private static func expect(_ condition: @autoclosure () -> Bool, _ message: String) {

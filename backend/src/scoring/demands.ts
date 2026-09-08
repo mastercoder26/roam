@@ -497,8 +497,8 @@ function afterDarkDemand(
   );
 }
 
-function formatLocalClock(localMinutes: number): string {
-  const totalMinutes = Math.round(localMinutes) % (24 * 60);
+export function formatLocalClock(localMinutes: number): string {
+  const totalMinutes = ((Math.round(localMinutes) % 1440) + 1440) % 1440;
   const hour24 = Math.floor(totalMinutes / 60);
   const minute = totalMinutes % 60;
   const hour12 = hour24 % 12 === 0 ? 12 : hour24 % 12;

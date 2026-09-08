@@ -46,7 +46,7 @@ export function ScoreGauge({
           strokeLinecap="round"
           strokeDasharray={circumference}
           strokeDashoffset={circumference * (1 - progress)}
-          style={{ transition: "stroke-dashoffset 1.1s cubic-bezier(0.22,1,0.36,1)" }}
+          style={{ transition: "stroke-dashoffset 360ms cubic-bezier(0.22, 1, 0.36, 1)" }}
         />
       </svg>
       <div className="flex flex-col items-center gap-0.5">

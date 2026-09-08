@@ -7,6 +7,7 @@ import {
   SignedOut,
   SignInButton,
   UserButton,
+  useAuth,
 } from "@clerk/nextjs";
 import { BrandLogo } from "@/components/BrandLogo";
 
@@ -18,6 +19,7 @@ const TABS = [
 
 export function NavBar() {
   const pathname = usePathname();
+  const { isLoaded } = useAuth();
 
   return (
     <header className="sticky top-0 z-30 border-b border-ink-primary/10 bg-canvas/90 backdrop-blur-xl">
@@ -48,21 +50,27 @@ export function NavBar() {
           })}
         </nav>
 
-        <div className="flex shrink-0 items-center gap-3">
-          <SignedOut>
-            <SignInButton mode="modal">
-              <button className="roam-jiggle border border-ink-primary bg-ink-primary px-3.5 py-2.5 text-[11px] font-bold uppercase tracking-[0.08em] text-white transition-colors hover:bg-accent hover:border-accent active:scale-[0.97] sm:px-5">
-                Sign in
-              </button>
-            </SignInButton>
-          </SignedOut>
-          <SignedIn>
-            <UserButton
-              appearance={{
-                elements: { avatarBox: "h-8 w-8" },
-              }}
-            />
-          </SignedIn>
+        <div className="flex min-h-[38px] shrink-0 items-center gap-3">
+          {!isLoaded ? (
+            <div className="h-[38px] w-[76px] animate-pulse rounded bg-ink-primary/10 sm:w-[92px]" />
+          ) : (
+            <>
+              <SignedOut>
+                <SignInButton mode="modal">
+                  <button className="roam-jiggle border border-ink-primary bg-ink-primary px-3.5 py-2.5 text-[11px] font-bold uppercase tracking-[0.08em] text-white transition-colors hover:bg-accent hover:border-accent active:scale-[0.97] sm:px-5">
+                    Sign in
+                  </button>
+                </SignInButton>
+              </SignedOut>
+              <SignedIn>
+                <UserButton
+                  appearance={{
+                    elements: { avatarBox: "h-8 w-8" },
+                  }}
+                />
+              </SignedIn>
+            </>
+          )}
         </div>
       </div>
     </header>

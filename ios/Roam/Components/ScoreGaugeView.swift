@@ -54,7 +54,7 @@ struct ScoreGaugeView: View {
             }
         }
         .onChange(of: progress) { _, newValue in
-            withAnimation(AppAnimation.spring) {
+            withAnimation(reduceMotion ? .easeOut(duration: 0.25) : AppAnimation.spring) {
                 animatedProgress = newValue
             }
         }

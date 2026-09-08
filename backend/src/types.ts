@@ -229,8 +229,8 @@ export interface DepartureComparisonCandidate {
 }
 
 export interface DepartureComparisonRequest {
-  origin: string;
-  destination: string;
+  origin: RouteEndpoint;
+  destination: RouteEndpoint;
   candidates: DepartureComparisonCandidate[];
 }
 

@@ -56,7 +56,7 @@ export function EvidenceCard({ evidence }: { evidence?: ScoreEvidence }) {
         <>
           <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-black/[0.07]">
             <div
-              className="h-full rounded-full transition-all duration-700"
+              className="h-full rounded-full transition-[width] duration-300 ease-out"
               style={{
                 width: `${percent}%`,
                 backgroundColor: meta.color,

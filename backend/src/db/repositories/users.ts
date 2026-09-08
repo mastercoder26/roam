@@ -40,11 +40,30 @@ export async function findUserById(id: string): Promise<UserRecord | null> {
   return row ? mapUser(row) : null;
 }
 
+export async function findUserByClerkId(clerkUserId: string): Promise<UserRecord | null> {
+  const result = await queryDatabase<UserRow>(getPool(), `
+    SELECT id, clerk_user_id, email, display_name, created_at, updated_at,
+           email_verified_at, deleted_at
+    FROM users WHERE clerk_user_id = $1 AND deleted_at IS NULL LIMIT 1
+  `, [clerkUserId]);
+  const row = result.rows[0];
+  return row ? mapUser(row) : null;
+}
+
 export async function findOrCreateByClerkId(input: {
   clerkUserId: string;
   email: string | null;
   displayName: string | null;
 }): Promise<UserRecord> {
+  const existing = await findUserByClerkId(input.clerkUserId);
+  if (existing) {
+    const emailMatches = input.email === null || input.email === existing.email;
+    const nameMatches = input.displayName === null || input.displayName === existing.displayName;
+    if (emailMatches && nameMatches) {
+      return existing;
+    }
+  }
+
   const result = await queryDatabase<UserRow>(getPool(), `
     INSERT INTO users (clerk_user_id, email, password_hash, display_name)
     VALUES (
@@ -64,6 +83,14 @@ export async function findOrCreateByClerkId(input: {
   const row = result.rows[0];
   if (!row) throw new Error("User insert returned no row");
   return mapUser(row);
+}
+
+export async function updateUserDisplayName(id: string, displayName: string): Promise<void> {
+  await queryDatabase(getPool(), `
+    UPDATE users
+    SET display_name = $2, updated_at = now()
+    WHERE id = $1 AND deleted_at IS NULL
+  `, [id, displayName]);
 }
 
 export async function deleteUser(id: string): Promise<void> {

@@ -6,6 +6,7 @@ import {
 } from "../../types.js";
 import { neutralConditions, type RouteConditions } from "../../enrichment/types.js";
 import { scoreRoute } from "../index.js";
+import { formatLocalClock } from "../demands.js";
 import { highwayRoute } from "./fixtures/highway-route.js";
 import { longDriveRoute } from "./fixtures/long-drive-route.js";
 import { mergeClusterRoute } from "./fixtures/merge-cluster-route.js";
@@ -393,5 +394,15 @@ describe("route demands", () => {
         );
       }
     }
+  });
+
+  it("formats local clock correctly for negative and wrap-around minutes", () => {
+    expect(formatLocalClock(-30)).toBe("11:30 PM");
+    expect(formatLocalClock(-90)).toBe("10:30 PM");
+    expect(formatLocalClock(-1440)).toBe("12:00 AM");
+    expect(formatLocalClock(0)).toBe("12:00 AM");
+    expect(formatLocalClock(720)).toBe("12:00 PM");
+    expect(formatLocalClock(1440)).toBe("12:00 AM");
+    expect(formatLocalClock(1500)).toBe("1:00 AM");
   });
 });

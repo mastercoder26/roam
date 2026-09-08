@@ -526,6 +526,8 @@ private struct FlipClockDigit: View {
     /// 90 = edge-on (not yet visible). 0 = flat (new digit fully landed).
     @State private var landAngle: Double = 90
 
+    @State private var flipToken = UUID()
+
     init(digit: String, style: FlipClock.Style) {
         self.digit = digit
         self.style = style
@@ -586,6 +588,13 @@ private struct FlipClockDigit: View {
         .onChange(of: digit) { oldValue, newValue in
             runFlip(from: oldValue, to: newValue)
         }
+        .onChange(of: reduceMotion) { _, isReduced in
+            if isReduced {
+                settledDigit = digit
+                isLifting = false
+                isLanding = false
+            }
+        }
     }
 
     private func runFlip(from oldValue: String, to newValue: String) {
@@ -595,11 +604,18 @@ private struct FlipClockDigit: View {
             return
         }
 
-        outgoingDigit = oldValue
-        liftAngle = 0
-        landAngle = 90
-        isLifting = true
-        isLanding = true
+        let token = UUID()
+        flipToken = token
+
+        var resetTx = Transaction(animation: nil)
+        resetTx.disablesAnimations = true
+        withTransaction(resetTx) {
+            outgoingDigit = oldValue
+            liftAngle = 0
+            landAngle = 90
+            isLifting = true
+            isLanding = true
+        }
 
         withAnimation(AppAnimation.flipLift) {
             liftAngle = -90
@@ -609,6 +625,7 @@ private struct FlipClockDigit: View {
         // flap has fully covered — then uncovers — that half, so the swap
         // never shows through either flap.
         DispatchQueue.main.asyncAfter(deadline: .now() + AppAnimation.flipLiftDuration) {
+            guard flipToken == token else { return }
             settledDigit = newValue
             isLifting = false
             withAnimation(AppAnimation.flip) {
@@ -619,6 +636,7 @@ private struct FlipClockDigit: View {
         DispatchQueue.main.asyncAfter(
             deadline: .now() + AppAnimation.flipLiftDuration + 0.3
         ) {
+            guard flipToken == token else { return }
             isLanding = false
         }
     }

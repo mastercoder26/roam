@@ -2,7 +2,7 @@ import type { Request, Response } from "express";
 import { afterEach, describe, expect, it } from "vitest";
 import { DatabaseOperationError } from "../../errors.js";
 import { setPoolForTests, type QueryResult } from "../../db/pool.js";
-import { handleGetDrive, handleGetDrives, handleDeleteDrive } from "../drives.js";
+import { handleGetDrive, handleGetDrives, handleDeleteDrive, handleUpsertDrives } from "../drives.js";
 
 const userId = "00000000-0000-0000-0000-000000000001";
 const driveId = "00000000-0000-0000-0000-000000000002";
@@ -126,4 +126,65 @@ describe("drive handlers", () => {
     expect(response.statusCode).toBe(503);
     expect(response.jsonBody).toMatchObject({ code: "SERVICE_UNAVAILABLE", requestId: expect.any(String) });
   });
+
+  it("rejects beforeId without before with 400 VALIDATION_ERROR", async () => {
+    const response = responseDouble();
+    await handleGetDrives(
+      request({ query: { beforeId: driveId } }),
+      response as unknown as Response
+    );
+    expect(response.statusCode).toBe(400);
+    expect(response.jsonBody).toMatchObject({
+      code: "VALIDATION_ERROR",
+      error: expect.stringContaining("beforeId requires before"),
+      requestId: expect.any(String),
+    });
+  });
+
+  it("handles batch upsert with duplicate drive UUIDs cleanly without error", async () => {
+    process.env.DATABASE_URL = "postgres://test";
+    setPoolForTests({
+      query: async <Row extends Record<string, unknown>>(): Promise<QueryResult<Row>> => ({
+        rows: [{
+          id: driveId,
+          user_id: userId,
+          started_at: new Date("2026-01-02T03:04:05.000Z"),
+          duration_seconds: 120,
+          distance_meters: 1500,
+          score: 92,
+          top_speed_meters_per_second: 20,
+          event_count: 3,
+          recording_time_zone_identifier: null,
+          payload: { id: driveId },
+          created_at: new Date("2026-01-02T03:05:05.000Z"),
+          updated_at: new Date("2026-01-02T03:05:05.000Z"),
+        }] as unknown as Row[],
+        rowCount: 1,
+      }),
+      connect: async () => { throw new Error("not used"); },
+      on: () => { throw new Error("not used"); },
+    });
+
+    const response = responseDouble();
+    const driveInput = {
+      id: driveId,
+      startedAt: "2026-01-02T03:04:05.000Z",
+      durationSeconds: 120,
+      distanceMeters: 1500,
+      score: 92,
+      topSpeedMetersPerSecond: 20,
+      payload: { test: true },
+    };
+
+    await handleUpsertDrives(
+      request({ body: { drives: [driveInput, driveInput] } }),
+      response as unknown as Response
+    );
+
+    expect(response.statusCode).toBe(200);
+    expect(response.jsonBody).toMatchObject({
+      drives: [{ id: driveId }],
+    });
+  });
 });
+

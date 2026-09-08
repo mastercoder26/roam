@@ -49,6 +49,7 @@ export async function enrichRoute(
   const road = { ...osm.road };
   if (warningsMentionConstruction(route.warnings)) {
     road.constructionZones = Math.max(1, road.constructionZones + 1);
+    road.available = true;
   }
 
   const sources: string[] = [];

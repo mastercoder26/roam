@@ -16,6 +16,7 @@ export function formatDurationSeconds(seconds: number): string {
 
 export function formatDelaySeconds(trafficDelaySeconds: number): string | null {
   if (trafficDelaySeconds <= 0) return null;
+  if (trafficDelaySeconds < 60) return "< 1 min";
   return `+${formatDurationSeconds(trafficDelaySeconds)}`;
 }
 

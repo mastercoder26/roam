@@ -8,6 +8,7 @@ export type PublicErrorCode =
   | "UNAUTHORIZED"
   | "TOKEN_EXPIRED"
   | "EMAIL_TAKEN"
+  | "PAYLOAD_TOO_LARGE"
   | "SERVICE_UNAVAILABLE"
   | "INTERNAL_ERROR";
 
@@ -107,6 +108,14 @@ export function publicFailure(
 ): { status: number; code: PublicErrorCode; message: string } {
   if (error instanceof RequestValidationError) {
     return { status: 400, code: "INVALID_REQUEST", message: error.message };
+  }
+
+  if (error instanceof RouteProviderError && error.providerStatus === 400) {
+    return {
+      status: 400,
+      code: "INVALID_REQUEST",
+      message: "The requested route could not be calculated. Please check the origin and destination addresses or coordinates.",
+    };
   }
 
   return {

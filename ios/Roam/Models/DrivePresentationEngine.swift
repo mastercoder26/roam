@@ -66,7 +66,7 @@ struct DrivePresentationState: Equatable {
     }
 
     var disablesScrolling: Bool {
-        phase != .idle
+        phase == .active || phase == .switchingToEnd
     }
 }
 

@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { RouteForm } from "@/components/route/RouteForm";
 
 export default function HomePage() {
@@ -9,14 +10,14 @@ export default function HomePage() {
           <span>Web edition · 01</span>
         </div>
 
-        <div className="relative z-10 mt-9 lg:mt-12">
-          <h1 className="roam-enter roam-enter-delay-1 max-w-5xl text-[clamp(4.1rem,11.5vw,8.8rem)] font-black leading-[0.82] tracking-[-0.068em] text-ink-primary">
+        <div className="relative z-10 mt-9 lg:mt-12 lg:max-w-[48%]">
+          <h1 className="roam-enter roam-enter-delay-1 max-w-5xl text-[clamp(4.1rem,11.5vw,8.8rem)] lg:text-[clamp(3.2rem,5vw,5.6rem)] xl:text-[clamp(4.5rem,6.8vw,8.8rem)] font-black leading-[0.82] tracking-[-0.068em] text-ink-primary">
             Read the road.
             <span className="block text-accent">Own the drive.</span>
           </h1>
         </div>
 
-        <div className="roam-enter roam-enter-delay-2 mt-9 lg:absolute lg:right-0 lg:top-9 lg:z-0 lg:mt-0 lg:w-[57%]">
+        <div className="roam-enter roam-enter-delay-2 mt-9 lg:absolute lg:right-0 lg:top-9 lg:z-0 lg:mt-0 lg:w-[50%] xl:w-[55%]">
           <RouteSketch />
         </div>
 
@@ -47,7 +48,16 @@ export default function HomePage() {
           </p>
         </div>
         <div className="roam-reveal roam-enter-delay-1">
-          <RouteForm />
+          <Suspense fallback={
+            <div className="border-y-2 border-ink-primary bg-transparent py-5 sm:py-7">
+              <div className="grid gap-4 lg:grid-cols-[1fr_280px]">
+                <div className="h-[128px] animate-pulse bg-card-elevated" />
+                <div className="h-[128px] animate-pulse bg-card-elevated" />
+              </div>
+            </div>
+          }>
+            <RouteForm />
+          </Suspense>
         </div>
       </section>
     </div>

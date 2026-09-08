@@ -58,4 +58,27 @@ describe("rate limiter memory", () => {
     expect(limiter.check("caller-0", 5_000).allowed).toBe(true);
     expect(limiter.check("caller-0", 5_000).allowed).toBe(false);
   });
+
+  it("endpoint-namespaced keys keep separate rate limit quotas for different endpoints (B7)", () => {
+    const limiter = createRateLimiter({ windowMs: 60_000, maxRequests: 2 });
+    const ip = "192.168.1.1";
+
+    expect(limiter.check(`places-autocomplete:${ip}`, 0).allowed).toBe(true);
+    expect(limiter.check(`places-autocomplete:${ip}`, 0).allowed).toBe(true);
+    expect(limiter.check(`places-autocomplete:${ip}`, 0).allowed).toBe(false);
+
+    // difficulty endpoint quota is separate
+    expect(limiter.check(`difficulty:${ip}`, 0).allowed).toBe(true);
+    expect(limiter.check(`difficulty:${ip}`, 0).allowed).toBe(true);
+  });
+
+  it("relaxed session check rate limiter allows up to 60 requests per 15-minute window (B8)", () => {
+    const limiter = createRateLimiter({ windowMs: 15 * 60_000, maxRequests: 60 });
+    const ip = "shared-nat-ip";
+
+    for (let i = 0; i < 60; i++) {
+      expect(limiter.check(ip, 0).allowed).toBe(true);
+    }
+    expect(limiter.check(ip, 0).allowed).toBe(false);
+  });
 });

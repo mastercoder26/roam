@@ -58,7 +58,10 @@ const listQuerySchema = z.object({
   /// Paired with `before` to make the page boundary unambiguous when several
   /// drives share a start timestamp. Optional so older cursors still work.
   beforeId: z.string().uuid().optional(),
-}).strict();
+}).strict().refine(
+  (query) => !query.beforeId || Boolean(query.before),
+  { message: "beforeId requires before to be specified", path: ["beforeId"] }
+);
 
 function validationMessage(error: z.ZodError): string {
   const issue = error.issues[0];

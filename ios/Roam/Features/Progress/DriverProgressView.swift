@@ -61,6 +61,7 @@ struct DriverProgressView: View {
                 .padding(.horizontal, AppDesign.contentPadding)
                 .padding(.vertical, 12)
             }
+            .safeAreaPadding(.bottom, AppDesign.tabBarClearance)
             .background(AppCanvasBackground())
             .toolbar(.hidden, for: .navigationBar)
         }

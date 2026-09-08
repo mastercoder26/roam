@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { fetchOsmRouteData } from "../osm.js";
+import { enrichRoute } from "../index.js";
 import type { ParsedRoute } from "../../types.js";
 
 const leftTurnRoute: ParsedRoute = {
@@ -77,5 +78,17 @@ describe("OSM turn protection", () => {
         protectedLeftTurns: 1,
       },
     });
+  });
+
+  it("sets road.available = true when route warnings mention construction even if OSM fails", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("Network failure")));
+    const routeWithWarnings: ParsedRoute = {
+      ...leftTurnRoute,
+      warnings: ["Heavy construction on Main St. Expect delays."],
+    };
+    const conditions = await enrichRoute(routeWithWarnings);
+    expect(conditions.road.available).toBe(true);
+    expect(conditions.road.constructionZones).toBeGreaterThan(0);
+    expect(conditions.sources).toContain("google-route-warnings");
   });
 });

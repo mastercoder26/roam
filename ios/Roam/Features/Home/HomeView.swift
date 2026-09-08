@@ -698,6 +698,7 @@ struct HomeView: View {
 
     private func analyzeRoute() async {
         withAnimation(AppAnimation.quick) { errorMessage = nil }
+        isCompletingLoading = false
         withAnimation(loadingTransitionAnimation) {
             isLoading = true
         }

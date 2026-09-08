@@ -130,8 +130,13 @@ export async function getDrive(userId: string, driveId: string): Promise<DriveRe
 
 export async function upsertDrives(userId: string, drives: DriveInputRecord[]): Promise<DriveRecord[]> {
   if (drives.length === 0) return [];
+  const driveMap = new Map<string, DriveInputRecord>();
+  for (const drive of drives) {
+    driveMap.set(drive.id, drive);
+  }
+  const uniqueDrives = Array.from(driveMap.values());
   const values: unknown[] = [];
-  const placeholders = drives.map((drive, index) => {
+  const placeholders = uniqueDrives.map((drive, index) => {
     const offset = index * 10;
     values.push(
       drive.id,
@@ -160,6 +165,7 @@ export async function upsertDrives(userId: string, drives: DriveInputRecord[]): 
       event_count = EXCLUDED.event_count,
       recording_time_zone_identifier = EXCLUDED.recording_time_zone_identifier,
       payload = EXCLUDED.payload,
+      deleted_at = NULL,
       updated_at = now()
     WHERE drives.user_id = EXCLUDED.user_id
     RETURNING ${driveColumns}

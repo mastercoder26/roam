@@ -11,10 +11,6 @@ final class DriveRouteAnalysisCoordinator {
     /// stall), so the session manager can persist the updated drive.
     var onDriveUpdated: ((UUID, DriveRouteAnalysis) -> Void)?
 
-    /// Called after persisting analysis results so the sync service can push
-    /// the update to the server.
-    var onSyncRequested: (() -> Void)?
-
     /// The most recent `/api/route/difficulty` attempt per drive, kept only
     /// for on-screen debugging when a drive is stuck `.pending`.
     private(set) var debugInfo: [UUID: RouteAnalysisDebugInfo] = [:]

@@ -27,7 +27,7 @@ import { computeTurnClustering, computeHighwayShare, computeManeuverComplexity }
 import { smoothstep } from "../helpers.js";
 import { aggregateMeanOnly, scoreSegmentLocal, segmentRoute } from "../segments.js";
 import { buildFeaturesFromRoute } from "../features.js";
-import { FACTOR_WEIGHTS } from "../explain.js";
+import { FACTOR_WEIGHTS, generateReasons } from "../explain.js";
 import { BASE_SCORE_WEIGHTS } from "../baseScore.js";
 
 describe("smoothstep", () => {
@@ -404,5 +404,30 @@ describe("explanation weights", () => {
     expect(FACTOR_WEIGHTS.turns).toBe(BASE_SCORE_WEIGHTS.T);
     expect(FACTOR_WEIGHTS.traffic).toBe(BASE_SCORE_WEIGHTS.C);
     expect(FACTOR_WEIGHTS.length).toBe(BASE_SCORE_WEIGHTS.L);
+  });
+
+  it("aligns reason weight for traffic so heavy traffic does not artificially displace higher-burden factors", () => {
+    const ctx = {
+      score: 5,
+      breakdown: {
+        speed: 0.6,
+        merges: 0,
+        turns: 0,
+        traffic: 0.6,
+        length: 0,
+        fatigue: 0,
+        weather: 0,
+        road: 0,
+        turnCluster: 0,
+        decisionDensity: 0,
+        sustained: 0,
+        laneChange: 0,
+        unprotectedLefts: 0,
+      },
+      durationHours: 1,
+    };
+    const reasons = generateReasons(ctx as any);
+    expect(reasons[0]).toBe("High-speed environment");
+    expect(reasons[1]).toBe("Heavy traffic");
   });
 });

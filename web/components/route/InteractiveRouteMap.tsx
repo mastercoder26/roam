@@ -60,6 +60,7 @@ export function InteractiveRouteMap({
         pathOptions={{ color: "rgba(0, 0, 0, 0.7)", weight: 8, opacity: 0.8 }}
       />
       <Polyline
+        key={`polyline-${color}`}
         positions={points}
         pathOptions={{ color, weight: 5, opacity: 1 }}
       />
@@ -81,7 +82,24 @@ function FitRouteBounds({ bounds }: { bounds: LatLngBoundsExpression }) {
   const map = useMap();
 
   useEffect(() => {
+    map.invalidateSize();
     map.fitBounds(bounds, { padding: [28, 28] });
+
+    // Re-invalidate size after CSS reveal animations settle to avoid distorted tiles
+    const timer1 = setTimeout(() => {
+      map.invalidateSize();
+      map.fitBounds(bounds, { padding: [28, 28] });
+    }, 150);
+
+    const timer2 = setTimeout(() => {
+      map.invalidateSize();
+      map.fitBounds(bounds, { padding: [28, 28] });
+    }, 350);
+
+    return () => {
+      clearTimeout(timer1);
+      clearTimeout(timer2);
+    };
   }, [bounds, map]);
 
   return null;

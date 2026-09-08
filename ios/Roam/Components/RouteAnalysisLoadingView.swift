@@ -101,15 +101,17 @@ struct RouteAnalysisLoadingView: View {
 
     private func driveAway() {
         guard !isDrivingAway else { return }
-        guard !reduceMotion else {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.16, execute: onDepartureComplete)
-            return
+        if reduceMotion {
+            withAnimation(AppAnimation.departureReduced) {
+                isDrivingAway = true
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.20, execute: onDepartureComplete)
+        } else {
+            withAnimation(AppAnimation.departure) {
+                isDrivingAway = true
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.34, execute: onDepartureComplete)
         }
-
-        withAnimation(AppAnimation.departure) {
-            isDrivingAway = true
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.34, execute: onDepartureComplete)
     }
 }
 
@@ -130,10 +132,10 @@ private struct DotCarIllustration: View {
             // network wait and make this otherwise small loading scene costly.
             TimelineView(.animation(minimumInterval: 1 / 30)) { context in
                 dotCar(time: context.date.timeIntervalSinceReferenceDate)
-                    .offset(x: isDrivingAway ? -390 : 0)
-                    .opacity(isDrivingAway ? 0.85 : 1)
-                    .animation(reduceMotion ? AppAnimation.departureReduced : AppAnimation.departure, value: isDrivingAway)
             }
+            .offset(x: isDrivingAway ? -390 : 0)
+            .opacity(isDrivingAway ? 0.85 : 1)
+            .animation(reduceMotion ? AppAnimation.departureReduced : AppAnimation.departure, value: isDrivingAway)
         }
         .frame(width: canvasSize.width, height: canvasSize.height)
         .clipped()
@@ -217,8 +219,8 @@ private struct FloatingDot: View {
             .opacity(isVisible ? 1 : 0)
             .scaleEffect(isVisible ? 1 : 0.72)
             .animation(
-                AppAnimation.selection
-                    .delay(phase * 0.024),
+                AppAnimation.content
+                    .delay(phase * 0.028),
                 value: isVisible
             )
     }

@@ -13,6 +13,8 @@ export function difficultyColor(label: DifficultyLabel): string {
       return "var(--difficulty-hard)";
     case "Very Hard":
       return "var(--difficulty-very-hard)";
+    default:
+      return "var(--difficulty-moderate)";
   }
 }
 
@@ -22,6 +24,8 @@ export function demandColor(level: RouteDemandLevel): string {
       return "var(--positive)";
     case "moderate":
     case "high":
+      return "var(--safety)";
+    default:
       return "var(--safety)";
   }
 }

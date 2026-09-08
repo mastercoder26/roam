@@ -2,6 +2,7 @@ import type { Request, Response } from "express";
 import { z } from "zod";
 import { createRequestId, DatabaseUnavailableError, DatabaseOperationError, logDatabaseFailure, logInternalFailure, RequestValidationError } from "../errors.js";
 import { getProfile, updateProfile } from "../db/repositories/profiles.js";
+import { updateUserDisplayName } from "../db/repositories/users.js";
 import type { DriverStage, ProfileRecord } from "../db/types.js";
 import type { AuthenticatedUser } from "../auth/middleware.js";
 
@@ -66,7 +67,11 @@ export async function handleUpdateProfile(req: Request, res: Response): Promise<
   const requestId = createRequestId();
   try {
     const input = validateProfileUpdate(req.body);
-    const profile = await updateProfile((req.user as AuthenticatedUser).id, {
+    const userId = (req.user as AuthenticatedUser).id;
+    if (input.displayName !== undefined) {
+      await updateUserDisplayName(userId, input.displayName);
+    }
+    const profile = await updateProfile(userId, {
       displayName: input.displayName,
       stage: input.stage as DriverStage | undefined,
       payload: input.payload,

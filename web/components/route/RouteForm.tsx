@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { useAuth, SignedIn, SignedOut, SignInButton } from "@clerk/nextjs";
 import { Card, MicroLabel } from "@/components/ui/Card";
 import { RouteResults } from "@/components/route/RouteResults";
@@ -22,9 +23,11 @@ const RECENT_ADDRESSES_KEY = "roam.recent-addresses";
 
 export function RouteForm() {
   const { isSignedIn, isLoaded, getToken } = useAuth();
-  const [origin, setOrigin] = useState("");
-  const [destination, setDestination] = useState("");
+  const searchParams = useSearchParams();
+  const [origin, setOrigin] = useState(() => searchParams?.get("origin") ?? "");
+  const [destination, setDestination] = useState(() => searchParams?.get("destination") ?? "");
   const [departure, setDeparture] = useState<Date>(() => defaultDepartureDate());
+  const [isMounted, setIsMounted] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<DifficultyResponse | null>(null);
@@ -32,6 +35,29 @@ export function RouteForm() {
   const [submittedDestination, setSubmittedDestination] = useState("");
   const [recentAddresses, setRecentAddresses] = useState<string[]>([]);
   const [isLocating, setIsLocating] = useState(false);
+  const analyzeControllerRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    setIsMounted(true);
+    setDeparture(defaultDepartureDate());
+  }, []);
+
+  useEffect(() => {
+    const urlOrigin = searchParams?.get("origin");
+    const urlDestination = searchParams?.get("destination");
+    if (urlOrigin !== null && urlOrigin !== undefined && urlOrigin !== origin) {
+      setOrigin(urlOrigin);
+    }
+    if (urlDestination !== null && urlDestination !== undefined && urlDestination !== destination) {
+      setDestination(urlDestination);
+    }
+  }, [searchParams]);
+
+  useEffect(() => {
+    return () => {
+      analyzeControllerRef.current?.abort();
+    };
+  }, []);
 
   useEffect(() => {
     try {
@@ -63,14 +89,36 @@ export function RouteForm() {
   const canAnalyze =
     origin.trim().length > 0 && destination.trim().length > 0 && !isLoading;
 
+  function syncUrlParams(newOrigin: string, newDest: string) {
+    if (typeof window === "undefined") return;
+    try {
+      const url = new URL(window.location.href);
+      if (newOrigin.trim()) {
+        url.searchParams.set("origin", newOrigin.trim());
+      } else {
+        url.searchParams.delete("origin");
+      }
+      if (newDest.trim()) {
+        url.searchParams.set("destination", newDest.trim());
+      } else {
+        url.searchParams.delete("destination");
+      }
+      window.history.replaceState(null, "", url.toString());
+    } catch {
+      // Route URL state sync is best-effort
+    }
+  }
+
   function swap() {
     setOrigin(destination);
     setDestination(origin);
+    syncUrlParams(destination, origin);
   }
 
   function applyExample(example: { origin: string; destination: string }) {
     setOrigin(example.origin);
     setDestination(example.destination);
+    syncUrlParams(example.origin, example.destination);
   }
 
   function rememberAddresses(values: string[]) {
@@ -110,6 +158,11 @@ export function RouteForm() {
     event.preventDefault();
     if (!canAnalyze) return;
 
+    analyzeControllerRef.current?.abort();
+    const controller = new AbortController();
+    analyzeControllerRef.current = controller;
+
+    syncUrlParams(origin, destination);
     setIsLoading(true);
     setError(null);
     try {
@@ -119,19 +172,25 @@ export function RouteForm() {
       }
       const response = await analyzeRoute(
         { origin, destination, departureTime: departure, includeAlternates: true },
-        token
+        token,
+        { signal: controller.signal, timeoutMs: 20_000 }
       );
       setResult(response);
       setSubmittedOrigin(origin.trim());
       setSubmittedDestination(destination.trim());
       rememberAddresses([origin, destination]);
     } catch (err) {
+      if (controller.signal.aborted) {
+        return;
+      }
       setResult(null);
       setError(
         err instanceof Error ? err.message : "Route analysis failed unexpectedly."
       );
     } finally {
-      setIsLoading(false);
+      if (!controller.signal.aborted) {
+        setIsLoading(false);
+      }
     }
   }
 
@@ -171,16 +230,19 @@ export function RouteForm() {
             suggestions={destinationSuggestions}
             autoComplete="section-destination street-address"
           />
-          {origin.trim() && destination.trim() ? (
-            <button
-              type="button"
-              onClick={swap}
-              aria-label="Swap starting location and destination"
-              className="absolute right-3 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center border border-ink-primary/20 bg-card text-ink-primary transition-transform hover:rotate-180 active:scale-90"
-            >
-              <SwapIcon className="h-4 w-4" />
-            </button>
-          ) : null}
+          <button
+            type="button"
+            onClick={swap}
+            disabled={!origin.trim() && !destination.trim()}
+            aria-label="Swap starting location and destination"
+            className={`absolute right-3 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center border border-ink-primary/20 bg-card text-ink-primary transition-[opacity,transform] duration-200 ease-out hover:rotate-180 active:scale-90 ${
+              origin.trim() || destination.trim()
+                ? "opacity-100 scale-100 pointer-events-auto"
+                : "opacity-0 scale-95 pointer-events-none"
+            }`}
+          >
+            <SwapIcon className="h-4 w-4" />
+          </button>
           </Card>
 
           <div className="flex flex-col gap-3">
@@ -192,7 +254,8 @@ export function RouteForm() {
                 <span className="mb-1 block text-[10px] font-bold uppercase tracking-[0.12em] text-ink-label">Leave around</span>
                 <input
                   type="datetime-local"
-                  value={toDateTimeLocalValue(departure)}
+                  value={isMounted ? toDateTimeLocalValue(departure) : ""}
+                  suppressHydrationWarning
                   onChange={(event) => {
                     const parsed = fromDateTimeLocalValue(event.target.value);
                     if (parsed) setDeparture(parsed);
@@ -202,30 +265,39 @@ export function RouteForm() {
               </span>
             </label>
 
-            <SignedIn>
-              <button
-                type="submit"
-                disabled={!canAnalyze}
-                className={`roam-jiggle flex min-h-14 items-center justify-center gap-2 px-5 text-[13px] font-bold uppercase tracking-[0.08em] transition-[color,background-color,box-shadow,transform] duration-200 active:scale-[0.97] ${
-                  canAnalyze
-                    ? "bg-accent text-white shadow-roam-lg"
-                    : "cursor-not-allowed bg-disabled text-ink-tertiary"
-                }`}
-              >
-                {isLoading ? (
-                  <><span className="roam-spin h-4 w-4 rounded-full border-2 border-white/30 border-t-white" />Analyzing route</>
-                ) : (
-                  <><SparkleIcon className="h-4 w-4" />Analyze difficulty</>
-                )}
-              </button>
-            </SignedIn>
-            <SignedOut>
-              <SignInButton mode="modal">
-                <button type="button" className="roam-jiggle flex min-h-14 items-center justify-center gap-2 bg-accent px-5 text-[13px] font-bold uppercase tracking-[0.08em] text-white shadow-roam-lg transition-transform active:scale-[0.97]">
-                  Sign in to analyze
-                </button>
-              </SignInButton>
-            </SignedOut>
+            {!isLoaded ? (
+              <div className="flex min-h-14 items-center justify-center bg-disabled/60 px-5 text-[13px] font-bold uppercase tracking-[0.08em] text-ink-tertiary">
+                <span className="roam-spin mr-2 h-4 w-4 rounded-full border-2 border-ink-tertiary/30 border-t-ink-tertiary" />
+                Loading session…
+              </div>
+            ) : (
+              <>
+                <SignedIn>
+                  <button
+                    type="submit"
+                    disabled={!canAnalyze}
+                    className={`roam-jiggle flex min-h-14 items-center justify-center gap-2 px-5 text-[13px] font-bold uppercase tracking-[0.08em] transition-[color,background-color,box-shadow,transform] duration-200 active:scale-[0.97] ${
+                      canAnalyze
+                        ? "bg-accent text-white shadow-roam-lg"
+                        : "cursor-not-allowed bg-disabled text-ink-tertiary"
+                    }`}
+                  >
+                    {isLoading ? (
+                      <><span className="roam-spin h-4 w-4 rounded-full border-2 border-white/30 border-t-white" />Analyzing route</>
+                    ) : (
+                      <><SparkleIcon className="h-4 w-4" />Analyze difficulty</>
+                    )}
+                  </button>
+                </SignedIn>
+                <SignedOut>
+                  <SignInButton mode="modal">
+                    <button type="button" className="roam-jiggle flex min-h-14 items-center justify-center gap-2 bg-accent px-5 text-[13px] font-bold uppercase tracking-[0.08em] text-white shadow-roam-lg transition-transform active:scale-[0.97]">
+                      Sign in to analyze
+                    </button>
+                  </SignInButton>
+                </SignedOut>
+              </>
+            )}
           </div>
         </div>
 
@@ -337,6 +409,16 @@ function FieldRow({
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
+  const blurTimerRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (blurTimerRef.current !== null) {
+        window.clearTimeout(blurTimerRef.current);
+      }
+    };
+  }, []);
+
   const normalizedValue = value.trim().toLowerCase();
   const visibleSuggestions = useMemo(() => {
     if (normalizedValue.length === 0) {
@@ -346,19 +428,38 @@ function FieldRow({
       .filter((suggestion) => {
         const normalizedSuggestion = suggestion.toLowerCase();
         if (normalizedSuggestion === normalizedValue) return false;
-        if (normalizedValue.length < 3) {
-          return normalizedSuggestion.includes(normalizedValue);
-        }
-        return true;
+        return normalizedSuggestion.includes(normalizedValue);
       })
       .slice(0, 5);
   }, [normalizedValue, suggestions]);
   const listboxId = `${listId}-listbox`;
 
   function chooseSuggestion(suggestion: string) {
+    if (blurTimerRef.current !== null) {
+      window.clearTimeout(blurTimerRef.current);
+      blurTimerRef.current = null;
+    }
     onChange(suggestion);
     setIsOpen(false);
     setActiveIndex(-1);
+  }
+
+  function handleFocus() {
+    if (blurTimerRef.current !== null) {
+      window.clearTimeout(blurTimerRef.current);
+      blurTimerRef.current = null;
+    }
+    setIsOpen(true);
+  }
+
+  function handleBlur() {
+    if (blurTimerRef.current !== null) {
+      window.clearTimeout(blurTimerRef.current);
+    }
+    blurTimerRef.current = window.setTimeout(() => {
+      setIsOpen(false);
+      blurTimerRef.current = null;
+    }, 250);
   }
 
   return (
@@ -380,8 +481,8 @@ function FieldRow({
               setIsOpen(true);
               setActiveIndex(-1);
             }}
-            onFocus={() => setIsOpen(true)}
-            onBlur={() => window.setTimeout(() => setIsOpen(false), 100)}
+            onFocus={handleFocus}
+            onBlur={handleBlur}
             onKeyDown={(event) => {
               if (visibleSuggestions.length === 0) return;
               if (event.key === "ArrowDown") {
@@ -414,7 +515,7 @@ function FieldRow({
             <div
               id={listboxId}
               role="listbox"
-              className="absolute left-0 right-0 top-full z-40 mt-3 border border-ink-primary/20 bg-card py-1 shadow-roam-lg"
+              className="roam-popover absolute left-0 right-0 top-full z-40 mt-3 border border-ink-primary/20 bg-card py-1 shadow-roam-lg"
             >
               {normalizedValue.length === 0 ? (
                 <div className="border-b border-ink-primary/10 px-3 py-1.5 text-[9px] font-bold uppercase tracking-[0.14em] text-ink-label">
@@ -428,7 +529,17 @@ function FieldRow({
                   type="button"
                   role="option"
                   aria-selected={index === activeIndex}
-                  onMouseDown={(event) => event.preventDefault()}
+                  onPointerDown={(event) => {
+                    event.preventDefault();
+                    if (blurTimerRef.current !== null) {
+                      window.clearTimeout(blurTimerRef.current);
+                      blurTimerRef.current = null;
+                    }
+                  }}
+                  onTouchEnd={(event) => {
+                    event.preventDefault();
+                    chooseSuggestion(suggestion);
+                  }}
                   onClick={() => chooseSuggestion(suggestion)}
                   className={`block w-full px-3 py-2.5 text-left text-sm leading-5 transition-colors ${
                     index === activeIndex

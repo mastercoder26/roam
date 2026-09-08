@@ -260,7 +260,7 @@ const REASON_WEIGHTS: Record<string, number> = {
   speed: 0.24,
   merges: 0.26,
   turns: 0.22,
-  traffic: 0.2,
+  traffic: BASE_SCORE_WEIGHTS.C,
   length: 0.14,
   fatigue: 0.1,
 };

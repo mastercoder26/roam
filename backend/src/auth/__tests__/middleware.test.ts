@@ -158,6 +158,19 @@ describe("Clerk authentication middleware", () => {
     expect(requests[1].user?.id).toBe(localUser.id);
     expect(next).toHaveBeenCalledTimes(2);
   });
+
+  it("chains .catch(next) so unexpected errors in requireAuth are forwarded to next", async () => {
+    const unexpectedError = new Error("Unexpected auth failure");
+    findOrCreateByClerkIdMock.mockRejectedValueOnce(unexpectedError);
+    const request = requestWithToken("valid-token");
+    const response = responseDouble();
+    const next = vi.fn();
+
+    requireAuth(request, response, next);
+    await settle();
+
+    expect(next).toHaveBeenCalledWith(unexpectedError);
+  });
 });
 
 describe("requireVerifiedIdentity", () => {
@@ -231,5 +244,14 @@ describe("requireVerifiedIdentity", () => {
 
     expect(next).not.toHaveBeenCalled();
     expect(response.statusCode).toBe(503);
+  });
+
+  it("chains .catch(next) so unexpected errors in requireVerifiedIdentity are forwarded to next", async () => {
+    process.env.CLERK_SECRET_KEY = "test-secret";
+    const request = requestWithToken("valid-token");
+    const response = responseDouble();
+    const next = vi.fn();
+
+    expect(() => requireVerifiedIdentity(request, response, next)).not.toThrow();
   });
 });

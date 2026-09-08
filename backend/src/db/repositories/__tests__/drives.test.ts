@@ -8,6 +8,7 @@ import {
   softDeleteDrive,
   upsertDrives,
 } from "../drives.js";
+import { findOrCreateByClerkId, updateUserDisplayName } from "../users.js";
 
 const userId = "00000000-0000-0000-0000-000000000001";
 const driveId = "00000000-0000-0000-0000-000000000002";
@@ -108,10 +109,42 @@ describe("drive repository", () => {
 
     expect(queryText).toContain("ON CONFLICT (id) DO UPDATE");
     expect(queryText).toContain("WHERE drives.user_id = EXCLUDED.user_id");
+    expect(queryText).toContain("deleted_at = NULL");
     expect(queryText).toContain("updated_at = now()");
     expect(queryValues).toContain(userId);
     expect(queryValues).toContain(JSON.stringify(input.payload));
     expect(queryText).not.toContain(JSON.stringify(input.payload));
+  });
+
+  it("deduplicates drives with duplicate IDs in a batch to avoid SQLSTATE 21000", async () => {
+    process.env.DATABASE_URL = "postgres://test";
+    let queryValues: readonly unknown[] = [];
+    setPoolForTests(fakePool(async (_text: string, values: readonly unknown[] | undefined): Promise<QueryResult> => {
+      queryValues = values ?? [];
+      return { rows: [driveRow()], rowCount: 1 };
+    }));
+
+    const drive1 = {
+      id: driveId,
+      startedAt: new Date("2026-01-02T03:04:05.000Z"),
+      durationSeconds: 120,
+      distanceMeters: 1_500,
+      score: 90,
+      topSpeedMetersPerSecond: 20,
+      eventCount: 3,
+      recordingTimeZoneIdentifier: "America/Chicago",
+      payload: { version: 1 },
+    };
+    const drive2 = {
+      ...drive1,
+      score: 95,
+      payload: { version: 2 },
+    };
+
+    const results = await upsertDrives(userId, [drive1, drive2]);
+    expect(results).toHaveLength(1);
+    expect(queryValues).toHaveLength(10);
+    expect(queryValues).toContain(JSON.stringify(drive2.payload));
   });
 
   it("returns aggregate progress statistics", async () => {
@@ -129,3 +162,54 @@ describe("drive repository", () => {
     });
   });
 });
+
+describe("user repository optimizations (B9, B10)", () => {
+  it("findOrCreateByClerkId reads existing user without issuing INSERT when claims match", async () => {
+    process.env.DATABASE_URL = "postgres://test";
+    const queries: string[] = [];
+    setPoolForTests(fakePool(async (text: string): Promise<QueryResult> => {
+      queries.push(text);
+      return {
+        rows: [{
+          id: userId,
+          clerk_user_id: "clerk_123",
+          email: "driver@example.com",
+          display_name: "Driver",
+          created_at: new Date(),
+          updated_at: new Date(),
+          email_verified_at: null,
+          deleted_at: null,
+        }],
+        rowCount: 1,
+      };
+    }));
+
+    const user = await findOrCreateByClerkId({
+      clerkUserId: "clerk_123",
+      email: "driver@example.com",
+      displayName: "Driver",
+    });
+
+    expect(user.id).toBe(userId);
+    expect(queries).toHaveLength(1);
+    expect(queries[0]).toContain("SELECT");
+    expect(queries[0]).not.toContain("INSERT INTO users");
+  });
+
+  it("updateUserDisplayName updates display_name in users table", async () => {
+    process.env.DATABASE_URL = "postgres://test";
+    let queryText = "";
+    let queryValues: readonly unknown[] = [];
+    setPoolForTests(fakePool(async (text: string, values?: readonly unknown[]): Promise<QueryResult> => {
+      queryText = text;
+      queryValues = values ?? [];
+      return { rows: [], rowCount: 1 };
+    }));
+
+    await updateUserDisplayName(userId, "New Name");
+    expect(queryText).toContain("UPDATE users");
+    expect(queryText).toContain("SET display_name = $2");
+    expect(queryValues).toEqual([userId, "New Name"]);
+  });
+});
+

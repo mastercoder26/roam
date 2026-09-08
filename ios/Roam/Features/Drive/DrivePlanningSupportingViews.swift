@@ -54,69 +54,25 @@ struct BreakRecommendationsView: View {
 }
 
 private struct BreakRecommendation {
-    struct Stop: Identifiable {
-        let id = UUID()
-        let minute: Int
-        let reason: String
+    typealias Stop = StopBreakPlan.Stop
 
-        var label: String {
-            let hours = minute / 60
-            let minutes = minute % 60
-            if hours > 0, minutes > 0 { return "~\(hours)h \(minutes)m" }
-            if hours > 0 { return "~\(hours)h" }
-            return "~\(minutes)m"
-        }
-    }
-
-    let title: String
-    let detail: String
-    let symbol: String
+    let plan: StopBreakPlan
     let color: Color
-    let stops: [Stop]
 
     init(route: ScoredRoute, continuousMinutes: Double) {
-        let routeMinutes = Double(route.durationSeconds) / 60
-        let highDemand = (route.routeDemands ?? []).contains { demand in
-            demand.available && (demand.level == .high || demand.intensity >= 0.66)
-        } || route.score >= 70
-        let longDrive = routeMinutes >= 90
-        let interval = highDemand ? 60 : 90
-        let firstBreak = max(30, interval - Int(continuousMinutes.rounded(.down)))
-        let breakMinutes = stride(from: firstBreak, through: Int(routeMinutes.rounded(.down)), by: interval)
-            .filter { $0 < Int(routeMinutes.rounded(.down)) - 10 }
-            .prefix(3)
-            .map {
-                Stop(
-                    minute: $0,
-                    reason: highDemand
-                        ? "Reset attention before the demanding stretch continues."
-                        : "Step out before fatigue builds."
-                )
-            }
-
-        if longDrive || highDemand || continuousMinutes >= 45 {
-            title = highDemand ? "Breaks recommended" : "Long-drive breaks"
-            detail = "This route is about \(Self.durationLabel(routeMinutes)). Roam factors in your current continuous driving time and suggests rest timing before you start."
-            symbol = "cup.and.saucer.fill"
-            color = highDemand ? AppDesign.safety : AppDesign.accent
-            stops = Array(breakMinutes)
+        let plan = StopBreakPlan(route: route, continuousMinutes: continuousMinutes)
+        self.plan = plan
+        if plan.isRecommended {
+            self.color = plan.highDemand ? AppDesign.safety : AppDesign.accent
         } else {
-            title = "No planned stop needed"
-            detail = "This route is about \(Self.durationLabel(routeMinutes)), so Roam does not recommend an automatic rest stop right now."
-            symbol = "checkmark.circle.fill"
-            color = AppDesign.positive
-            stops = []
+            self.color = AppDesign.positive
         }
     }
 
-    private static func durationLabel(_ minutes: Double) -> String {
-        let rounded = Int(minutes.rounded())
-        let hours = rounded / 60
-        let mins = rounded % 60
-        if hours > 0, mins > 0 { return "\(hours) hr \(mins) min" }
-        if hours > 0 { return "\(hours) hr" }
-        return "\(mins) min"
-    }
+    var title: String { plan.title }
+    var detail: String { plan.detail }
+    var symbol: String { plan.symbol }
+    var stops: [Stop] { plan.stops }
 }
 
 struct PracticeDebriefCard: View {

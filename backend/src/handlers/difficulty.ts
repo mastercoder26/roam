@@ -125,8 +125,8 @@ const departureCandidateSchema = z.object({
 }).strict();
 
 const departureComparisonRequestSchema = z.object({
-  origin: addressSchema("origin"),
-  destination: addressSchema("destination"),
+  origin: routeEndpointSchema("origin"),
+  destination: routeEndpointSchema("destination"),
   candidates: z.array(departureCandidateSchema)
     .min(1, "candidates must contain between 1 and 3 items")
     .max(3, "candidates must contain between 1 and 3 items"),

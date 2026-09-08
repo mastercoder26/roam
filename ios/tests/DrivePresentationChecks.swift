@@ -28,16 +28,19 @@ struct DrivePresentationChecks {
         expect(!state.isExpanded, "the timer and button should return to their compact positions")
         expect(state.preservesFocusedCanvas, "the canvas must stay tall while the button returns vertically")
         expect(!state.showsSupportingContent, "normal content must stay hidden while the control returns")
+        expect(!state.disablesScrolling, "the return transition must not lock out user scroll interaction")
 
         state = DrivePresentationEngine.reduce(state, event: .returnMotionCompleted)
         expect(state.phase == .switchingToStart, "the action should swap back only after return motion completes")
         expect(state.action == .start, "the returned control should now become Start Drive")
         expect(state.preservesFocusedCanvas, "the Start Drive label swap must stay on the same canvas")
         expect(!state.showsSupportingContent, "the label swap must not reveal the card contents early")
+        expect(!state.disablesScrolling, "switching back to start must not lock out user scroll interaction")
 
         state = DrivePresentationEngine.reduce(state, event: .startSwapCompleted)
         expect(state.phase == .idle, "the normal Drive surface should return after the Start Drive label settles")
         expect(state.showsSupportingContent, "idle should restore normal Drive content")
+        expect(!state.disablesScrolling, "idle drive surface must not disable scrolling")
 
         print("DrivePresentation checks passed")
     }

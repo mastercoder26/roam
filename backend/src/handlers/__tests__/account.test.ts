@@ -1,5 +1,8 @@
 import type { Request, Response } from "express";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { Server } from "node:http";
+import type { AddressInfo } from "node:net";
+import { app } from "../../../server.js";
 import { ClerkAccountDeletionError } from "../../auth/errors.js";
 
 const { deleteClerkUserMock, deleteUserMock, findByIdMock, toPublicUserMock } = vi.hoisted(() => ({
@@ -82,5 +85,59 @@ describe("Clerk-backed account handlers", () => {
     expect(response.body).toEqual({
       user: { id: localUser.id, email: localUser.email, displayName: null },
     });
+  });
+});
+
+describe("server middleware (B11, B12)", () => {
+  let server: Server;
+  let port: number;
+
+  beforeEach(async () => {
+    await new Promise<void>((resolve) => {
+      server = app.listen(0, () => {
+        port = (server.address() as AddressInfo).port;
+        resolve();
+      });
+    });
+  });
+
+  afterEach(async () => {
+    await new Promise<void>((resolve) => {
+      server.close(() => resolve());
+    });
+  });
+
+  it("maps body-parser 413 error to HTTP 413 PAYLOAD_TOO_LARGE (B11)", async () => {
+    const hugePayload = JSON.stringify({ padding: "a".repeat(2.5 * 1024 * 1024) });
+    const res = await fetch(`http://127.0.0.1:${port}/api/route/difficulty`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: hugePayload,
+    });
+
+    expect(res.status).toBe(413);
+    const body = await res.json();
+    expect(body).toMatchObject({
+      error: "Payload too large. Request body exceeds limit.",
+      code: "PAYLOAD_TOO_LARGE",
+      requestId: expect.any(String),
+    });
+  });
+
+  it("emits Vary: Origin on dynamic CORS responses (B12)", async () => {
+    const prevOrigins = process.env.ALLOWED_ORIGINS;
+    process.env.ALLOWED_ORIGINS = "https://roam.example.com,http://localhost:3000";
+
+    try {
+      const res = await fetch(`http://127.0.0.1:${port}/health`, {
+        headers: { Origin: "http://localhost:3000" },
+      });
+
+      expect(res.headers.get("access-control-allow-origin")).toBe("http://localhost:3000");
+      expect(res.headers.get("vary")).toBe("Origin");
+    } finally {
+      if (prevOrigins === undefined) delete process.env.ALLOWED_ORIGINS;
+      else process.env.ALLOWED_ORIGINS = prevOrigins;
+    }
   });
 });

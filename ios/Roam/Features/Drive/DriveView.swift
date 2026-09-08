@@ -78,7 +78,9 @@ struct DriveView: View {
                     Color.clear
                         .onAppear { viewportHeight = geometry.size.height }
                         .onChange(of: geometry.size.height) { _, height in
-                            viewportHeight = height
+                            withAnimation(driveModeAnimation) {
+                                viewportHeight = height
+                            }
                         }
                 }
             }
@@ -135,11 +137,33 @@ struct DriveView: View {
             if usesCurrentRouteOrigin, routeOrigin.isEmpty {
                 routeLocationCoordinator.useCurrentLocation()
             }
-            guard session.isRecording else { return }
-            presentationState = DrivePresentationState(phase: .active)
+            syncPresentationState(isRecording: session.isRecording, animated: false)
+        }
+        .onChange(of: session.isRecording) { _, isRecording in
+            syncPresentationState(isRecording: isRecording, animated: true)
         }
         .onChange(of: routeLocationCoordinator.state) { _, state in
             if case .resolved(let address) = state { routeOrigin = address }
+        }
+    }
+
+    private func syncPresentationState(isRecording: Bool, animated: Bool) {
+        let targetPhase: DrivePresentationPhase = isRecording ? .active : .idle
+        guard presentationState.phase != targetPhase else { return }
+
+        // Don't interrupt in-flight user tap sequences
+        if isRecording {
+            guard presentationState.phase != .switchingToEnd else { return }
+        } else {
+            guard presentationState.phase != .returning && presentationState.phase != .switchingToStart else { return }
+        }
+
+        if animated {
+            withAnimation(driveModeAnimation) {
+                presentationState = DrivePresentationState(phase: targetPhase)
+            }
+        } else {
+            presentationState = DrivePresentationState(phase: targetPhase)
         }
     }
 
@@ -180,11 +204,11 @@ struct DriveView: View {
     /// Settling windows used when chaining start/stop phases. Slightly longer
     /// than the spring response so layout finishes before the next step.
     private var actionSwapSettlingNanos: UInt64 {
-        reduceMotion ? 130_000_000 : 150_000_000
+        reduceMotion ? 100_000_000 : 120_000_000
     }
 
     private var driveModeSettlingNanos: UInt64 {
-        reduceMotion ? 200_000_000 : 480_000_000
+        reduceMotion ? 180_000_000 : 320_000_000
     }
 
     private var isExpandedDriveSurface: Bool {
@@ -693,16 +717,20 @@ struct DriveView: View {
         guard presentationState.phase == .active, session.isRecording else { return }
         transitionToken = UUID()
         let token = transitionToken
-        session.endDrive()
 
         // Keep the End Drive label while the control travels back up the same
         // vertical path, then swap to Start only after that motion settles.
+        // Transition presentationState to .returning before ending the session so
+        // the session.isRecording observer sees the in-flight return motion and
+        // preserves the reverse choreography.
         withAnimation(driveModeAnimation) {
             presentationState = DrivePresentationEngine.reduce(
                 presentationState,
                 event: .endTapped
             )
         }
+
+        session.endDrive()
 
         Task { @MainActor in
             try? await Task.sleep(nanoseconds: driveModeSettlingNanos)

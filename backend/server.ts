@@ -78,17 +78,19 @@ app.set("trust proxy", 1);
 const port = Number(process.env.PORT ?? 3000);
 const allowedOrigins = getAllowedOrigins();
 const rateLimiter = createRateLimiter(getRateLimitConfig());
-const authRateLimiter = createRateLimiter({ windowMs: 15 * 60_000, maxRequests: 10 });
+const authRateLimiter = createRateLimiter({ windowMs: 15 * 60_000, maxRequests: 60 });
 
 app.use(express.json({ limit: "2mb" }));
 
 app.use((req, res, next) => {
   const origin = req.headers.origin ?? "";
+  const origins = getAllowedOrigins();
 
-  if (allowedOrigins.includes("*")) {
+  if (origins.includes("*")) {
     res.setHeader("Access-Control-Allow-Origin", "*");
-  } else if (origin && allowedOrigins.includes(origin)) {
+  } else if (origin && origins.includes(origin)) {
     res.setHeader("Access-Control-Allow-Origin", origin);
+    res.setHeader("Vary", "Origin");
   }
 
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
@@ -110,7 +112,8 @@ app.use((req, res, next) => {
  */
 function rateLimit(endpoint: string) {
   return (req: Request, res: Response, next: NextFunction) => {
-    const key = req.clerkUserId ?? req.ip ?? req.socket.remoteAddress ?? "unknown";
+    const rawKey = req.clerkUserId ?? req.ip ?? req.socket.remoteAddress ?? "unknown";
+    const key = `${endpoint}:${rawKey}`;
     const result = rateLimiter.check(key);
 
     if (!result.allowed) {
@@ -215,6 +218,22 @@ app.use((error: unknown, _req: Request, res: Response, next: NextFunction) => {
   const requestId = createRequestId();
   if (error instanceof SyntaxError) {
     res.status(400).json({ error: "Request body is invalid JSON.", code: "VALIDATION_ERROR", requestId });
+    return;
+  }
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    ("status" in error || "statusCode" in error || "type" in error || "name" in error) &&
+    ((error as { status?: number }).status === 413 ||
+      (error as { statusCode?: number }).statusCode === 413 ||
+      (error as { type?: string }).type === "entity.too.large" ||
+      (error as { name?: string }).name === "PayloadTooLargeError")
+  ) {
+    res.status(413).json({
+      error: "Payload too large. Request body exceeds limit.",
+      code: "PAYLOAD_TOO_LARGE",
+      requestId,
+    });
     return;
   }
   logInternalFailure(requestId, { endpoint: "unknown" }, error);

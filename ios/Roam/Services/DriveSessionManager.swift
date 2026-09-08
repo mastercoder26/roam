@@ -114,9 +114,6 @@ final class DriveSessionManager: NSObject, ObservableObject {
         routeAnalysisCoordinator.onDriveUpdated = { [weak self] id, analysis in
             self?.replaceSavedDrive(id: id, routeAnalysis: analysis)
         }
-        routeAnalysisCoordinator.onSyncRequested = { [weak self] in
-            self?.requestDriveHistorySync()
-        }
 
         observeBackgroundEntry()
     }
@@ -845,9 +842,12 @@ extension DriveSessionManager: CLLocationManagerDelegate {
     }
 
     nonisolated func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
-        guard let location = locations.last else { return }
+        guard !locations.isEmpty else { return }
+        let ordered = locations.sorted { $0.timestamp < $1.timestamp }
         Task { @MainActor [weak self] in
-            self?.record(location: location)
+            for location in ordered {
+                self?.record(location: location)
+            }
         }
     }
 

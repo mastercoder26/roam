@@ -104,19 +104,27 @@ struct KineticMetricText: View {
         !reduceMotion && PremiumMotionSpec.allowsKineticTreatment(in: context)
     }
 
+    @State private var blurResetToken = UUID()
+
     private func resolveMetricBlur() {
         guard allowsKineticTreatment else {
             blurRadius = 0
             return
         }
 
+        let token = UUID()
+        blurResetToken = token
+
         var resetTransaction = Transaction(animation: nil)
         resetTransaction.disablesAnimations = true
         withTransaction(resetTransaction) {
             blurRadius = PremiumMotionSpec.heroMetric.maximumBlur
         }
-        withAnimation(AppAnimation.kineticMetric) {
-            blurRadius = 0
+        DispatchQueue.main.async {
+            guard blurResetToken == token else { return }
+            withAnimation(AppAnimation.kineticMetric) {
+                blurRadius = 0
+            }
         }
     }
 }

@@ -14,8 +14,8 @@ struct ProfileView: View {
     @ObservedObject private var appIcon = AppIconManager.shared
     @EnvironmentObject private var driveSession: DriveSessionManager
     @EnvironmentObject private var authSession: AuthSessionStore
-    @StateObject private var profile = DriverProfileStore.shared
-    @StateObject private var driveHistorySync = DriveHistorySyncService.shared
+    @ObservedObject private var profile = DriverProfileStore.shared
+    @ObservedObject private var driveHistorySync = DriveHistorySyncService.shared
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     @State private var showingThemePicker = false
@@ -86,7 +86,7 @@ struct ProfileView: View {
                 .padding(.horizontal, AppDesign.space20)
                 .padding(.vertical, AppDesign.space16)
             }
-            .safeAreaPadding(.bottom, AppDesign.tabBarClearance + AppDesign.space24)
+            .safeAreaPadding(.bottom, AppDesign.tabBarClearance)
             .background(AppCanvasBackground())
             .navigationTitle("Profile")
             .toolbar(.hidden, for: .navigationBar)
@@ -673,7 +673,9 @@ struct ProfileView: View {
 
             ForEach(DriverProfile.Stage.allCases) { stage in
                 Button {
-                    withAnimation(AppAnimation.selection) { profile.stage = stage }
+                    withAnimation(reduceMotion ? .easeOut(duration: 0.16) : AppAnimation.selection) {
+                        profile.stage = stage
+                    }
                 } label: {
                     HStack(spacing: AppDesign.space12) {
                         Image(systemName: profile.stage == stage ? "largecircle.fill.circle" : "circle")

@@ -75,7 +75,7 @@ export function RouteResults({
               <button
                 key={index}
                 onClick={() => setSelectedIndex(index)}
-                className={`flex items-center gap-3.5 rounded-roam border px-[18px] py-[14px] text-left transition-colors ${
+                className={`flex items-center gap-3.5 rounded-roam border px-[18px] py-[14px] text-left transition-[color,background-color,border-color,transform] duration-150 ease-out active:scale-[0.985] ${
                   index === selectedIndex
                     ? "border-accent/50 bg-accent/10"
                     : "border-card bg-card hover:border-card-strong"
@@ -103,22 +103,23 @@ export function RouteResults({
                     <span>{formatDistanceMeters(route.distanceMeters)}</span>
                   </div>
                 </div>
-                {"scoreDelta" in route && route.scoreDelta !== undefined ? (
-                  <span
-                    className={`rounded-full px-2 py-1 text-xs font-semibold ${
-                      route.scoreDelta >= 0
-                        ? "bg-safety/15 text-safety"
-                        : "bg-positive/15 text-positive"
-                    }`}
-                  >
-                    {route.scoreDelta >= 0 ? "+" : ""}
-                    {route.scoreDelta.toFixed(1)}
-                  </span>
-                ) : (
-                  index === selectedIndex && (
+                <div className="flex items-center gap-2">
+                  {"scoreDelta" in route && route.scoreDelta !== undefined ? (
+                    <span
+                      className={`rounded-full px-2 py-1 text-xs font-semibold ${
+                        route.scoreDelta >= 0
+                          ? "bg-safety/15 text-safety"
+                          : "bg-positive/15 text-positive"
+                      }`}
+                    >
+                      {route.scoreDelta >= 0 ? "+" : ""}
+                      {route.scoreDelta.toFixed(1)}
+                    </span>
+                  ) : null}
+                  {index === selectedIndex && (
                     <CheckIcon className="h-5 w-5 text-accent" />
-                  )
-                )}
+                  )}
+                </div>
               </button>
             ))}
           </div>

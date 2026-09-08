@@ -118,7 +118,7 @@ async function authenticate(req: Request, res: Response, next: NextFunction): Pr
 }
 
 export function requireAuth(req: Request, res: Response, next: NextFunction): void {
-  void authenticate(req, res, next);
+  authenticate(req, res, next).catch(next);
 }
 
 /**
@@ -161,7 +161,7 @@ async function verifyIdentity(req: Request, res: Response, next: NextFunction): 
 }
 
 export function requireVerifiedIdentity(req: Request, res: Response, next: NextFunction): void {
-  void verifyIdentity(req, res, next);
+  verifyIdentity(req, res, next).catch(next);
 }
 
 export function assertAuthConfigured(): void {

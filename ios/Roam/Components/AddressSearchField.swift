@@ -47,7 +47,7 @@ struct AddressSearchField: View {
                     .padding(.leading, showsIcon ? 32 : 0)
                     .transition(.opacity)
 
-                ForEach(Array(completer.suggestions.prefix(maximumSuggestions).enumerated()), id: \.offset) { _, suggestion in
+                ForEach(Array(completer.suggestions.prefix(maximumSuggestions)), id: \.suggestionIdentifier) { suggestion in
                     Button {
                         text = suggestion.title + (suggestion.subtitle.isEmpty ? "" : ", \(suggestion.subtitle)")
                         completer.clear()
@@ -122,5 +122,11 @@ final class AddressSearchCompleter: NSObject, ObservableObject, MKLocalSearchCom
         Task { @MainActor in
             suggestions = []
         }
+    }
+}
+
+private extension MKLocalSearchCompletion {
+    var suggestionIdentifier: String {
+        "\(title)|\(subtitle)"
     }
 }

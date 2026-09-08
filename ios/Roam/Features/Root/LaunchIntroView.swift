@@ -213,6 +213,7 @@ struct LaunchIntroView: View {
         }
         isGlobeIntroActive = true
         DispatchQueue.main.asyncAfter(deadline: .now() + choreography.videoWordmarkDelay) {
+            guard !hasSignaledVisualCompletion else { return }
             withAnimation(.easeOut(duration: choreography.videoWordmarkFadeDuration)) {
                 isGlobeWordmarkVisible = true
             }
@@ -221,6 +222,7 @@ struct LaunchIntroView: View {
             }
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + choreography.wordmarkDockDelay) {
+            guard !hasSignaledVisualCompletion else { return }
             // One animation drives both scale and offset, so the mark reads
             // as a single object moving rather than a size change racing a
             // position change.

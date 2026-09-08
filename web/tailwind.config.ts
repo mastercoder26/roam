@@ -16,11 +16,11 @@ const config: Config = {
         "card-elevated": "#EFECDF",
         "ink-primary": "#18233C",
         difficulty: {
-          "very-easy": "rgb(77, 209, 115)",
-          easy: "rgb(122, 219, 107)",
-          moderate: "rgb(247, 199, 56)",
-          hard: "rgb(255, 153, 64)",
-          "very-hard": "rgb(255, 107, 82)",
+          "very-easy": "#198A62",
+          easy: "#55A766",
+          moderate: "#D49A16",
+          hard: "#E77B12",
+          "very-hard": "#D44C42",
         },
       },
       textColor: {

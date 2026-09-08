@@ -75,17 +75,17 @@ input:focus-visible {
 }
 
 .roam-reveal {
-  animation: roam-fade-up 0.52s var(--motion-ease-out) both;
+  animation: roam-fade-up 280ms var(--motion-ease-out) both;
 }
 
 .roam-enter {
-  animation: roam-fade-up 0.72s var(--motion-ease-soft) both;
+  animation: roam-fade-up 280ms var(--motion-ease-out) both;
 }
 
-.roam-enter-delay-1 { animation-delay: 80ms; }
-.roam-enter-delay-2 { animation-delay: 150ms; }
-.roam-enter-delay-3 { animation-delay: 220ms; }
-.roam-enter-delay-4 { animation-delay: 300ms; }
+.roam-enter-delay-1 { animation-delay: 40ms; }
+.roam-enter-delay-2 { animation-delay: 80ms; }
+.roam-enter-delay-3 { animation-delay: 120ms; }
+.roam-enter-delay-4 { animation-delay: 160ms; }
 
 @keyframes roam-wiggle {
   0%, 100% { transform: rotate(0deg) translateZ(0); }
@@ -101,9 +101,13 @@ input:focus-visible {
 }
 
 @keyframes roam-pop-in {
-  0% { opacity: 0; transform: scale(0.6); }
-  70% { opacity: 1; transform: scale(1.08); }
+  0% { opacity: 0; transform: scale(0.96); }
   100% { opacity: 1; transform: scale(1); }
+}
+
+.roam-popover {
+  transform-origin: top;
+  animation: roam-pop-in 160ms var(--motion-ease-out) forwards;
 }
 
 @keyframes roam-fade-in {
@@ -133,19 +137,30 @@ input:focus-visible {
   animation: roam-fade-in 0.4s ease-out 1.02s forwards;
 }
 
+.roam-jiggle {
+  transition: transform 160ms var(--motion-ease-out), box-shadow 160ms var(--motion-ease-out);
+}
+
+.roam-jiggle:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
 .roam-hover-lift {
   transition: transform 260ms var(--motion-ease-out), box-shadow 260ms var(--motion-ease-out);
 }
 
 @media (hover: hover) and (pointer: fine) {
-  .roam-jiggle:hover {
-    animation: roam-wiggle 420ms ease-in-out;
-    will-change: transform;
+  .roam-jiggle:hover:not(:disabled) {
+    transform: translateY(-1px);
   }
 
   .roam-hover-lift:hover {
     transform: translateY(-4px);
     box-shadow: 0 34px 90px rgba(24, 35, 60, 0.18);
+  }
+
+  .roam-hover-lift:active {
+    transform: translateY(-1px) scale(0.99);
   }
 }
 
@@ -156,7 +171,22 @@ input:focus-visible {
 }
 
 .roam-spin {
-  animation: roam-spin 0.9s linear infinite;
+  animation: roam-spin 0.65s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .roam-spin {
+    animation: none !important;
+    opacity: 0.7;
+  }
 }
 
 .route-map {

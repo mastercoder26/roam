@@ -8,6 +8,7 @@ import {
   validateDepartureComparisonRequest,
   validateDifficultyRequest,
 } from "../difficulty.js";
+import { publicFailure, RouteProviderError } from "../../errors.js";
 import { neutralConditions } from "../../enrichment/index.js";
 import { scoreRoutes } from "../../scoring/index.js";
 import { urbanRoute } from "../../scoring/__tests__/fixtures/urban-route.js";
@@ -112,6 +113,18 @@ describe("departure comparison request validation", () => {
         departureLocalMinutes: 19 * 60 + 30,
       }],
     });
+  });
+
+  it("accepts coordinate endpoints matching difficulty request schema", () => {
+    const origin = { latitude: 30.2672, longitude: -97.7431 };
+    const destination = { latitude: 30.3072, longitude: -97.7031 };
+    expect(
+      validateDepartureComparisonRequest({
+        origin,
+        destination,
+        candidates: [validCandidate],
+      })
+    ).toMatchObject({ origin, destination, candidates: [validCandidate] });
   });
 
   it("rejects malformed candidates before any route work begins", () => {
@@ -368,3 +381,19 @@ describe("departure comparison analysis", () => {
     expect(response.candidates[0].error).toBeUndefined();
   });
 });
+
+describe("publicFailure error mapping", () => {
+  it("maps RouteProviderError with status 400 to 400 INVALID_REQUEST", () => {
+    const failure = publicFailure(new RouteProviderError(400));
+    expect(failure.status).toBe(400);
+    expect(failure.code).toBe("INVALID_REQUEST");
+    expect(failure.message).toContain("check the origin and destination");
+  });
+
+  it("maps RouteProviderError with status 500 to 503 ROUTE_UNAVAILABLE", () => {
+    const failure = publicFailure(new RouteProviderError(500));
+    expect(failure.status).toBe(503);
+    expect(failure.code).toBe("ROUTE_UNAVAILABLE");
+  });
+});
+

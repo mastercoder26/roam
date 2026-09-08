@@ -781,3 +781,123 @@ extension DifficultyLabel {
         }
     }
 }
+
+// MARK: - Stop Break Planning
+
+/// Plans recovery rest stops along a route based on continuous driving time,
+/// route duration, and route demands / difficulty score.
+struct StopBreakPlan: Equatable {
+    struct Stop: Equatable, Identifiable {
+        let id: UUID
+        let minute: Int
+        let reason: String
+
+        init(id: UUID = UUID(), minute: Int, reason: String) {
+            self.id = id
+            self.minute = minute
+            self.reason = reason
+        }
+
+        var label: String {
+            let hours = minute / 60
+            let minutes = minute % 60
+            if hours > 0, minutes > 0 { return "~\(hours)h \(minutes)m" }
+            if hours > 0 { return "~\(hours)h" }
+            return "~\(minutes)m"
+        }
+    }
+
+    let interval: Int
+    let highDemand: Bool
+    let longDrive: Bool
+    let isRecommended: Bool
+    let title: String
+    let detail: String
+    let symbol: String
+    let stops: [Stop]
+
+    init(route: ScoredRoute, continuousMinutes: Double) {
+        let routeMinutes = Double(route.durationSeconds) / 60
+        let highDemand = (route.routeDemands ?? []).contains { demand in
+            demand.available && (demand.level == .high || demand.intensity >= 0.66)
+        } || route.score >= 7.0
+        let longDrive = routeMinutes >= 90
+        let interval = highDemand ? 60 : 90
+        self.highDemand = highDemand
+        self.longDrive = longDrive
+        self.interval = interval
+
+        let firstBreak = max(30, interval - Int(continuousMinutes.rounded(.down)))
+        let breakMinutes = stride(from: firstBreak, through: Int(routeMinutes.rounded(.down)), by: interval)
+            .filter { $0 < Int(routeMinutes.rounded(.down)) - 10 }
+            .prefix(3)
+            .map {
+                Stop(
+                    minute: $0,
+                    reason: highDemand
+                        ? "Reset attention before the demanding stretch continues."
+                        : "Step out before fatigue builds."
+                )
+            }
+
+        if longDrive || highDemand || continuousMinutes >= 45 {
+            isRecommended = true
+            title = highDemand ? "Breaks recommended" : "Long-drive breaks"
+            detail = "This route is about \(Self.durationLabel(routeMinutes)). Roam factors in your current continuous driving time and suggests rest timing before you start."
+            symbol = "cup.and.saucer.fill"
+            stops = Array(breakMinutes)
+        } else {
+            isRecommended = false
+            title = "No planned stop needed"
+            detail = "This route is about \(Self.durationLabel(routeMinutes)), so Roam does not recommend an automatic rest stop right now."
+            symbol = "checkmark.circle.fill"
+            stops = []
+        }
+    }
+
+    private static func durationLabel(_ minutes: Double) -> String {
+        let rounded = Int(minutes.rounded())
+        let hours = rounded / 60
+        let mins = rounded % 60
+        if hours > 0, mins > 0 { return "\(hours) hr \(mins) min" }
+        if hours > 0 { return "\(hours) hr" }
+        return "\(mins) min"
+    }
+}
+
+extension ScoredRoute {
+    static func stub(
+        score: Double,
+        durationSeconds: Int = 3600,
+        demands: [RouteDemand]? = nil
+    ) -> ScoredRoute {
+        ScoredRoute(
+            score: score,
+            uncalibratedScore: nil,
+            label: .moderate,
+            reasons: [],
+            breakdown: DifficultyBreakdown(
+                speed: nil, merges: nil, turns: nil, traffic: 0,
+                length: nil, fatigue: nil, weather: nil, road: nil,
+                highway: 0, maneuvers: 0, navDensity: 0, effort: 0
+            ),
+            contributions: nil,
+            uncertainty: nil,
+            hotspots: nil,
+            conditions: nil,
+            modelVersion: nil,
+            distanceMeters: 50_000,
+            durationSeconds: durationSeconds,
+            staticDurationSeconds: durationSeconds,
+            trafficDelaySeconds: 0,
+            polyline: "stub-\(score)-\(durationSeconds)",
+            bounds: RouteBounds(
+                southwest: Coordinate(latitude: 0, longitude: 0),
+                northeast: Coordinate(latitude: 0, longitude: 0)
+            ),
+            scoreDelta: nil,
+            routeDemands: demands
+        )
+    }
+}
+
