@@ -176,6 +176,56 @@ enum LaunchIntroChoreography {
         videoWordmarkDelay + videoWordmarkFadeDuration + wordmarkHeroHoldDuration
     }
 
+    // MARK: - Globe motion
+
+    /// Terminal rotation rate of the ASCII globe, in radians of texture
+    /// longitude per second.
+    static let globeRotationSpeed: Double = 0.55
+    /// How long the globe takes to reach that rate from rest. A globe that is
+    /// already at full speed on the first frame reads as a looping asset
+    /// someone dropped in; one that spins up reads as something starting.
+    static let globeSpinUpDuration: TimeInterval = 0.7
+    /// The globe arrives fractionally small and settles out to full size, so
+    /// the opening beat has depth rather than being a pure opacity ramp.
+    static let globeEntranceScale: Double = 0.94
+    static let globeEntranceDuration: TimeInterval = 0.42
+
+    /// Accumulated texture rotation at `elapsed`.
+    ///
+    /// The rate ramps as `(t / spinUp)²` and then holds, and this is that
+    /// rate's exact integral — so angle and angular velocity are both
+    /// continuous at the hand-off. Integrating numerically per frame would
+    /// instead make the spin depend on frame rate, which is precisely what
+    /// this rewrite is trying to stop doing.
+    static func globeRotation(elapsed: TimeInterval) -> Double {
+        guard elapsed > 0 else { return 0 }
+        let rampDuration = globeSpinUpDuration
+        guard elapsed < rampDuration else {
+            // Angle accumulated during the ramp, plus constant-rate travel.
+            return globeRotationSpeed * (rampDuration / 3 + (elapsed - rampDuration))
+        }
+        return globeRotationSpeed * elapsed * elapsed * elapsed / (3 * rampDuration * rampDuration)
+    }
+
+    /// Instantaneous rotation rate, exposed so the ramp can be checked as a
+    /// rate rather than only as an accumulated angle.
+    static func globeRotationRate(elapsed: TimeInterval) -> Double {
+        guard elapsed > 0 else { return 0 }
+        guard elapsed < globeSpinUpDuration else { return globeRotationSpeed }
+        let u = elapsed / globeSpinUpDuration
+        return globeRotationSpeed * u * u
+    }
+
+    /// Scale of the globe as it settles in. Smoothstep, so it eases out of
+    /// the entrance without a velocity discontinuity at the end.
+    static func globeScale(elapsed: TimeInterval) -> Double {
+        guard elapsed > 0 else { return globeEntranceScale }
+        guard elapsed < globeEntranceDuration else { return 1 }
+        let u = elapsed / globeEntranceDuration
+        let eased = u * u * (3 - 2 * u)
+        return globeEntranceScale + (1 - globeEntranceScale) * eased
+    }
+
     // MARK: - Wordmark placement
 
     /// The mark is *drawn* at hero size and scaled down to dock, never up.

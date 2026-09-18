@@ -13,6 +13,8 @@ struct LaunchIntroChoreographyChecks {
         aReturningDriverOnlySeesItAfterARealAbsence()
         theWordmarkIsBigAndCenteredBeforeItDocks()
         theNoPathGlobeRevealKeepsItsVisualBeatsOrdered()
+        theGlobeSpinsUpFromRestAndNeverRunsBackwards()
+        theGlobeSettlesToFullSizeAndStaysThere()
 
         print("Launch intro choreography checks passed")
     }
@@ -254,6 +256,101 @@ struct LaunchIntroChoreographyChecks {
                 < LaunchIntroChoreography.videoDuration,
             "the globe duration must leave the docked wordmark visible before handoff"
         )
+    }
+
+    /// The spin is authored as a rate that ramps from rest and then holds.
+    /// Both the angle and the rate must be continuous across that hand-off,
+    /// or the globe visibly jerks the moment it reaches full speed.
+    private static func theGlobeSpinsUpFromRestAndNeverRunsBackwards() {
+        expect(
+            LaunchIntroChoreography.globeRotation(elapsed: 0) == 0,
+            "the globe must start un-rotated"
+        )
+        expect(
+            LaunchIntroChoreography.globeRotationRate(elapsed: 0) == 0,
+            "the globe must start from rest rather than at full speed"
+        )
+
+        // Monotonic: the texture must never travel backwards.
+        var previousAngle = -1.0
+        var previousRate = -1.0
+        var elapsed = 0.0
+        while elapsed <= LaunchIntroChoreography.videoDuration {
+            let angle = LaunchIntroChoreography.globeRotation(elapsed: elapsed)
+            expect(angle >= previousAngle, "the globe must never rotate backwards at \(elapsed)")
+            previousAngle = angle
+
+            let rate = LaunchIntroChoreography.globeRotationRate(elapsed: elapsed)
+            expect(rate >= previousRate - 0.0001, "the spin-up must never lose speed at \(elapsed)")
+            expect(
+                rate <= LaunchIntroChoreography.globeRotationSpeed + 0.0001,
+                "the globe must never exceed its authored speed at \(elapsed)"
+            )
+            previousRate = rate
+            elapsed += 1.0 / 240.0
+        }
+
+        let spinUp = LaunchIntroChoreography.globeSpinUpDuration
+        expect(
+            nearlyEqual(
+                LaunchIntroChoreography.globeRotationRate(elapsed: spinUp),
+                LaunchIntroChoreography.globeRotationSpeed
+            ),
+            "the ramp must arrive at exactly the authored speed"
+        )
+        // Continuity of the angle across the ramp boundary: the two branches
+        // must agree to well under a frame's worth of rotation.
+        expect(
+            nearlyEqual(
+                LaunchIntroChoreography.globeRotation(elapsed: spinUp - 0.0005),
+                LaunchIntroChoreography.globeRotation(elapsed: spinUp + 0.0005),
+                tolerance: 0.001
+            ),
+            "the angle must not jump where the ramp hands off to constant speed"
+        )
+        // After the ramp the globe must genuinely be at full speed, not
+        // merely approaching it.
+        let a = LaunchIntroChoreography.globeRotation(elapsed: 1.5)
+        let b = LaunchIntroChoreography.globeRotation(elapsed: 2.5)
+        expect(
+            nearlyEqual(b - a, LaunchIntroChoreography.globeRotationSpeed),
+            "past the ramp the globe must turn at a constant authored rate"
+        )
+    }
+
+    private static func theGlobeSettlesToFullSizeAndStaysThere() {
+        expect(
+            LaunchIntroChoreography.globeScale(elapsed: 0) == LaunchIntroChoreography.globeEntranceScale,
+            "the globe must arrive fractionally small"
+        )
+        expect(
+            LaunchIntroChoreography.globeEntranceScale < 1,
+            "the entrance must scale up, never down"
+        )
+        expect(
+            LaunchIntroChoreography.globeScale(elapsed: LaunchIntroChoreography.globeEntranceDuration) == 1,
+            "the entrance must finish at full size"
+        )
+        expect(
+            LaunchIntroChoreography.globeScale(elapsed: LaunchIntroChoreography.videoDuration) == 1,
+            "the globe must not keep growing after it has settled"
+        )
+
+        // The entrance must finish well before the wordmark arrives, so the
+        // two beats read in sequence rather than on top of each other.
+        expect(
+            LaunchIntroChoreography.globeEntranceDuration < LaunchIntroChoreography.videoWordmarkDelay,
+            "the globe must finish settling before the wordmark fades in"
+        )
+
+        var previous = 0.0
+        var elapsed = 0.0
+        while elapsed <= LaunchIntroChoreography.globeEntranceDuration {
+            let scale = LaunchIntroChoreography.globeScale(elapsed: elapsed)
+            expect(scale >= previous, "the entrance must never shrink at \(elapsed)")
+            previous = scale
+            elapsed += 1.0 / 240.0
+        }
     }
 
     private static func nearlyEqual(_ lhs: Double, _ rhs: Double, tolerance: Double = 0.0001) -> Bool {
