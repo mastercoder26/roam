@@ -19,6 +19,11 @@ struct DriveView: View {
     @State private var viewportHeight: CGFloat = 640
     @State private var pendingDeletionID: UUID?
     @State private var breakPlanningControlsWidth: CGFloat = 0
+    /// Set for one beat when a clean-streak badge is earned, then cleared.
+    /// Held here rather than read straight from the session so the flourish
+    /// fires exactly once per badge, whatever else redraws.
+    @State private var streakCelebration: CleanStreakCelebration?
+    @State private var streakCelebrationToken = UUID()
     @StateObject private var routeLocationCoordinator = RoutePlanningLocationCoordinator()
     /// Ties the clock and the primary action across the compact and expanded
     /// branches below. Those are two separate `if`/`else` hierarchies, so
@@ -145,6 +150,38 @@ struct DriveView: View {
         .onChange(of: routeLocationCoordinator.state) { _, state in
             if case .resolved(let address) = state { routeOrigin = address }
         }
+        .onChange(of: session.cleanStreakCelebration) { _, celebration in
+            guard let celebration else { return }
+            celebrateStreak(celebration)
+        }
+        .onChange(of: session.liveEvents.count) { previous, current in
+            // A coaching event is the one thing on this screen the driver must
+            // notice without looking. Warning-weight, and only on an increase
+            // so resetting the list between drives stays silent.
+            guard current > previous else { return }
+            UINotificationFeedbackGenerator().notificationOccurred(.warning)
+        }
+    }
+
+    /// Fires the badge flourish, then clears it so the overlay is a one-shot
+    /// beat rather than a permanent ring. The token guards against a second
+    /// badge arriving before the first has finished clearing.
+    private func celebrateStreak(_ celebration: CleanStreakCelebration) {
+        streakCelebrationToken = UUID()
+        let token = streakCelebrationToken
+
+        withAnimation(AppAnimation.selection) {
+            streakCelebration = celebration
+        }
+        UINotificationFeedbackGenerator().notificationOccurred(.success)
+
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 700_000_000)
+            guard streakCelebrationToken == token else { return }
+            withAnimation(AppAnimation.content) {
+                streakCelebration = nil
+            }
+        }
     }
 
     private func syncPresentationState(isRecording: Bool, animated: Bool) {
@@ -167,23 +204,34 @@ struct DriveView: View {
         }
     }
 
-    private var activeSpeed: some View {
-        VStack(spacing: AppDesign.space8) {
-            Text("CURRENT SPEED")
-                .font(AppDesign.Typography.microLabel)
-                .tracking(1.1)
-                .foregroundStyle(AppDesign.Ink.secondary)
-            HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Text("\(session.currentSpeedMilesPerHour)")
-                    .font(.system(size: 62, weight: .semibold, design: .rounded))
-                    .monospacedDigit()
-                    .contentTransition(.numericText())
-                Text("mph")
-                    .font(.title3.weight(.semibold))
-                    .foregroundStyle(AppDesign.Ink.secondary)
-            }
+    /// Speed and the clean-streak badge on one line.
+    ///
+    /// Speed used to be a 62pt hero numeral here. The car already shows the
+    /// driver their speed; what it cannot show is how this drive is being
+    /// scored, so the score ring takes the hero slot and speed keeps a smaller
+    /// — still glanceable — one.
+    private var activeVitalsRow: some View {
+        HStack(alignment: .center, spacing: AppDesign.space12) {
+            activeSpeed
+            Spacer(minLength: AppDesign.space8)
+            LiveCleanStreakChip(
+                live: session.liveScore,
+                celebration: streakCelebration
+            )
         }
-        .frame(maxWidth: .infinity)
+    }
+
+    private var activeSpeed: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 4) {
+            Text("\(session.currentSpeedMilesPerHour)")
+                .font(.system(size: 38, weight: .semibold, design: .rounded))
+                .monospacedDigit()
+                .contentTransition(reduceMotion ? .identity : .numericText())
+                .foregroundStyle(AppDesign.Ink.primary)
+            Text("mph")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(AppDesign.Ink.secondary)
+        }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Current speed \(session.currentSpeedMilesPerHour) miles per hour")
     }
@@ -191,6 +239,16 @@ struct DriveView: View {
     private var compactPlacementWarning: some View {
         StatusBadge(text: "Secure the phone when it is safe", symbol: "iphone.gen3.radiowaves.left.and.right", tint: AppDesign.safety)
             .accessibilityLabel("Sensor placement may be unstable. Secure the phone when it is safe.")
+    }
+
+    /// Which live-coaching modules this canvas can afford. Recomputed as the
+    /// viewport changes so rotation and large text drop readouts rather than
+    /// pushing End Drive off-screen.
+    private var liveModules: LiveDriveCanvasLayout.Modules {
+        LiveDriveCanvasLayout.modules(
+            availableHeight: viewportHeight,
+            usesLargeText: dynamicTypeSize.isAccessibilitySize
+        )
     }
 
     private var driveModeAnimation: Animation {
@@ -575,24 +633,38 @@ struct DriveView: View {
             if isExpandedDriveSurface {
                 Spacer(minLength: 8)
 
-                VStack(spacing: AppDesign.space24) {
+                VStack(spacing: AppDesign.space16) {
                     FlipClock(elapsed: session.elapsed, style: .active)
                         .matchedGeometryEffect(id: DriveTransitionID.clock, in: driveTransition)
 
-                    activeSpeed
+                    if liveModules.showsScoreRing {
+                        LiveDriveScoreRing(live: session.liveScore)
+                    }
 
-                    DashboardMetricStrip(metrics: [
-                        DashboardMetric(value: String(format: "%.1f", session.distanceMeters / 1_609.344), label: "miles"),
-                        DashboardMetric(value: "\(session.acceptedLocationSamples)", label: "GPS samples"),
-                        DashboardMetric(value: "\(session.motionSamples)", label: "motion samples")
-                    ])
-                    .padding(.horizontal, AppDesign.contentPadding)
+                    activeVitalsRow
+                        .padding(.horizontal, AppDesign.contentPadding)
+
+                    if liveModules.showsSmoothnessBadge {
+                        LiveSmoothnessBadge(state: session.liveScore.smoothness)
+                    }
+
+                    if liveModules.showsMetricStrip {
+                        // Sensor counts belong to the saved drive's detail
+                        // screen. Behind the wheel they are numbers the driver
+                        // can do nothing with, changing every second.
+                        DashboardMetricStrip(metrics: [
+                            DashboardMetric(value: String(format: "%.1f", session.distanceMeters / 1_609.344), label: "miles"),
+                            DashboardMetric(value: "\(session.liveScore.eventCount)", label: "events")
+                        ])
+                        .padding(.horizontal, AppDesign.contentPadding)
+                    }
 
                     if session.phonePlacementAssessment == .needsAdjustment {
                         compactPlacementWarning
                             .transition(.opacity)
                     }
                 }
+                .animation(driveModeAnimation, value: liveModules)
 
                 Spacer(minLength: 16)
 
