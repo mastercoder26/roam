@@ -39,7 +39,12 @@ private struct AsciiGlobeScene: View {
             let center = CGPoint(x: geometry.size.width / 2, y: geometry.size.height * 0.39)
             let glyphs = AsciiGlobe.glyphs(radius: radius, spacing: spacing)
 
-            TimelineView(.periodic(from: startDate, by: AsciiGlobeMetrics.frameInterval)) { timeline in
+            // `.animation` drives this at the display's own rate — 120 Hz on
+            // ProMotion — instead of the fixed 30 Hz cap this used to run at.
+            // The spin is computed from `elapsed` in closed form below, so the
+            // motion is identical at any frame rate; only its smoothness
+            // changes.
+            TimelineView(.animation) { timeline in
                 let elapsed = timeline.date.timeIntervalSince(startDate)
 
                 Canvas { context, _ in
@@ -60,6 +65,15 @@ private struct AsciiGlobeScene: View {
     ) {
         let sceneOpacity = AsciiGlobeMetrics.sceneOpacity(elapsed: elapsed)
         guard sceneOpacity > 0 else { return }
+
+        // The globe arrives fractionally small and settles out to full size,
+        // so the opening beat has depth rather than being a pure opacity ramp.
+        // Scaling about the globe's own center keeps it anchored while it
+        // grows.
+        let scale = LaunchIntroChoreography.globeScale(elapsed: elapsed)
+        context.translateBy(x: center.x, y: center.y)
+        context.scaleBy(x: scale, y: scale)
+        context.translateBy(x: -center.x, y: -center.y)
 
         drawAtmosphere(in: &context, center: center, radius: radius, sceneOpacity: sceneOpacity)
         drawGlobe(in: &context, center: center, glyphs: glyphs, spacing: spacing, elapsed: elapsed, sceneOpacity: sceneOpacity)
@@ -98,7 +112,11 @@ private struct AsciiGlobeScene: View {
         elapsed: TimeInterval,
         sceneOpacity: Double
     ) {
-        let phase = elapsed * AsciiGlobeMetrics.rotationSpeed
+        // Ramped from rest rather than `elapsed * speed`: a globe already at
+        // full speed on its first frame reads as a looping asset dropped in,
+        // not as something starting. The ramp is integrated in closed form so
+        // it stays frame-rate independent.
+        let phase = LaunchIntroChoreography.globeRotation(elapsed: elapsed)
         let levels = AsciiGlobe.charset.map { char in
             context.resolve(
                 Text(char)
@@ -138,7 +156,11 @@ private struct GlobeGlyph {
         let longitude = atan2(dxNormalized, depth) + phase
         let pattern = 0.5 + 0.5 * sin(longitude * 3 + latitude * 3.2)
         let lit = depth * 0.55 - latitude * 0.25
-        return (pattern * 0.5 + lit * 0.5).clampedToUnit
+        // A faint brightening at the limb, where `depth` falls to zero. Real
+        // lit spheres carry this edge, and without it a glyph field reads as a
+        // flat disc of text rather than as something round.
+        let rim = pow(1 - depth, 3) * 0.26
+        return (pattern * 0.5 + lit * 0.5 + rim).clampedToUnit
     }
 
     /// A stable, travelling character field gives the surface its own
@@ -190,11 +212,6 @@ private enum AsciiGlobeMetrics {
     /// The radius glyph spacing is authored against, so density stays
     /// constant as the globe grows rather than spreading thin.
     static let referenceRadius: CGFloat = 132
-    static let rotationSpeed: Double = 0.55
-    /// Smooth, near-display-rate motion for the spin — the glyph texture
-    /// itself reads as "text" regardless of frame rate, so there's no reason
-    /// to cap this the way a genuinely retro effect would.
-    static let frameInterval: TimeInterval = 1.0 / 30.0
 
     /// The globe fills most of the screen's shorter dimension, leaving just
     /// enough margin that the bloom doesn't clip at the edges.
