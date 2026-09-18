@@ -139,12 +139,13 @@ anywhere.** There is no local Postgres running (`DATABASE_URL` in
 Docker available locally. The SQL is reviewed but unexecuted. The first real run
 will be when `roam-data-api` boots on Render.
 
-**iOS points at a Render URL that does not exist yet.**
-`Debug.local.xcconfig`/`Release.local.xcconfig` were set to
+**~~iOS points at a Render URL that does not exist yet.~~ Resolved.**
+`Debug.local.xcconfig`/`Release.local.xcconfig` were originally set to
 `https://roam-data-api.onrender.com` — a *guess* based on the service name in
-`render.yaml`, made before that service was deployed. Render may assign a
-different hostname. Confirm the real URL once step 2 below is done and update
-both files if it differs.
+`render.yaml`, made before that service was deployed. Render did assign a
+different hostname. The real URL is
+**`https://roam-data-api-n2sw.onrender.com`**, and both xcconfigs now carry it.
+The guessed hostname resolves but serves nothing (`x-render-routing: no-server`).
 
 ## Remaining human steps
 
@@ -171,9 +172,13 @@ else in this document is done and verified above.
    together can both see a migration as unapplied, and the loser dies on the
    `schema_migrations` primary key. That is a crash loop on every cold start.
 
-3. **Confirm the real `roam-data-api` URL and fix the iOS placeholder** if it
-   differs from `https://roam-data-api.onrender.com`, in both
-   `ios/Roam/Config/Debug.local.xcconfig` and `Release.local.xcconfig`.
+3. ~~**Confirm the real `roam-data-api` URL and fix the iOS placeholder.**~~
+   **Done.** Render assigned `https://roam-data-api-n2sw.onrender.com`, not the
+   guessed `https://roam-data-api.onrender.com`. Both
+   `ios/Roam/Config/Debug.local.xcconfig` and `Release.local.xcconfig` are
+   updated. Verified live: `/health` returns
+   `{"status":"ok","database":"up"}` and `/api/drives` returns `401`, which
+   also confirms `CLERK_SECRET_KEY` is set (an unset key would give `503`).
 
 4. **Cloud Run needs no further changes.** Already deployed and correctly
    serving difficulty-only with `GOOGLE_MAPS_API_KEY` only. Do not give it
