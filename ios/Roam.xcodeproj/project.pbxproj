@@ -32,6 +32,7 @@
 		A10000000000000000000014 /* DriveSessionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000014 /* DriveSessionManager.swift */; };
 		A10000000000000000000015 /* DrivingScore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000015 /* DrivingScore.swift */; };
 		A10000000000000000000016 /* DriveScoringEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000016 /* DriveScoringEngine.swift */; };
+		A10000000000000000000104 /* LiveDriveScoreEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000104 /* LiveDriveScoreEngine.swift */; };
 		A10000000000000000000017 /* RouteAnalysisLoadingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000017 /* RouteAnalysisLoadingView.swift */; };
 		A10000000000000000000018 /* RoutePlanningLocationCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000018 /* RoutePlanningLocationCoordinator.swift */; };
 		A10000000000000000000019 /* DriverReadinessEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000019 /* DriverReadinessEngine.swift */; };
@@ -164,6 +165,7 @@
 		A20000000000000000000014 /* DriveSessionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriveSessionManager.swift; sourceTree = "<group>"; };
 		A20000000000000000000015 /* DrivingScore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DrivingScore.swift; sourceTree = "<group>"; };
 		A20000000000000000000016 /* DriveScoringEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriveScoringEngine.swift; sourceTree = "<group>"; };
+		A20000000000000000000104 /* LiveDriveScoreEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveDriveScoreEngine.swift; sourceTree = "<group>"; };
 		A20000000000000000000017 /* RouteAnalysisLoadingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RouteAnalysisLoadingView.swift; sourceTree = "<group>"; };
 		A20000000000000000000018 /* RoutePlanningLocationCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoutePlanningLocationCoordinator.swift; sourceTree = "<group>"; };
 		A20000000000000000000019 /* DriverReadinessEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriverReadinessEngine.swift; sourceTree = "<group>"; };
@@ -333,6 +335,7 @@
 				A20000000000000000000004 /* RouteDifficultyModels.swift */,
 				A20000000000000000000015 /* DrivingScore.swift */,
 				A20000000000000000000016 /* DriveScoringEngine.swift */,
+				A20000000000000000000104 /* LiveDriveScoreEngine.swift */,
 				A2000000000000000000001A /* DriveExperienceEngine.swift */,
 				A2000000000000000000001B /* RouteChoiceRankingEngine.swift */,
 				A2000000000000000000001C /* PracticePlanEngine.swift */,
@@ -677,6 +680,7 @@
 				A10000000000000000000014 /* DriveSessionManager.swift in Sources */,
 				A10000000000000000000015 /* DrivingScore.swift in Sources */,
 				A10000000000000000000016 /* DriveScoringEngine.swift in Sources */,
+				A10000000000000000000104 /* LiveDriveScoreEngine.swift in Sources */,
 				A10000000000000000000017 /* RouteAnalysisLoadingView.swift in Sources */,
 				A10000000000000000000018 /* RoutePlanningLocationCoordinator.swift in Sources */,
 				A10000000000000000000019 /* DriverReadinessEngine.swift in Sources */,

@@ -23,6 +23,16 @@ final class DriveSessionManager: NSObject, ObservableObject {
     @Published private(set) var recordedDrives: [RecordedDrive] = []
     @Published private(set) var queuedPracticeRoute: PlannedRouteContext?
     @Published private(set) var phonePlacementAssessment: PhonePlacementAssessment = .inconclusive
+    /// The live coaching readout — provisional score, band, trend, clean
+    /// streak, and smoothness. Recomputed from this drive's own raw state, so
+    /// the number on screen mid-drive is the same math the saved drive uses.
+    @Published private(set) var liveScore: LiveDriveScore = .idle
+    /// Coaching events for *this* drive, newest last, published so the live
+    /// surface can animate a feed. Saved history still travels on `DrivingScore`.
+    @Published private(set) var liveEvents: [DrivingEvent] = []
+    /// Bumped once per clean-streak badge earned in this drive, so the view can
+    /// fire a one-shot flourish without re-firing it on every recompute.
+    @Published private(set) var cleanStreakCelebration: CleanStreakCelebration?
     /// A distinct presentation event for the root view. The queued context
     /// remains available until the driver explicitly starts or cancels it.
     @Published private(set) var practiceRoutePresentationRequest: UUID?
@@ -45,6 +55,23 @@ final class DriveSessionManager: NSObject, ObservableObject {
     private var lastEventAt: [DrivingEventKind: Date] = [:]
     private var recentMotionSamples: [DriveMotionSample] = []
     private var phoneMovementDetector = PhoneMovementDetector()
+    /// The score the trend arrow compares against, plus when it was taken.
+    /// The baseline is deliberately *not* the previous tick: at the refresh
+    /// rate below that is a fraction of a second ago, and every comparison
+    /// would read as steady. It is re-anchored once per `liveTrendWindow`.
+    private var liveTrendBaseline: (score: Int, takenAt: Date)?
+    /// How far back the trend arrow looks. Long enough that the arrow answers
+    /// "is this drive going better or worse than it was", short enough that it
+    /// still responds within a single drive.
+    private static let liveTrendWindow: TimeInterval = 30
+    /// Highest milestone already celebrated in the current streak. Reset with
+    /// the streak itself so a later streak can earn its badges again.
+    private var celebratedStreakMilestone: CleanStreakMilestone?
+    /// Live smoothness is derived from 20 Hz motion. Publishing at that rate
+    /// would rebuild the drive surface 20×/s for a value that only needs to
+    /// look continuous, so recomputes are throttled to this interval.
+    private static let liveSmoothnessInterval: TimeInterval = 0.2
+    private var lastLiveScoreRefreshAt: Date?
     private var phonePlacementAnalyzer = PhonePlacementAnalyzer(startedAt: .distantPast)
     private var routePoints: [DriveRoutePoint] = []
     private var latestCoordinate: DriveCoordinate?
@@ -527,6 +554,12 @@ final class DriveSessionManager: NSObject, ObservableObject {
         lastEventAt = [:]
         recentMotionSamples = []
         phoneMovementDetector.reset()
+        liveScore = .idle
+        liveEvents = []
+        liveTrendBaseline = nil
+        celebratedStreakMilestone = nil
+        cleanStreakCelebration = nil
+        lastLiveScoreRefreshAt = nil
         phonePlacementAnalyzer.reset(startedAt: .distantPast)
         phonePlacementAssessment = .inconclusive
         routePoints = []
@@ -541,6 +574,7 @@ final class DriveSessionManager: NSObject, ObservableObject {
             Task { @MainActor [weak self] in
                 guard let self, let startDate = self.startDate else { return }
                 self.elapsed = Date().timeIntervalSince(startDate)
+                self.refreshLiveScore(force: true)
                 self.publishLiveDriveSnapshot()
                 // Persist from the clock, not only from accepted GPS samples and
                 // coaching events. A motion-only drive (location denied, phone
@@ -596,7 +630,10 @@ final class DriveSessionManager: NSObject, ObservableObject {
         )
 
         recentMotionSamples.append(motionSample)
-        recentMotionSamples.removeAll { timestamp.timeIntervalSince($0.timestamp) > 2 }
+        // The smoothness window is longer than the detector's own evidence
+        // window, so keep enough history for both.
+        recentMotionSamples.removeAll { timestamp.timeIntervalSince($0.timestamp) > 3 }
+        refreshLiveScore()
 
         let hasFreshAcceptedGPS = latestAcceptedLocationAt.map {
             abs(timestamp.timeIntervalSince($0)) <= 2
@@ -740,11 +777,62 @@ final class DriveSessionManager: NSObject, ObservableObject {
     private func addEvent(_ kind: DrivingEventKind, timestamp: Date, coordinate: DriveCoordinate?, source: DrivingEventSource, cooldown: TimeInterval) {
         if let lastEvent = lastEventAt[kind], timestamp.timeIntervalSince(lastEvent) < cooldown { return }
         lastEventAt[kind] = timestamp
-        events.append(DrivingEvent(kind: kind, timestamp: timestamp, source: source, coordinate: coordinate))
+        let event = DrivingEvent(kind: kind, timestamp: timestamp, source: source, coordinate: coordinate)
+        events.append(event)
+        liveEvents.append(event)
+        // A new event both restarts the streak and moves the score, so the
+        // readout must not wait for the next throttled tick to reflect it.
+        celebratedStreakMilestone = nil
+        refreshLiveScore(force: true)
         publishLiveDriveSnapshot(force: true)
         // Force past the normal throttle so a coaching event is never the
         // thing lost if the app is killed a moment later.
         persistInProgressSnapshot(force: true)
+    }
+
+    /// Recomputes the live readout from this drive's raw state.
+    ///
+    /// Called from the 20 Hz motion path, the one-second clock, and every
+    /// coaching event. `force` bypasses the throttle for the two callers whose
+    /// changes the driver must see immediately.
+    private func refreshLiveScore(force: Bool = false) {
+        guard isRecording else { return }
+        let now = Date()
+        if !force, let last = lastLiveScoreRefreshAt,
+           now.timeIntervalSince(last) < Self.liveSmoothnessInterval {
+            return
+        }
+        lastLiveScoreRefreshAt = now
+
+        let updated = LiveDriveScoreEngine.evaluate(
+            now: now,
+            driveStartedAt: startDate,
+            duration: elapsed,
+            distanceMeters: distanceMeters,
+            events: events,
+            motionSamples: recentMotionSamples,
+            previousScore: liveTrendBaseline?.score,
+            currentSmoothness: liveScore.smoothness
+        )
+        // Re-anchor the trend baseline only once the window has elapsed, and
+        // only on a real score — carrying a settling `nil` forward would reset
+        // the comparison the moment scoring starts.
+        if let score = updated.score {
+            let baselineIsStale = liveTrendBaseline
+                .map { now.timeIntervalSince($0.takenAt) >= Self.liveTrendWindow } ?? true
+            if baselineIsStale {
+                liveTrendBaseline = (score: score, takenAt: now)
+            }
+        }
+
+        if let milestone = updated.cleanStreakMilestone,
+           milestone != celebratedStreakMilestone {
+            celebratedStreakMilestone = milestone
+            cleanStreakCelebration = CleanStreakCelebration(milestone: milestone)
+        }
+
+        guard updated != liveScore else { return }
+        liveScore = updated
     }
 
     private func publishLiveDriveSnapshot(force: Bool = false) {
