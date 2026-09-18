@@ -226,6 +226,30 @@ struct DriveScoringEngineChecks {
             ),
             "a starved GPS trace must not count as readiness evidence"
         )
+        // A score card renders the coaching line and the data-quality note as
+        // separate rows. Low confidence makes `summary` fall back to the
+        // data-quality sentence, so the coaching line must drop out rather
+        // than repeat that sentence verbatim.
+        expect(
+            starvedScore.summary == starvedScore.dataQuality.summary,
+            "a preliminary drive's summary is the data-quality sentence"
+        )
+        expect(
+            starvedScore.coachingSummary == nil,
+            "a preliminary drive must not repeat its data-quality sentence as coaching"
+        )
+        let confidentScore = DrivingScore(
+            score: 92, duration: 1_800, distanceMeters: 16_093, topSpeedMetersPerSecond: 20,
+            events: [], motionSamples: 36_000, dataQuality: sustainedTrip.quality
+        )
+        expect(
+            confidentScore.coachingSummary == confidentScore.summary,
+            "a confident drive must still show its coaching line"
+        )
+        expect(
+            confidentScore.coachingSummary != confidentScore.dataQuality.summary,
+            "a confident drive's coaching line must differ from its data-quality note"
+        )
 
         // Same samples, but the usable trace is short: wall-clock duration must
         // not be what earns high confidence.

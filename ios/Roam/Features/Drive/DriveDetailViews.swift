@@ -393,7 +393,9 @@ struct DriveScoreCard: View {
                     .font(.subheadline)
                 }
             }
-            Text(score.summary).font(.footnote).foregroundStyle(AppDesign.Ink.secondary)
+            if let coaching = score.coachingSummary {
+                Text(coaching).font(.footnote).foregroundStyle(AppDesign.Ink.secondary)
+            }
             Label(score.dataQuality.summary, systemImage: "checkmark.shield")
                 .font(.footnote)
                 .foregroundStyle(AppDesign.Ink.secondary)

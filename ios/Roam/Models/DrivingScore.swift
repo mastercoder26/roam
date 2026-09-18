@@ -112,6 +112,18 @@ struct DrivingScore: Codable {
             ?? "Review this trip before the next drive."
     }
 
+    /// The coaching line for a score surface, or `nil` when there is nothing
+    /// to say beyond the data-quality note the surface already renders.
+    ///
+    /// `summary` falls back to `dataQuality.summary` whenever confidence is
+    /// low — the common case for a short or preliminary drive — so a card that
+    /// renders both prints the same sentence twice. Callers show this line and
+    /// the data-quality note as two distinct concerns.
+    var coachingSummary: String? {
+        let line = summary
+        return line == dataQuality.summary ? nil : line
+    }
+
     func count(for kind: DrivingEventKind) -> Int {
         events.filter { $0.kind == kind }.count
     }
