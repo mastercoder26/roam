@@ -108,16 +108,16 @@ struct DriverProgressCoachSummary: Hashable {
     }
 
     var trendDetail: String {
-        guard let recentScoreChange else {
+        guard let change = recentScoreChange else {
             return "Complete four qualifying drives to reveal a recent score trend."
         }
         switch trend {
         case .improving:
-            return "Your latest drives average (recentScoreChange) points higher than the two before them."
+            return "Your latest drives average " + String(change) + " points higher than the two before them."
         case .steady:
-            return "Your latest drives are within (abs(recentScoreChange)) points of the two before them."
+            return "Your latest drives are within " + String(abs(change)) + " points of the two before them."
         case .rebuilding:
-            return "Your latest drives average (abs(recentScoreChange)) points lower; use one focus at a time."
+            return "Your latest drives average " + String(abs(change)) + " points lower; use one focus at a time."
         case .buildingBaseline:
             return "Complete four qualifying drives to reveal a recent score trend."
         }

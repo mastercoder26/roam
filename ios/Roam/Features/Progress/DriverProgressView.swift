@@ -18,6 +18,10 @@ struct DriverProgressView: View {
         DriverPerformanceEngine.makeSummary(from: session.recordedDrives)
     }
 
+    private var coaching: DriverProgressCoachSummary {
+        DriverProgressCoachEngine.makeSummary(from: session.recordedDrives)
+    }
+
     /// Saved drives can be high-quality yet still fall short of the minimum
     /// distance or continuous-trace threshold for progress aggregation.
     private var notYetQualifyingDriveCount: Int {
@@ -45,6 +49,7 @@ struct DriverProgressView: View {
                     .animation(reduceMotion ? .easeOut(duration: 0.16) : AppAnimation.selection, value: session.recordedDrives.map(\.id))
 
                     if summary.hasRecordedEvidence {
+                        personalizedCoachCard
                         progressOverview
                         if hasThinRecordedHistory {
                             thinEvidenceState
@@ -175,6 +180,86 @@ struct DriverProgressView: View {
             .accessibilityHint("Opens the Drive tab")
         }
         .premiumCard()
+    }
+
+    private var personalizedCoachCard: some View {
+        VStack(alignment: .leading, spacing: AppDesign.space16) {
+            SectionHeader(
+                title: "Your next drive",
+                subtitle: "A private focus chosen from your recent qualifying drives."
+            )
+
+            HStack(alignment: .top, spacing: AppDesign.space12) {
+                Image(systemName: coaching.focus.symbol)
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(AppDesign.accentForeground)
+                    .frame(width: 46, height: 46)
+                    .background(AppDesign.accent, in: RoundedRectangle(cornerRadius: AppDesign.cornerRadiusSmall, style: .continuous))
+
+                VStack(alignment: .leading, spacing: AppDesign.space4) {
+                    Text(coaching.focus.title)
+                        .font(.headline)
+                        .foregroundStyle(AppDesign.Ink.primary)
+                    Text(coaching.focus.detail)
+                        .font(.footnote)
+                        .foregroundStyle(AppDesign.Ink.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+
+            Button {
+                UISelectionFeedbackGenerator().selectionChanged()
+                showDriveTab()
+            } label: {
+                Label("Start a focus drive", systemImage: "steeringwheel")
+                    .font(.subheadline.weight(.semibold))
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .foregroundStyle(AppDesign.accentForeground)
+                    .background(AppDesign.accent, in: RoundedRectangle(cornerRadius: AppDesign.cornerRadiusSmall, style: .continuous))
+            }
+            .buttonStyle(PressableScaleStyle())
+            .accessibilityHint("Opens the Drive tab with this coaching focus in mind")
+
+            Divider()
+
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .top, spacing: AppDesign.space12) {
+                    trendTile
+                    weeklyGoalTile
+                }
+                VStack(spacing: AppDesign.space12) {
+                    trendTile
+                    weeklyGoalTile
+                }
+            }
+        }
+        .premiumCard()
+    }
+
+    private var trendTile: some View {
+        ProgressCoachTile(
+            eyebrow: "RECENT TREND",
+            title: coaching.trend.title,
+            detail: coaching.trendDetail,
+            symbol: coaching.trend.symbol
+        )
+    }
+
+    private var weeklyGoalTile: some View {
+        ProgressCoachTile(
+            eyebrow: "WEEKLY RHYTHM",
+            title: coaching.completedThisWeek >= coaching.weeklyTargetDriveCount
+                ? "Goal complete"
+                : String(coaching.completedThisWeek) + " of " + String(coaching.weeklyTargetDriveCount) + " drives",
+            detail: coaching.completedThisWeek >= coaching.weeklyTargetDriveCount
+                ? "You reached this week’s personalized practice target."
+                : "Based on your recent qualifying-drive cadence.",
+            symbol: coaching.completedThisWeek >= coaching.weeklyTargetDriveCount
+                ? "checkmark.circle.fill"
+                : "calendar.badge.clock",
+            progress: coaching.weeklyGoalProgress
+        )
     }
 
     private var progressOverview: some View {
@@ -397,6 +482,48 @@ private struct ProgressCoverageRow: View {
                 .font(.subheadline.weight(.semibold).monospacedDigit())
                 .multilineTextAlignment(.trailing)
         }
+        .accessibilityElement(children: .combine)
+    }
+}
+
+private struct ProgressCoachTile: View {
+    @ObservedObject private var theme = ThemeManager.shared
+    let eyebrow: String
+    let title: String
+    let detail: String
+    let symbol: String
+    var progress: Double?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: AppDesign.space8) {
+            HStack(spacing: AppDesign.space8) {
+                Image(systemName: symbol)
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(AppDesign.accent)
+                Text(eyebrow)
+                    .font(AppDesign.Typography.microLabel)
+                    .tracking(1.1)
+                    .foregroundStyle(AppDesign.Ink.tertiary)
+            }
+
+            Text(title)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(AppDesign.Ink.primary)
+
+            if let progress {
+                ProgressView(value: progress)
+                    .tint(AppDesign.accent)
+                    .accessibilityHidden(true)
+            }
+
+            Text(detail)
+                .font(.caption)
+                .foregroundStyle(AppDesign.Ink.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(AppDesign.space12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(AppDesign.trackSurface.opacity(0.72), in: RoundedRectangle(cornerRadius: AppDesign.cornerRadiusSmall, style: .continuous))
         .accessibilityElement(children: .combine)
     }
 }

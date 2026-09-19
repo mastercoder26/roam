@@ -139,9 +139,11 @@ struct DriveInsightEngineChecks {
         )
 
         expect(coaching.trend == .improving, "recent qualifying scores should identify an improving trend")
+        expect(coaching.trendDetail.contains("15 points higher"), "trend copy should explain the measured score change")
         expect(coaching.focus == .smoothBraking, "the most common recent measured event should personalize the next focus")
         expect(coaching.completedThisWeek == 4, "the weekly goal should count only qualifying drives in the current calendar week")
         expect((2...4).contains(coaching.weeklyTargetDriveCount), "the personalized weekly target should remain achievable")
+        expect(coaching.weeklyGoalProgress == 1, "weekly progress should cap at complete when the driver exceeds the target")
 
         let quietHistory = [
             scoredDrive(startedAt: start.addingTimeInterval(-86_400), score: 88),
