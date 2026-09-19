@@ -9,6 +9,7 @@ struct DriveInsightEngineChecks {
 
         replayChecks(start: start)
         progressChecks(start: start, calendar: calendar)
+        progressCoachingChecks(start: start, calendar: calendar)
         placementChecks(start: start)
 
         print("DriveInsightEngine checks passed")
@@ -118,6 +119,51 @@ struct DriveInsightEngineChecks {
         expect(!noHistory.hasRecordedEvidence && noHistory.validatedMiles == 0, "preliminary-only history must not inflate progress")
     }
 
+    private static func progressCoachingChecks(start: Date, calendar: Calendar) {
+        let olderScores = [72, 74]
+        let recentScores = [86, 90]
+        let improvingHistory = (olderScores + recentScores).enumerated().map { index, score in
+            scoredDrive(
+                startedAt: calendar.date(byAdding: .day, value: index - 4, to: start)!,
+                score: score,
+                events: index >= 2
+                    ? [DrivingEvent(kind: .hardBrake, timestamp: start, source: .gpsSpeed)]
+                    : []
+            )
+        }
+
+        let coaching = DriverProgressCoachEngine.makeSummary(
+            from: improvingHistory,
+            referenceDate: start,
+            calendar: calendar
+        )
+
+        expect(coaching.trend == .improving, "recent qualifying scores should identify an improving trend")
+        expect(coaching.focus == .smoothBraking, "the most common recent measured event should personalize the next focus")
+        expect(coaching.completedThisWeek == 4, "the weekly goal should count only qualifying drives in the current calendar week")
+        expect((2...4).contains(coaching.weeklyTargetDriveCount), "the personalized weekly target should remain achievable")
+
+        let quietHistory = [
+            scoredDrive(startedAt: start.addingTimeInterval(-86_400), score: 88),
+            scoredDrive(startedAt: start.addingTimeInterval(-172_800), score: 89),
+        ]
+        let quietCoaching = DriverProgressCoachEngine.makeSummary(
+            from: quietHistory,
+            referenceDate: start,
+            calendar: calendar
+        )
+        expect(quietCoaching.trend == .buildingBaseline, "fewer than four qualifying drives should avoid claiming a trend")
+        expect(quietCoaching.focus == .consistency, "event-free history should reinforce consistency rather than invent a weakness")
+
+        let emptyCoaching = DriverProgressCoachEngine.makeSummary(
+            from: [],
+            referenceDate: start,
+            calendar: calendar
+        )
+        expect(emptyCoaching.completedThisWeek == 0, "empty history should have no weekly completions")
+        expect(emptyCoaching.weeklyTargetDriveCount == 2, "empty history should start with a gentle two-drive goal")
+    }
+
     private static func placementChecks(start: Date) {
         var unavailable = PhonePlacementAnalyzer(startedAt: start)
         for second in 0...20 {
@@ -213,6 +259,34 @@ struct DriveInsightEngineChecks {
                     rejectedLocationSamples: 0,
                     motionSamples: 1_200,
                     confidence: confidence
+                )
+            ),
+            route: route,
+            recordingTimeZoneIdentifier: "UTC"
+        )
+    }
+
+    private static func scoredDrive(
+        startedAt: Date,
+        score: Int,
+        events: [DrivingEvent] = []
+    ) -> RecordedDrive {
+        let route = qualifyingRoute(start: startedAt, speed: 14)
+        let distance = DriveExperienceEngine.validTraceSegments(for: route).reduce(0) { $0 + $1.distanceMeters }
+        return RecordedDrive(
+            startedAt: startedAt,
+            score: DrivingScore(
+                score: score,
+                duration: 120,
+                distanceMeters: distance,
+                topSpeedMetersPerSecond: 14,
+                events: events,
+                motionSamples: 1_200,
+                dataQuality: DriveDataQuality(
+                    acceptedLocationSamples: route.count,
+                    rejectedLocationSamples: 0,
+                    motionSamples: 1_200,
+                    confidence: .high
                 )
             ),
             route: route,
