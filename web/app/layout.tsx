@@ -37,7 +37,7 @@ export default function RootLayout({
             <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-center gap-x-2 gap-y-1 text-center text-xs sm:text-sm">
               <span className="text-white/70">This is an extremely basic web demo. See the complete Roam experience.</span>
               <a
-                href="https://youtu.be/4EA2f0rQKrM"
+                href="https://youtu.be/b0pFSwxqZD0"
                 target="_blank"
                 rel="noreferrer"
                 className="roam-jiggle inline-flex items-center gap-1 font-bold text-white underline decoration-white/40 underline-offset-4 transition-colors hover:decoration-white"
