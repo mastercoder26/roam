@@ -3,7 +3,6 @@
 import { useState } from "react";
 import type { AlternateRoute, DifficultyResponse, ScoredRoute } from "@/lib/types";
 import { Card, SectionHeader, Pill } from "@/components/ui/Card";
-import { ScoreGauge } from "@/components/route/ScoreGauge";
 import { EvidenceCard } from "@/components/route/EvidenceCard";
 import { RouteDemandRow } from "@/components/route/RouteDemandRow";
 import { RoutePolylinePreview } from "@/components/route/RoutePolylinePreview";
@@ -33,36 +32,67 @@ export function RouteResults({
   const color = difficultyColor(selected.label);
 
   return (
-    <div className="roam-reveal flex flex-col gap-6">
-      <Card className="flex items-center justify-between gap-3 !py-3">
-        <div className="flex min-w-0 flex-col gap-1">
-          <span className="truncate text-[14px] font-semibold text-ink-primary">
-            {origin}
-          </span>
-          <span className="truncate text-[14px] font-semibold text-ink-primary">
-            {destination}
-          </span>
+    <div className="roam-reveal flex flex-col gap-8">
+      <section className="relative min-h-[590px] overflow-hidden rounded-roam-lg border border-card bg-card-elevated shadow-roam-md sm:min-h-[520px]">
+        <div className="absolute inset-0">
+          <RoutePolylinePreview
+            polyline={selected.polyline}
+            bounds={selected.bounds}
+            color={color}
+          />
         </div>
-        {result.alternateRoutes.length > 0 ? (
-          <Pill tone="accent">
-            {allRoutes.length} route{allRoutes.length > 1 ? "s" : ""}
-          </Pill>
-        ) : null}
-      </Card>
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-white/10 via-transparent to-ink-primary/10" />
 
-      <Card className="flex flex-col items-center gap-3 py-8">
-        <ScoreGauge score={selected.score} label={selected.label} />
-        <span
-          className="rounded-full px-3.5 py-1.5 text-[14px] font-semibold"
-          style={{
-            backgroundColor: `color-mix(in srgb, ${color} 12%, transparent)`,
-            color,
-          }}
-        >
-          {selected.label}
-        </span>
-        <EvidenceCard evidence={selected.uncertainty?.evidence} />
-      </Card>
+        <div className="roam-glass pointer-events-none absolute inset-x-4 top-4 flex items-center justify-between gap-4 rounded-xl px-4 py-3 sm:inset-x-6 sm:top-6">
+          <div className="min-w-0">
+            <p className="truncate text-sm font-semibold text-ink-primary">{origin}</p>
+            <p className="mt-0.5 truncate text-sm text-ink-secondary">{destination}</p>
+          </div>
+          {result.alternateRoutes.length > 0 ? (
+            <Pill tone="accent">
+              {allRoutes.length} route{allRoutes.length > 1 ? "s" : ""}
+            </Pill>
+          ) : null}
+        </div>
+
+        <div className="pointer-events-none absolute inset-x-4 bottom-4 grid gap-3 sm:inset-x-6 sm:bottom-6 sm:grid-cols-[minmax(210px,0.72fr)_1.28fr]">
+          <div className="roam-glass rounded-2xl p-4 sm:p-5">
+            <div className="flex items-end justify-between gap-4">
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.13em] text-ink-label">Difficulty score</p>
+                <p className="mt-2 text-5xl font-semibold leading-none tracking-[-0.055em] text-ink-primary tabular-nums">{formatScore(selected.score)}</p>
+              </div>
+              <span
+                className="mb-1 rounded-full px-3 py-1.5 text-xs font-semibold"
+                style={{
+                  backgroundColor: `color-mix(in srgb, ${color} 14%, white 72%)`,
+                  color,
+                }}
+              >
+                {selected.label}
+              </span>
+            </div>
+            {selected.reasons[0] ? (
+              <p className="mt-3 border-t border-white/60 pt-3 text-[12px] leading-5 text-ink-secondary">{selected.reasons[0]}</p>
+            ) : null}
+          </div>
+
+          <div className="roam-glass rounded-2xl p-4 sm:p-5">
+            <div className={`grid gap-4 ${formatDelaySeconds(selected.trafficDelaySeconds) ? "grid-cols-3" : "grid-cols-2"}`}>
+              <Metric label="Drive time" value={formatDurationSeconds(selected.durationSeconds)} />
+              {formatDelaySeconds(selected.trafficDelaySeconds) ? (
+                <Metric label="Traffic delay" value={formatDelaySeconds(selected.trafficDelaySeconds)!} tone="safety" />
+              ) : null}
+              <Metric label="Distance" value={formatDistanceMeters(selected.distanceMeters)} />
+            </div>
+            <p className="mt-4 border-t border-white/60 pt-3 text-[11px] text-ink-secondary">
+              Normal drive: {formatDurationSeconds(selected.staticDurationSeconds)}
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <EvidenceCard evidence={selected.uncertainty?.evidence} />
 
       {result.alternateRoutes.length > 0 ? (
         <div>
@@ -125,45 +155,6 @@ export function RouteResults({
           </div>
         </div>
       ) : null}
-
-      <div>
-        <SectionHeader title="Trip at a glance" />
-        <Card>
-          <div className={`grid gap-4 ${formatDelaySeconds(selected.trafficDelaySeconds) ? "grid-cols-3" : "grid-cols-2"}`}>
-            <Metric
-              label="ETA"
-              value={formatDurationSeconds(selected.durationSeconds)}
-            />
-            {formatDelaySeconds(selected.trafficDelaySeconds) ? (
-              <Metric
-                label="Delay"
-                value={formatDelaySeconds(selected.trafficDelaySeconds)!}
-                tone="safety"
-              />
-            ) : null}
-            <Metric
-              label="Distance"
-              value={formatDistanceMeters(selected.distanceMeters)}
-            />
-          </div>
-          <div className="mt-3 border-t border-card pt-3 text-[13px] text-ink-secondary">
-            Normal drive: {formatDurationSeconds(selected.staticDurationSeconds)}
-          </div>
-        </Card>
-      </div>
-
-      <div>
-        <SectionHeader title="Route map" subtitle="Explore the surrounding roads with the scored route highlighted." />
-        <Card className="!p-0 overflow-hidden">
-          <div className="h-[220px] w-full bg-card-elevated">
-            <RoutePolylinePreview
-              polyline={selected.polyline}
-              bounds={selected.bounds}
-              color={color}
-            />
-          </div>
-        </Card>
-      </div>
 
       {selected.routeDemands?.length ? (
         <div>

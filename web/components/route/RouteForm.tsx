@@ -195,63 +195,67 @@ export function RouteForm() {
   }
 
   return (
-    <div className="flex flex-col gap-6">
-      <form onSubmit={handleSubmit} className="border-y-2 border-ink-primary bg-transparent py-5 sm:py-7">
-        <div className="grid gap-4 lg:grid-cols-[1fr_280px]">
-          <Card className="relative flex flex-col divide-y divide-card !rounded-none !border-ink-primary/20 !p-0 !shadow-none">
-          <FieldRow
-            label="FROM"
-            value={origin}
-            onChange={setOrigin}
-            placeholder="Street address, city, or landmark"
-            iconColor="var(--accent)"
-            listId="origin-addresses"
-            suggestions={originSuggestions}
-            autoComplete="section-origin street-address"
-            action={
+    <div className="flex flex-col gap-10">
+      <form onSubmit={handleSubmit} className="mx-auto max-w-4xl overflow-visible rounded-roam-lg border border-card bg-card shadow-roam-md">
+          <div className="relative z-20 flex flex-col p-5 sm:p-7">
+            <div className="mb-6">
+              <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-accent">Trip details</span>
+              <p className="mt-2 text-sm leading-5 text-ink-secondary">Start with the places you know. You can fine-tune the route after scoring.</p>
+            </div>
+
+            <Card className="relative flex flex-col divide-y divide-card !rounded-xl !p-0">
+              <FieldRow
+                label="From"
+                value={origin}
+                onChange={setOrigin}
+                placeholder="Address, city, or landmark"
+                iconColor="var(--accent)"
+                listId="origin-addresses"
+                suggestions={originSuggestions}
+                autoComplete="section-origin street-address"
+                action={
+                  <button
+                    type="button"
+                    onClick={useCurrentLocation}
+                    disabled={isLocating}
+                    className="roam-jiggle inline-flex shrink-0 items-center gap-1.5 text-[10px] font-semibold text-accent transition-colors hover:text-ink-primary disabled:opacity-60"
+                  >
+                    <LocationArrowIcon className="h-3.5 w-3.5" />
+                    {isLocating ? "Locating…" : "Use my location"}
+                  </button>
+                }
+              />
+              <FieldRow
+                label="To"
+                value={destination}
+                onChange={setDestination}
+                placeholder="Address, city, or landmark"
+                iconColor="var(--ink-secondary)"
+                listId="destination-addresses"
+                suggestions={destinationSuggestions}
+                autoComplete="section-destination street-address"
+              />
               <button
                 type="button"
-                onClick={useCurrentLocation}
-                disabled={isLocating}
-                className="roam-jiggle inline-flex shrink-0 items-center gap-1.5 border-b border-accent/40 px-0.5 py-1 text-[10px] font-bold uppercase tracking-[0.08em] text-accent transition-colors hover:border-accent disabled:opacity-60"
+                onClick={swap}
+                disabled={!origin.trim() && !destination.trim()}
+                aria-label="Swap starting location and destination"
+                className={`absolute right-3 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-lg border border-card-strong bg-card text-ink-primary shadow-roam transition-[opacity,transform] duration-150 [transition-timing-function:var(--motion-ease-out)] active:scale-[0.97] ${
+                  origin.trim() || destination.trim()
+                    ? "pointer-events-auto scale-100 opacity-100"
+                    : "pointer-events-none scale-95 opacity-0"
+                }`}
               >
-                <LocationArrowIcon className="h-3.5 w-3.5" />
-                {isLocating ? "Locating…" : "Use my location"}
+                <SwapIcon className="h-4 w-4" />
               </button>
-            }
-          />
-          <FieldRow
-            label="TO"
-            value={destination}
-            onChange={setDestination}
-            placeholder="Street address, city, or landmark"
-            iconColor="var(--ink-secondary)"
-            listId="destination-addresses"
-            suggestions={destinationSuggestions}
-            autoComplete="section-destination street-address"
-          />
-          <button
-            type="button"
-            onClick={swap}
-            disabled={!origin.trim() && !destination.trim()}
-            aria-label="Swap starting location and destination"
-            className={`absolute right-3 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center border border-ink-primary/20 bg-card text-ink-primary transition-[opacity,transform] duration-200 ease-out hover:rotate-180 active:scale-90 ${
-              origin.trim() || destination.trim()
-                ? "opacity-100 scale-100 pointer-events-auto"
-                : "opacity-0 scale-95 pointer-events-none"
-            }`}
-          >
-            <SwapIcon className="h-4 w-4" />
-          </button>
-          </Card>
+            </Card>
 
-          <div className="flex flex-col gap-3">
-            <label className="flex flex-1 items-center gap-3 border border-ink-primary/20 bg-card-elevated px-4 py-3.5">
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-card text-accent shadow-roam">
-                <CalendarIcon className="h-[18px] w-[18px]" />
+            <label className="mt-3 flex items-center gap-3 rounded-xl border border-card bg-card-elevated/60 px-4 py-3.5">
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-card text-accent">
+                <CalendarIcon className="h-4 w-4" />
               </span>
               <span className="min-w-0 flex-1">
-                <span className="mb-1 block text-[10px] font-bold uppercase tracking-[0.12em] text-ink-label">Leave around</span>
+                <span className="mb-1 block text-[10px] font-semibold uppercase tracking-[0.12em] text-ink-label">Leave around</span>
                 <input
                   type="datetime-local"
                   value={isMounted ? toDateTimeLocalValue(departure) : ""}
@@ -260,79 +264,76 @@ export function RouteForm() {
                     const parsed = fromDateTimeLocalValue(event.target.value);
                     if (parsed) setDeparture(parsed);
                   }}
-                  className="w-full bg-transparent text-[13px] font-bold text-ink-primary outline-none"
+                  className="w-full bg-transparent text-[13px] font-medium text-ink-primary outline-none"
                 />
               </span>
             </label>
 
-            {!isLoaded ? (
-              <div className="flex min-h-14 items-center justify-center bg-disabled/60 px-5 text-[13px] font-bold uppercase tracking-[0.08em] text-ink-tertiary">
-                <span className="roam-spin mr-2 h-4 w-4 rounded-full border-2 border-ink-tertiary/30 border-t-ink-tertiary" />
-                Loading session…
-              </div>
-            ) : (
-              <>
-                <SignedIn>
-                  <button
-                    type="submit"
-                    disabled={!canAnalyze}
-                    className={`roam-jiggle flex min-h-14 items-center justify-center gap-2 px-5 text-[13px] font-bold uppercase tracking-[0.08em] transition-[color,background-color,box-shadow,transform] duration-200 active:scale-[0.97] ${
-                      canAnalyze
-                        ? "bg-accent text-white shadow-roam-lg"
-                        : "cursor-not-allowed bg-disabled text-ink-tertiary"
-                    }`}
-                  >
-                    {isLoading ? (
-                      <><span className="roam-spin h-4 w-4 rounded-full border-2 border-white/30 border-t-white" />Analyzing route</>
-                    ) : (
-                      <><SparkleIcon className="h-4 w-4" />Analyze difficulty</>
-                    )}
-                  </button>
-                </SignedIn>
-                <SignedOut>
-                  <SignInButton mode="modal">
-                    <button type="button" className="roam-jiggle flex min-h-14 items-center justify-center gap-2 bg-accent px-5 text-[13px] font-bold uppercase tracking-[0.08em] text-white shadow-roam-lg transition-transform active:scale-[0.97]">
-                      Sign in to analyze
+            {!origin && !destination ? (
+              <div className="mt-5">
+                <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-ink-label">Popular examples</span>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {EXAMPLE_ROUTES.map((example) => (
+                    <button
+                      key={example.origin}
+                      type="button"
+                      onClick={() => applyExample(example)}
+                      className="roam-jiggle rounded-full border border-card-strong px-3 py-1.5 text-[11px] font-medium text-ink-secondary transition-[color,border-color,background-color] hover:border-ink-primary hover:bg-card-elevated hover:text-ink-primary"
+                    >
+                      {example.label}
                     </button>
-                  </SignInButton>
-                </SignedOut>
-              </>
-            )}
-          </div>
-        </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
 
-        {!origin && !destination ? (
-          <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-card pt-4">
-            <span className="mr-1 text-[11px] font-bold uppercase tracking-[0.1em] text-ink-label">Try a route</span>
-            {EXAMPLE_ROUTES.map((example) => (
-              <button
-                key={example.origin}
-                type="button"
-                onClick={() => applyExample(example)}
-                className="roam-jiggle border border-ink-primary/20 bg-transparent px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.06em] text-ink-secondary transition-colors hover:border-accent hover:text-accent"
-              >
-                {example.label}
-              </button>
-            ))}
-          </div>
-        ) : null}
+            <div className="mt-auto pt-6">
+              {!isLoaded ? (
+                <div className="flex min-h-12 items-center justify-center rounded-lg bg-disabled/60 px-5 text-[13px] font-semibold text-ink-tertiary">
+                  <span className="roam-spin mr-2 h-4 w-4 rounded-full border-2 border-ink-tertiary/30 border-t-ink-tertiary" />
+                  Loading session…
+                </div>
+              ) : (
+                <>
+                  <SignedIn>
+                    <button
+                      type="submit"
+                      disabled={!canAnalyze}
+                      className={`roam-jiggle flex min-h-12 w-full items-center justify-center gap-2 rounded-lg px-5 text-[13px] font-semibold transition-[color,background-color,box-shadow,transform] duration-150 ${
+                        canAnalyze
+                          ? "bg-ink-primary text-white shadow-roam-md hover:bg-accent"
+                          : "cursor-not-allowed bg-disabled text-ink-tertiary"
+                      }`}
+                    >
+                      {isLoading ? (
+                        <><span className="roam-spin h-4 w-4 rounded-full border-2 border-white/30 border-t-white" />Analyzing route</>
+                      ) : (
+                        <><SparkleIcon className="h-4 w-4" />Analyze route</>
+                      )}
+                    </button>
+                  </SignedIn>
+                  <SignedOut>
+                    <SignInButton mode="modal">
+                      <button type="button" className="roam-jiggle flex min-h-12 w-full items-center justify-center gap-2 rounded-lg bg-ink-primary px-5 text-[13px] font-semibold text-white shadow-roam-md transition-colors hover:bg-accent">
+                        Sign in to analyze
+                      </button>
+                    </SignInButton>
+                  </SignedOut>
+                </>
+              )}
 
-        {error ? (
-          <div className="mt-4 flex items-start gap-2.5 border border-safety/30 bg-safety/[0.07] px-4 py-3.5 text-sm text-ink-primary">
-            <WarningIcon className="h-4 w-4 shrink-0 translate-y-0.5 text-safety" />
-            <span>{error}</span>
-          </div>
-        ) : null}
+              {error ? (
+                <div className="mt-3 flex items-start gap-2.5 rounded-lg border border-safety/25 bg-safety/[0.07] px-3.5 py-3 text-[13px] leading-5 text-ink-primary">
+                  <WarningIcon className="h-4 w-4 shrink-0 translate-y-0.5 text-safety" />
+                  <span>{error}</span>
+                </div>
+              ) : null}
 
-        {!isLoaded ? (
-          <p className="mt-3 text-center text-xs text-ink-tertiary">
-            Loading your session…
-          </p>
-        ) : !isSignedIn ? (
-          <p className="mt-3 text-center text-xs leading-5 text-ink-tertiary">
-            Sign in to use live route scoring and compare alternate routes.
-          </p>
-        ) : null}
+              {!isLoaded ? null : !isSignedIn ? (
+                <p className="mt-3 text-center text-[11px] leading-4 text-ink-tertiary">Sign in to score live routes and compare alternatives.</p>
+              ) : null}
+            </div>
+          </div>
       </form>
 
       {result ? (

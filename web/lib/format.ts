@@ -33,7 +33,7 @@ export function formatPercent(value: number): string {
  * the format the backend's `departureTime` validator accepts
  * (`YYYY-MM-DDTHH:mm:ss.sss±HH:MM`). `Date#toISOString` always renders UTC,
  * which would silently shift a "6 PM departure" to whatever hour 6 PM local
- * time is in UTC once the server reads it back as a plain instant — the
+ * time is in UTC once the server reads it back as a plain instant; the
  * separate `departureLocalMinutes` field carries the actual wall-clock time.
  */
 export function toIsoWithLocalOffset(date: Date): string {

@@ -1,4 +1,4 @@
-// Ported from backend/src/utils/polyline.ts (decode only — the web demo just
+// Ported from backend/src/utils/polyline.ts (decode only; the web demo just
 // needs to preview the returned route, not re-derive coverage geometry).
 
 export interface LatLngPoint {

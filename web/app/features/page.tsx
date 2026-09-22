@@ -1,9 +1,9 @@
 import type { ReactNode } from "react";
 import { Divider, InfoRow } from "@/components/info/InfoRow";
-import { Card, Pill, SectionHeader } from "@/components/ui/Card";
+import { Card, Pill } from "@/components/ui/Card";
 
 export const metadata = {
-  title: "Features — Roam",
+  title: "Features | Roam",
 };
 
 const groups: Array<{
@@ -55,7 +55,7 @@ const groups: Array<{
     features: [
       {
         title: "Demand-by-demand readiness",
-        detail: "Compare eight route demands—such as after-dark driving, merges, traffic, faster roads, and weather—with matching measured experience.",
+        detail: "Compare eight route demands, such as after-dark driving, merges, traffic, faster roads, and weather, with matching measured experience.",
         tone: "safety",
         icon: <GaugeIcon />,
       },
@@ -135,7 +135,7 @@ const groups: Array<{
       },
       {
         title: "Lifetime profile",
-        detail: "See locally recorded totals alongside a self-declared display name and licensing stage—neither identity field changes any score.",
+        detail: "See locally recorded totals alongside a self-declared display name and licensing stage. Neither identity field changes any score.",
         tone: "secondary",
         icon: <PersonIcon />,
       },
@@ -176,18 +176,18 @@ const groups: Array<{
 
 export default function FeaturesPage() {
   return (
-    <div className="roam-reveal flex flex-col gap-9">
-      <header className="flex flex-col gap-3">
-        <div className="flex h-[52px] w-[52px] items-center justify-center rounded-roam-sm bg-accent/12 text-accent">
-          <GridIcon className="h-6 w-6" />
-        </div>
-        <div className="flex flex-wrap items-center gap-2.5">
-          <h1 className="text-[26px] font-bold tracking-[-0.4px] text-ink-primary">
+    <div className="roam-reveal mx-auto flex max-w-5xl flex-col gap-12">
+      <header className="grid gap-5 border-b border-card pb-10 md:grid-cols-[1fr_1.3fr] md:items-end">
+        <div>
+          <div className="mb-5 flex h-10 w-10 items-center justify-center rounded-lg border border-card bg-card text-accent">
+            <GridIcon className="h-5 w-5" />
+          </div>
+          <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-accent">Product map</p>
+          <h1 className="text-[clamp(2.5rem,6vw,4.75rem)] font-semibold leading-[0.95] tracking-[-0.05em] text-ink-primary">
             Everything Roam can do
           </h1>
-          <Pill tone="accent">Product map</Pill>
         </div>
-        <p className="max-w-2xl text-[15px] leading-relaxed text-ink-secondary">
+        <p className="max-w-2xl text-[15px] leading-7 text-ink-secondary md:justify-self-end">
           Roam connects route planning, private driving evidence, and guided
           practice into one coaching experience. Route analysis is playable in
           this web demo; sensor-based features live in the native iOS app.
@@ -195,13 +195,12 @@ export default function FeaturesPage() {
       </header>
 
       {groups.map((group) => (
-        <section key={group.title}>
-          <div className="mb-3 flex items-end justify-between gap-4">
-            <SectionHeader title={group.title} subtitle={group.subtitle} />
+        <section key={group.title} className="grid gap-5 border-t border-card pt-6 md:grid-cols-[240px_1fr] md:gap-10">
+          <div>
+            <h2 className="text-xl font-semibold tracking-[-0.025em] text-ink-primary">{group.title}</h2>
+            <p className="mt-2 text-[13px] leading-5 text-ink-secondary">{group.subtitle}</p>
             {group.status ? (
-              <span className="mb-3 shrink-0 text-[11px] font-bold uppercase tracking-[0.9px] text-ink-label">
-                {group.status}
-              </span>
+              <div className="mt-4"><Pill tone={group.status === "In this demo" ? "positive" : "neutral"}>{group.status}</Pill></div>
             ) : null}
           </div>
           <Card className="!py-1">
@@ -222,7 +221,7 @@ export default function FeaturesPage() {
           </div>
           <div>
             <h2 className="text-[15px] font-semibold text-ink-primary">
-              Planning and coaching—not a safety verdict
+              Planning and coaching, not a safety verdict
             </h2>
             <p className="mt-1 text-[13px] leading-relaxed text-ink-secondary">
               Roam cannot guarantee that a route or person is safe, detect a

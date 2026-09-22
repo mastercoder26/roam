@@ -6,7 +6,7 @@ import "leaflet/dist/leaflet.css";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Roam — Route difficulty, explained",
+  title: "Roam: Route difficulty, explained",
   description:
     "A web demo of Roam's route-scoring engine: plan a drive, see what makes it demanding, and learn how driver coaching scores work.",
   icons: { icon: "/brand/roam-icon.png", apple: "/brand/roam-icon.png" },
@@ -33,26 +33,27 @@ export default function RootLayout({
     >
       <html lang="en" data-scroll-behavior="smooth">
         <body className="min-h-screen bg-canvas font-sans text-ink-primary antialiased">
-          <aside className="border-b border-white/10 bg-ink-primary px-5 py-2.5 text-white">
-            <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-center gap-x-2 gap-y-1 text-center text-xs sm:text-sm">
-              <span className="text-white/70">This is an extremely basic web demo. See the complete Roam experience.</span>
+          <aside className="border-b border-card bg-card px-5 py-2 text-ink-primary">
+            <div className="mx-auto flex max-w-7xl items-center justify-center gap-2 text-center text-xs">
+              <span className="inline-block h-1.5 w-1.5 rounded-full bg-positive" aria-hidden="true" />
+              <span className="text-ink-secondary">Roam for iPhone</span>
               <a
                 href="https://youtu.be/b0pFSwxqZD0"
                 target="_blank"
                 rel="noreferrer"
-                className="roam-jiggle inline-flex items-center gap-1 font-bold text-white underline decoration-white/40 underline-offset-4 transition-colors hover:decoration-white"
+                className="roam-jiggle inline-flex items-center gap-1 font-semibold text-ink-primary underline decoration-card-strong underline-offset-4 transition-colors hover:decoration-ink-primary"
               >
-                Watch the iOS walkthrough
+                Watch the walkthrough
                 <span aria-hidden="true">↗</span>
               </a>
             </div>
           </aside>
           <NavBar />
-          <main className="mx-auto w-full max-w-6xl px-5 pb-20 pt-8 sm:px-8 sm:pt-12">
+          <main className="mx-auto w-full max-w-7xl px-5 pb-24 pt-8 sm:px-8 sm:pt-12">
             {children}
           </main>
-          <footer className="border-t border-card bg-card/60 px-5 py-8">
-            <div className="mx-auto flex max-w-6xl flex-col items-start justify-between gap-5 sm:flex-row sm:items-center">
+          <footer className="border-t border-card bg-card px-5 py-8">
+            <div className="mx-auto flex max-w-7xl flex-col items-start justify-between gap-5 sm:flex-row sm:items-center">
               <div className="flex items-center gap-4">
                 <BrandLogo compact />
                 <span className="hidden h-5 w-px bg-card-strong sm:block" />

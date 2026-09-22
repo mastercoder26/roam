@@ -1,24 +1,27 @@
-import { Card, SectionHeader } from "@/components/ui/Card";
+import { Card } from "@/components/ui/Card";
 import { InfoRow, Divider } from "@/components/info/InfoRow";
 
 export const metadata = {
-  title: "How driver scoring works — Roam",
+  title: "How driver scoring works | Roam",
 };
 
 export default function DriverScoringPage() {
   return (
-    <div className="roam-reveal flex flex-col gap-9">
-      <header className="flex flex-col gap-3">
-        <div className="flex h-[52px] w-[52px] items-center justify-center rounded-roam-sm bg-accent/12 text-accent">
-          <SteeringWheelIcon className="h-6 w-6" />
-        </div>
-        <h1 className="text-[26px] font-bold tracking-[-0.4px] text-ink-primary">
+    <div className="roam-reveal mx-auto flex max-w-5xl flex-col gap-12">
+      <header className="grid gap-5 border-b border-card pb-10 md:grid-cols-[1fr_1.3fr] md:items-end">
+        <div>
+          <div className="mb-5 flex h-10 w-10 items-center justify-center rounded-lg border border-card bg-card text-accent">
+            <SteeringWheelIcon className="h-5 w-5" />
+          </div>
+          <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-accent">Methodology</p>
+          <h1 className="text-[clamp(2.5rem,6vw,4.75rem)] font-semibold leading-[0.95] tracking-[-0.05em] text-ink-primary">
           How driver scoring works
-        </h1>
-        <p className="max-w-2xl text-[15px] leading-relaxed text-ink-secondary">
+          </h1>
+        </div>
+        <p className="max-w-2xl text-[15px] leading-7 text-ink-secondary md:justify-self-end">
           Roam&apos;s Drive tab turns a manually started session into a private,
           on-device coaching score. Nothing here is a safety system or a
-          guarantee — it&apos;s feedback built entirely from measured GPS speed
+          guarantee. It&apos;s feedback built entirely from measured GPS speed
           changes and phone motion.
         </p>
       </header>
@@ -78,7 +81,7 @@ export default function DriverScoringPage() {
             />
             <EventStat
               title="Possible phone handling"
-              detail="A sustained acceleration-and-rotation pattern while the vehicle is moving — a single bump is ignored."
+              detail="A sustained acceleration-and-rotation pattern while the vehicle is moving. A single bump is ignored."
               weight="-0.75 pts / 10 mi"
             />
           </div>
@@ -124,14 +127,14 @@ export default function DriverScoringPage() {
 
       <Section
         title="The overall coaching score"
-        subtitle="Progress and Profile combine many drives into one evidence-weighted number — never a single trip."
+        subtitle="Progress and Profile combine many drives into one evidence-weighted number, never a single trip."
       >
         <Card className="!py-1">
           <InfoRow
             tone="accent"
             icon={<GaugeIcon className="h-4 w-4" />}
             title="Route-adjusted"
-            detail="Each qualifying drive's sensor score is nudged by that trip's independently analyzed route difficulty — a smooth drive on a demanding route counts a bit more than the same smoothness on an easy one."
+            detail="Each qualifying drive's sensor score is nudged by that trip's independently analyzed route difficulty. A smooth drive on a demanding route counts a bit more than the same smoothness on an easy one."
           />
           <Divider />
           <InfoRow
@@ -178,7 +181,7 @@ export default function DriverScoringPage() {
 
       <Section
         title="“Can I drive this?” route readiness"
-        subtitle="Before showing a verdict, Roam requires a real base of recorded experience — not just a good-looking score."
+        subtitle="Before showing a verdict, Roam requires a real base of recorded experience, not just a good-looking score."
       >
         <Card className="!py-1">
           <InfoRow
@@ -192,14 +195,14 @@ export default function DriverScoringPage() {
             tone="safety"
             icon={<CompareIcon className="h-4 w-4" />}
             title="Demand-by-demand comparison"
-            detail="Each of the route's 8 demand categories (after-dark, fast roads, merges, intersections, weather, sustained drive, traffic, road conditions) is checked against matching recorded exposure — after-dark miles against after-dark miles, not a single overall grade."
+            detail="Each of the route's 8 demand categories (after-dark, fast roads, merges, intersections, weather, sustained drive, traffic, road conditions) is checked against matching recorded exposure. After-dark miles are compared with after-dark miles, not a single overall grade."
           />
           <Divider />
           <InfoRow
             tone="safety"
             icon={<MapPinIcon className="h-4 w-4" />}
             title="Route familiarity"
-            detail="On-device GPS overlap with saved, directionally aligned traces — parallel roads and long gaps are excluded — contributes to, but never replaces, the demand comparison."
+            detail="On-device GPS overlap with saved, directionally aligned traces contributes to, but never replaces, the demand comparison. Parallel roads and long gaps are excluded."
           />
         </Card>
         <div className="mt-3 flex flex-col gap-2 sm:flex-row">
@@ -219,8 +222,8 @@ export default function DriverScoringPage() {
               <p className="text-[13.5px] leading-relaxed text-ink-secondary">
                 Manual driving scores stay on the device. Only after a
                 completed drive with a continuous trace does Roam send the
-                measured start and end <em>coordinates</em> — never an address
-                or the recorded route geometry — to the route-analysis
+                measured start and end <em>coordinates</em>, never an address
+                or the recorded route geometry, to the route-analysis
                 service, and it stores only the resulting compact difficulty
                 snapshot locally.
               </p>
@@ -238,7 +241,7 @@ export default function DriverScoringPage() {
           {[
             "Roam is a planning and coaching tool, not a safety guarantee.",
             "A drive score is coaching feedback, not proof a person or route is safe.",
-            "The phone-motion detector never identifies handheld use — it only flags a sustained, abrupt movement pattern.",
+            "The phone-motion detector never identifies handheld use. It only flags a sustained, abrupt movement pattern.",
             "Follow local laws, license restrictions, supervision rules, and your own judgment.",
           ].map((text) => (
             <div key={text} className="flex items-start gap-2.5">
@@ -264,9 +267,12 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <section>
-      <SectionHeader title={title} subtitle={subtitle} />
-      {children}
+    <section className="grid gap-5 border-t border-card pt-6 md:grid-cols-[240px_1fr] md:gap-10">
+      <div>
+        <h2 className="text-xl font-semibold tracking-[-0.025em] text-ink-primary">{title}</h2>
+        {subtitle ? <p className="mt-2 text-[13px] leading-5 text-ink-secondary">{subtitle}</p> : null}
+      </div>
+      <div>{children}</div>
     </section>
   );
 }

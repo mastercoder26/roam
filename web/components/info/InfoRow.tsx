@@ -22,16 +22,16 @@ export function InfoRow({
   const color = toneColor[tone];
 
   return (
-    <div className="flex items-start gap-3.5 py-3">
+    <div className="flex items-start gap-4 py-4">
       <div
-        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-roam-tiny"
+        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-current/10"
         style={{ backgroundColor: `color-mix(in srgb, ${color} 12%, transparent)`, color }}
       >
         {icon}
       </div>
       <div className="flex flex-1 flex-col gap-0.5">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-[15px] font-semibold text-ink-primary">
+          <span className="text-[14px] font-semibold text-ink-primary">
             {title}
           </span>
           {badge ? (
@@ -43,7 +43,7 @@ export function InfoRow({
             </span>
           ) : null}
         </div>
-        <p className="text-[13px] leading-relaxed text-ink-secondary">
+        <p className="max-w-3xl text-[13px] leading-5 text-ink-secondary">
           {detail}
         </p>
       </div>

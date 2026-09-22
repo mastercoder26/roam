@@ -22,11 +22,11 @@ export function NavBar() {
   const { isLoaded } = useAuth();
 
   return (
-    <header className="sticky top-0 z-30 border-b border-ink-primary/10 bg-canvas/90 backdrop-blur-xl">
-      <div className="mx-auto flex max-w-6xl items-center justify-between gap-5 px-5 py-4 sm:px-8">
+    <header className="sticky top-0 z-30 border-b border-card bg-canvas/92 backdrop-blur-xl">
+      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-5 px-5 sm:px-8">
         <BrandLogo compact />
 
-        <nav aria-label="Primary navigation" className="ml-auto flex items-center justify-center gap-1 sm:gap-7">
+        <nav aria-label="Primary navigation" className="ml-auto flex items-center justify-center gap-1 rounded-lg border border-card bg-card p-1 sm:gap-1">
           {TABS.map((tab) => {
             const active =
               tab.href === "/" ? pathname === "/" : pathname?.startsWith(tab.href);
@@ -37,10 +37,10 @@ export function NavBar() {
                 href={tab.href}
                 aria-label={tab.label}
                 aria-current={active ? "page" : undefined}
-                className={`roam-jiggle relative flex items-center gap-1.5 px-2 py-2 text-[11px] font-bold uppercase tracking-[0.1em] transition-colors duration-200 sm:px-0 ${
+                className={`roam-jiggle relative flex items-center gap-1.5 rounded-md px-2.5 py-2 text-[12px] font-semibold transition-[color,background-color] duration-150 sm:px-3 ${
                   active
-                    ? "text-accent after:absolute after:inset-x-0 after:-bottom-0.5 after:h-0.5 after:bg-accent"
-                    : "text-ink-primary hover:text-accent"
+                    ? "bg-ink-primary text-white"
+                    : "text-ink-secondary hover:bg-card-elevated hover:text-ink-primary"
                 }`}
               >
                 <Icon className="h-4 w-4 shrink-0 sm:hidden" />
@@ -57,7 +57,7 @@ export function NavBar() {
             <>
               <SignedOut>
                 <SignInButton mode="modal">
-                  <button className="roam-jiggle border border-ink-primary bg-ink-primary px-3.5 py-2.5 text-[11px] font-bold uppercase tracking-[0.08em] text-white transition-colors hover:bg-accent hover:border-accent active:scale-[0.97] sm:px-5">
+                  <button className="roam-jiggle rounded-lg border border-ink-primary bg-ink-primary px-3.5 py-2.5 text-[12px] font-semibold text-white transition-[color,background-color,border-color] hover:border-accent hover:bg-accent sm:px-4">
                     Sign in
                   </button>
                 </SignInButton>

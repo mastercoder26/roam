@@ -14,7 +14,7 @@ export function Card({
       className={`rounded-roam border ${
         elevated
           ? "border-card-strong bg-card-elevated shadow-roam-md"
-          : "border-card bg-card shadow-roam"
+          : "border-card bg-card"
       } p-[18px] ${className}`}
     >
       {children}
@@ -30,8 +30,8 @@ export function SectionHeader({
   subtitle?: string;
 }) {
   return (
-    <div className="mb-3 flex flex-col gap-1">
-      <h2 className="text-[20px] font-semibold tracking-[-0.2px] text-ink-primary">
+    <div className="mb-4 flex flex-col gap-1.5 border-t border-ink-primary pt-3">
+      <h2 className="text-[20px] font-semibold tracking-[-0.35px] text-ink-primary">
         {title}
       </h2>
       {subtitle ? (
@@ -43,7 +43,7 @@ export function SectionHeader({
 
 export function MicroLabel({ children }: { children: ReactNode }) {
   return (
-    <span className="text-[11px] font-bold uppercase tracking-[1.1px] text-ink-label">
+    <span className="text-[10px] font-semibold uppercase tracking-[1.25px] text-ink-label">
       {children}
     </span>
   );

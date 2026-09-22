@@ -57,7 +57,7 @@ export interface AnalyzeRouteOptions {
  * Calls the same deployed Cloud Run route-analysis backend the iOS app uses
  * (`roam-backend`). It verifies only a Clerk session token
  * (`requireVerifiedIdentity`) and holds no database, so this is the real
- * production scoring pipeline — not a mock.
+ * production scoring pipeline, not a mock.
  */
 export async function analyzeRoute(
   params: AnalyzeRouteParams,
