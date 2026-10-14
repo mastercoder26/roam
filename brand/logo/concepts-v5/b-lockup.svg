@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 850 256" width="850" height="256" role="img" aria-labelledby="title">
+  <title id="title">Roam curb lockup</title>
+  <g transform="translate(8,34) scale(0.73)"><path fill="#000" fill-rule="evenodd" d="M80,28 H176 A52,52 0 0 1 228,80 V176 A52,52 0 0 1 176,228 H80 A52,52 0 0 1 28,176 V80 A52,52 0 0 1 80,28 Z M92,82 H164 A10,10 0 0 1 174,92 V164 A10,10 0 0 1 164,174 H92 A10,10 0 0 1 82,164 V92 A10,10 0 0 1 92,82 Z M97,174 H159 V228 H97 Z"/></g>
+  <g transform="translate(232,63.23) scale(1.28)"><path fill="#000" fill-rule="evenodd" d="M 0,100 V 0 H 51.5 A 15.5,15.5 0 0 1 51.5,31 H 31 V 100 Z"/>
+    <path fill="#000" fill-rule="evenodd" d="M 81,50 A 54,54 0 1 1 189,50 A 54,54 0 1 1 81,50 Z M 112,50 A 23,23 0 1 0 158,50 A 23,23 0 1 0 112,50 Z"/>
+    <path fill="#000" fill-rule="evenodd" d="M 199,50 A 54,54 0 1 1 307,50 A 54,54 0 1 1 199,50 Z M 230,50 A 23,23 0 1 0 276,50 A 23,23 0 1 0 230,50 Z"/>
+    <path fill="#000" fill-rule="evenodd" d="M 276,0 H 307 V 100 H 276 Z"/>
+    <path fill="#000" fill-rule="evenodd" d="M 323,46 A 46,46 0 0 1 415,46 L 384,46 A 15,15 0 0 0 354,46 Z"/>
+    <path fill="#000" fill-rule="evenodd" d="M 323,46 H 354 V 100 H 323 Z"/>
+    <path fill="#000" fill-rule="evenodd" d="M 384,46 H 415 V 100 H 384 Z"/>
+    <path fill="#000" fill-rule="evenodd" d="M 384,46 A 46,46 0 0 1 476,46 L 445,46 A 15,15 0 0 0 415,46 Z"/>
+    <path fill="#000" fill-rule="evenodd" d="M 384,46 H 415 V 100 H 384 Z"/>
+    <path fill="#000" fill-rule="evenodd" d="M 445,46 H 476 V 100 H 445 Z"/></g>
+</svg>

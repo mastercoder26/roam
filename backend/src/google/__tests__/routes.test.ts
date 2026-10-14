@@ -26,6 +26,7 @@ const params = {
 };
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.unstubAllGlobals();
 });
 
@@ -121,6 +122,26 @@ describe("Google Routes payload validation", () => {
     // Simulate the timeout firing without waiting out the real 10s budget.
     const fetchCall = (fetch as unknown as ReturnType<typeof vi.fn>).mock.calls[0];
     (fetchCall[1] as RequestInit).signal?.dispatchEvent(new Event("abort"));
+    await assertion;
+  });
+
+  it("keeps the timeout active while reading a stalled response body", async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal("fetch", vi.fn().mockImplementation((_url, init?: RequestInit) => {
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () => new Promise((_resolve, reject) => {
+          init?.signal?.addEventListener("abort", () => {
+            reject(new DOMException("The operation was aborted.", "AbortError"));
+          });
+        }),
+      });
+    }));
+
+    const pending = computeRoutes(params);
+    const assertion = expect(pending).rejects.toThrow("Routes provider returned invalid data");
+    await vi.advanceTimersByTimeAsync(10_000);
     await assertion;
   });
 });

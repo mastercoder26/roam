@@ -165,6 +165,7 @@ export function RouteForm() {
     syncUrlParams(origin, destination);
     setIsLoading(true);
     setError(null);
+    setResult(null);
     try {
       const token = await getToken();
       if (!token) {
@@ -323,7 +324,7 @@ export function RouteForm() {
               )}
 
               {error ? (
-                <div className="mt-3 flex items-start gap-2.5 rounded-lg border border-safety/25 bg-safety/[0.07] px-3.5 py-3 text-[13px] leading-5 text-ink-primary">
+                <div role="alert" className="mt-3 flex items-start gap-2.5 rounded-lg border border-safety/25 bg-safety/[0.07] px-3.5 py-3 text-[13px] leading-5 text-ink-primary">
                   <WarningIcon className="h-4 w-4 shrink-0 translate-y-0.5 text-safety" />
                   <span>{error}</span>
                 </div>
@@ -471,11 +472,12 @@ function FieldRow({
       />
       <div className="min-w-0 flex flex-1 flex-col gap-1">
         <div className="flex items-center justify-between gap-3">
-          <MicroLabel>{label}</MicroLabel>
+          <label htmlFor={listId}><MicroLabel>{label}</MicroLabel></label>
           {action}
         </div>
         <div className="relative">
           <input
+            id={listId}
             value={value}
             onChange={(event) => {
               onChange(event.target.value);

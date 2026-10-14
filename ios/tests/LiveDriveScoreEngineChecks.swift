@@ -97,6 +97,10 @@ struct LiveDriveScoreEngineChecks {
         // Samples older than the window must be ignored.
         let stale = [motion(10, acceleration: 0.9)]
         expect(
+            LiveDriveScoreEngine.smoothness(from: [motion(101, acceleration: 0.9), motion(100, acceleration: .infinity), motion(100, acceleration: .nan)], now: now) == 1,
+            "future and invalid motion samples must not lower smoothness"
+        )
+        expect(
             LiveDriveScoreEngine.smoothness(from: stale, now: now) == 1,
             "samples outside the window must not affect the reading"
         )
@@ -254,6 +258,16 @@ struct LiveDriveScoreEngineChecks {
         expect(live.cleanStreakSeconds == 60, "the streak restarts at the most recent event")
         expect(live.trend == .falling, "a score drop must read as falling")
         expect(live.ringProgress > 0 && live.ringProgress <= 1, "the ring fill must stay in range")
+        let reordered = LiveDriveScoreEngine.evaluate(
+            now: now, driveStartedAt: start, duration: 600, distanceMeters: 8_000,
+            events: [event(.hardBrake, at: 540), event(.hardBrake, at: 300), event(.hardBrake, at: 700)],
+            motionSamples: [], previousScore: nil, currentSmoothness: nil
+        )
+        expect(reordered.cleanStreakSeconds == 60, "streaks must use the latest occurred event regardless of array order")
+        expect(
+            LiveDriveScoreEngine.provisionalScore(duration: 600, distanceMeters: .infinity, events: []) == nil,
+            "an invalid distance must keep the live score settling"
+        )
     }
 
     // MARK: - Helpers

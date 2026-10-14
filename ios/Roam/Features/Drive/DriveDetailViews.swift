@@ -62,7 +62,7 @@ struct DriveDetailView: View {
                     ContentUnavailableView(
                         "Route unavailable",
                         systemImage: "location.slash",
-                        description: Text("This drive did not receive a continuous accurate GPS trace to draw a route.")
+                        description: Text("GPS coverage was too limited to draw this route.")
                     )
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 36)
@@ -109,7 +109,7 @@ struct DriveDetailView: View {
         VStack(alignment: .leading, spacing: AppDesign.space12) {
             SectionHeader(
                 title: "Moments that mattered",
-                subtitle: "Tap a moment or map marker to review the measured context."
+                subtitle: "Tap a moment to review it."
             )
 
             if replayMoments.isEmpty {

@@ -13,16 +13,15 @@ export default function DriverScoringPage() {
           <div className="mb-5 flex h-10 w-10 items-center justify-center rounded-lg border border-card bg-card text-accent">
             <SteeringWheelIcon className="h-5 w-5" />
           </div>
-          <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-accent">Methodology</p>
+          <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-accent">How scores work</p>
           <h1 className="text-[clamp(2.5rem,6vw,4.75rem)] font-semibold leading-[0.95] tracking-[-0.05em] text-ink-primary">
           How driver scoring works
           </h1>
         </div>
         <p className="max-w-2xl text-[15px] leading-7 text-ink-secondary md:justify-self-end">
-          Roam&apos;s Drive tab turns a manually started session into a private,
-          on-device coaching score. Nothing here is a safety system or a
-          guarantee. It&apos;s feedback built entirely from measured GPS speed
-          changes and phone motion.
+          Roam turns a drive you start into a private coaching score on your
+          phone. It is not a safety system or a guarantee. The score uses GPS
+          speed changes and phone motion.
         </p>
       </header>
 
@@ -32,21 +31,21 @@ export default function DriverScoringPage() {
             tone="accent"
             icon={<LocationIcon className="h-4 w-4" />}
             title="Route trace"
-            detail="GPS continuity, distance, speed, duration, and overlap with a planned practice route."
+            detail="Recording length, distance, speed, and overlap with a planned practice route."
           />
           <Divider />
           <InfoRow
             tone="accent"
             icon={<SpeedIcon className="h-4 w-4" />}
             title="Speed changes"
-            detail="Measured changes in accepted GPS speed can identify rapid acceleration and hard braking events."
+            detail="Reliable GPS speed changes can identify rapid acceleration and hard braking."
           />
           <Divider />
           <InfoRow
             tone="accent"
             icon={<TurnIcon className="h-4 w-4" />}
             title="Turning motion"
-            detail="Course change and gravity-free Core Motion readings can identify sharper cornering when sensor quality is sufficient."
+            detail="Changes in direction and phone motion sensors can help identify sharp turns when readings are reliable."
           />
           <Divider />
           <InfoRow
@@ -60,7 +59,7 @@ export default function DriverScoringPage() {
 
       <Section
         title="How one drive is scored"
-        subtitle="Every drive starts at 100 and loses points for coaching events, normalized per 10 miles so a short trip and a long trip are judged fairly."
+        subtitle="Each drive starts at 100. Coaching events reduce the score, with penalties adjusted per 10 miles."
       >
         <Card>
           <div className="grid gap-3 sm:grid-cols-2">
@@ -87,16 +86,15 @@ export default function DriverScoringPage() {
           </div>
           <p className="mt-4 text-[12.5px] leading-relaxed text-ink-tertiary">
             Penalties are capped at 55 points and the floor is 20, so one rough
-            trip is never scored as a zero. GPS-derived events count on their
-            own; motion data that corroborates a GPS event upgrades its
-            provenance from &ldquo;GPS speed&rdquo; to &ldquo;GPS + motion.&rdquo;
+            trip never scores zero. GPS speed can flag an event on its own;
+            supporting phone motion adds a &ldquo;GPS + motion&rdquo; label.
           </p>
         </Card>
       </Section>
 
       <Section
         title="Confidence tiers"
-        subtitle="A score is only as trustworthy as the data behind it, so every drive is labeled honestly."
+        subtitle="Each drive is labeled by how much reliable data it contains."
       >
         <Card className="!py-1">
           <InfoRow
@@ -104,7 +102,7 @@ export default function DriverScoringPage() {
             icon={<SealIcon className="h-4 w-4" />}
             title="Strong sample"
             badge="High"
-            detail="At least 5 minutes of usable trace, 2+ miles, 24+ accepted GPS fixes, and 1,200+ motion samples."
+            detail="At least 5 minutes of usable recording, 2+ miles, 24+ accurate location readings, and 1,200+ motion samples."
           />
           <Divider />
           <InfoRow
@@ -112,7 +110,7 @@ export default function DriverScoringPage() {
             icon={<HalfCircleIcon className="h-4 w-4" />}
             title="Useful sample"
             badge="Medium"
-            detail="At least 90 seconds of usable trace, 0.5+ miles, 8+ accepted GPS fixes, and 240+ motion samples."
+            detail="At least 90 seconds of usable recording, 0.5+ miles, 8+ accurate location readings, and 240+ motion samples."
           />
           <Divider />
           <InfoRow
@@ -120,47 +118,47 @@ export default function DriverScoringPage() {
             icon={<ExclamationIcon className="h-4 w-4" />}
             title="Preliminary"
             badge="Low"
-            detail="Short or sparse drives, or drives where over half of delivered GPS fixes had to be rejected for accuracy."
+            detail="Short or sparse drives, or drives where over half of location readings were too inaccurate to use."
           />
         </Card>
       </Section>
 
       <Section
         title="The overall coaching score"
-        subtitle="Progress and Profile combine many drives into one evidence-weighted number, never a single trip."
+        subtitle="Progress and Profile combine multiple drives into one score based on reliable recordings."
       >
         <Card className="!py-1">
           <InfoRow
             tone="accent"
             icon={<GaugeIcon className="h-4 w-4" />}
             title="Route-adjusted"
-            detail="Each qualifying drive's sensor score is nudged by that trip's independently analyzed route difficulty. A smooth drive on a demanding route counts a bit more than the same smoothness on an easy one."
+            detail="Each eligible drive's score is adjusted for route difficulty. A smooth drive on a harder route counts a little more than the same drive on an easier route."
           />
           <Divider />
           <InfoRow
             tone="accent"
             icon={<RulerIcon className="h-4 w-4" />}
-            title="Distance-weighted"
+            title="Trip length"
             detail="Weight grows with the square root of measured miles, so one unusually long drive can't dominate a broad, consistent history."
           />
           <Divider />
           <InfoRow
             tone="accent"
             icon={<ClockIcon className="h-4 w-4" />}
-            title="Recency-weighted"
+            title="Recent drives"
             detail="Older drives fade on a 120-day half-life, so the score reflects how someone drives now, not only when they started."
           />
           <Divider />
           <InfoRow
             tone="accent"
             icon={<CheckSealIcon className="h-4 w-4" />}
-            title="Quality-gated"
-            detail="Only medium- or high-confidence drives are included at all, and high-confidence drives count more than medium."
+            title="Reliable recordings only"
+            detail="Only medium- or high-confidence drives count, and high-confidence drives count more."
           />
         </Card>
         <div className="mt-3 flex flex-wrap gap-2.5">
           {[
-            { title: "Building", detail: "Fewer than 3 analyzed drives or 10 miles." },
+            { title: "Building", detail: "Fewer than 3 qualifying drives or 10 miles." },
             { title: "Growing", detail: "3+ drives and 10+ miles." },
             { title: "Established", detail: "8+ drives and 30+ miles." },
           ].map((tier) => (
@@ -180,29 +178,29 @@ export default function DriverScoringPage() {
       </Section>
 
       <Section
-        title="“Can I drive this?” route readiness"
-        subtitle="Before showing a verdict, Roam requires a real base of recorded experience, not just a good-looking score."
+        title="Can I drive this route?"
+        subtitle="Roam compares a route only after enough driving experience has been recorded."
       >
         <Card className="!py-1">
           <InfoRow
             tone="safety"
             icon={<HistoryIcon className="h-4 w-4" />}
-            title="History gate"
-            detail="At least 3 qualifying drives on 3 different days, 15+ miles of validated trace, and 45+ minutes of continuous driving before any route gets compared at all."
+            title="Enough experience"
+            detail="At least 3 qualifying drives on 3 different days, 15+ verified miles, and 45+ minutes of continuous driving before Roam compares a route."
           />
           <Divider />
           <InfoRow
             tone="safety"
             icon={<CompareIcon className="h-4 w-4" />}
-            title="Demand-by-demand comparison"
-            detail="Each of the route's 8 demand categories (after-dark, fast roads, merges, intersections, weather, sustained drive, traffic, road conditions) is checked against matching recorded exposure. After-dark miles are compared with after-dark miles, not a single overall grade."
+            title="Compare each road condition"
+            detail="Roam checks 8 route demands, including night driving, faster roads, merges, intersections, weather, long drives, traffic, and road conditions, against matching experience. Night miles are compared with night miles, not one overall grade."
           />
           <Divider />
           <InfoRow
             tone="safety"
             icon={<MapPinIcon className="h-4 w-4" />}
             title="Route familiarity"
-            detail="On-device GPS overlap with saved, directionally aligned traces contributes to, but never replaces, the demand comparison. Parallel roads and long gaps are excluded."
+            detail="Roam checks how saved drives overlap with the planned route in the same direction. This supports, but does not replace, the demand comparison. Nearby parallel roads and long GPS gaps are excluded."
           />
         </Card>
         <div className="mt-3 flex flex-col gap-2 sm:flex-row">
@@ -220,12 +218,11 @@ export default function DriverScoringPage() {
             </div>
             <div className="flex flex-col gap-2">
               <p className="text-[13.5px] leading-relaxed text-ink-secondary">
-                Manual driving scores stay on the device. Only after a
-                completed drive with a continuous trace does Roam send the
-                measured start and end <em>coordinates</em>, never an address
-                or the recorded route geometry, to the route-analysis
-                service, and it stores only the resulting compact difficulty
-                snapshot locally.
+                Driving scores are calculated on your phone. After a completed drive
+                with a continuous recording, Roam sends the start and end
+                {" "}<em>coordinates</em> for route analysis. Signed-in accounts
+                can also back up drive summaries. Recorded route traces stay
+                on your phone.
               </p>
               <p className="text-[13px] font-semibold text-ink-primary">
                 A driver&apos;s name and licensing stage are self-declared and

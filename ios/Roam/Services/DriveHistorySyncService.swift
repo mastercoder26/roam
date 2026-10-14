@@ -442,15 +442,18 @@ final class DriveHistorySyncService: ObservableObject {
     private var applyLocalDrives: (([RecordedDrive]) -> Void)?
     private var syncTask: Task<Void, Never>?
     private var needsSync = false
+    /// Invalidates work that resumes after cancellation or an account change.
+    /// Some transports can finish a request even after their task is canceled.
+    private var syncGeneration = 0
 
     init(
         transport: any DriveHistorySyncTransport = APIClientDriveHistoryTransport(),
-        authSession: AuthSessionStore = .shared,
+        authSession: AuthSessionStore? = nil,
         userDefaults: UserDefaults = .standard,
         retryDelaysNanoseconds: [UInt64] = [1_000_000_000, 4_000_000_000, 16_000_000_000]
     ) {
         self.transport = transport
-        self.authSession = authSession
+        self.authSession = authSession ?? .shared
         self.userDefaults = userDefaults
         self.retryDelaysNanoseconds = retryDelaysNanoseconds
         if let data = userDefaults.data(forKey: accountMetadataKey),
@@ -480,8 +483,7 @@ final class DriveHistorySyncService: ObservableObject {
         localDrives: [RecordedDrive],
         applyLocalDrives: @escaping ([RecordedDrive]) -> Void
     ) {
-        guard authSession.isSignedIn, let accountID = authSession.currentUser?.id else { return }
-        activateAccount(accountID)
+        guard let accountID = activateSignedInAccount() else { return }
 
         latestLocalDrives = localDrives
         self.applyLocalDrives = applyLocalDrives
@@ -504,8 +506,9 @@ final class DriveHistorySyncService: ObservableObject {
         needsSync = true
         guard syncTask == nil else { return }
 
+        let generation = syncGeneration
         syncTask = Task { @MainActor [weak self] in
-            await self?.runSyncLoop()
+            await self?.runSyncLoop(generation: generation, accountID: accountID)
         }
     }
 
@@ -514,9 +517,7 @@ final class DriveHistorySyncService: ObservableObject {
     /// temporarily empty because persistence is unreadable, a load was
     /// interrupted, or the on-device retention window was trimmed.
     func markDriveDeleted(id: UUID) {
-        if let accountID = authSession.currentUser?.id {
-            activateAccount(accountID)
-        }
+        _ = activateSignedInAccount()
         // A drive created and deleted before any account has ever been active
         // has no remote copy to delete. Once an account has been active, the
         // last account remains selected so an offline signed-out deletion can
@@ -536,6 +537,7 @@ final class DriveHistorySyncService: ObservableObject {
     /// remain so offline uploads and explicit deletions resume if that account
     /// returns later.
     func didSignOut() {
+        syncGeneration &+= 1
         syncTask?.cancel()
         syncTask = nil
         needsSync = false
@@ -551,6 +553,14 @@ final class DriveHistorySyncService: ObservableObject {
 
         // Save the previous account before switching the in-memory view.
         persistMetadata()
+        syncGeneration &+= 1
+        syncTask?.cancel()
+        syncTask = nil
+        needsSync = false
+        pendingDrives = [:]
+        latestLocalDrives = []
+        applyLocalDrives = nil
+        state = .idle
         activeAccountID = accountID
         accountMetadataStore.lastActiveAccountID = accountID
 
@@ -568,30 +578,81 @@ final class DriveHistorySyncService: ObservableObject {
         persistMetadata()
     }
 
-    private func runSyncLoop() async {
-        defer { syncTask = nil }
+    private func activateSignedInAccount() -> String? {
+        guard let accountID = authSession.driveHistoryAccountID else { return nil }
+        activateAccount(accountID)
+        if let backendID = authSession.currentUser?.id {
+            migrateBackendMetadata(from: backendID, into: accountID)
+        }
+        return accountID
+    }
+
+    /// Earlier versions keyed this store by the data API's user UUID. When
+    /// Clerk later provides that UUID, fold its saved confirmations and
+    /// offline deletions into the stable Clerk-keyed bucket exactly once.
+    private func migrateBackendMetadata(from backendID: String, into accountID: String) {
+        guard backendID != accountID,
+              let previous = accountMetadataStore.accounts.removeValue(forKey: backendID) else { return }
+
+        metadata.pendingDeletionIDs.formUnion(previous.pendingDeletionIDs)
+        metadata.syncedDriveIDs.formUnion(previous.syncedDriveIDs)
+        metadata.syncedDriveIDs.subtract(metadata.pendingDeletionIDs)
+        metadata.syncedRouteAnalysisStatus.merge(previous.syncedRouteAnalysisStatus) { current, _ in current }
+        metadata.syncedPayloadVersions.merge(previous.syncedPayloadVersions) { current, _ in current }
+        for id in metadata.pendingDeletionIDs {
+            metadata.syncedRouteAnalysisStatus.removeValue(forKey: id)
+            metadata.syncedPayloadVersions.removeValue(forKey: id)
+        }
+        if let previousDate = previous.lastSyncedAt,
+           previousDate > (metadata.lastSyncedAt ?? .distantPast) {
+            metadata.lastSyncedAt = previousDate
+        }
+        persistMetadata()
+    }
+
+    private func runSyncLoop(generation: Int, accountID: String) async {
+        defer {
+            if syncGeneration == generation { syncTask = nil }
+        }
 
         while needsSync && !Task.isCancelled {
+            guard syncGeneration == generation,
+                  activeAccountID == accountID,
+                  authSession.driveHistoryAccountID == accountID else { return }
             needsSync = false
             do {
-                try await attemptSyncWithRetry()
+                try await attemptSyncWithRetry(generation: generation, accountID: accountID)
             } catch {
-                guard !Task.isCancelled, authSession.isSignedIn else { return }
+                guard !Task.isCancelled,
+                      syncGeneration == generation,
+                      authSession.driveHistoryAccountID == accountID else { return }
                 state = state(for: error)
                 return
             }
         }
     }
 
-    private func attemptSyncWithRetry() async throws {
+    private func ensureCurrentSync(generation: Int, accountID: String) throws {
+        try Task.checkCancellation()
+        guard syncGeneration == generation,
+              activeAccountID == accountID,
+              authSession.driveHistoryAccountID == accountID else {
+            throw CancellationError()
+        }
+    }
+
+    private func attemptSyncWithRetry(generation: Int, accountID: String) async throws {
         var retryIndex = 0
         while true {
+            try ensureCurrentSync(generation: generation, accountID: accountID)
             do {
                 state = .syncing
-                try await syncOnce()
+                try await syncOnce(generation: generation, accountID: accountID)
+                try ensureCurrentSync(generation: generation, accountID: accountID)
                 state = .synced
                 return
             } catch {
+                try ensureCurrentSync(generation: generation, accountID: accountID)
                 state = state(for: error)
                 guard retryIndex < retryDelaysNanoseconds.count else { throw error }
                 let delay = retryDelaysNanoseconds[retryIndex]
@@ -601,8 +662,8 @@ final class DriveHistorySyncService: ObservableObject {
         }
     }
 
-    private func syncOnce() async throws {
-        try await pushPendingDeletions()
+    private func syncOnce(generation: Int, accountID: String) async throws {
+        try await pushPendingDeletions(generation: generation, accountID: accountID)
 
         var remoteDrives: [DriveHistoryDTO] = []
         var cursor: String?
@@ -620,6 +681,7 @@ final class DriveHistorySyncService: ObservableObject {
                     accessToken: token
                 )
             }
+            try ensureCurrentSync(generation: generation, accountID: accountID)
             remoteDrives.append(contentsOf: page.drives)
             cursor = page.nextCursor
             cursorId = page.nextCursorId
@@ -632,6 +694,16 @@ final class DriveHistorySyncService: ObservableObject {
         if !metadata.pendingDeletionIDs.isEmpty {
             remoteDrives = remoteDrives.filter { !metadata.pendingDeletionIDs.contains($0.id) }
         }
+
+        // A page boundary or a concurrent server update can repeat an ID.
+        // Keep the latest revision before merging and building status maps;
+        // Dictionary(uniqueKeysWithValues:) traps on duplicate IDs.
+        let latestRemoteByID = remoteDrives.reduce(into: [String: DriveHistoryDTO]()) { latest, dto in
+            let id = UUID(uuidString: dto.id)?.uuidString ?? dto.id
+            if let current = latest[id], current.updatedAt > dto.updatedAt { return }
+            latest[id] = dto
+        }
+        remoteDrives = Array(latestRemoteByID.values)
 
         let merged = DriveHistorySyncEngine.merge(local: latestLocalDrives, remote: remoteDrives)
         latestLocalDrives = merged
@@ -648,7 +720,8 @@ final class DriveHistorySyncService: ObservableObject {
             metadata.syncedRouteAnalysisStatus[id] = status
         }
         for dto in remoteDrives {
-            metadata.syncedPayloadVersions[dto.id] = DriveHistoryPayloadCodec.version(in: dto.payload)
+            let id = UUID(uuidString: dto.id)?.uuidString ?? dto.id
+            metadata.syncedPayloadVersions[id] = DriveHistoryPayloadCodec.version(in: dto.payload)
         }
         // A drive can exist remotely and still need re-upload: it only counts
         // as caught up once the server's confirmed route analysis status
@@ -673,6 +746,7 @@ final class DriveHistorySyncService: ObservableObject {
             let response = try await authSession.performAuthenticated { token in
                 try await self.transport.uploadDrives(batch, accessToken: token)
             }
+            try ensureCurrentSync(generation: generation, accountID: accountID)
             let confirmedIDs = response.compactMap { UUID(uuidString: $0.id)?.uuidString }
             metadata.syncedDriveIDs.formUnion(confirmedIDs)
             for idString in confirmedIDs {
@@ -688,7 +762,7 @@ final class DriveHistorySyncService: ObservableObject {
         persistMetadata()
     }
 
-    private func pushPendingDeletions() async throws {
+    private func pushPendingDeletions(generation: Int, accountID: String) async throws {
         guard !metadata.pendingDeletionIDs.isEmpty else { return }
         // Snapshot the set before iterating — the loop removes confirmed IDs
         // from the live set, and iterating a collection while mutating it is
@@ -698,6 +772,7 @@ final class DriveHistorySyncService: ObservableObject {
             try await authSession.performAuthenticated { token in
                 try await self.transport.deleteDrive(id: id, accessToken: token)
             }
+            try ensureCurrentSync(generation: generation, accountID: accountID)
             metadata.pendingDeletionIDs.remove(id)
             // Also scrub the synced status so a re-uploaded drive with the same
             // UUID (unlikely but possible after a sign-out/sign-in cycle) is

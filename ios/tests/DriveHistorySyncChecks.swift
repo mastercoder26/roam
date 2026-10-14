@@ -18,6 +18,11 @@ struct DriveHistorySyncChecks {
         await aFailedDeletionSurvivesRelaunchAndDoesNotResurrect()
         await aFailedDeletionSurvivesSignOutAndSameAccountReturn()
         await pendingDeletionsNeverCrossAccounts()
+        await signedOutInFlightFetchCannotApplyHistory()
+        await accountSwitchCannotApplyPreviousAccountsHistory()
+        await duplicateRemoteDriveUsesLatestRevision()
+        await offlineDeletionSurvivesBackendIdentityTransition()
+        await backendKeyedDeletionMigratesToClerkAccount()
 
         print("Drive history sync checks passed")
     }
@@ -405,6 +410,167 @@ struct DriveHistorySyncChecks {
         expect(applied.first?.score.score == 88, "the second account's remote drive must remain intact")
     }
 
+    @MainActor
+    private static func signedOutInFlightFetchCannotApplyHistory() async {
+        let session = AuthSessionStore(automaticallyRestore: false)
+        session.setSignedInForTesting(
+            user: AuthUser(id: "departing-account", email: "first@example.com", displayName: nil),
+            accessToken: "first-token"
+        )
+        let transport = FakeDriveHistoryTransport()
+        transport.holdNextFetch = true
+        transport.page = DriveHistoryPage(drives: [makeDTO(for: makeDrive(score: 91))], nextCursor: nil)
+        let service = DriveHistorySyncService(
+            transport: transport,
+            authSession: session,
+            userDefaults: isolatedDefaults(),
+            retryDelaysNanoseconds: []
+        )
+        var applied = false
+
+        service.sync(localDrives: [], applyLocalDrives: { _ in applied = true })
+        await waitUntil { transport.hasHeldFetch }
+        service.didSignOut()
+        transport.releaseHeldFetch()
+        for _ in 0..<10 { await Task.yield() }
+
+        expect(!applied, "a fetch completing after sign-out must not apply old account history")
+        expect(service.state == .idle, "a canceled fetch must not change the signed-out sync state")
+    }
+
+    @MainActor
+    private static func accountSwitchCannotApplyPreviousAccountsHistory() async {
+        let session = AuthSessionStore(automaticallyRestore: false)
+        let firstUser = AuthUser(id: "old-account", email: "old@example.com", displayName: nil)
+        let secondUser = AuthUser(id: "new-account", email: "new@example.com", displayName: nil)
+        session.setSignedInForTesting(user: firstUser, accessToken: "old-token")
+        let transport = FakeDriveHistoryTransport()
+        transport.holdNextFetch = true
+        let oldDrive = makeDrive(score: 31)
+        transport.page = DriveHistoryPage(drives: [makeDTO(for: oldDrive)], nextCursor: nil)
+        let service = DriveHistorySyncService(
+            transport: transport,
+            authSession: session,
+            userDefaults: isolatedDefaults(),
+            retryDelaysNanoseconds: []
+        )
+        var applied: [RecordedDrive] = []
+
+        service.sync(localDrives: [], applyLocalDrives: { applied = $0 })
+        await waitUntil { transport.hasHeldFetch }
+        session.setSignedInForTesting(user: secondUser, accessToken: "new-token")
+        let newDrive = makeDrive(score: 92)
+        transport.page = DriveHistoryPage(drives: [makeDTO(for: newDrive)], nextCursor: nil)
+        service.sync(localDrives: [], applyLocalDrives: { applied = $0 })
+        transport.releaseHeldFetch()
+        await waitUntil { service.state == .synced }
+
+        expect(applied.map(\.id) == [newDrive.id], "a previous account's fetch must not enter the current account's history")
+    }
+
+    @MainActor
+    private static func duplicateRemoteDriveUsesLatestRevision() async {
+        let session = AuthSessionStore(automaticallyRestore: false)
+        session.setSignedInForTesting(
+            user: AuthUser(id: "duplicate-account", email: "duplicate@example.com", displayName: nil),
+            accessToken: "token"
+        )
+        let oldDrive = makeDrive(score: 40)
+        let newDrive = makeDrive(id: oldDrive.id, score: 90)
+        let oldDTO = makeDTO(for: oldDrive, updatedAt: Date(timeIntervalSince1970: 100))
+        let newDTO = makeDTO(for: newDrive, updatedAt: Date(timeIntervalSince1970: 200))
+        let transport = FakeDriveHistoryTransport()
+        transport.page = DriveHistoryPage(drives: [newDTO, oldDTO], nextCursor: nil)
+        let service = DriveHistorySyncService(
+            transport: transport,
+            authSession: session,
+            userDefaults: isolatedDefaults(),
+            retryDelaysNanoseconds: []
+        )
+        var applied: [RecordedDrive] = []
+
+        service.sync(localDrives: [], applyLocalDrives: { applied = $0 })
+        await waitUntil { service.state == .synced }
+        expect(applied.count == 1, "duplicate records should merge to one drive")
+        expect(applied.first?.score.score == 90, "the newest remote revision should win even if an older duplicate appears later")
+    }
+
+    @MainActor
+    private static func offlineDeletionSurvivesBackendIdentityTransition() async {
+        let clerkUser = AuthUser(id: "user_offline", email: "offline@example.com", displayName: nil)
+        let backendUser = AuthUser(id: UUID().uuidString, email: clerkUser.email, displayName: nil)
+        let session = AuthSessionStore(automaticallyRestore: false)
+        session.setSignedInForTesting(user: clerkUser, accessToken: "token", stableAccountID: clerkUser.id)
+        let drive = makeDrive(score: 72)
+        let transport = FakeDriveHistoryTransport()
+        transport.page = DriveHistoryPage(drives: [makeDTO(for: drive)], nextCursor: nil)
+        transport.shouldFail = true
+        let service = DriveHistorySyncService(
+            transport: transport,
+            authSession: session,
+            userDefaults: isolatedDefaults(),
+            retryDelaysNanoseconds: []
+        )
+        var applied: [RecordedDrive] = []
+
+        service.sync(localDrives: [drive], applyLocalDrives: { applied = $0 })
+        service.markDriveDeleted(id: drive.id)
+        service.sync(localDrives: [], applyLocalDrives: { applied = $0 })
+        await waitUntil { service.state == .offline }
+        try? await Task.sleep(nanoseconds: 10_000_000)
+
+        expect(session.applyBackendIdentityForTesting(backendUser), "the backend identity transition should succeed")
+        transport.shouldFail = false
+        service.sync(localDrives: [], applyLocalDrives: { applied = $0 })
+        await waitUntil { service.state == .synced }
+
+        expect(transport.deletedIDs == [drive.id.uuidString], "an offline Clerk-keyed deletion must reach the server after the backend UUID arrives")
+        expect(applied.isEmpty, "the deleted drive must not be restored during the identity transition")
+    }
+
+    @MainActor
+    private static func backendKeyedDeletionMigratesToClerkAccount() async {
+        let backendUser = AuthUser(id: UUID().uuidString, email: "driver@example.com", displayName: nil)
+        let oldSession = AuthSessionStore(automaticallyRestore: false)
+        oldSession.setSignedInForTesting(user: backendUser, accessToken: "token")
+        let drive = makeDrive(score: 73)
+        let transport = FakeDriveHistoryTransport()
+        transport.page = DriveHistoryPage(drives: [makeDTO(for: drive)], nextCursor: nil)
+        let defaults = isolatedDefaults()
+        let oldService = DriveHistorySyncService(
+            transport: transport,
+            authSession: oldSession,
+            userDefaults: defaults,
+            retryDelaysNanoseconds: []
+        )
+
+        oldService.sync(localDrives: [drive], applyLocalDrives: { _ in })
+        await waitUntil { oldService.state == .synced }
+        transport.shouldFail = true
+        oldService.markDriveDeleted(id: drive.id)
+        oldService.sync(localDrives: [], applyLocalDrives: { _ in })
+        await waitUntil { oldService.state == .offline }
+
+        let clerkUser = AuthUser(id: "user_upgraded", email: backendUser.email, displayName: nil)
+        let newSession = AuthSessionStore(automaticallyRestore: false)
+        newSession.setSignedInForTesting(user: clerkUser, accessToken: "token", stableAccountID: clerkUser.id)
+        expect(newSession.applyBackendIdentityForTesting(backendUser), "the upgraded session should receive the backend identity")
+        transport.shouldFail = false
+        let newService = DriveHistorySyncService(
+            transport: transport,
+            authSession: newSession,
+            userDefaults: defaults,
+            retryDelaysNanoseconds: []
+        )
+        var applied: [RecordedDrive] = []
+
+        newService.sync(localDrives: [], applyLocalDrives: { applied = $0 })
+        await waitUntil { newService.state == .synced }
+
+        expect(transport.deletedIDs == [drive.id.uuidString], "an older backend-keyed tombstone must migrate to the Clerk account")
+        expect(applied.isEmpty, "migration must not resurrect a drive pending deletion")
+    }
+
     private static func makeDrive(
         id: UUID = UUID(),
         score: Int,
@@ -428,7 +594,10 @@ struct DriveHistorySyncChecks {
         return RecordedDrive(id: id, startedAt: startedAt, score: drivingScore, route: [])
     }
 
-    private static func makeDTO(for drive: RecordedDrive) -> DriveHistoryDTO {
+    private static func makeDTO(
+        for drive: RecordedDrive,
+        updatedAt: Date = Date(timeIntervalSince1970: 1_800_000_000)
+    ) -> DriveHistoryDTO {
         DriveHistoryDTO(
             id: drive.id.uuidString,
             startedAt: drive.startedAt,
@@ -440,7 +609,7 @@ struct DriveHistorySyncChecks {
             recordingTimeZoneIdentifier: drive.recordingTimeZoneIdentifier,
             payload: DriveHistoryPayloadCodec.payload(for: drive),
             createdAt: drive.startedAt,
-            updatedAt: Date(timeIntervalSince1970: 1_800_000_000)
+            updatedAt: updatedAt
         )
     }
 
@@ -474,11 +643,29 @@ private final class FakeDriveHistoryTransport: DriveHistorySyncTransport {
     private(set) var fetchCount = 0
     private(set) var uploadCount = 0
     private(set) var deletedIDs: [String] = []
+    var holdNextFetch = false
+    private(set) var hasHeldFetch = false
+    private var heldFetch: CheckedContinuation<DriveHistoryPage, Never>?
+    private var heldPage: DriveHistoryPage?
 
     func fetchDrives(limit: Int, before: String?, beforeId: String?, accessToken: String) async throws -> DriveHistoryPage {
         fetchCount += 1
         if shouldFail { throw AuthError.offline }
+        if holdNextFetch {
+            holdNextFetch = false
+            hasHeldFetch = true
+            heldPage = page
+            return await withCheckedContinuation { continuation in
+                heldFetch = continuation
+            }
+        }
         return page
+    }
+
+    func releaseHeldFetch() {
+        heldFetch?.resume(returning: heldPage ?? page)
+        heldFetch = nil
+        heldPage = nil
     }
 
     func uploadDrives(_ drives: [DriveHistoryInput], accessToken: String) async throws -> [DriveHistoryDTO] {

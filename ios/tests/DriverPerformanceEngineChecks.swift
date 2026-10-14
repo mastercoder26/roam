@@ -6,6 +6,18 @@ struct DriverPerformanceEngineChecks {
     static func main() {
         let calendar = utcCalendar()
         let reference = date(2026, 7, 28, 12, 0, calendar: calendar)
+        let invalidDifficulty = drive(startedAt: reference.addingTimeInterval(-3_600), score: 100, difficulty: .nan)
+        expect(
+            DriverPerformanceEngine.makeSummary(from: [invalidDifficulty], referenceDate: reference, calendar: calendar).score == nil,
+            "invalid route difficulty must not produce a performance score or trap"
+        )
+        expect(
+            DriveExperienceEngine.validTraceSegments(for: [
+                DriveRoutePoint(timestamp: reference, coordinate: DriveCoordinate(CLLocationCoordinate2D(latitude: 40, longitude: -90)), speedMetersPerSecond: .infinity),
+                DriveRoutePoint(timestamp: reference.addingTimeInterval(2), coordinate: DriveCoordinate(CLLocationCoordinate2D(latitude: 40.0001, longitude: -90)), speedMetersPerSecond: 10)
+            ]).isEmpty,
+            "non-finite speeds must not become measured experience"
+        )
 
         expect(
             DriverPerformanceEngine.makeSummary(from: [], referenceDate: reference, calendar: calendar).score == nil,

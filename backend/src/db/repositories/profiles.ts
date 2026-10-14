@@ -1,4 +1,4 @@
-import { getPool } from "../pool.js";
+import { getPool, withTransaction } from "../pool.js";
 import type { DriverStage, ProfileRecord } from "../types.js";
 import { queryDatabase } from "./helpers.js";
 
@@ -28,7 +28,7 @@ export async function updateProfile(userId: string, input: {
   stage?: DriverStage;
   payload?: Record<string, unknown>;
 }): Promise<ProfileRecord> {
-  const result = await queryDatabase<ProfileRow>(getPool(), `
+  const statement = `
     INSERT INTO driver_profiles (user_id, display_name, stage, payload)
     VALUES ($1, $2, $3, COALESCE($4::jsonb, '{}'::jsonb))
     ON CONFLICT (user_id) DO UPDATE SET
@@ -37,7 +37,20 @@ export async function updateProfile(userId: string, input: {
       payload = CASE WHEN $4::jsonb IS NULL THEN driver_profiles.payload ELSE EXCLUDED.payload END,
       updated_at = now()
     RETURNING user_id, display_name, stage, payload, updated_at
-  `, [userId, input.displayName ?? null, input.stage ?? null, input.payload === undefined ? null : JSON.stringify(input.payload)]);
+  `;
+  const values = [userId, input.displayName ?? null, input.stage ?? null,
+    input.payload === undefined ? null : JSON.stringify(input.payload)];
+  const result = input.displayName === undefined
+    ? await queryDatabase<ProfileRow>(getPool(), statement, values)
+    : await withTransaction(async (client) => {
+      await client.query(`
+        UPDATE users SET display_name = $2, updated_at = now()
+        WHERE id = $1 AND deleted_at IS NULL
+      `, [userId, input.displayName]);
+      const updated = await client.query<ProfileRow>(statement, values);
+      if (!updated.rows[0]) throw new Error("Profile update returned no row");
+      return updated;
+    });
   const row = result.rows[0];
   if (!row) throw new Error("Profile update returned no row");
   return mapProfile(row);

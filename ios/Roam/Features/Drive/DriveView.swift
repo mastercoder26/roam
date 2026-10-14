@@ -365,7 +365,7 @@ struct DriveView: View {
                     Text("Plan a recovery stop")
                         .font(AppDesign.Typography.sectionTitle)
                         .foregroundStyle(AppDesign.Ink.primary)
-                    Text("Preview a sensible place to pause before a longer drive.")
+                    Text("Choose a break for a longer drive.")
                         .font(.footnote)
                         .foregroundStyle(AppDesign.Ink.secondary)
                         .fixedSize(horizontal: false, vertical: true)

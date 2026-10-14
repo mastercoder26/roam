@@ -128,7 +128,8 @@ final class DriveSessionManager: NSObject, ObservableObject {
     /// signed-out path without a Clerk session.
     private let authSession: AuthSessionStore
 
-    init(authSession: AuthSessionStore = .shared) {
+    init(authSession: AuthSessionStore? = nil) {
+        let authSession = authSession ?? .shared
         self.authSession = authSession
         self.routeAnalysisCoordinator = DriveRouteAnalysisCoordinator(authSession: authSession)
         super.init()

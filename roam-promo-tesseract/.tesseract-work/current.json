@@ -1,0 +1,2189 @@
+{
+  "$schema": "https://jerboa.dev/schemas/fx-composition/editable/v1/document.schema.json",
+  "composition": {
+    "dynamics": {
+      "entries": [
+        {
+          "animator": {
+            "layerTimeJsCode": "var q=Math.max(0,Math.min(1,input.time.seconds/.8));var e=q*q*(3-2*q);return -2300+4300*e;",
+            "type": "jsScript"
+          },
+          "target": {
+            "kind": "layer",
+            "layerId": 1,
+            "propertyType": "positionX"
+          }
+        },
+        {
+          "animator": {
+            "layerTimeJsCode": "var q=Math.max(0,Math.min(1,input.time.seconds/.8));var e=q*q*(3-2*q);return -2300+4300*e;",
+            "type": "jsScript"
+          },
+          "target": {
+            "kind": "layer",
+            "layerId": 2,
+            "propertyType": "positionX"
+          }
+        },
+        {
+          "animator": {
+            "layerTimeJsCode": "var q=Math.max(0,Math.min(1,input.time.seconds/.8));var e=q*q*(3-2*q);return -2300+4300*e;",
+            "type": "jsScript"
+          },
+          "target": {
+            "kind": "layer",
+            "layerId": 3,
+            "propertyType": "positionX"
+          }
+        },
+        {
+          "animator": {
+            "layerTimeJsCode": "var q=Math.max(0,Math.min(1,input.time.seconds/.8));var e=q*q*(3-2*q);return -2300+4300*e;",
+            "type": "jsScript"
+          },
+          "target": {
+            "kind": "layer",
+            "layerId": 4,
+            "propertyType": "positionX"
+          }
+        },
+        {
+          "animator": {
+            "layerTimeJsCode": "var t=Math.max(0,input.time.seconds-0);var q=Math.max(0,Math.min(1,t/.65));var e=1-Math.pow(1-q,4);return 314+(1-e)*48;",
+            "type": "jsScript"
+          },
+          "target": {
+            "kind": "layer",
+            "layerId": 6,
+            "propertyType": "positionY"
+          }
+        },
+        {
+          "animator": {
+            "layerTimeJsCode": "var t=input.time.seconds;return 100*Math.min(1,Math.max(0,(t-0)/.25))*Math.min(1,Math.max(0,(4-t)/.20));",
+            "type": "jsScript"
+          },
+          "target": {
+            "kind": "layer",
+            "layerId": 6,
+            "propertyType": "opacity"
+          }
+        },
+        {
+          "animator": {
+            "layerTimeJsCode": "var t=Math.max(0,input.time.seconds-0);var q=Math.max(0,Math.min(1,t/.65));var e=1-Math.pow(1-q,4);return 618+(1-e)*48;",
+            "type": "jsScript"
+          },
+          "target": {
+            "kind": "layer",
+            "layerId": 7,
+            "propertyType": "positionY"
+          }
+        },
+        {
+          "animator": {
+            "layerTimeJsCode": "var t=input.time.seconds;return 100*Math.min(1,Math.max(0,(t-0)/.25))*Math.min(1,Math.max(0,(3.65-t)/.20));",
+            "type": "jsScript"
+          },
+          "target": {
+            "kind": "layer",
+            "layerId": 7,
+            "propertyType": "opacity"
+          }
+        },
+        {
+          "animator": {
+            "layerTimeJsCode": "var t=Math.max(0,input.time.seconds-0);var q=Math.max(0,Math.min(1,t/.65));var e=1-Math.pow(1-q,4);return 305+(1-e)*48;",
+            "type": "jsScript"
+          },
+          "target": {
+            "kind": "layer",
+            "layerId": 8,
+            "propertyType": "positionY"
+          }
+        },
+        {
+          "animator": {
+            "layerTimeJsCode": "var t=input.time.seconds;return 100*Math.min(1,Math.max(0,(t-0)/.25))*Math.min(1,Math.max(0,(6-t)/.20));",
+            "type": "jsScript"
+          },
+          "target": {
+            "kind": "layer",
+            "layerId": 8,
+            "propertyType": "opacity"
+          }
+        },
+        {
+          "animator": {
+            "layerTimeJsCode": "var t=Math.max(0,input.time.seconds-0);var q=Math.max(0,Math.min(1,t/.65));var e=1-Math.pow(1-q,4);return 593+(1-e)*48;",
+            "type": "jsScript"
+          },
+          "target": {
+            "kind": "layer",
+            "layerId": 9,
+            "propertyType": "positionY"
+          }
+        },
+        {
+          "animator": {
+            "layerTimeJsCode": "var t=input.time.seconds;return 100*Math.min(1,Math.max(0,(t-0)/.25))*Math.min(1,Math.max(0,(5.6-t)/.20));",
+            "type": "jsScript"
+          },
+          "target": {
+            "kind": "layer",
+            "layerId": 9,
+            "propertyType": "opacity"
+          }
+        },
+        {
+          "animator": {
+            "layerTimeJsCode": "var t=Math.max(0,input.time.seconds-0);var q=Math.max(0,Math.min(1,t/.65));var e=1-Math.pow(1-q,4);return 250+(1-e)*48;",
+            "type": "jsScript"
+          },
+          "target": {
+            "kind": "layer",
+            "layerId": 10,
+            "propertyType": "positionY"
+          }
+        },
+        {
+          "animator": {
+            "layerTimeJsCode": "var t=input.time.seconds;return 100*Math.min(1,Math.max(0,(t-0)/.25))*Math.min(1,Math.max(0,(5.6-t)/.20));",
+            "type": "jsScript"
+          },
+          "target": {
+            "kind": "layer",
+            "layerId": 10,
+            "propertyType": "opacity"
+          }
+        },
+        {
+          "animator": {
+            "layerTimeJsCode": "return -3+Math.sin(input.time.seconds*.6)*1.2;",
+            "type": "jsScript"
+          },
+          "target": {
+            "kind": "layer",
+            "layerId": 10,
+            "propertyType": "rotation"
+          }
+        },
+        {
+          "animator": {
+            "layerTimeJsCode": "var t=Math.max(0,input.time.seconds-0);var q=Math.max(0,Math.min(1,t/.65));var e=1-Math.pow(1-q,4);return 272+(1-e)*48;",
+            "type": "jsScript"
+          },
+          "target": {
+            "kind": "layer",
+            "layerId": 11,
+            "propertyType": "positionY"
+          }
+        },
+        {
+          "animator": {
+            "layerTimeJsCode": "var t=input.time.seconds;return 100*Math.min(1,Math.max(0,(t-0)/.25))*Math.min(1,Math.max(0,(4-t)/.20));",
+            "type": "jsScript"
+          },
+          "target": {
+            "kind": "layer",
+            "layerId": 11,
+            "propertyType": "opacity"
+          }
+        },
+        {
+          "animator": {
+            "layerTimeJsCode": "var t=Math.max(0,input.time.seconds-0);var q=Math.max(0,Math.min(1,t/.65));var e=1-Math.pow(1-q,4);return 656+(1-e)*48;",
+            "type": "jsScript"
+          },
+          "target": {
+            "kind": "layer",
+            "layerId": 12,
+            "propertyType": "positionY"
+          }
+        },
+        {
+          "animator": {
+            "layerTimeJsCode": "var t=input.time.seconds;return 100*Math.min(1,Math.max(0,(t-0)/.25))*Math.min(1,Math.max(0,(3.6500000000000004-t)/.20));",
+            "type": "jsScript"
+          },
+          "target": {
+            "kind": "layer",
+            "layerId": 12,
+            "propertyType": "opacity"
+          }
+        },
+        {
+          "animator": {
+            "layerTimeJsCode": "var t=Math.max(0,input.time.seconds-0);var q=Math.max(0,Math.min(1,t/.65));var e=1-Math.pow(1-q,4);return 310+(1-e)*48;",
+            "type": "jsScript"
+          },
+          "target": {
+            "kind": "layer",
+            "layerId": 13,
+            "propertyType": "positionY"
+          }
+        },
+        {
+          "animator": {
+            "layerTimeJsCode": "var t=input.time.seconds;return 100*Math.min(1,Math.max(0,(t-0)/.25))*Math.min(1,Math.max(0,(4-t)/.20));",
+            "type": "jsScript"
+          },
+          "target": {
+            "kind": "layer",
+            "layerId": 13,
+            "propertyType": "opacity"
+          }
+        },
+        {
+          "animator": {
+            "layerTimeJsCode": "var t=Math.max(0,input.time.seconds-0);var q=Math.max(0,Math.min(1,t/.65));var e=1-Math.pow(1-q,4);return 610+(1-e)*48;",
+            "type": "jsScript"
+          },
+          "target": {
+            "kind": "layer",
+            "layerId": 14,
+            "propertyType": "positionY"
+          }
+        },
+        {
+          "animator": {
+            "layerTimeJsCode": "var t=input.time.seconds;return 100*Math.min(1,Math.max(0,(t-0)/.25))*Math.min(1,Math.max(0,(3.6500000000000004-t)/.20));",
+            "type": "jsScript"
+          },
+          "target": {
+            "kind": "layer",
+            "layerId": 14,
+            "propertyType": "opacity"
+          }
+        },
+        {
+          "animator": {
+            "layerTimeJsCode": "var t=Math.max(0,input.time.seconds-0);var q=Math.max(0,Math.min(1,t/.65));var e=1-Math.pow(1-q,4);return 210+(1-e)*48;",
+            "type": "jsScript"
+          },
+          "target": {
+            "kind": "layer",
+            "layerId": 15,
+            "propertyType": "positionY"
+          }
+        },
+        {
+          "animator": {
+            "layerTimeJsCode": "var t=input.time.seconds;return 100*Math.min(1,Math.max(0,(t-0)/.25))*Math.min(1,Math.max(0,(6-t)/.20));",
+            "type": "jsScript"
+          },
+          "target": {
+            "kind": "layer",
+            "layerId": 15,
+            "propertyType": "opacity"
+          }
+        },
+        {
+          "animator": {
+            "layerTimeJsCode": "var t=Math.max(0,input.time.seconds-0);var q=Math.max(0,Math.min(1,t/.65));var e=1-Math.pow(1-q,4);return 436+(1-e)*48;",
+            "type": "jsScript"
+          },
+          "target": {
+            "kind": "layer",
+            "layerId": 16,
+            "propertyType": "positionY"
+          }
+        },
+        {
+          "animator": {
+            "layerTimeJsCode": "var t=input.time.seconds;return 100*Math.min(1,Math.max(0,(t-0)/.25))*Math.min(1,Math.max(0,(5.649999999999999-t)/.20));",
+            "type": "jsScript"
+          },
+          "target": {
+            "kind": "layer",
+            "layerId": 16,
+            "propertyType": "opacity"
+          }
+        },
+        {
+          "animator": {
+            "layerTimeJsCode": "var t=Math.max(0,input.time.seconds-0);var q=Math.max(0,Math.min(1,t/.65));var e=1-Math.pow(1-q,4);return 683+(1-e)*48;",
+            "type": "jsScript"
+          },
+          "target": {
+            "kind": "layer",
+            "layerId": 17,
+            "propertyType": "positionY"
+          }
+        },
+        {
+          "animator": {
+            "layerTimeJsCode": "var t=input.time.seconds;return 100*Math.min(1,Math.max(0,(t-0)/.25))*Math.min(1,Math.max(0,(5.25-t)/.20));",
+            "type": "jsScript"
+          },
+          "target": {
+            "kind": "layer",
+            "layerId": 17,
+            "propertyType": "opacity"
+          }
+        }
+      ]
+    },
+    "id": "main",
+    "layers": [
+      {
+        "activeRange": {
+          "duration": 800,
+          "start": 3600
+        },
+        "blendMode": "normal",
+        "id": 1,
+        "name": "Roam blue scene wipe",
+        "rect": {
+          "fillColor": [
+            0.192,
+            0.345,
+            0.831,
+            1.0
+          ],
+          "fillEnabled": true,
+          "position": [
+            0.0,
+            0.0
+          ],
+          "roundness": 0.0,
+          "size": [
+            2250.0,
+            1080.0
+          ],
+          "strokeEnabled": false,
+          "strokeWidth": 0.0
+        },
+        "transform": {
+          "anchorPoint": [
+            0.0,
+            0.0
+          ],
+          "opacity": 100.0,
+          "orientation": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "position": [
+            -2300.0,
+            0.0
+          ],
+          "rotation": 0.0,
+          "rotationX": 0.0,
+          "rotationY": 0.0,
+          "scale": [
+            100.0,
+            100.0
+          ],
+          "skew": 0.0,
+          "skewAxis": 0.0
+        },
+        "type": "Rect"
+      },
+      {
+        "activeRange": {
+          "duration": 800,
+          "start": 9600
+        },
+        "blendMode": "normal",
+        "id": 2,
+        "name": "Roam blue scene wipe",
+        "rect": {
+          "fillColor": [
+            0.192,
+            0.345,
+            0.831,
+            1.0
+          ],
+          "fillEnabled": true,
+          "position": [
+            0.0,
+            0.0
+          ],
+          "roundness": 0.0,
+          "size": [
+            2250.0,
+            1080.0
+          ],
+          "strokeEnabled": false,
+          "strokeWidth": 0.0
+        },
+        "transform": {
+          "anchorPoint": [
+            0.0,
+            0.0
+          ],
+          "opacity": 100.0,
+          "orientation": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "position": [
+            -2300.0,
+            0.0
+          ],
+          "rotation": 0.0,
+          "rotationX": 0.0,
+          "rotationY": 0.0,
+          "scale": [
+            100.0,
+            100.0
+          ],
+          "skew": 0.0,
+          "skewAxis": 0.0
+        },
+        "type": "Rect"
+      },
+      {
+        "activeRange": {
+          "duration": 800,
+          "start": 13600
+        },
+        "blendMode": "normal",
+        "id": 3,
+        "name": "Roam blue scene wipe",
+        "rect": {
+          "fillColor": [
+            0.192,
+            0.345,
+            0.831,
+            1.0
+          ],
+          "fillEnabled": true,
+          "position": [
+            0.0,
+            0.0
+          ],
+          "roundness": 0.0,
+          "size": [
+            2250.0,
+            1080.0
+          ],
+          "strokeEnabled": false,
+          "strokeWidth": 0.0
+        },
+        "transform": {
+          "anchorPoint": [
+            0.0,
+            0.0
+          ],
+          "opacity": 100.0,
+          "orientation": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "position": [
+            -2300.0,
+            0.0
+          ],
+          "rotation": 0.0,
+          "rotationX": 0.0,
+          "rotationY": 0.0,
+          "scale": [
+            100.0,
+            100.0
+          ],
+          "skew": 0.0,
+          "skewAxis": 0.0
+        },
+        "type": "Rect"
+      },
+      {
+        "activeRange": {
+          "duration": 800,
+          "start": 17600
+        },
+        "blendMode": "normal",
+        "id": 4,
+        "name": "Roam blue scene wipe",
+        "rect": {
+          "fillColor": [
+            0.192,
+            0.345,
+            0.831,
+            1.0
+          ],
+          "fillEnabled": true,
+          "position": [
+            0.0,
+            0.0
+          ],
+          "roundness": 0.0,
+          "size": [
+            2250.0,
+            1080.0
+          ],
+          "strokeEnabled": false,
+          "strokeWidth": 0.0
+        },
+        "transform": {
+          "anchorPoint": [
+            0.0,
+            0.0
+          ],
+          "opacity": 100.0,
+          "orientation": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "position": [
+            -2300.0,
+            0.0
+          ],
+          "rotation": 0.0,
+          "rotationX": 0.0,
+          "rotationY": 0.0,
+          "scale": [
+            100.0,
+            100.0
+          ],
+          "skew": 0.0,
+          "skewAxis": 0.0
+        },
+        "type": "Rect"
+      },
+      {
+        "activeRange": {
+          "duration": 18000,
+          "start": 0
+        },
+        "blendMode": "normal",
+        "id": 5,
+        "name": "Roam brand signature",
+        "source": {
+          "assetId": "wordmark",
+          "fit": "contain"
+        },
+        "transform": {
+          "anchorPoint": [
+            0.0,
+            0.0
+          ],
+          "opacity": 100.0,
+          "orientation": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "position": [
+            100.0,
+            69.0
+          ],
+          "rotation": 0.0,
+          "rotationX": 0.0,
+          "rotationY": 0.0,
+          "scale": [
+            83.0,
+            83.0
+          ],
+          "skew": 0.0,
+          "skewAxis": 0.0
+        },
+        "type": "Image"
+      },
+      {
+        "activeRange": {
+          "duration": 4000,
+          "start": 0
+        },
+        "blendMode": "normal",
+        "id": 6,
+        "name": "New driver. / Big world.",
+        "sourceText": {
+          "allCaps": false,
+          "applyFill": true,
+          "applyStroke": false,
+          "baselineShift": 0.0,
+          "boxPosition": [
+            0.0,
+            0.0
+          ],
+          "boxSize": [
+            820.0,
+            400.0
+          ],
+          "boxText": true,
+          "fillColor": [
+            0.09411764705882351,
+            0.12549019607843137,
+            0.23137254901960785,
+            1.0
+          ],
+          "fontFamily": "Avenir Next",
+          "fontSize": 108.0,
+          "fontStyle": "Bold",
+          "justification": "left",
+          "leading": 122.04,
+          "strokeOverFill": false,
+          "strokeWidth": 0.0,
+          "text": "New driver.\nBig world.",
+          "tracking": -1.2
+        },
+        "transform": {
+          "anchorPoint": [
+            0.0,
+            0.0
+          ],
+          "opacity": 100.0,
+          "orientation": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "position": [
+            105.0,
+            314.0
+          ],
+          "rotation": 0.0,
+          "rotationX": 0.0,
+          "rotationY": 0.0,
+          "scale": [
+            100.0,
+            100.0
+          ],
+          "skew": 0.0,
+          "skewAxis": 0.0
+        },
+        "type": "Text"
+      },
+      {
+        "activeRange": {
+          "duration": 3650,
+          "start": 350
+        },
+        "blendMode": "normal",
+        "id": 7,
+        "name": "Meet Roam.",
+        "sourceText": {
+          "allCaps": false,
+          "applyFill": true,
+          "applyStroke": false,
+          "baselineShift": 0.0,
+          "boxPosition": [
+            0.0,
+            0.0
+          ],
+          "boxSize": [
+            820.0,
+            400.0
+          ],
+          "boxText": true,
+          "fillColor": [
+            0.19215686274509805,
+            0.34509803921568627,
+            0.8313725490196079,
+            1.0
+          ],
+          "fontFamily": "Avenir Next",
+          "fontSize": 32.0,
+          "fontStyle": "Regular",
+          "justification": "left",
+          "leading": 36.16,
+          "strokeOverFill": false,
+          "strokeWidth": 0.0,
+          "text": "Meet Roam.",
+          "tracking": 0.0
+        },
+        "transform": {
+          "anchorPoint": [
+            0.0,
+            0.0
+          ],
+          "opacity": 100.0,
+          "orientation": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "position": [
+            110.0,
+            618.0
+          ],
+          "rotation": 0.0,
+          "rotationX": 0.0,
+          "rotationY": 0.0,
+          "scale": [
+            100.0,
+            100.0
+          ],
+          "skew": 0.0,
+          "skewAxis": 0.0
+        },
+        "type": "Text"
+      },
+      {
+        "activeRange": {
+          "duration": 6000,
+          "start": 4000
+        },
+        "blendMode": "normal",
+        "id": 8,
+        "name": "Know the road / before you go.",
+        "sourceText": {
+          "allCaps": false,
+          "applyFill": true,
+          "applyStroke": false,
+          "baselineShift": 0.0,
+          "boxPosition": [
+            0.0,
+            0.0
+          ],
+          "boxSize": [
+            820.0,
+            400.0
+          ],
+          "boxText": true,
+          "fillColor": [
+            0.09411764705882351,
+            0.12549019607843137,
+            0.23137254901960785,
+            1.0
+          ],
+          "fontFamily": "Avenir Next",
+          "fontSize": 95.0,
+          "fontStyle": "Bold",
+          "justification": "left",
+          "leading": 107.35,
+          "strokeOverFill": false,
+          "strokeWidth": 0.0,
+          "text": "Know the road\nbefore you go.",
+          "tracking": -1.2
+        },
+        "transform": {
+          "anchorPoint": [
+            0.0,
+            0.0
+          ],
+          "opacity": 100.0,
+          "orientation": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "position": [
+            105.0,
+            305.0
+          ],
+          "rotation": 0.0,
+          "rotationX": 0.0,
+          "rotationY": 0.0,
+          "scale": [
+            100.0,
+            100.0
+          ],
+          "skew": 0.0,
+          "skewAxis": 0.0
+        },
+        "type": "Text"
+      },
+      {
+        "activeRange": {
+          "duration": 5600,
+          "start": 4400
+        },
+        "blendMode": "normal",
+        "id": 9,
+        "name": "Plan routes. See the tricky parts.",
+        "sourceText": {
+          "allCaps": false,
+          "applyFill": true,
+          "applyStroke": false,
+          "baselineShift": 0.0,
+          "boxPosition": [
+            0.0,
+            0.0
+          ],
+          "boxSize": [
+            820.0,
+            400.0
+          ],
+          "boxText": true,
+          "fillColor": [
+            0.37254901960784315,
+            0.396078431372549,
+            0.4196078431372549,
+            1.0
+          ],
+          "fontFamily": "Avenir Next",
+          "fontSize": 31.0,
+          "fontStyle": "Regular",
+          "justification": "left",
+          "leading": 35.029999999999994,
+          "strokeOverFill": false,
+          "strokeWidth": 0.0,
+          "text": "Plan routes. See the tricky parts.",
+          "tracking": 0.0
+        },
+        "transform": {
+          "anchorPoint": [
+            0.0,
+            0.0
+          ],
+          "opacity": 100.0,
+          "orientation": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "position": [
+            110.0,
+            593.0
+          ],
+          "rotation": 0.0,
+          "rotationX": 0.0,
+          "rotationY": 0.0,
+          "scale": [
+            100.0,
+            100.0
+          ],
+          "skew": 0.0,
+          "skewAxis": 0.0
+        },
+        "type": "Text"
+      },
+      {
+        "activeRange": {
+          "duration": 5600,
+          "start": 4250
+        },
+        "blendMode": "normal",
+        "cornerRadius": 0.1,
+        "effects": [
+          {
+            "effect": {
+              "blendMode": "normal",
+              "blurRadius": 38.0,
+              "color": [
+                0.08,
+                0.11,
+                0.18,
+                0.24
+              ],
+              "enabled": true,
+              "offset": [
+                0.0,
+                18.0
+              ],
+              "spreadRadius": 0.0,
+              "type": "dropShadow"
+            },
+            "enabled": true,
+            "id": 1
+          }
+        ],
+        "id": 10,
+        "name": "Actual Roam route-planning UI crop",
+        "source": {
+          "assetId": "route-ui",
+          "fit": "contain"
+        },
+        "transform": {
+          "anchorPoint": [
+            0.0,
+            0.0
+          ],
+          "opacity": 100.0,
+          "orientation": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "position": [
+            1095.0,
+            250.0
+          ],
+          "rotation": 0.0,
+          "rotationX": 0.0,
+          "rotationY": 0.0,
+          "scale": [
+            62.0,
+            62.0
+          ],
+          "skew": 0.0,
+          "skewAxis": 0.0
+        },
+        "type": "Image"
+      },
+      {
+        "activeRange": {
+          "duration": 4000,
+          "start": 10000
+        },
+        "blendMode": "normal",
+        "id": 11,
+        "name": "Practice. / One drive / at a time.",
+        "sourceText": {
+          "allCaps": false,
+          "applyFill": true,
+          "applyStroke": false,
+          "baselineShift": 0.0,
+          "boxPosition": [
+            0.0,
+            0.0
+          ],
+          "boxSize": [
+            820.0,
+            400.0
+          ],
+          "boxText": true,
+          "fillColor": [
+            0.09411764705882351,
+            0.12549019607843137,
+            0.23137254901960785,
+            1.0
+          ],
+          "fontFamily": "Avenir Next",
+          "fontSize": 94.0,
+          "fontStyle": "Bold",
+          "justification": "left",
+          "leading": 106.21999999999998,
+          "strokeOverFill": false,
+          "strokeWidth": 0.0,
+          "text": "Practice.\nOne drive\nat a time.",
+          "tracking": -1.2
+        },
+        "transform": {
+          "anchorPoint": [
+            0.0,
+            0.0
+          ],
+          "opacity": 100.0,
+          "orientation": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "position": [
+            105.0,
+            272.0
+          ],
+          "rotation": 0.0,
+          "rotationX": 0.0,
+          "rotationY": 0.0,
+          "scale": [
+            100.0,
+            100.0
+          ],
+          "skew": 0.0,
+          "skewAxis": 0.0
+        },
+        "type": "Text"
+      },
+      {
+        "activeRange": {
+          "duration": 3650,
+          "start": 10350
+        },
+        "blendMode": "normal",
+        "id": 12,
+        "name": "Record the drive. Learn from it.",
+        "sourceText": {
+          "allCaps": false,
+          "applyFill": true,
+          "applyStroke": false,
+          "baselineShift": 0.0,
+          "boxPosition": [
+            0.0,
+            0.0
+          ],
+          "boxSize": [
+            820.0,
+            400.0
+          ],
+          "boxText": true,
+          "fillColor": [
+            0.37254901960784315,
+            0.396078431372549,
+            0.4196078431372549,
+            1.0
+          ],
+          "fontFamily": "Avenir Next",
+          "fontSize": 30.0,
+          "fontStyle": "Regular",
+          "justification": "left",
+          "leading": 33.9,
+          "strokeOverFill": false,
+          "strokeWidth": 0.0,
+          "text": "Record the drive. Learn from it.",
+          "tracking": 0.0
+        },
+        "transform": {
+          "anchorPoint": [
+            0.0,
+            0.0
+          ],
+          "opacity": 100.0,
+          "orientation": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "position": [
+            110.0,
+            656.0
+          ],
+          "rotation": 0.0,
+          "rotationX": 0.0,
+          "rotationY": 0.0,
+          "scale": [
+            100.0,
+            100.0
+          ],
+          "skew": 0.0,
+          "skewAxis": 0.0
+        },
+        "type": "Text"
+      },
+      {
+        "activeRange": {
+          "duration": 4000,
+          "start": 14000
+        },
+        "blendMode": "normal",
+        "id": 13,
+        "name": "See how far / you\u2019ve come.",
+        "sourceText": {
+          "allCaps": false,
+          "applyFill": true,
+          "applyStroke": false,
+          "baselineShift": 0.0,
+          "boxPosition": [
+            0.0,
+            0.0
+          ],
+          "boxSize": [
+            820.0,
+            400.0
+          ],
+          "boxText": true,
+          "fillColor": [
+            0.09411764705882351,
+            0.12549019607843137,
+            0.23137254901960785,
+            1.0
+          ],
+          "fontFamily": "Avenir Next",
+          "fontSize": 96.0,
+          "fontStyle": "Bold",
+          "justification": "left",
+          "leading": 108.48,
+          "strokeOverFill": false,
+          "strokeWidth": 0.0,
+          "text": "See how far\nyou\u2019ve come.",
+          "tracking": -1.2
+        },
+        "transform": {
+          "anchorPoint": [
+            0.0,
+            0.0
+          ],
+          "opacity": 100.0,
+          "orientation": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "position": [
+            105.0,
+            310.0
+          ],
+          "rotation": 0.0,
+          "rotationX": 0.0,
+          "rotationY": 0.0,
+          "scale": [
+            100.0,
+            100.0
+          ],
+          "skew": 0.0,
+          "skewAxis": 0.0
+        },
+        "type": "Text"
+      },
+      {
+        "activeRange": {
+          "duration": 3650,
+          "start": 14350
+        },
+        "blendMode": "normal",
+        "id": 14,
+        "name": "Your miles. Your progress.",
+        "sourceText": {
+          "allCaps": false,
+          "applyFill": true,
+          "applyStroke": false,
+          "baselineShift": 0.0,
+          "boxPosition": [
+            0.0,
+            0.0
+          ],
+          "boxSize": [
+            820.0,
+            400.0
+          ],
+          "boxText": true,
+          "fillColor": [
+            0.37254901960784315,
+            0.396078431372549,
+            0.4196078431372549,
+            1.0
+          ],
+          "fontFamily": "Avenir Next",
+          "fontSize": 32.0,
+          "fontStyle": "Regular",
+          "justification": "left",
+          "leading": 36.16,
+          "strokeOverFill": false,
+          "strokeWidth": 0.0,
+          "text": "Your miles. Your progress.",
+          "tracking": 0.0
+        },
+        "transform": {
+          "anchorPoint": [
+            0.0,
+            0.0
+          ],
+          "opacity": 100.0,
+          "orientation": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "position": [
+            110.0,
+            610.0
+          ],
+          "rotation": 0.0,
+          "rotationX": 0.0,
+          "rotationY": 0.0,
+          "scale": [
+            100.0,
+            100.0
+          ],
+          "skew": 0.0,
+          "skewAxis": 0.0
+        },
+        "type": "Text"
+      },
+      {
+        "activeRange": {
+          "duration": 6000,
+          "start": 18000
+        },
+        "blendMode": "normal",
+        "id": 15,
+        "name": "Roam end-card wordmark",
+        "source": {
+          "assetId": "wordmark",
+          "fit": "contain"
+        },
+        "transform": {
+          "anchorPoint": [
+            0.0,
+            0.0
+          ],
+          "opacity": 100.0,
+          "orientation": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "position": [
+            86.0,
+            210.0
+          ],
+          "rotation": 0.0,
+          "rotationX": 0.0,
+          "rotationY": 0.0,
+          "scale": [
+            220.0,
+            220.0
+          ],
+          "skew": 0.0,
+          "skewAxis": 0.0
+        },
+        "type": "Image"
+      },
+      {
+        "activeRange": {
+          "duration": 5650,
+          "start": 18350
+        },
+        "blendMode": "normal",
+        "id": 16,
+        "name": "Build confidence. / Go roam.",
+        "sourceText": {
+          "allCaps": false,
+          "applyFill": true,
+          "applyStroke": false,
+          "baselineShift": 0.0,
+          "boxPosition": [
+            0.0,
+            0.0
+          ],
+          "boxSize": [
+            820.0,
+            400.0
+          ],
+          "boxText": true,
+          "fillColor": [
+            0.09411764705882351,
+            0.12549019607843137,
+            0.23137254901960785,
+            1.0
+          ],
+          "fontFamily": "Avenir Next",
+          "fontSize": 82.0,
+          "fontStyle": "Bold",
+          "justification": "left",
+          "leading": 92.66,
+          "strokeOverFill": false,
+          "strokeWidth": 0.0,
+          "text": "Build confidence.\nGo roam.",
+          "tracking": -1.2
+        },
+        "transform": {
+          "anchorPoint": [
+            0.0,
+            0.0
+          ],
+          "opacity": 100.0,
+          "orientation": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "position": [
+            105.0,
+            436.0
+          ],
+          "rotation": 0.0,
+          "rotationX": 0.0,
+          "rotationY": 0.0,
+          "scale": [
+            100.0,
+            100.0
+          ],
+          "skew": 0.0,
+          "skewAxis": 0.0
+        },
+        "type": "Text"
+      },
+      {
+        "activeRange": {
+          "duration": 5250,
+          "start": 18750
+        },
+        "blendMode": "normal",
+        "id": 17,
+        "name": "Your driving journey starts here.",
+        "sourceText": {
+          "allCaps": false,
+          "applyFill": true,
+          "applyStroke": false,
+          "baselineShift": 0.0,
+          "boxPosition": [
+            0.0,
+            0.0
+          ],
+          "boxSize": [
+            820.0,
+            400.0
+          ],
+          "boxText": true,
+          "fillColor": [
+            0.37254901960784315,
+            0.396078431372549,
+            0.4196078431372549,
+            1.0
+          ],
+          "fontFamily": "Avenir Next",
+          "fontSize": 30.0,
+          "fontStyle": "Regular",
+          "justification": "left",
+          "leading": 33.9,
+          "strokeOverFill": false,
+          "strokeWidth": 0.0,
+          "text": "Your driving journey starts here.",
+          "tracking": 0.0
+        },
+        "transform": {
+          "anchorPoint": [
+            0.0,
+            0.0
+          ],
+          "opacity": 100.0,
+          "orientation": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "position": [
+            110.0,
+            683.0
+          ],
+          "rotation": 0.0,
+          "rotationX": 0.0,
+          "rotationY": 0.0,
+          "scale": [
+            100.0,
+            100.0
+          ],
+          "skew": 0.0,
+          "skewAxis": 0.0
+        },
+        "type": "Text"
+      },
+      {
+        "activeRange": {
+          "duration": 4000,
+          "start": 0
+        },
+        "blendMode": "normal",
+        "effects": [
+          {
+            "effect": {
+              "description": "Lit solid car, tires, windows, roads, trees and growth pillars, modeled with signed distance geometry. Orthographic camera, contact shadows, restrained motion.",
+              "name": "RoamMiniatureWorld",
+              "params": [
+                {
+                  "default": 0.0,
+                  "description": "Engine time in seconds.",
+                  "max": 24.0,
+                  "min": 0.0,
+                  "name": "animationTime"
+                },
+                {
+                  "default": 0.0,
+                  "description": "Scene selector: 0 hero, 1 route, 2 drive, 3 progress, 4 signoff.",
+                  "max": 4.0,
+                  "min": 0.0,
+                  "name": "shot"
+                },
+                {
+                  "default": 0.0,
+                  "description": "Reserved camera control.",
+                  "max": 10.0,
+                  "min": 0.0,
+                  "name": "camera"
+                },
+                {
+                  "default": 0.0,
+                  "description": "Scene in-point in seconds.",
+                  "max": 24.0,
+                  "min": 0.0,
+                  "name": "start"
+                }
+              ],
+              "textureInputs": [],
+              "type": "customShader",
+              "wgsl": "struct VertexInput { @location(0) position: vec2<f32>, @location(1) tex_coords: vec2<f32>, @location(2) color: vec4<f32> };\nstruct VertexOutput { @builtin(position) clip_position: vec4<f32>, @location(0) tex_coords: vec2<f32> };\n@vertex fn vs_main(v: VertexInput) -> VertexOutput { var o: VertexOutput; o.clip_position=vec4<f32>(v.position,0.,1.); o.tex_coords=v.tex_coords; return o; }\nstruct Params { animationTime: f32, shot: f32, camera: f32, start: f32 };\n@group(0) @binding(0) var source: texture_2d<f32>;\n@group(0) @binding(1) var samp: sampler;\n@group(0) @binding(2) var<uniform> params: Params;\nfn ease(t:f32)->f32 { let q=clamp(t,0.,1.);return q*q*(3.-2.*q); }\nfn box(p:vec3<f32>,b:vec3<f32>,r:f32)->f32 { let q=abs(p)-b;return length(max(q,vec3<f32>(0.)))+min(max(q.x,max(q.y,q.z)),0.)-r; }\nfn cylX(p:vec3<f32>,r:f32,h:f32)->f32 { let q=vec2<f32>(length(p.yz)-r,abs(p.x)-h);return min(max(q.x,q.y),0.)+length(max(q,vec2<f32>(0.))); }\nfn cylY(p:vec3<f32>,r:f32,h:f32)->f32 { let q=vec2<f32>(length(p.xz)-r,abs(p.y)-h);return min(max(q.x,q.y),0.)+length(max(q,vec2<f32>(0.))); }\nfn rot(p:vec3<f32>,a:f32)->vec3<f32> {return vec3<f32>(cos(a)*p.x-sin(a)*p.z,p.y,sin(a)*p.x+cos(a)*p.z);}\nfn put(a:vec2<f32>,d:f32,id:f32)->vec2<f32> {if(d<a.x){return vec2<f32>(d,id);}return a;}\nfn road(z:f32)->f32{return .65*sin(z*.62);}\nfn car(p0:vec3<f32>,t:f32,hero:bool)->vec2<f32> {\n var p=p0; var sc=1.;\n if(hero){sc=1.65;p=rot(p-vec3<f32>(0.,.08,0.),-.55+.8*ease(t/3.5)+.05*sin(t*1.5));}\n else {let z=.35*sin(t*.75); p=rot(p-vec3<f32>(road(z)+.38,0.,z),-.25*cos(z*.62));}\n p=p/sc;\n p.y=p.y-.015*sin(t*3.);\n var d=vec2<f32>(box(p-vec3<f32>(0.,.51,0.),vec3<f32>(.55,.19,.96),.12),1.);\n d=put(d,box(p-vec3<f32>(0.,.89,-.14),vec3<f32>(.46,.23,.49),.11),2.);\n d=put(d,box(p-vec3<f32>(0.,1.15,-.14),vec3<f32>(.49,.035,.49),.065),1.);\n d=put(d,box(p-vec3<f32>(0.,.91,-.18),vec3<f32>(.535,.25,.033),.018),1.);\n let wp=vec3<f32>(abs(p.x)-.59,p.y-.30,abs(p.z)-.62);\n d=put(d,cylX(wp,.275,.115),3.);\n d=put(d,cylX(vec3<f32>(abs(p.x)-.717,p.y-.30,abs(p.z)-.62),.155,.014),4.);\n d=put(d,cylX(vec3<f32>(abs(p.x)-.735,p.y-.30,abs(p.z)-.62),.067,.02),1.);\n d=put(d,box(vec3<f32>(abs(p.x)-.37,p.y-.58,p.z-1.075),vec3<f32>(.13,.07,.012),.045),5.);\n d=put(d,box(vec3<f32>(abs(p.x)-.39,p.y-.55,p.z+1.075),vec3<f32>(.09,.065,.014),.025),6.);\n d=put(d,box(p-vec3<f32>(0.,.35,1.06),vec3<f32>(.40,.035,.035),.035),4.);\n d.x=d.x*sc;return d;\n}\nfn scene(p:vec3<f32>)->vec2<f32> {\n let t=params.animationTime-params.start;let shot=params.shot;\n let hero=shot<.5||shot>3.5;\n var d=vec2<f32>(p.y+.27,0.);\n if(hero){\n  d=put(d,cylY(p-vec3<f32>(0.,-.14,0.),2.38,.16),7.);\n }else if(shot<2.5){\n  d=put(d,box(p-vec3<f32>(0.,-.25,0.),vec3<f32>(2.75,.13,3.6),.10),7.);\n  let q=vec3<f32>(p.x-road(p.z),p.y+.018,p.z);\n  d=put(d,box(q,vec3<f32>(1.05,.015,3.5),.025),8.);\n  let dz=abs(fract((p.z+t*1.3)/.95)-.5)*.95;\n  d=put(d,max(box(vec3<f32>(p.x-road(p.z),p.y-.032,dz),vec3<f32>(.035,.008,.19),.013),abs(p.z)-3.45),5.);\n  for(var i=0;i<4;i=i+1){\n   let fi=f32(i);let side=select(-1.,1.,i%2==0);let z=(fi-1.5)*1.8;\n   let center=vec3<f32>(side*2.08,0.,z);\n   let growth=ease((t-.1*fi)/.8);\n   let h=.6*growth;\n   d=put(d,cylY(p-center-vec3<f32>(0.,h*.5,0.),.07,h*.5),9.);\n   let top=p-center-vec3<f32>(0.,h+.34*growth,0.);\n   d=put(d,(length(top/vec3<f32>(1.,1.25,1.))-.48*growth)*.8,10.);\n  }\n }else{\n  d=put(d,cylY(p-vec3<f32>(0.,-.14,0.),2.8,.16),7.);\n  for(var i=0;i<3;i=i+1){\n   let fi=f32(i);let h=(.5+fi*.50)*ease((t-.18*fi)/1.0);\n   d=put(d,box(p-vec3<f32>((fi-1.)*1.13,h*.5,-.8),vec3<f32>(.39,h*.5,.40),.09),11.+fi);\n  }\n }\n if(shot<2.5||hero){let c=car(p,t,hero);d=put(d,c.x,c.y);}\n return d;\n}\nfn normal(p:vec3<f32>)->vec3<f32>{let e=.003;return normalize(vec3<f32>(scene(p+vec3<f32>(e,0.,0.)).x-scene(p-vec3<f32>(e,0.,0.)).x,scene(p+vec3<f32>(0.,e,0.)).x-scene(p-vec3<f32>(0.,e,0.)).x,scene(p+vec3<f32>(0.,0.,e)).x-scene(p-vec3<f32>(0.,0.,e)).x));}\nfn color(id:f32)->vec3<f32>{\n if(id<.5){return vec3<f32>(.951,.941,.914);}\n if(id<1.5){return vec3<f32>(.10,.26,.81);}\n if(id<2.5){return vec3<f32>(.055,.13,.22);}\n if(id<3.5){return vec3<f32>(.075,.086,.105);}\n if(id<4.5){return vec3<f32>(.80,.85,.87);}\n if(id<5.5){return vec3<f32>(1.,.95,.75);}\n if(id<6.5){return vec3<f32>(.92,.22,.13);}\n if(id<7.5){return vec3<f32>(.79,.86,.75);}\n if(id<8.5){return vec3<f32>(.34,.40,.49);}\n if(id<9.5){return vec3<f32>(.60,.35,.18);}\n if(id<10.5){return vec3<f32>(.28,.57,.36);}\n if(id<11.5){return vec3<f32>(.49,.65,.98);}\n if(id<12.5){return vec3<f32>(.23,.43,.90);}\n return vec3<f32>(.12,.30,.78);\n}\n@fragment fn fs_main(v:VertexOutput)->@location(0) vec4<f32>{\n let t=params.animationTime-params.start;\n let hero=params.shot<.5||params.shot>3.5;\n let center=select(.72,.70,hero);\n let frame=vec2<f32>((v.tex_coords.x-center)*1.7778,.56-v.tex_coords.y);\n let cam=rot(vec3<f32>(5.2,4.6,6.8),.11*sin(t*.43));\n let aim=vec3<f32>(0.,.35,0.);\n let forward=normalize(aim-cam);let right=normalize(cross(forward,vec3<f32>(0.,1.,0.)));let up=cross(right,forward);\n let span=select(9.3,7.2,hero)+.18*sin(t*.5);\n let ro=cam+span*(frame.x*right+frame.y*up);\n let rd=forward;\n var dist=0.;var hit=vec2<f32>(1.,0.);var found=false;\n for(var i=0;i<64;i=i+1){hit=scene(ro+rd*dist);if(hit.x<.004){found=true;break;}dist=dist+max(hit.x*.85,.003);if(dist>25.){break;}}\n var rgb=vec3<f32>(.951,.941,.914);\n if(found){\n  let p=ro+rd*dist;let n=normal(p);let light=normalize(vec3<f32>(-3.,6.,4.));\n  var shadow=1.;var sd=.03;\n  for(var j=0;j<14;j=j+1){let h=scene(p+n*.013+light*sd).x;shadow=min(shadow,8.*h/sd);sd=sd+clamp(h,.05,.36);}\n  shadow=clamp(shadow,.28,1.);\n  let ambient=.60+.12*n.y;let diffuse=max(dot(n,light),0.)*.43*shadow;\n  let occl=clamp(scene(p+n*.16).x/.16,.40,1.);\n  let base=color(hit.y);\n  let spec=pow(max(dot(reflect(-light,n),-rd),0.),42.)*.25*shadow;\n  rgb=base*(ambient+diffuse)*(.80+.20*occl)+spec;\n  if(hit.y<.5){rgb=mix(vec3<f32>(.951,.941,.914),rgb,.52);}\n }\n return vec4<f32>(clamp(rgb,vec3<f32>(0.),vec3<f32>(1.)),1.);\n}\n"
+            },
+            "enabled": true,
+            "id": 100
+          }
+        ],
+        "id": 18,
+        "name": "3D miniature world / shot 1",
+        "rect": {
+          "fillColor": [
+            1.0,
+            1.0,
+            1.0,
+            1.0
+          ],
+          "fillEnabled": true,
+          "position": [
+            0.0,
+            0.0
+          ],
+          "roundness": 0.0,
+          "size": [
+            1920.0,
+            1080.0
+          ],
+          "strokeEnabled": false,
+          "strokeWidth": 0.0
+        },
+        "transform": {
+          "anchorPoint": [
+            0.0,
+            0.0
+          ],
+          "opacity": 100.0,
+          "orientation": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "position": [
+            0.0,
+            0.0
+          ],
+          "rotation": 0.0,
+          "rotationX": 0.0,
+          "rotationY": 0.0,
+          "scale": [
+            100.0,
+            100.0
+          ],
+          "skew": 0.0,
+          "skewAxis": 0.0
+        },
+        "type": "Rect"
+      },
+      {
+        "activeRange": {
+          "duration": 6000,
+          "start": 4000
+        },
+        "blendMode": "normal",
+        "effects": [
+          {
+            "effect": {
+              "description": "Lit solid car, tires, windows, roads, trees and growth pillars, modeled with signed distance geometry. Orthographic camera, contact shadows, restrained motion.",
+              "name": "RoamMiniatureWorld",
+              "params": [
+                {
+                  "default": 0.0,
+                  "description": "Engine time in seconds.",
+                  "max": 24.0,
+                  "min": 0.0,
+                  "name": "animationTime"
+                },
+                {
+                  "default": 1.0,
+                  "description": "Scene selector: 0 hero, 1 route, 2 drive, 3 progress, 4 signoff.",
+                  "max": 4.0,
+                  "min": 0.0,
+                  "name": "shot"
+                },
+                {
+                  "default": 0.0,
+                  "description": "Reserved camera control.",
+                  "max": 10.0,
+                  "min": 0.0,
+                  "name": "camera"
+                },
+                {
+                  "default": 4.0,
+                  "description": "Scene in-point in seconds.",
+                  "max": 24.0,
+                  "min": 0.0,
+                  "name": "start"
+                }
+              ],
+              "textureInputs": [],
+              "type": "customShader",
+              "wgsl": "struct VertexInput { @location(0) position: vec2<f32>, @location(1) tex_coords: vec2<f32>, @location(2) color: vec4<f32> };\nstruct VertexOutput { @builtin(position) clip_position: vec4<f32>, @location(0) tex_coords: vec2<f32> };\n@vertex fn vs_main(v: VertexInput) -> VertexOutput { var o: VertexOutput; o.clip_position=vec4<f32>(v.position,0.,1.); o.tex_coords=v.tex_coords; return o; }\nstruct Params { animationTime: f32, shot: f32, camera: f32, start: f32 };\n@group(0) @binding(0) var source: texture_2d<f32>;\n@group(0) @binding(1) var samp: sampler;\n@group(0) @binding(2) var<uniform> params: Params;\nfn ease(t:f32)->f32 { let q=clamp(t,0.,1.);return q*q*(3.-2.*q); }\nfn box(p:vec3<f32>,b:vec3<f32>,r:f32)->f32 { let q=abs(p)-b;return length(max(q,vec3<f32>(0.)))+min(max(q.x,max(q.y,q.z)),0.)-r; }\nfn cylX(p:vec3<f32>,r:f32,h:f32)->f32 { let q=vec2<f32>(length(p.yz)-r,abs(p.x)-h);return min(max(q.x,q.y),0.)+length(max(q,vec2<f32>(0.))); }\nfn cylY(p:vec3<f32>,r:f32,h:f32)->f32 { let q=vec2<f32>(length(p.xz)-r,abs(p.y)-h);return min(max(q.x,q.y),0.)+length(max(q,vec2<f32>(0.))); }\nfn rot(p:vec3<f32>,a:f32)->vec3<f32> {return vec3<f32>(cos(a)*p.x-sin(a)*p.z,p.y,sin(a)*p.x+cos(a)*p.z);}\nfn put(a:vec2<f32>,d:f32,id:f32)->vec2<f32> {if(d<a.x){return vec2<f32>(d,id);}return a;}\nfn road(z:f32)->f32{return .65*sin(z*.62);}\nfn car(p0:vec3<f32>,t:f32,hero:bool)->vec2<f32> {\n var p=p0; var sc=1.;\n if(hero){sc=1.65;p=rot(p-vec3<f32>(0.,.08,0.),-.55+.8*ease(t/3.5)+.05*sin(t*1.5));}\n else {let z=.35*sin(t*.75); p=rot(p-vec3<f32>(road(z)+.38,0.,z),-.25*cos(z*.62));}\n p=p/sc;\n p.y=p.y-.015*sin(t*3.);\n var d=vec2<f32>(box(p-vec3<f32>(0.,.51,0.),vec3<f32>(.55,.19,.96),.12),1.);\n d=put(d,box(p-vec3<f32>(0.,.89,-.14),vec3<f32>(.46,.23,.49),.11),2.);\n d=put(d,box(p-vec3<f32>(0.,1.15,-.14),vec3<f32>(.49,.035,.49),.065),1.);\n d=put(d,box(p-vec3<f32>(0.,.91,-.18),vec3<f32>(.535,.25,.033),.018),1.);\n let wp=vec3<f32>(abs(p.x)-.59,p.y-.30,abs(p.z)-.62);\n d=put(d,cylX(wp,.275,.115),3.);\n d=put(d,cylX(vec3<f32>(abs(p.x)-.717,p.y-.30,abs(p.z)-.62),.155,.014),4.);\n d=put(d,cylX(vec3<f32>(abs(p.x)-.735,p.y-.30,abs(p.z)-.62),.067,.02),1.);\n d=put(d,box(vec3<f32>(abs(p.x)-.37,p.y-.58,p.z-1.075),vec3<f32>(.13,.07,.012),.045),5.);\n d=put(d,box(vec3<f32>(abs(p.x)-.39,p.y-.55,p.z+1.075),vec3<f32>(.09,.065,.014),.025),6.);\n d=put(d,box(p-vec3<f32>(0.,.35,1.06),vec3<f32>(.40,.035,.035),.035),4.);\n d.x=d.x*sc;return d;\n}\nfn scene(p:vec3<f32>)->vec2<f32> {\n let t=params.animationTime-params.start;let shot=params.shot;\n let hero=shot<.5||shot>3.5;\n var d=vec2<f32>(p.y+.27,0.);\n if(hero){\n  d=put(d,cylY(p-vec3<f32>(0.,-.14,0.),2.38,.16),7.);\n }else if(shot<2.5){\n  d=put(d,box(p-vec3<f32>(0.,-.25,0.),vec3<f32>(2.75,.13,3.6),.10),7.);\n  let q=vec3<f32>(p.x-road(p.z),p.y+.018,p.z);\n  d=put(d,box(q,vec3<f32>(1.05,.015,3.5),.025),8.);\n  let dz=abs(fract((p.z+t*1.3)/.95)-.5)*.95;\n  d=put(d,max(box(vec3<f32>(p.x-road(p.z),p.y-.032,dz),vec3<f32>(.035,.008,.19),.013),abs(p.z)-3.45),5.);\n  for(var i=0;i<4;i=i+1){\n   let fi=f32(i);let side=select(-1.,1.,i%2==0);let z=(fi-1.5)*1.8;\n   let center=vec3<f32>(side*2.08,0.,z);\n   let growth=ease((t-.1*fi)/.8);\n   let h=.6*growth;\n   d=put(d,cylY(p-center-vec3<f32>(0.,h*.5,0.),.07,h*.5),9.);\n   let top=p-center-vec3<f32>(0.,h+.34*growth,0.);\n   d=put(d,(length(top/vec3<f32>(1.,1.25,1.))-.48*growth)*.8,10.);\n  }\n }else{\n  d=put(d,cylY(p-vec3<f32>(0.,-.14,0.),2.8,.16),7.);\n  for(var i=0;i<3;i=i+1){\n   let fi=f32(i);let h=(.5+fi*.50)*ease((t-.18*fi)/1.0);\n   d=put(d,box(p-vec3<f32>((fi-1.)*1.13,h*.5,-.8),vec3<f32>(.39,h*.5,.40),.09),11.+fi);\n  }\n }\n if(shot<2.5||hero){let c=car(p,t,hero);d=put(d,c.x,c.y);}\n return d;\n}\nfn normal(p:vec3<f32>)->vec3<f32>{let e=.003;return normalize(vec3<f32>(scene(p+vec3<f32>(e,0.,0.)).x-scene(p-vec3<f32>(e,0.,0.)).x,scene(p+vec3<f32>(0.,e,0.)).x-scene(p-vec3<f32>(0.,e,0.)).x,scene(p+vec3<f32>(0.,0.,e)).x-scene(p-vec3<f32>(0.,0.,e)).x));}\nfn color(id:f32)->vec3<f32>{\n if(id<.5){return vec3<f32>(.951,.941,.914);}\n if(id<1.5){return vec3<f32>(.10,.26,.81);}\n if(id<2.5){return vec3<f32>(.055,.13,.22);}\n if(id<3.5){return vec3<f32>(.075,.086,.105);}\n if(id<4.5){return vec3<f32>(.80,.85,.87);}\n if(id<5.5){return vec3<f32>(1.,.95,.75);}\n if(id<6.5){return vec3<f32>(.92,.22,.13);}\n if(id<7.5){return vec3<f32>(.79,.86,.75);}\n if(id<8.5){return vec3<f32>(.34,.40,.49);}\n if(id<9.5){return vec3<f32>(.60,.35,.18);}\n if(id<10.5){return vec3<f32>(.28,.57,.36);}\n if(id<11.5){return vec3<f32>(.49,.65,.98);}\n if(id<12.5){return vec3<f32>(.23,.43,.90);}\n return vec3<f32>(.12,.30,.78);\n}\n@fragment fn fs_main(v:VertexOutput)->@location(0) vec4<f32>{\n let t=params.animationTime-params.start;\n let hero=params.shot<.5||params.shot>3.5;\n let center=select(.72,.70,hero);\n let frame=vec2<f32>((v.tex_coords.x-center)*1.7778,.56-v.tex_coords.y);\n let cam=rot(vec3<f32>(5.2,4.6,6.8),.11*sin(t*.43));\n let aim=vec3<f32>(0.,.35,0.);\n let forward=normalize(aim-cam);let right=normalize(cross(forward,vec3<f32>(0.,1.,0.)));let up=cross(right,forward);\n let span=select(9.3,7.2,hero)+.18*sin(t*.5);\n let ro=cam+span*(frame.x*right+frame.y*up);\n let rd=forward;\n var dist=0.;var hit=vec2<f32>(1.,0.);var found=false;\n for(var i=0;i<64;i=i+1){hit=scene(ro+rd*dist);if(hit.x<.004){found=true;break;}dist=dist+max(hit.x*.85,.003);if(dist>25.){break;}}\n var rgb=vec3<f32>(.951,.941,.914);\n if(found){\n  let p=ro+rd*dist;let n=normal(p);let light=normalize(vec3<f32>(-3.,6.,4.));\n  var shadow=1.;var sd=.03;\n  for(var j=0;j<14;j=j+1){let h=scene(p+n*.013+light*sd).x;shadow=min(shadow,8.*h/sd);sd=sd+clamp(h,.05,.36);}\n  shadow=clamp(shadow,.28,1.);\n  let ambient=.60+.12*n.y;let diffuse=max(dot(n,light),0.)*.43*shadow;\n  let occl=clamp(scene(p+n*.16).x/.16,.40,1.);\n  let base=color(hit.y);\n  let spec=pow(max(dot(reflect(-light,n),-rd),0.),42.)*.25*shadow;\n  rgb=base*(ambient+diffuse)*(.80+.20*occl)+spec;\n  if(hit.y<.5){rgb=mix(vec3<f32>(.951,.941,.914),rgb,.52);}\n }\n return vec4<f32>(clamp(rgb,vec3<f32>(0.),vec3<f32>(1.)),1.);\n}\n"
+            },
+            "enabled": true,
+            "id": 101
+          }
+        ],
+        "id": 19,
+        "name": "3D miniature world / shot 2",
+        "rect": {
+          "fillColor": [
+            1.0,
+            1.0,
+            1.0,
+            1.0
+          ],
+          "fillEnabled": true,
+          "position": [
+            0.0,
+            0.0
+          ],
+          "roundness": 0.0,
+          "size": [
+            1920.0,
+            1080.0
+          ],
+          "strokeEnabled": false,
+          "strokeWidth": 0.0
+        },
+        "transform": {
+          "anchorPoint": [
+            0.0,
+            0.0
+          ],
+          "opacity": 100.0,
+          "orientation": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "position": [
+            0.0,
+            0.0
+          ],
+          "rotation": 0.0,
+          "rotationX": 0.0,
+          "rotationY": 0.0,
+          "scale": [
+            100.0,
+            100.0
+          ],
+          "skew": 0.0,
+          "skewAxis": 0.0
+        },
+        "type": "Rect"
+      },
+      {
+        "activeRange": {
+          "duration": 4000,
+          "start": 10000
+        },
+        "blendMode": "normal",
+        "effects": [
+          {
+            "effect": {
+              "description": "Lit solid car, tires, windows, roads, trees and growth pillars, modeled with signed distance geometry. Orthographic camera, contact shadows, restrained motion.",
+              "name": "RoamMiniatureWorld",
+              "params": [
+                {
+                  "default": 0.0,
+                  "description": "Engine time in seconds.",
+                  "max": 24.0,
+                  "min": 0.0,
+                  "name": "animationTime"
+                },
+                {
+                  "default": 2.0,
+                  "description": "Scene selector: 0 hero, 1 route, 2 drive, 3 progress, 4 signoff.",
+                  "max": 4.0,
+                  "min": 0.0,
+                  "name": "shot"
+                },
+                {
+                  "default": 0.0,
+                  "description": "Reserved camera control.",
+                  "max": 10.0,
+                  "min": 0.0,
+                  "name": "camera"
+                },
+                {
+                  "default": 10.0,
+                  "description": "Scene in-point in seconds.",
+                  "max": 24.0,
+                  "min": 0.0,
+                  "name": "start"
+                }
+              ],
+              "textureInputs": [],
+              "type": "customShader",
+              "wgsl": "struct VertexInput { @location(0) position: vec2<f32>, @location(1) tex_coords: vec2<f32>, @location(2) color: vec4<f32> };\nstruct VertexOutput { @builtin(position) clip_position: vec4<f32>, @location(0) tex_coords: vec2<f32> };\n@vertex fn vs_main(v: VertexInput) -> VertexOutput { var o: VertexOutput; o.clip_position=vec4<f32>(v.position,0.,1.); o.tex_coords=v.tex_coords; return o; }\nstruct Params { animationTime: f32, shot: f32, camera: f32, start: f32 };\n@group(0) @binding(0) var source: texture_2d<f32>;\n@group(0) @binding(1) var samp: sampler;\n@group(0) @binding(2) var<uniform> params: Params;\nfn ease(t:f32)->f32 { let q=clamp(t,0.,1.);return q*q*(3.-2.*q); }\nfn box(p:vec3<f32>,b:vec3<f32>,r:f32)->f32 { let q=abs(p)-b;return length(max(q,vec3<f32>(0.)))+min(max(q.x,max(q.y,q.z)),0.)-r; }\nfn cylX(p:vec3<f32>,r:f32,h:f32)->f32 { let q=vec2<f32>(length(p.yz)-r,abs(p.x)-h);return min(max(q.x,q.y),0.)+length(max(q,vec2<f32>(0.))); }\nfn cylY(p:vec3<f32>,r:f32,h:f32)->f32 { let q=vec2<f32>(length(p.xz)-r,abs(p.y)-h);return min(max(q.x,q.y),0.)+length(max(q,vec2<f32>(0.))); }\nfn rot(p:vec3<f32>,a:f32)->vec3<f32> {return vec3<f32>(cos(a)*p.x-sin(a)*p.z,p.y,sin(a)*p.x+cos(a)*p.z);}\nfn put(a:vec2<f32>,d:f32,id:f32)->vec2<f32> {if(d<a.x){return vec2<f32>(d,id);}return a;}\nfn road(z:f32)->f32{return .65*sin(z*.62);}\nfn car(p0:vec3<f32>,t:f32,hero:bool)->vec2<f32> {\n var p=p0; var sc=1.;\n if(hero){sc=1.65;p=rot(p-vec3<f32>(0.,.08,0.),-.55+.8*ease(t/3.5)+.05*sin(t*1.5));}\n else {let z=.35*sin(t*.75); p=rot(p-vec3<f32>(road(z)+.38,0.,z),-.25*cos(z*.62));}\n p=p/sc;\n p.y=p.y-.015*sin(t*3.);\n var d=vec2<f32>(box(p-vec3<f32>(0.,.51,0.),vec3<f32>(.55,.19,.96),.12),1.);\n d=put(d,box(p-vec3<f32>(0.,.89,-.14),vec3<f32>(.46,.23,.49),.11),2.);\n d=put(d,box(p-vec3<f32>(0.,1.15,-.14),vec3<f32>(.49,.035,.49),.065),1.);\n d=put(d,box(p-vec3<f32>(0.,.91,-.18),vec3<f32>(.535,.25,.033),.018),1.);\n let wp=vec3<f32>(abs(p.x)-.59,p.y-.30,abs(p.z)-.62);\n d=put(d,cylX(wp,.275,.115),3.);\n d=put(d,cylX(vec3<f32>(abs(p.x)-.717,p.y-.30,abs(p.z)-.62),.155,.014),4.);\n d=put(d,cylX(vec3<f32>(abs(p.x)-.735,p.y-.30,abs(p.z)-.62),.067,.02),1.);\n d=put(d,box(vec3<f32>(abs(p.x)-.37,p.y-.58,p.z-1.075),vec3<f32>(.13,.07,.012),.045),5.);\n d=put(d,box(vec3<f32>(abs(p.x)-.39,p.y-.55,p.z+1.075),vec3<f32>(.09,.065,.014),.025),6.);\n d=put(d,box(p-vec3<f32>(0.,.35,1.06),vec3<f32>(.40,.035,.035),.035),4.);\n d.x=d.x*sc;return d;\n}\nfn scene(p:vec3<f32>)->vec2<f32> {\n let t=params.animationTime-params.start;let shot=params.shot;\n let hero=shot<.5||shot>3.5;\n var d=vec2<f32>(p.y+.27,0.);\n if(hero){\n  d=put(d,cylY(p-vec3<f32>(0.,-.14,0.),2.38,.16),7.);\n }else if(shot<2.5){\n  d=put(d,box(p-vec3<f32>(0.,-.25,0.),vec3<f32>(2.75,.13,3.6),.10),7.);\n  let q=vec3<f32>(p.x-road(p.z),p.y+.018,p.z);\n  d=put(d,box(q,vec3<f32>(1.05,.015,3.5),.025),8.);\n  let dz=abs(fract((p.z+t*1.3)/.95)-.5)*.95;\n  d=put(d,max(box(vec3<f32>(p.x-road(p.z),p.y-.032,dz),vec3<f32>(.035,.008,.19),.013),abs(p.z)-3.45),5.);\n  for(var i=0;i<4;i=i+1){\n   let fi=f32(i);let side=select(-1.,1.,i%2==0);let z=(fi-1.5)*1.8;\n   let center=vec3<f32>(side*2.08,0.,z);\n   let growth=ease((t-.1*fi)/.8);\n   let h=.6*growth;\n   d=put(d,cylY(p-center-vec3<f32>(0.,h*.5,0.),.07,h*.5),9.);\n   let top=p-center-vec3<f32>(0.,h+.34*growth,0.);\n   d=put(d,(length(top/vec3<f32>(1.,1.25,1.))-.48*growth)*.8,10.);\n  }\n }else{\n  d=put(d,cylY(p-vec3<f32>(0.,-.14,0.),2.8,.16),7.);\n  for(var i=0;i<3;i=i+1){\n   let fi=f32(i);let h=(.5+fi*.50)*ease((t-.18*fi)/1.0);\n   d=put(d,box(p-vec3<f32>((fi-1.)*1.13,h*.5,-.8),vec3<f32>(.39,h*.5,.40),.09),11.+fi);\n  }\n }\n if(shot<2.5||hero){let c=car(p,t,hero);d=put(d,c.x,c.y);}\n return d;\n}\nfn normal(p:vec3<f32>)->vec3<f32>{let e=.003;return normalize(vec3<f32>(scene(p+vec3<f32>(e,0.,0.)).x-scene(p-vec3<f32>(e,0.,0.)).x,scene(p+vec3<f32>(0.,e,0.)).x-scene(p-vec3<f32>(0.,e,0.)).x,scene(p+vec3<f32>(0.,0.,e)).x-scene(p-vec3<f32>(0.,0.,e)).x));}\nfn color(id:f32)->vec3<f32>{\n if(id<.5){return vec3<f32>(.951,.941,.914);}\n if(id<1.5){return vec3<f32>(.10,.26,.81);}\n if(id<2.5){return vec3<f32>(.055,.13,.22);}\n if(id<3.5){return vec3<f32>(.075,.086,.105);}\n if(id<4.5){return vec3<f32>(.80,.85,.87);}\n if(id<5.5){return vec3<f32>(1.,.95,.75);}\n if(id<6.5){return vec3<f32>(.92,.22,.13);}\n if(id<7.5){return vec3<f32>(.79,.86,.75);}\n if(id<8.5){return vec3<f32>(.34,.40,.49);}\n if(id<9.5){return vec3<f32>(.60,.35,.18);}\n if(id<10.5){return vec3<f32>(.28,.57,.36);}\n if(id<11.5){return vec3<f32>(.49,.65,.98);}\n if(id<12.5){return vec3<f32>(.23,.43,.90);}\n return vec3<f32>(.12,.30,.78);\n}\n@fragment fn fs_main(v:VertexOutput)->@location(0) vec4<f32>{\n let t=params.animationTime-params.start;\n let hero=params.shot<.5||params.shot>3.5;\n let center=select(.72,.70,hero);\n let frame=vec2<f32>((v.tex_coords.x-center)*1.7778,.56-v.tex_coords.y);\n let cam=rot(vec3<f32>(5.2,4.6,6.8),.11*sin(t*.43));\n let aim=vec3<f32>(0.,.35,0.);\n let forward=normalize(aim-cam);let right=normalize(cross(forward,vec3<f32>(0.,1.,0.)));let up=cross(right,forward);\n let span=select(9.3,7.2,hero)+.18*sin(t*.5);\n let ro=cam+span*(frame.x*right+frame.y*up);\n let rd=forward;\n var dist=0.;var hit=vec2<f32>(1.,0.);var found=false;\n for(var i=0;i<64;i=i+1){hit=scene(ro+rd*dist);if(hit.x<.004){found=true;break;}dist=dist+max(hit.x*.85,.003);if(dist>25.){break;}}\n var rgb=vec3<f32>(.951,.941,.914);\n if(found){\n  let p=ro+rd*dist;let n=normal(p);let light=normalize(vec3<f32>(-3.,6.,4.));\n  var shadow=1.;var sd=.03;\n  for(var j=0;j<14;j=j+1){let h=scene(p+n*.013+light*sd).x;shadow=min(shadow,8.*h/sd);sd=sd+clamp(h,.05,.36);}\n  shadow=clamp(shadow,.28,1.);\n  let ambient=.60+.12*n.y;let diffuse=max(dot(n,light),0.)*.43*shadow;\n  let occl=clamp(scene(p+n*.16).x/.16,.40,1.);\n  let base=color(hit.y);\n  let spec=pow(max(dot(reflect(-light,n),-rd),0.),42.)*.25*shadow;\n  rgb=base*(ambient+diffuse)*(.80+.20*occl)+spec;\n  if(hit.y<.5){rgb=mix(vec3<f32>(.951,.941,.914),rgb,.52);}\n }\n return vec4<f32>(clamp(rgb,vec3<f32>(0.),vec3<f32>(1.)),1.);\n}\n"
+            },
+            "enabled": true,
+            "id": 102
+          }
+        ],
+        "id": 20,
+        "name": "3D miniature world / shot 3",
+        "rect": {
+          "fillColor": [
+            1.0,
+            1.0,
+            1.0,
+            1.0
+          ],
+          "fillEnabled": true,
+          "position": [
+            0.0,
+            0.0
+          ],
+          "roundness": 0.0,
+          "size": [
+            1920.0,
+            1080.0
+          ],
+          "strokeEnabled": false,
+          "strokeWidth": 0.0
+        },
+        "transform": {
+          "anchorPoint": [
+            0.0,
+            0.0
+          ],
+          "opacity": 100.0,
+          "orientation": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "position": [
+            0.0,
+            0.0
+          ],
+          "rotation": 0.0,
+          "rotationX": 0.0,
+          "rotationY": 0.0,
+          "scale": [
+            100.0,
+            100.0
+          ],
+          "skew": 0.0,
+          "skewAxis": 0.0
+        },
+        "type": "Rect"
+      },
+      {
+        "activeRange": {
+          "duration": 4000,
+          "start": 14000
+        },
+        "blendMode": "normal",
+        "effects": [
+          {
+            "effect": {
+              "description": "Lit solid car, tires, windows, roads, trees and growth pillars, modeled with signed distance geometry. Orthographic camera, contact shadows, restrained motion.",
+              "name": "RoamMiniatureWorld",
+              "params": [
+                {
+                  "default": 0.0,
+                  "description": "Engine time in seconds.",
+                  "max": 24.0,
+                  "min": 0.0,
+                  "name": "animationTime"
+                },
+                {
+                  "default": 3.0,
+                  "description": "Scene selector: 0 hero, 1 route, 2 drive, 3 progress, 4 signoff.",
+                  "max": 4.0,
+                  "min": 0.0,
+                  "name": "shot"
+                },
+                {
+                  "default": 0.0,
+                  "description": "Reserved camera control.",
+                  "max": 10.0,
+                  "min": 0.0,
+                  "name": "camera"
+                },
+                {
+                  "default": 14.0,
+                  "description": "Scene in-point in seconds.",
+                  "max": 24.0,
+                  "min": 0.0,
+                  "name": "start"
+                }
+              ],
+              "textureInputs": [],
+              "type": "customShader",
+              "wgsl": "struct VertexInput { @location(0) position: vec2<f32>, @location(1) tex_coords: vec2<f32>, @location(2) color: vec4<f32> };\nstruct VertexOutput { @builtin(position) clip_position: vec4<f32>, @location(0) tex_coords: vec2<f32> };\n@vertex fn vs_main(v: VertexInput) -> VertexOutput { var o: VertexOutput; o.clip_position=vec4<f32>(v.position,0.,1.); o.tex_coords=v.tex_coords; return o; }\nstruct Params { animationTime: f32, shot: f32, camera: f32, start: f32 };\n@group(0) @binding(0) var source: texture_2d<f32>;\n@group(0) @binding(1) var samp: sampler;\n@group(0) @binding(2) var<uniform> params: Params;\nfn ease(t:f32)->f32 { let q=clamp(t,0.,1.);return q*q*(3.-2.*q); }\nfn box(p:vec3<f32>,b:vec3<f32>,r:f32)->f32 { let q=abs(p)-b;return length(max(q,vec3<f32>(0.)))+min(max(q.x,max(q.y,q.z)),0.)-r; }\nfn cylX(p:vec3<f32>,r:f32,h:f32)->f32 { let q=vec2<f32>(length(p.yz)-r,abs(p.x)-h);return min(max(q.x,q.y),0.)+length(max(q,vec2<f32>(0.))); }\nfn cylY(p:vec3<f32>,r:f32,h:f32)->f32 { let q=vec2<f32>(length(p.xz)-r,abs(p.y)-h);return min(max(q.x,q.y),0.)+length(max(q,vec2<f32>(0.))); }\nfn rot(p:vec3<f32>,a:f32)->vec3<f32> {return vec3<f32>(cos(a)*p.x-sin(a)*p.z,p.y,sin(a)*p.x+cos(a)*p.z);}\nfn put(a:vec2<f32>,d:f32,id:f32)->vec2<f32> {if(d<a.x){return vec2<f32>(d,id);}return a;}\nfn road(z:f32)->f32{return .65*sin(z*.62);}\nfn car(p0:vec3<f32>,t:f32,hero:bool)->vec2<f32> {\n var p=p0; var sc=1.;\n if(hero){sc=1.65;p=rot(p-vec3<f32>(0.,.08,0.),-.55+.8*ease(t/3.5)+.05*sin(t*1.5));}\n else {let z=.35*sin(t*.75); p=rot(p-vec3<f32>(road(z)+.38,0.,z),-.25*cos(z*.62));}\n p=p/sc;\n p.y=p.y-.015*sin(t*3.);\n var d=vec2<f32>(box(p-vec3<f32>(0.,.51,0.),vec3<f32>(.55,.19,.96),.12),1.);\n d=put(d,box(p-vec3<f32>(0.,.89,-.14),vec3<f32>(.46,.23,.49),.11),2.);\n d=put(d,box(p-vec3<f32>(0.,1.15,-.14),vec3<f32>(.49,.035,.49),.065),1.);\n d=put(d,box(p-vec3<f32>(0.,.91,-.18),vec3<f32>(.535,.25,.033),.018),1.);\n let wp=vec3<f32>(abs(p.x)-.59,p.y-.30,abs(p.z)-.62);\n d=put(d,cylX(wp,.275,.115),3.);\n d=put(d,cylX(vec3<f32>(abs(p.x)-.717,p.y-.30,abs(p.z)-.62),.155,.014),4.);\n d=put(d,cylX(vec3<f32>(abs(p.x)-.735,p.y-.30,abs(p.z)-.62),.067,.02),1.);\n d=put(d,box(vec3<f32>(abs(p.x)-.37,p.y-.58,p.z-1.075),vec3<f32>(.13,.07,.012),.045),5.);\n d=put(d,box(vec3<f32>(abs(p.x)-.39,p.y-.55,p.z+1.075),vec3<f32>(.09,.065,.014),.025),6.);\n d=put(d,box(p-vec3<f32>(0.,.35,1.06),vec3<f32>(.40,.035,.035),.035),4.);\n d.x=d.x*sc;return d;\n}\nfn scene(p:vec3<f32>)->vec2<f32> {\n let t=params.animationTime-params.start;let shot=params.shot;\n let hero=shot<.5||shot>3.5;\n var d=vec2<f32>(p.y+.27,0.);\n if(hero){\n  d=put(d,cylY(p-vec3<f32>(0.,-.14,0.),2.38,.16),7.);\n }else if(shot<2.5){\n  d=put(d,box(p-vec3<f32>(0.,-.25,0.),vec3<f32>(2.75,.13,3.6),.10),7.);\n  let q=vec3<f32>(p.x-road(p.z),p.y+.018,p.z);\n  d=put(d,box(q,vec3<f32>(1.05,.015,3.5),.025),8.);\n  let dz=abs(fract((p.z+t*1.3)/.95)-.5)*.95;\n  d=put(d,max(box(vec3<f32>(p.x-road(p.z),p.y-.032,dz),vec3<f32>(.035,.008,.19),.013),abs(p.z)-3.45),5.);\n  for(var i=0;i<4;i=i+1){\n   let fi=f32(i);let side=select(-1.,1.,i%2==0);let z=(fi-1.5)*1.8;\n   let center=vec3<f32>(side*2.08,0.,z);\n   let growth=ease((t-.1*fi)/.8);\n   let h=.6*growth;\n   d=put(d,cylY(p-center-vec3<f32>(0.,h*.5,0.),.07,h*.5),9.);\n   let top=p-center-vec3<f32>(0.,h+.34*growth,0.);\n   d=put(d,(length(top/vec3<f32>(1.,1.25,1.))-.48*growth)*.8,10.);\n  }\n }else{\n  d=put(d,cylY(p-vec3<f32>(0.,-.14,0.),2.8,.16),7.);\n  for(var i=0;i<3;i=i+1){\n   let fi=f32(i);let h=(.5+fi*.50)*ease((t-.18*fi)/1.0);\n   d=put(d,box(p-vec3<f32>((fi-1.)*1.13,h*.5,-.8),vec3<f32>(.39,h*.5,.40),.09),11.+fi);\n  }\n }\n if(shot<2.5||hero){let c=car(p,t,hero);d=put(d,c.x,c.y);}\n return d;\n}\nfn normal(p:vec3<f32>)->vec3<f32>{let e=.003;return normalize(vec3<f32>(scene(p+vec3<f32>(e,0.,0.)).x-scene(p-vec3<f32>(e,0.,0.)).x,scene(p+vec3<f32>(0.,e,0.)).x-scene(p-vec3<f32>(0.,e,0.)).x,scene(p+vec3<f32>(0.,0.,e)).x-scene(p-vec3<f32>(0.,0.,e)).x));}\nfn color(id:f32)->vec3<f32>{\n if(id<.5){return vec3<f32>(.951,.941,.914);}\n if(id<1.5){return vec3<f32>(.10,.26,.81);}\n if(id<2.5){return vec3<f32>(.055,.13,.22);}\n if(id<3.5){return vec3<f32>(.075,.086,.105);}\n if(id<4.5){return vec3<f32>(.80,.85,.87);}\n if(id<5.5){return vec3<f32>(1.,.95,.75);}\n if(id<6.5){return vec3<f32>(.92,.22,.13);}\n if(id<7.5){return vec3<f32>(.79,.86,.75);}\n if(id<8.5){return vec3<f32>(.34,.40,.49);}\n if(id<9.5){return vec3<f32>(.60,.35,.18);}\n if(id<10.5){return vec3<f32>(.28,.57,.36);}\n if(id<11.5){return vec3<f32>(.49,.65,.98);}\n if(id<12.5){return vec3<f32>(.23,.43,.90);}\n return vec3<f32>(.12,.30,.78);\n}\n@fragment fn fs_main(v:VertexOutput)->@location(0) vec4<f32>{\n let t=params.animationTime-params.start;\n let hero=params.shot<.5||params.shot>3.5;\n let center=select(.72,.70,hero);\n let frame=vec2<f32>((v.tex_coords.x-center)*1.7778,.56-v.tex_coords.y);\n let cam=rot(vec3<f32>(5.2,4.6,6.8),.11*sin(t*.43));\n let aim=vec3<f32>(0.,.35,0.);\n let forward=normalize(aim-cam);let right=normalize(cross(forward,vec3<f32>(0.,1.,0.)));let up=cross(right,forward);\n let span=select(9.3,7.2,hero)+.18*sin(t*.5);\n let ro=cam+span*(frame.x*right+frame.y*up);\n let rd=forward;\n var dist=0.;var hit=vec2<f32>(1.,0.);var found=false;\n for(var i=0;i<64;i=i+1){hit=scene(ro+rd*dist);if(hit.x<.004){found=true;break;}dist=dist+max(hit.x*.85,.003);if(dist>25.){break;}}\n var rgb=vec3<f32>(.951,.941,.914);\n if(found){\n  let p=ro+rd*dist;let n=normal(p);let light=normalize(vec3<f32>(-3.,6.,4.));\n  var shadow=1.;var sd=.03;\n  for(var j=0;j<14;j=j+1){let h=scene(p+n*.013+light*sd).x;shadow=min(shadow,8.*h/sd);sd=sd+clamp(h,.05,.36);}\n  shadow=clamp(shadow,.28,1.);\n  let ambient=.60+.12*n.y;let diffuse=max(dot(n,light),0.)*.43*shadow;\n  let occl=clamp(scene(p+n*.16).x/.16,.40,1.);\n  let base=color(hit.y);\n  let spec=pow(max(dot(reflect(-light,n),-rd),0.),42.)*.25*shadow;\n  rgb=base*(ambient+diffuse)*(.80+.20*occl)+spec;\n  if(hit.y<.5){rgb=mix(vec3<f32>(.951,.941,.914),rgb,.52);}\n }\n return vec4<f32>(clamp(rgb,vec3<f32>(0.),vec3<f32>(1.)),1.);\n}\n"
+            },
+            "enabled": true,
+            "id": 103
+          }
+        ],
+        "id": 21,
+        "name": "3D miniature world / shot 4",
+        "rect": {
+          "fillColor": [
+            1.0,
+            1.0,
+            1.0,
+            1.0
+          ],
+          "fillEnabled": true,
+          "position": [
+            0.0,
+            0.0
+          ],
+          "roundness": 0.0,
+          "size": [
+            1920.0,
+            1080.0
+          ],
+          "strokeEnabled": false,
+          "strokeWidth": 0.0
+        },
+        "transform": {
+          "anchorPoint": [
+            0.0,
+            0.0
+          ],
+          "opacity": 100.0,
+          "orientation": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "position": [
+            0.0,
+            0.0
+          ],
+          "rotation": 0.0,
+          "rotationX": 0.0,
+          "rotationY": 0.0,
+          "scale": [
+            100.0,
+            100.0
+          ],
+          "skew": 0.0,
+          "skewAxis": 0.0
+        },
+        "type": "Rect"
+      },
+      {
+        "activeRange": {
+          "duration": 6000,
+          "start": 18000
+        },
+        "blendMode": "normal",
+        "effects": [
+          {
+            "effect": {
+              "description": "Lit solid car, tires, windows, roads, trees and growth pillars, modeled with signed distance geometry. Orthographic camera, contact shadows, restrained motion.",
+              "name": "RoamMiniatureWorld",
+              "params": [
+                {
+                  "default": 0.0,
+                  "description": "Engine time in seconds.",
+                  "max": 24.0,
+                  "min": 0.0,
+                  "name": "animationTime"
+                },
+                {
+                  "default": 4.0,
+                  "description": "Scene selector: 0 hero, 1 route, 2 drive, 3 progress, 4 signoff.",
+                  "max": 4.0,
+                  "min": 0.0,
+                  "name": "shot"
+                },
+                {
+                  "default": 0.0,
+                  "description": "Reserved camera control.",
+                  "max": 10.0,
+                  "min": 0.0,
+                  "name": "camera"
+                },
+                {
+                  "default": 18.0,
+                  "description": "Scene in-point in seconds.",
+                  "max": 24.0,
+                  "min": 0.0,
+                  "name": "start"
+                }
+              ],
+              "textureInputs": [],
+              "type": "customShader",
+              "wgsl": "struct VertexInput { @location(0) position: vec2<f32>, @location(1) tex_coords: vec2<f32>, @location(2) color: vec4<f32> };\nstruct VertexOutput { @builtin(position) clip_position: vec4<f32>, @location(0) tex_coords: vec2<f32> };\n@vertex fn vs_main(v: VertexInput) -> VertexOutput { var o: VertexOutput; o.clip_position=vec4<f32>(v.position,0.,1.); o.tex_coords=v.tex_coords; return o; }\nstruct Params { animationTime: f32, shot: f32, camera: f32, start: f32 };\n@group(0) @binding(0) var source: texture_2d<f32>;\n@group(0) @binding(1) var samp: sampler;\n@group(0) @binding(2) var<uniform> params: Params;\nfn ease(t:f32)->f32 { let q=clamp(t,0.,1.);return q*q*(3.-2.*q); }\nfn box(p:vec3<f32>,b:vec3<f32>,r:f32)->f32 { let q=abs(p)-b;return length(max(q,vec3<f32>(0.)))+min(max(q.x,max(q.y,q.z)),0.)-r; }\nfn cylX(p:vec3<f32>,r:f32,h:f32)->f32 { let q=vec2<f32>(length(p.yz)-r,abs(p.x)-h);return min(max(q.x,q.y),0.)+length(max(q,vec2<f32>(0.))); }\nfn cylY(p:vec3<f32>,r:f32,h:f32)->f32 { let q=vec2<f32>(length(p.xz)-r,abs(p.y)-h);return min(max(q.x,q.y),0.)+length(max(q,vec2<f32>(0.))); }\nfn rot(p:vec3<f32>,a:f32)->vec3<f32> {return vec3<f32>(cos(a)*p.x-sin(a)*p.z,p.y,sin(a)*p.x+cos(a)*p.z);}\nfn put(a:vec2<f32>,d:f32,id:f32)->vec2<f32> {if(d<a.x){return vec2<f32>(d,id);}return a;}\nfn road(z:f32)->f32{return .65*sin(z*.62);}\nfn car(p0:vec3<f32>,t:f32,hero:bool)->vec2<f32> {\n var p=p0; var sc=1.;\n if(hero){sc=1.65;p=rot(p-vec3<f32>(0.,.08,0.),-.55+.8*ease(t/3.5)+.05*sin(t*1.5));}\n else {let z=.35*sin(t*.75); p=rot(p-vec3<f32>(road(z)+.38,0.,z),-.25*cos(z*.62));}\n p=p/sc;\n p.y=p.y-.015*sin(t*3.);\n var d=vec2<f32>(box(p-vec3<f32>(0.,.51,0.),vec3<f32>(.55,.19,.96),.12),1.);\n d=put(d,box(p-vec3<f32>(0.,.89,-.14),vec3<f32>(.46,.23,.49),.11),2.);\n d=put(d,box(p-vec3<f32>(0.,1.15,-.14),vec3<f32>(.49,.035,.49),.065),1.);\n d=put(d,box(p-vec3<f32>(0.,.91,-.18),vec3<f32>(.535,.25,.033),.018),1.);\n let wp=vec3<f32>(abs(p.x)-.59,p.y-.30,abs(p.z)-.62);\n d=put(d,cylX(wp,.275,.115),3.);\n d=put(d,cylX(vec3<f32>(abs(p.x)-.717,p.y-.30,abs(p.z)-.62),.155,.014),4.);\n d=put(d,cylX(vec3<f32>(abs(p.x)-.735,p.y-.30,abs(p.z)-.62),.067,.02),1.);\n d=put(d,box(vec3<f32>(abs(p.x)-.37,p.y-.58,p.z-1.075),vec3<f32>(.13,.07,.012),.045),5.);\n d=put(d,box(vec3<f32>(abs(p.x)-.39,p.y-.55,p.z+1.075),vec3<f32>(.09,.065,.014),.025),6.);\n d=put(d,box(p-vec3<f32>(0.,.35,1.06),vec3<f32>(.40,.035,.035),.035),4.);\n d.x=d.x*sc;return d;\n}\nfn scene(p:vec3<f32>)->vec2<f32> {\n let t=params.animationTime-params.start;let shot=params.shot;\n let hero=shot<.5||shot>3.5;\n var d=vec2<f32>(p.y+.27,0.);\n if(hero){\n  d=put(d,cylY(p-vec3<f32>(0.,-.14,0.),2.38,.16),7.);\n }else if(shot<2.5){\n  d=put(d,box(p-vec3<f32>(0.,-.25,0.),vec3<f32>(2.75,.13,3.6),.10),7.);\n  let q=vec3<f32>(p.x-road(p.z),p.y+.018,p.z);\n  d=put(d,box(q,vec3<f32>(1.05,.015,3.5),.025),8.);\n  let dz=abs(fract((p.z+t*1.3)/.95)-.5)*.95;\n  d=put(d,max(box(vec3<f32>(p.x-road(p.z),p.y-.032,dz),vec3<f32>(.035,.008,.19),.013),abs(p.z)-3.45),5.);\n  for(var i=0;i<4;i=i+1){\n   let fi=f32(i);let side=select(-1.,1.,i%2==0);let z=(fi-1.5)*1.8;\n   let center=vec3<f32>(side*2.08,0.,z);\n   let growth=ease((t-.1*fi)/.8);\n   let h=.6*growth;\n   d=put(d,cylY(p-center-vec3<f32>(0.,h*.5,0.),.07,h*.5),9.);\n   let top=p-center-vec3<f32>(0.,h+.34*growth,0.);\n   d=put(d,(length(top/vec3<f32>(1.,1.25,1.))-.48*growth)*.8,10.);\n  }\n }else{\n  d=put(d,cylY(p-vec3<f32>(0.,-.14,0.),2.8,.16),7.);\n  for(var i=0;i<3;i=i+1){\n   let fi=f32(i);let h=(.5+fi*.50)*ease((t-.18*fi)/1.0);\n   d=put(d,box(p-vec3<f32>((fi-1.)*1.13,h*.5,-.8),vec3<f32>(.39,h*.5,.40),.09),11.+fi);\n  }\n }\n if(shot<2.5||hero){let c=car(p,t,hero);d=put(d,c.x,c.y);}\n return d;\n}\nfn normal(p:vec3<f32>)->vec3<f32>{let e=.003;return normalize(vec3<f32>(scene(p+vec3<f32>(e,0.,0.)).x-scene(p-vec3<f32>(e,0.,0.)).x,scene(p+vec3<f32>(0.,e,0.)).x-scene(p-vec3<f32>(0.,e,0.)).x,scene(p+vec3<f32>(0.,0.,e)).x-scene(p-vec3<f32>(0.,0.,e)).x));}\nfn color(id:f32)->vec3<f32>{\n if(id<.5){return vec3<f32>(.951,.941,.914);}\n if(id<1.5){return vec3<f32>(.10,.26,.81);}\n if(id<2.5){return vec3<f32>(.055,.13,.22);}\n if(id<3.5){return vec3<f32>(.075,.086,.105);}\n if(id<4.5){return vec3<f32>(.80,.85,.87);}\n if(id<5.5){return vec3<f32>(1.,.95,.75);}\n if(id<6.5){return vec3<f32>(.92,.22,.13);}\n if(id<7.5){return vec3<f32>(.79,.86,.75);}\n if(id<8.5){return vec3<f32>(.34,.40,.49);}\n if(id<9.5){return vec3<f32>(.60,.35,.18);}\n if(id<10.5){return vec3<f32>(.28,.57,.36);}\n if(id<11.5){return vec3<f32>(.49,.65,.98);}\n if(id<12.5){return vec3<f32>(.23,.43,.90);}\n return vec3<f32>(.12,.30,.78);\n}\n@fragment fn fs_main(v:VertexOutput)->@location(0) vec4<f32>{\n let t=params.animationTime-params.start;\n let hero=params.shot<.5||params.shot>3.5;\n let center=select(.72,.70,hero);\n let frame=vec2<f32>((v.tex_coords.x-center)*1.7778,.56-v.tex_coords.y);\n let cam=rot(vec3<f32>(5.2,4.6,6.8),.11*sin(t*.43));\n let aim=vec3<f32>(0.,.35,0.);\n let forward=normalize(aim-cam);let right=normalize(cross(forward,vec3<f32>(0.,1.,0.)));let up=cross(right,forward);\n let span=select(9.3,7.2,hero)+.18*sin(t*.5);\n let ro=cam+span*(frame.x*right+frame.y*up);\n let rd=forward;\n var dist=0.;var hit=vec2<f32>(1.,0.);var found=false;\n for(var i=0;i<64;i=i+1){hit=scene(ro+rd*dist);if(hit.x<.004){found=true;break;}dist=dist+max(hit.x*.85,.003);if(dist>25.){break;}}\n var rgb=vec3<f32>(.951,.941,.914);\n if(found){\n  let p=ro+rd*dist;let n=normal(p);let light=normalize(vec3<f32>(-3.,6.,4.));\n  var shadow=1.;var sd=.03;\n  for(var j=0;j<14;j=j+1){let h=scene(p+n*.013+light*sd).x;shadow=min(shadow,8.*h/sd);sd=sd+clamp(h,.05,.36);}\n  shadow=clamp(shadow,.28,1.);\n  let ambient=.60+.12*n.y;let diffuse=max(dot(n,light),0.)*.43*shadow;\n  let occl=clamp(scene(p+n*.16).x/.16,.40,1.);\n  let base=color(hit.y);\n  let spec=pow(max(dot(reflect(-light,n),-rd),0.),42.)*.25*shadow;\n  rgb=base*(ambient+diffuse)*(.80+.20*occl)+spec;\n  if(hit.y<.5){rgb=mix(vec3<f32>(.951,.941,.914),rgb,.52);}\n }\n return vec4<f32>(clamp(rgb,vec3<f32>(0.),vec3<f32>(1.)),1.);\n}\n"
+            },
+            "enabled": true,
+            "id": 104
+          }
+        ],
+        "id": 22,
+        "name": "3D miniature world / shot 5",
+        "rect": {
+          "fillColor": [
+            1.0,
+            1.0,
+            1.0,
+            1.0
+          ],
+          "fillEnabled": true,
+          "position": [
+            0.0,
+            0.0
+          ],
+          "roundness": 0.0,
+          "size": [
+            1920.0,
+            1080.0
+          ],
+          "strokeEnabled": false,
+          "strokeWidth": 0.0
+        },
+        "transform": {
+          "anchorPoint": [
+            0.0,
+            0.0
+          ],
+          "opacity": 100.0,
+          "orientation": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "position": [
+            0.0,
+            0.0
+          ],
+          "rotation": 0.0,
+          "rotationX": 0.0,
+          "rotationY": 0.0,
+          "scale": [
+            100.0,
+            100.0
+          ],
+          "skew": 0.0,
+          "skewAxis": 0.0
+        },
+        "type": "Rect"
+      },
+      {
+        "captionsEnabled": false,
+        "id": 23,
+        "name": "Original electric keys and bass",
+        "playback": {
+          "inputOffsetMs": 0,
+          "inputRange": {
+            "duration": 24000,
+            "start": 0
+          },
+          "mapping": {
+            "input": {
+              "duration": 24000,
+              "start": 0
+            },
+            "output": {
+              "duration": 24000,
+              "start": 0
+            },
+            "type": "linear"
+          },
+          "type": "windowed"
+        },
+        "source": {
+          "assetId": "music"
+        },
+        "sourceIntrinsicDuration": 24000,
+        "sourceRange": {
+          "duration": 24000,
+          "start": 0
+        },
+        "type": "Audio",
+        "volume": 1.3608612640987996,
+        "windowMs": 50
+      },
+      {
+        "captionsEnabled": false,
+        "id": 24,
+        "name": "Original swung drums",
+        "playback": {
+          "inputOffsetMs": 0,
+          "inputRange": {
+            "duration": 24000,
+            "start": 0
+          },
+          "mapping": {
+            "input": {
+              "duration": 24000,
+              "start": 0
+            },
+            "output": {
+              "duration": 24000,
+              "start": 0
+            },
+            "type": "linear"
+          },
+          "type": "windowed"
+        },
+        "source": {
+          "assetId": "drums"
+        },
+        "sourceIntrinsicDuration": 24000,
+        "sourceRange": {
+          "duration": 24000,
+          "start": 0
+        },
+        "type": "Audio",
+        "volume": 1.3276695259500486,
+        "windowMs": 50
+      },
+      {
+        "captionsEnabled": false,
+        "id": 25,
+        "name": "Soft directional transition",
+        "playback": {
+          "inputOffsetMs": 0,
+          "inputRange": {
+            "duration": 600,
+            "start": 3620
+          },
+          "mapping": {
+            "input": {
+              "duration": 600,
+              "start": 0
+            },
+            "output": {
+              "duration": 600,
+              "start": 0
+            },
+            "type": "linear"
+          },
+          "type": "windowed"
+        },
+        "source": {
+          "assetId": "whoosh"
+        },
+        "sourceIntrinsicDuration": 600,
+        "sourceRange": {
+          "duration": 600,
+          "start": 0
+        },
+        "type": "Audio",
+        "volume": 0.5808554176031462,
+        "windowMs": 50
+      },
+      {
+        "captionsEnabled": false,
+        "id": 26,
+        "name": "Soft directional transition",
+        "playback": {
+          "inputOffsetMs": 0,
+          "inputRange": {
+            "duration": 600,
+            "start": 9620
+          },
+          "mapping": {
+            "input": {
+              "duration": 600,
+              "start": 0
+            },
+            "output": {
+              "duration": 600,
+              "start": 0
+            },
+            "type": "linear"
+          },
+          "type": "windowed"
+        },
+        "source": {
+          "assetId": "whoosh"
+        },
+        "sourceIntrinsicDuration": 600,
+        "sourceRange": {
+          "duration": 600,
+          "start": 0
+        },
+        "type": "Audio",
+        "volume": 0.5808554176031462,
+        "windowMs": 50
+      },
+      {
+        "captionsEnabled": false,
+        "id": 27,
+        "name": "Soft directional transition",
+        "playback": {
+          "inputOffsetMs": 0,
+          "inputRange": {
+            "duration": 600,
+            "start": 13620
+          },
+          "mapping": {
+            "input": {
+              "duration": 600,
+              "start": 0
+            },
+            "output": {
+              "duration": 600,
+              "start": 0
+            },
+            "type": "linear"
+          },
+          "type": "windowed"
+        },
+        "source": {
+          "assetId": "whoosh"
+        },
+        "sourceIntrinsicDuration": 600,
+        "sourceRange": {
+          "duration": 600,
+          "start": 0
+        },
+        "type": "Audio",
+        "volume": 0.5808554176031462,
+        "windowMs": 50
+      },
+      {
+        "captionsEnabled": false,
+        "id": 28,
+        "name": "Soft directional transition",
+        "playback": {
+          "inputOffsetMs": 0,
+          "inputRange": {
+            "duration": 600,
+            "start": 17620
+          },
+          "mapping": {
+            "input": {
+              "duration": 600,
+              "start": 0
+            },
+            "output": {
+              "duration": 600,
+              "start": 0
+            },
+            "type": "linear"
+          },
+          "type": "windowed"
+        },
+        "source": {
+          "assetId": "whoosh"
+        },
+        "sourceIntrinsicDuration": 600,
+        "sourceRange": {
+          "duration": 600,
+          "start": 0
+        },
+        "type": "Audio",
+        "volume": 0.5808554176031462,
+        "windowMs": 50
+      },
+      {
+        "captionsEnabled": false,
+        "id": 29,
+        "name": "Progress pillar soft pop",
+        "playback": {
+          "inputOffsetMs": 0,
+          "inputRange": {
+            "duration": 220,
+            "start": 14250
+          },
+          "mapping": {
+            "input": {
+              "duration": 220,
+              "start": 0
+            },
+            "output": {
+              "duration": 220,
+              "start": 0
+            },
+            "type": "linear"
+          },
+          "type": "windowed"
+        },
+        "source": {
+          "assetId": "pop"
+        },
+        "sourceIntrinsicDuration": 220,
+        "sourceRange": {
+          "duration": 220,
+          "start": 0
+        },
+        "type": "Audio",
+        "volume": 0.6306430248262731,
+        "windowMs": 50
+      },
+      {
+        "captionsEnabled": false,
+        "id": 30,
+        "name": "Progress pillar soft pop",
+        "playback": {
+          "inputOffsetMs": 0,
+          "inputRange": {
+            "duration": 220,
+            "start": 14470
+          },
+          "mapping": {
+            "input": {
+              "duration": 220,
+              "start": 0
+            },
+            "output": {
+              "duration": 220,
+              "start": 0
+            },
+            "type": "linear"
+          },
+          "type": "windowed"
+        },
+        "source": {
+          "assetId": "pop"
+        },
+        "sourceIntrinsicDuration": 220,
+        "sourceRange": {
+          "duration": 220,
+          "start": 0
+        },
+        "type": "Audio",
+        "volume": 0.6306430248262731,
+        "windowMs": 50
+      },
+      {
+        "captionsEnabled": false,
+        "id": 31,
+        "name": "Progress pillar soft pop",
+        "playback": {
+          "inputOffsetMs": 0,
+          "inputRange": {
+            "duration": 220,
+            "start": 14690
+          },
+          "mapping": {
+            "input": {
+              "duration": 220,
+              "start": 0
+            },
+            "output": {
+              "duration": 220,
+              "start": 0
+            },
+            "type": "linear"
+          },
+          "type": "windowed"
+        },
+        "source": {
+          "assetId": "pop"
+        },
+        "sourceIntrinsicDuration": 220,
+        "sourceRange": {
+          "duration": 220,
+          "start": 0
+        },
+        "type": "Audio",
+        "volume": 0.6306430248262731,
+        "windowMs": 50
+      },
+      {
+        "captionsEnabled": false,
+        "id": 32,
+        "name": "Opening car accent",
+        "playback": {
+          "inputOffsetMs": 0,
+          "inputRange": {
+            "duration": 400,
+            "start": 120
+          },
+          "mapping": {
+            "input": {
+              "duration": 400,
+              "start": 0
+            },
+            "output": {
+              "duration": 400,
+              "start": 0
+            },
+            "type": "linear"
+          },
+          "type": "windowed"
+        },
+        "source": {
+          "assetId": "impact"
+        },
+        "sourceIntrinsicDuration": 400,
+        "sourceRange": {
+          "duration": 400,
+          "start": 0
+        },
+        "type": "Audio",
+        "volume": 0.5808554176031462,
+        "windowMs": 50
+      }
+    ],
+    "name": "Roam / A little more confidence"
+  },
+  "dimensions": {
+    "height": 1080,
+    "width": 1920
+  },
+  "duration": 24.0,
+  "formatVersion": 1
+}

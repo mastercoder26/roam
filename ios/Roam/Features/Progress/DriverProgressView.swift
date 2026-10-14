@@ -184,10 +184,7 @@ struct DriverProgressView: View {
 
     private var personalizedCoachCard: some View {
         VStack(alignment: .leading, spacing: AppDesign.space16) {
-            SectionHeader(
-                title: "Your next drive",
-                subtitle: "A private focus chosen from your recent qualifying drives."
-            )
+            SectionHeader(title: "Your next drive")
 
             HStack(alignment: .top, spacing: AppDesign.space12) {
                 Image(systemName: coaching.focus.symbol)
@@ -253,8 +250,8 @@ struct DriverProgressView: View {
                 ? "Goal complete"
                 : String(coaching.completedThisWeek) + " of " + String(coaching.weeklyTargetDriveCount) + " drives",
             detail: coaching.completedThisWeek >= coaching.weeklyTargetDriveCount
-                ? "You reached this week’s personalized practice target."
-                : "Based on your recent qualifying-drive cadence.",
+                ? "Weekly practice target reached."
+                : "Target follows your recent practice pace.",
             symbol: coaching.completedThisWeek >= coaching.weeklyTargetDriveCount
                 ? "checkmark.circle.fill"
                 : "calendar.badge.clock",

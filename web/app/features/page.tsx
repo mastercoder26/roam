@@ -19,30 +19,30 @@ const groups: Array<{
 }> = [
   {
     title: "Plan a route",
-    subtitle: "Understand what a drive may demand before setting out.",
+    subtitle: "See what a drive may ask of you before setting out.",
     status: "In this demo",
     features: [
       {
         title: "Live route difficulty",
-        detail: "Score an origin and destination using route geometry, maneuvers, traffic-aware timing, weather, daylight, and available road context.",
+        detail: "Compare two places using road layout, turns, traffic, weather, daylight, and available road information.",
         tone: "accent",
         icon: <RouteIcon />,
       },
       {
         title: "Route choices",
-        detail: "Compare the primary route with returned alternatives, ranked easiest-first with distance, duration, reasons, demands, and uncertainty.",
+        detail: "Compare the main route with alternatives by difficulty, time, distance, and confidence in the available data.",
         tone: "positive",
         icon: <ForkIcon />,
       },
       {
         title: "Departure comparisons",
-        detail: "The iOS app can compare nearby departure times when live conditions are available, helping families avoid a more demanding window.",
+        detail: "The iOS app can compare nearby departure times when live conditions are available, helping families choose a less demanding time.",
         tone: "safety",
         icon: <ClockIcon />,
       },
       {
         title: "Transparent evidence",
-        detail: "See which live sources contributed, how much of the route they covered, and where the strongest difficulty hotspots appear.",
+        detail: "See which live sources contributed, how much of the route they covered, and where the hardest sections are.",
         tone: "accent",
         icon: <LayersIcon />,
       },
@@ -50,12 +50,12 @@ const groups: Array<{
   },
   {
     title: "Build route readiness",
-    subtitle: "Turn recorded experience into specific, explainable practice guidance.",
+    subtitle: "Turn driving experience into clear practice guidance.",
     status: "iOS app",
     features: [
       {
         title: "Demand-by-demand readiness",
-        detail: "Compare eight route demands, such as after-dark driving, merges, traffic, faster roads, and weather, with matching measured experience.",
+        detail: "Compare eight route demands, including night driving, merges, traffic, faster roads, and weather, with matching driving experience.",
         tone: "safety",
         icon: <GaugeIcon />,
       },
@@ -67,7 +67,7 @@ const groups: Array<{
       },
       {
         title: "Route familiarity",
-        detail: "Privately compare a planned route with directionally aligned local traces while excluding parallel roads and long GPS gaps.",
+        detail: "Privately compare a planned route with saved drives in the same direction, excluding nearby parallel roads and long GPS gaps.",
         tone: "accent",
         icon: <MapIcon />,
       },
@@ -81,24 +81,24 @@ const groups: Array<{
   },
   {
     title: "Record and coach",
-    subtitle: "A manually controlled drive session using the sensors already in an iPhone.",
+    subtitle: "A drive session you start and stop, using your iPhone's GPS and motion sensors.",
     status: "iOS app",
     features: [
       {
         title: "Manual drive recording",
-        detail: "Start before leaving and end after parking. Roam measures elapsed time, accepted GPS fixes, distance, speed, and phone motion during the session.",
+        detail: "Start before leaving and stop after parking. Roam records time, distance, speed, accurate location readings, and phone motion.",
         tone: "accent",
         icon: <RecordIcon />,
       },
       {
         title: "Coaching events",
-        detail: "Flag hard braking, rapid acceleration, sharp cornering, and sustained abrupt phone movement using quality-gated GPS and motion evidence.",
+        detail: "Flag hard braking, rapid acceleration, sharp turns, and sustained abrupt phone movement when GPS and motion readings are reliable.",
         tone: "safety",
         icon: <PulseIcon />,
       },
       {
         title: "Honest confidence",
-        detail: "Label each drive Preliminary, Useful, or Strong based on trace duration, distance, accepted GPS fixes, motion samples, and rejected-location rate.",
+        detail: "Label each drive Preliminary, Useful, or Strong based on recording length, distance, accurate location readings, motion samples, and GPS accuracy.",
         tone: "positive",
         icon: <SealIcon />,
       },
@@ -112,24 +112,24 @@ const groups: Array<{
   },
   {
     title: "Track progress",
-    subtitle: "Evidence over time, weighted by quality instead of raw activity alone.",
+    subtitle: "Track progress across drives, giving more weight to reliable recordings.",
     status: "iOS app",
     features: [
       {
         title: "Overall coaching score",
-        detail: "Combine qualifying drives using route adjustment, distance weighting, confidence weighting, and a 120-day recency half-life.",
+        detail: "Combine eligible drives using route difficulty, trip length, recording confidence, and a 120-day recency half-life.",
         tone: "accent",
         icon: <ChartIcon />,
       },
       {
         title: "Measured experience",
-        detail: "Track validated miles, after-dark miles, 45+ mph miles, continuous-trace coverage, and qualifying drive time.",
+        detail: "Track verified miles, night miles, 45+ mph miles, continuous recording coverage, and qualifying drive time.",
         tone: "positive",
         icon: <RoadIcon />,
       },
       {
         title: "Eight-week history",
-        detail: "Review recent evidence and trends without letting one unusually long or unusually good drive dominate the story.",
+        detail: "Review recent drives and trends without letting one unusually long or high-scoring trip dominate.",
         tone: "accent",
         icon: <CalendarIcon />,
       },
@@ -143,7 +143,7 @@ const groups: Array<{
   },
   {
     title: "Drive-aware integrations",
-    subtitle: "Useful information in the right place, with deliberate limits.",
+    subtitle: "Helpful drive information, with clear limits.",
     status: "iOS app",
     features: [
       {

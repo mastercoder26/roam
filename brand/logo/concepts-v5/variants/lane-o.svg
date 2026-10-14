@@ -1,0 +1,4 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256" role="img" aria-labelledby="title">
+  <title id="title">Lane o</title>
+  <path fill="#000" fill-rule="evenodd" d="M32,128 A96,96 0 1 1 224,128 A96,96 0 1 1 32,128 Z M78,128 A50,50 0 1 0 178,128 A50,50 0 1 0 78,128 Z M28,110 H228 V146 H28 Z"/>
+</svg>

@@ -98,7 +98,7 @@ struct LiveDriveScoreRing: View {
                 .foregroundStyle(AppDesign.Ink.label)
 
             HStack(alignment: .firstTextBaseline, spacing: 5) {
-                Text(live.score.map(String.init) ?? "—")
+                Text(live.score.map(String.init) ?? "…")
                     .font(.system(size: dynamicTypeSize.isAccessibilitySize ? 48 : 60, weight: .bold, design: .rounded))
                     .monospacedDigit()
                     // A live safety value rolls between digits rather than

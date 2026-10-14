@@ -1,13 +1,13 @@
 # Roam runs a split backend. This blueprint describes only the data API.
 #
 #   iOS ──> Cloud Run `roam-backend` (us-central1)  route difficulty; stateless,
-#           no database and no Clerk credentials.
+#           no database, but verifies Clerk tokens.
 #   iOS ──> Render  `roam-data-api`  (this file)    accounts, drive history,
 #           profiles, saved routes; owns the Postgres below.
 #
 # Both deployments run the same `backend/` codebase. The service degrades by
-# design: without DATABASE_URL and CLERK_SECRET_KEY the account endpoints return
-# 503 while route analysis keeps working, which is exactly what Cloud Run wants.
+# design: without DATABASE_URL the account endpoints return 503, while route
+# analysis works when GOOGLE_MAPS_API_KEY and CLERK_SECRET_KEY are configured.
 # Set GOOGLE_MAPS_API_KEY here only if this service should also answer route
 # analysis; it is otherwise unused.
 services:

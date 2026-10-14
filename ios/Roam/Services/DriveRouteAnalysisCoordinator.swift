@@ -18,8 +18,8 @@ final class DriveRouteAnalysisCoordinator {
     private var tasks: [UUID: Task<Void, Never>] = [:]
     private let authSession: AuthSessionStore
 
-    init(authSession: AuthSessionStore = .shared) {
-        self.authSession = authSession
+    init(authSession: AuthSessionStore? = nil) {
+        self.authSession = authSession ?? .shared
     }
 
     /// Restarts analyses that outlived their request — a drive left `.pending`

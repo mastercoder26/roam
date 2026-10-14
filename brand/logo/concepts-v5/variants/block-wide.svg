@@ -1,0 +1,4 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256" role="img" aria-labelledby="title">
+  <title id="title">Block wide</title>
+  <path fill="#000" fill-rule="evenodd" d="M74,28 H182 A46,46 0 0 1 228,74 V182 A46,46 0 0 1 182,228 H74 A46,46 0 0 1 28,182 V74 A46,46 0 0 1 74,28 Z M96,86 H160 A10,10 0 0 1 170,96 V160 A10,10 0 0 1 160,170 H96 A10,10 0 0 1 86,160 V96 A10,10 0 0 1 96,86 Z M89,170 H167 V228 H89 Z"/>
+</svg>

@@ -17,10 +17,13 @@ struct AsciiGlobeIntroLayer: View {
             .ignoresSafeArea()
             .allowsHitTesting(false)
             .accessibilityHidden(true)
-            .onAppear {
-                DispatchQueue.main.asyncAfter(deadline: .now() + LaunchIntroChoreography.videoDuration) {
-                    onFinished()
+            .task {
+                do {
+                    try await Task.sleep(for: .seconds(LaunchIntroChoreography.videoDuration))
+                } catch {
+                    return
                 }
+                onFinished()
             }
     }
 }

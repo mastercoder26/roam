@@ -337,7 +337,7 @@ private enum SharedRouteShareItemReader {
 
     private static func log(_ error: Error?, forType type: String) {
         // The underlying error is diagnostic detail, not user-facing copy.
-        logger.error("Share attachment (\(type, privacy: .public)) failed to load: \(error?.localizedDescription ?? "no error reported", privacy: .public)")
+        logger.error("Share attachment (\(type, privacy: .public)) failed to load: \(error?.localizedDescription ?? "no error reported", privacy: .private)")
     }
 
     private static let logger = Logger(

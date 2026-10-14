@@ -7,6 +7,7 @@ struct DriveHistoryPolicyChecks {
     }
 
     static func main() {
+        expect(!DriveHistoryPolicy.shouldSave(duration: .infinity), "an invalid duration must not save a drive")
         expect(
             DriveHistoryPolicy.minimumSavedDriveSeconds == 30,
             "minimum saved duration should be 30 seconds"

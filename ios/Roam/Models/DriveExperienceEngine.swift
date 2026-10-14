@@ -227,6 +227,8 @@ enum DriveExperienceEngine {
             let current = route[index]
             guard CLLocationCoordinate2DIsValid(previous.coordinate.clLocationCoordinate),
                   CLLocationCoordinate2DIsValid(current.coordinate.clLocationCoordinate),
+                  previous.speedMetersPerSecond.isFinite,
+                  current.speedMetersPerSecond.isFinite,
                   previous.speedMetersPerSecond >= 0,
                   current.speedMetersPerSecond >= 0 else {
                 continue

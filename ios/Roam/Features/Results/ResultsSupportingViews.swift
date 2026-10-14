@@ -4,14 +4,14 @@ import UIKit
 struct PracticePlanPreview: View {
     @ObservedObject private var theme = ThemeManager.shared
     let plan: PracticePlan
+    @State private var showsInstructions = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: AppDesign.space8) {
                 Image(systemName: "target").foregroundStyle(AppDesign.safety)
-                Text("Guided practice plan").font(.subheadline.weight(.semibold))
+                Text("Practice focus").font(.subheadline.weight(.semibold))
             }
-            Text(plan.summary).font(.footnote).foregroundStyle(AppDesign.Ink.secondary)
             ForEach(plan.goals) { goal in
                 HStack(alignment: .top, spacing: 9) {
                     Image(systemName: goal.requiresAdultSupervision ? "figure.and.child.holdinghands" : "checkmark.circle")
@@ -20,15 +20,36 @@ struct PracticePlanPreview: View {
                         .frame(width: 18)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(goal.title).font(.footnote.weight(.semibold))
-                        Text(goal.coachingText).font(.caption).foregroundStyle(AppDesign.Ink.secondary).fixedSize(horizontal: false, vertical: true)
+                        if goal.requiresAdultSupervision {
+                            Text("Practice with an adult")
+                                .font(.caption.weight(.medium))
+                                .foregroundStyle(AppDesign.safety)
+                        }
                     }
                 }
             }
+            DisclosureGroup("Practice instructions", isExpanded: $showsInstructions) {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text(plan.summary)
+                    ForEach(plan.goals) { goal in
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(goal.title).fontWeight(.semibold)
+                            Text(goal.coachingText)
+                        }
+                    }
+                }
+                .font(.caption)
+                .foregroundStyle(AppDesign.Ink.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.top, 8)
+            }
+            .font(.footnote.weight(.semibold))
+            .tint(AppDesign.accent)
         }
         .padding(12)
         .background(AppDesign.safety.opacity(0.08), in: RoundedRectangle(cornerRadius: AppDesign.cornerRadiusSmall, style: .continuous))
         .overlay { RoundedRectangle(cornerRadius: AppDesign.cornerRadiusSmall, style: .continuous).stroke(AppDesign.safety.opacity(0.16), lineWidth: 1) }
-        .accessibilityElement(children: .combine)
+        .accessibilityElement(children: .contain)
     }
 }
 
@@ -103,24 +124,30 @@ struct DepartureComparisonRow: View {
 struct ReadinessHistorySummary: View {
     @ObservedObject private var theme = ThemeManager.shared
     let profile: DriverReadinessProfile
+    @State private var showsExposure = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 7) {
-            Label("Evidence recorded on this device", systemImage: "lock.shield.fill")
+            Label("Your recorded drives", systemImage: "lock.shield.fill")
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(AppDesign.Ink.secondary)
             Text("\(profile.qualifyingDriveCount) qualifying \(profile.qualifyingDriveCount == 1 ? "drive" : "drives") · \(String(format: "%.1f", profile.reliableTraceMiles)) validated mi · \(profile.qualifyingDriveDayCount) \(profile.qualifyingDriveDayCount == 1 ? "day" : "days")")
                 .font(.footnote.weight(.medium))
                 .monospacedDigit()
-            VStack(alignment: .leading, spacing: AppDesign.space4) {
-                readinessFact("After-dark miles", value: "\(String(format: "%.1f", profile.nightExposure.miles)) mi across \(profile.nightExposure.sessionCount) \(profile.nightExposure.sessionCount == 1 ? "drive" : "drives")", symbol: "moon.stars.fill")
-                readinessFact("45+ mph miles", value: "\(String(format: "%.1f", profile.fastRoad45Exposure.miles)) mi across \(profile.fastRoad45Exposure.sessionCount) \(profile.fastRoad45Exposure.sessionCount == 1 ? "drive" : "drives")", symbol: "speedometer")
-                readinessFact("Longest continuous trace", value: durationText(profile.longestDriveDuration), symbol: "clock.fill")
+            DisclosureGroup("History details", isExpanded: $showsExposure) {
+                VStack(alignment: .leading, spacing: AppDesign.space8) {
+                    readinessFact("After-dark miles", value: "\(String(format: "%.1f", profile.nightExposure.miles)) mi across \(profile.nightExposure.sessionCount) \(profile.nightExposure.sessionCount == 1 ? "drive" : "drives")", symbol: "moon.stars.fill")
+                    readinessFact("45+ mph miles", value: "\(String(format: "%.1f", profile.fastRoad45Exposure.miles)) mi across \(profile.fastRoad45Exposure.sessionCount) \(profile.fastRoad45Exposure.sessionCount == 1 ? "drive" : "drives")", symbol: "speedometer")
+                    readinessFact("Longest continuous trace", value: durationText(profile.longestDriveDuration), symbol: "clock.fill")
+                }
+                .padding(.top, 8)
             }
+            .font(.caption.weight(.semibold))
+            .tint(AppDesign.accent)
         }
         .padding(12)
         .background(AppDesign.cardSurfaceElevated, in: RoundedRectangle(cornerRadius: AppDesign.cornerRadiusSmall, style: .continuous))
-        .accessibilityElement(children: .combine)
+        .accessibilityElement(children: .contain)
     }
 
     @ViewBuilder
@@ -143,6 +170,7 @@ struct ReadinessHistorySummary: View {
 struct ReadinessInsightRow: View {
     @ObservedObject private var theme = ThemeManager.shared
     let insight: DriverReadinessInsight
+    @State private var showsEvidence = false
 
     private var color: Color {
         switch insight.state {
@@ -170,25 +198,30 @@ struct ReadinessInsightRow: View {
                 Text(stateTitle).font(.caption2.weight(.bold)).foregroundStyle(color).textCase(.uppercase)
                 Text(insight.detail).font(.footnote).foregroundStyle(AppDesign.Ink.secondary).fixedSize(horizontal: false, vertical: true)
                 if let evidence = insight.evidence {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Saved: \(evidence.recordedValue)").font(.caption.weight(.medium)).foregroundStyle(AppDesign.Ink.primary)
-                        if let target = evidence.comparisonTarget {
-                            Text("Compared with: \(target)").font(.caption).foregroundStyle(AppDesign.Ink.secondary)
+                    DisclosureGroup("Compare with your drives", isExpanded: $showsEvidence) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Recorded: \(evidence.recordedValue)").font(.caption.weight(.medium)).foregroundStyle(AppDesign.Ink.primary)
+                            if let target = evidence.comparisonTarget {
+                                Text("Compared with: \(target)").font(.caption).foregroundStyle(AppDesign.Ink.secondary)
+                            }
+                            if let collectionNote = evidence.collectionNote {
+                                Label(collectionNote, systemImage: "info.circle")
+                                    .font(.caption2)
+                                    .foregroundStyle(AppDesign.Ink.secondary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                                    .padding(.top, 2)
+                            }
                         }
-                        if let collectionNote = evidence.collectionNote {
-                            Label(collectionNote, systemImage: "info.circle")
-                                .font(.caption2)
-                                .foregroundStyle(AppDesign.Ink.secondary)
-                                .fixedSize(horizontal: false, vertical: true)
-                                .padding(.top, 2)
-                        }
+                        .padding(.top, 6)
                     }
+                    .font(.caption.weight(.semibold))
+                    .tint(AppDesign.accent)
                     .padding(.top, 3)
                 }
             }
             Spacer(minLength: 0)
         }
-        .accessibilityElement(children: .combine)
+        .accessibilityElement(children: .contain)
     }
 
     private var stateTitle: String {

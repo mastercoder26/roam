@@ -12,6 +12,8 @@ struct RouteAnalysisLoadingView: View {
     @State private var dotsAreFormed = false
     @State private var departureRequested = false
     @State private var isDrivingAway = false
+    @State private var formationIsComplete = false
+    @State private var departureTask: Task<Void, Never>?
 
     var body: some View {
         ZStack {
@@ -54,8 +56,12 @@ struct RouteAnalysisLoadingView: View {
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Analyzing route difficulty")
-        .onAppear(perform: startSequence)
-        .onChange(of: isFinishing) { _, finishing in
+        .task { await startSequence() }
+        .onDisappear {
+            departureTask?.cancel()
+            departureTask = nil
+        }
+        .onChange(of: isFinishing, initial: true) { _, finishing in
             guard finishing else { return }
             requestDeparture()
         }
@@ -67,10 +73,24 @@ struct RouteAnalysisLoadingView: View {
         return "Tracing your route"
     }
 
-    private func startSequence() {
+    @MainActor
+    private func startSequence() async {
+        departureTask?.cancel()
+        departureTask = nil
+        var transaction = Transaction(animation: nil)
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            routeProgress = 0
+            dotsAreFormed = false
+            formationIsComplete = false
+            isDrivingAway = false
+            departureRequested = isFinishing
+        }
         guard !reduceMotion else {
             routeProgress = 1
             dotsAreFormed = true
+            formationIsComplete = true
+            if departureRequested || isFinishing { requestDeparture() }
             return
         }
 
@@ -80,19 +100,20 @@ struct RouteAnalysisLoadingView: View {
 
         // Let the route finish drawing before the data points assemble into a
         // car. The story reads in a single direction: trace, understand, go.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.68) {
-            withAnimation(AppAnimation.content) {
-                dotsAreFormed = true
-            }
-            if departureRequested {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3, execute: driveAway)
-            }
+        do {
+            try await Task.sleep(for: .seconds(0.68))
+            withAnimation(AppAnimation.content) { dotsAreFormed = true }
+            try await Task.sleep(for: .seconds(0.6))
+        } catch {
+            return
         }
+        formationIsComplete = true
+        if departureRequested || isFinishing { requestDeparture() }
     }
 
     private func requestDeparture() {
         guard !isDrivingAway else { return }
-        guard dotsAreFormed else {
+        guard formationIsComplete else {
             departureRequested = true
             return
         }
@@ -101,16 +122,16 @@ struct RouteAnalysisLoadingView: View {
 
     private func driveAway() {
         guard !isDrivingAway else { return }
-        if reduceMotion {
-            withAnimation(AppAnimation.departureReduced) {
-                isDrivingAway = true
+        withAnimation(reduceMotion ? AppAnimation.departureReduced : AppAnimation.departure) {
+            isDrivingAway = true
+        }
+        departureTask = Task { @MainActor in
+            do {
+                try await Task.sleep(for: .seconds(reduceMotion ? 0.20 : 0.34))
+            } catch {
+                return
             }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.20, execute: onDepartureComplete)
-        } else {
-            withAnimation(AppAnimation.departure) {
-                isDrivingAway = true
-            }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.34, execute: onDepartureComplete)
+            onDepartureComplete()
         }
     }
 }
@@ -130,11 +151,11 @@ private struct DotCarIllustration: View {
             // A single display-synced timeline drives the whole illustration.
             // Individual timelines per dot create unnecessary work during a
             // network wait and make this otherwise small loading scene costly.
-            TimelineView(.animation(minimumInterval: 1 / 30)) { context in
+            TimelineView(.animation(minimumInterval: 1 / 30, paused: reduceMotion || isDrivingAway)) { context in
                 dotCar(time: context.date.timeIntervalSinceReferenceDate)
             }
-            .offset(x: isDrivingAway ? -390 : 0)
-            .opacity(isDrivingAway ? 0.85 : 1)
+            .offset(x: isDrivingAway && !reduceMotion ? -390 : 0)
+            .opacity(isDrivingAway ? (reduceMotion ? 0 : 0.85) : 1)
             .animation(reduceMotion ? AppAnimation.departureReduced : AppAnimation.departure, value: isDrivingAway)
         }
         .frame(width: canvasSize.width, height: canvasSize.height)
@@ -174,8 +195,8 @@ private struct DotCarIllustration: View {
                     y: dotsAreFormed ? dot.y : 145
                 )
                 .animation(
-                    AppAnimation.content
-                        .delay(dot.phase * 0.028),
+                    reduceMotion ? nil : AppAnimation.content
+                        .delay(min(dot.phase * 0.004, 0.12)),
                     value: dotsAreFormed
                 )
             }
@@ -202,6 +223,7 @@ private struct DotCarIllustration: View {
 }
 
 private struct FloatingDot: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let size: CGFloat
     let color: Color
     let phase: Double
@@ -217,10 +239,10 @@ private struct FloatingDot: View {
             .frame(width: size, height: size)
             .offset(y: bob)
             .opacity(isVisible ? 1 : 0)
-            .scaleEffect(isVisible ? 1 : 0.72)
+            .scaleEffect(isVisible || reduceMotion ? 1 : 0.72)
             .animation(
-                AppAnimation.content
-                    .delay(phase * 0.028),
+                reduceMotion ? nil : AppAnimation.content
+                    .delay(min(phase * 0.004, 0.12)),
                 value: isVisible
             )
     }
@@ -273,7 +295,7 @@ private struct DotWheel: View {
         .animation(reduceMotion ? AppAnimation.departureReduced : AppAnimation.departure, value: isSpinning)
         .position(x: isVisible ? center.x : center.x * 0.92 + 12, y: isVisible ? center.y : 145)
         .animation(
-            AppAnimation.content.delay(phase * 0.028),
+            reduceMotion ? nil : AppAnimation.content.delay(min(phase * 0.004, 0.12)),
             value: isVisible
         )
     }

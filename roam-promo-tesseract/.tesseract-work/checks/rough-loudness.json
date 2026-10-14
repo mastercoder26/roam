@@ -1,0 +1,16 @@
+{
+  "path": "/Users/akhilkonduru/VSC/roam/roam-promo-tesseract/.tesseract-work/checks/Rough.mp4",
+  "audio_stream": "first audio stream",
+  "integrated_lufs": -21.01,
+  "true_peak_dbtp": -5.96,
+  "loudness_range_lu": 2.8,
+  "working_target": {
+    "integrated_lufs": [
+      -16,
+      -14
+    ],
+    "true_peak_max_dbtp": -1
+  },
+  "within_working_target": false,
+  "note": "Measurement only. Targets are a social-edit starting point, not a platform guarantee. Listen to the mix; silence/very short cues may not have meaningful integrated loudness."
+}

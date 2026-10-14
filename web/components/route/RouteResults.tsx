@@ -30,10 +30,17 @@ export function RouteResults({
   const [selectedIndex, setSelectedIndex] = useState(0);
   const selected = allRoutes[selectedIndex] ?? result.primaryRoute;
   const color = difficultyColor(selected.label);
+  const hasTypicalDuration =
+    Number.isFinite(selected.staticDurationSeconds) && selected.staticDurationSeconds > 0;
 
   return (
     <div className="roam-reveal flex flex-col gap-8">
-      <section className="relative min-h-[590px] overflow-hidden rounded-roam-lg border border-card bg-card-elevated shadow-roam-md sm:min-h-[520px]">
+      <section className="relative min-h-[500px] overflow-hidden rounded-roam-lg border border-card bg-card-elevated shadow-roam-md sm:min-h-[520px]">
+        <p className="sr-only">
+          Route map from {origin} to {destination}. {selected.label} difficulty,
+          score {formatScore(selected.score)}, {formatDistanceMeters(selected.distanceMeters)},
+          {" "}{formatDurationSeconds(selected.durationSeconds)} drive time.
+        </p>
         <div className="absolute inset-0">
           <RoutePolylinePreview
             polyline={selected.polyline}
@@ -55,39 +62,38 @@ export function RouteResults({
           ) : null}
         </div>
 
-        <div className="pointer-events-none absolute inset-x-4 bottom-4 grid gap-3 sm:inset-x-6 sm:bottom-6 sm:grid-cols-[minmax(210px,0.72fr)_1.28fr]">
+        <div className="pointer-events-none absolute inset-x-4 bottom-4 sm:inset-x-6 sm:bottom-6">
           <div className="roam-glass rounded-2xl p-4 sm:p-5">
-            <div className="flex items-end justify-between gap-4">
-              <div>
-                <p className="text-[10px] font-semibold uppercase tracking-[0.13em] text-ink-label">Difficulty score</p>
-                <p className="mt-2 text-5xl font-semibold leading-none tracking-[-0.055em] text-ink-primary tabular-nums">{formatScore(selected.score)}</p>
+            <div className="grid grid-cols-1 items-center gap-x-5 gap-y-4 sm:grid-cols-[minmax(170px,0.7fr)_1.3fr]">
+              <div className="flex items-end gap-3">
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.13em] text-ink-label">Difficulty</p>
+                  <p className="mt-1.5 text-4xl font-semibold leading-none tracking-[-0.055em] text-ink-primary tabular-nums">{formatScore(selected.score)}</p>
+                </div>
+                <span
+                  className="mb-0.5 rounded-full px-2.5 py-1 text-[11px] font-semibold"
+                  style={{
+                    backgroundColor: `color-mix(in srgb, ${color} 14%, white 72%)`,
+                    color,
+                  }}
+                >
+                  {selected.label}
+                </span>
               </div>
-              <span
-                className="mb-1 rounded-full px-3 py-1.5 text-xs font-semibold"
-                style={{
-                  backgroundColor: `color-mix(in srgb, ${color} 14%, white 72%)`,
-                  color,
-                }}
-              >
-                {selected.label}
-              </span>
-            </div>
-            {selected.reasons[0] ? (
-              <p className="mt-3 border-t border-white/60 pt-3 text-[12px] leading-5 text-ink-secondary">{selected.reasons[0]}</p>
-            ) : null}
-          </div>
-
-          <div className="roam-glass rounded-2xl p-4 sm:p-5">
-            <div className={`grid gap-4 ${formatDelaySeconds(selected.trafficDelaySeconds) ? "grid-cols-3" : "grid-cols-2"}`}>
-              <Metric label="Drive time" value={formatDurationSeconds(selected.durationSeconds)} />
-              {formatDelaySeconds(selected.trafficDelaySeconds) ? (
-                <Metric label="Traffic delay" value={formatDelaySeconds(selected.trafficDelaySeconds)!} tone="safety" />
+              <div className={`grid gap-3 ${formatDelaySeconds(selected.trafficDelaySeconds) ? "grid-cols-3" : "grid-cols-2"}`}>
+                <Metric label="Drive time" value={formatDurationSeconds(selected.durationSeconds)} />
+                {formatDelaySeconds(selected.trafficDelaySeconds) ? (
+                  <Metric label="Traffic delay" value={formatDelaySeconds(selected.trafficDelaySeconds)!} tone="safety" />
+                ) : null}
+                <Metric label="Distance" value={formatDistanceMeters(selected.distanceMeters)} />
+              </div>
+              {selected.reasons[0] || hasTypicalDuration ? (
+                <p className="col-span-full border-t border-white/60 pt-3 text-[11px] leading-4 text-ink-secondary">
+                  {selected.reasons[0] ?? `Without traffic: ${formatDurationSeconds(selected.staticDurationSeconds)}.`}
+                  {selected.reasons[0] && hasTypicalDuration ? ` Typical drive: ${formatDurationSeconds(selected.staticDurationSeconds)}.` : ""}
+                </p>
               ) : null}
-              <Metric label="Distance" value={formatDistanceMeters(selected.distanceMeters)} />
             </div>
-            <p className="mt-4 border-t border-white/60 pt-3 text-[11px] text-ink-secondary">
-              Normal drive: {formatDurationSeconds(selected.staticDurationSeconds)}
-            </p>
           </div>
         </div>
       </section>
@@ -98,7 +104,7 @@ export function RouteResults({
         <div>
           <SectionHeader
             title="Route choices"
-            subtitle="Ranked easiest-first, exactly as the backend returns them."
+            subtitle="Compare time, distance, and difficulty."
           />
           <div className="flex flex-col gap-2.5">
             {allRoutes.map((route, index) => (
@@ -159,7 +165,7 @@ export function RouteResults({
       {selected.routeDemands?.length ? (
         <div>
           <SectionHeader
-            title="What this route asks of you"
+            title="Route demands"
             subtitle="The road conditions that stand out for this drive."
           />
           <Card className="!py-1">
@@ -175,11 +181,11 @@ export function RouteResults({
         </div>
       ) : null}
 
-      {selected.reasons.length > 0 ? (
+      {selected.reasons.length > 1 ? (
         <div>
-          <SectionHeader title="Why this score" />
+          <SectionHeader title="Other factors" />
           <div className="flex flex-wrap gap-2">
-            {selected.reasons.map((reason) => (
+            {selected.reasons.slice(1).map((reason) => (
               <span
                 key={reason}
                 className="rounded-roam-sm bg-card-elevated px-3 py-2 text-sm font-medium text-ink-primary"
@@ -214,11 +220,6 @@ export function RouteResults({
         </div>
       ) : null}
 
-      {selected.modelVersion ? (
-        <p className="text-center text-xs text-ink-tertiary">
-          Scored live by the deployed backend · model {selected.modelVersion}
-        </p>
-      ) : null}
     </div>
   );
 }

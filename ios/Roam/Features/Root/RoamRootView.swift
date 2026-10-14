@@ -56,12 +56,13 @@ struct RoamRootView: View {
     @StateObject private var routeForm = RoutePlanningFormModel()
     @StateObject private var sharedRouteImport = SharedRouteImportCoordinator()
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         VStack(spacing: 0) {
             if !driveSession.isRecording {
                 topBrandBar
-                    .transition(.move(edge: .top).combined(with: .opacity))
+                    .transition(reduceMotion ? .opacity : .move(edge: .top).combined(with: .opacity))
             }
 
             // Keep the four destinations stable. The minimized iOS 26 bar can
@@ -87,13 +88,13 @@ struct RoamRootView: View {
             .environment(
                 \.showDriveTab,
                 ShowDriveTabAction {
-                    withAnimation(AppAnimation.tabSwitch) {
+                    withAnimation(reduceMotion ? AppAnimation.tabSwitchReduced : AppAnimation.tabSwitch) {
                         selectedTab = .drive
                     }
                 }
             )
         }
-        .animation(AppAnimation.driveMode, value: driveSession.isRecording)
+        .animation(reduceMotion ? AppAnimation.tabSwitchReduced : AppAnimation.driveMode, value: driveSession.isRecording)
         .environmentObject(driveSession)
         .environmentObject(themeManager)
         // System chrome — tab bar selection, toolbar buttons, text carets —

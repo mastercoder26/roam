@@ -1,0 +1,15 @@
+ad/**/*.png filter=lfs diff=lfs merge=lfs -text
+ad/**/*.jpg filter=lfs diff=lfs merge=lfs -text
+ad/**/*.mp4 filter=lfs diff=lfs merge=lfs -text
+ad/**/*.wav filter=lfs diff=lfs merge=lfs -text
+roam-promo-tesseract/**/*.png filter=lfs diff=lfs merge=lfs -text
+roam-promo-tesseract/**/*.mp4 filter=lfs diff=lfs merge=lfs -text
+roam-promo-tesseract/**/*.wav filter=lfs diff=lfs merge=lfs -text
+roam-promo-tesseract/**/*.tsrct filter=lfs diff=lfs merge=lfs -text
+watkins-recreation-tesseract/**/*.png filter=lfs diff=lfs merge=lfs -text
+watkins-recreation-tesseract/**/*.jpg filter=lfs diff=lfs merge=lfs -text
+watkins-recreation-tesseract/**/*.mp4 filter=lfs diff=lfs merge=lfs -text
+watkins-recreation-tesseract/**/*.m4a filter=lfs diff=lfs merge=lfs -text
+watkins-recreation-tesseract/**/*.wav filter=lfs diff=lfs merge=lfs -text
+watkins-recreation-tesseract/**/*.tsrct filter=lfs diff=lfs merge=lfs -text
+watkins-recreation-tesseract/.tesseract-work/*.json filter=lfs diff=lfs merge=lfs -text

@@ -200,7 +200,10 @@ enum LiveDriveScoreEngine {
     /// the same reasoning as `DriveScoringEngine.corroboratingMotionG`.
     static func smoothness(from samples: [DriveMotionSample], window: TimeInterval = 2.5, now: Date) -> Double {
         let values = samples
-            .filter { now.timeIntervalSince($0.timestamp) <= window }
+            .filter {
+                let age = now.timeIntervalSince($0.timestamp)
+                return age >= 0 && age <= window && $0.horizontalAccelerationG.isFinite && $0.horizontalAccelerationG >= 0
+            }
             .map(\.horizontalAccelerationG)
             .sorted()
         guard !values.isEmpty else { return 1 }
@@ -258,7 +261,8 @@ enum LiveDriveScoreEngine {
         distanceMeters: Double,
         events: [DrivingEvent]
     ) -> Int? {
-        guard duration >= minimumScoringDuration,
+        guard duration.isFinite, distanceMeters.isFinite,
+              duration >= minimumScoringDuration,
               distanceMeters >= minimumScoringDistanceMeters else {
             return nil
         }
@@ -292,7 +296,7 @@ enum LiveDriveScoreEngine {
         )
         let streak = cleanStreakSeconds(
             now: now,
-            lastEventAt: events.last?.timestamp,
+            lastEventAt: events.map(\.timestamp).filter { $0 <= now && $0 >= (driveStartedAt ?? $0) }.max(),
             driveStartedAt: driveStartedAt
         )
 

@@ -267,7 +267,7 @@ struct ResultsView: View {
     private var readinessSection: some View {
         VStack(alignment: .leading, spacing: 14) {
             SectionHeader(
-                title: "Can I drive this?",
+                title: "Ready for this route?",
                 subtitle: "Compared with your recorded drives."
             )
 
@@ -365,13 +365,12 @@ struct ResultsView: View {
         if selectedRoute.routeDemands != nil {
             VStack(alignment: .leading, spacing: 14) {
                 SectionHeader(
-                    title: "What this route asks of you",
-                    subtitle: "The road conditions that stand out for this drive."
+                    title: "Route demands"
                 )
 
                 if visibleRouteDemands.isEmpty {
                     Label(
-                        "No route demand stands out above its usual range.",
+                        "No unusually high route demands.",
                         systemImage: "checkmark.circle.fill"
                     )
                     .font(.subheadline)
@@ -389,7 +388,7 @@ struct ResultsView: View {
 
                 if selectedRoute.routeDemands?.contains(where: { !$0.available }) == true {
                     Label(
-                        "Unavailable live road or weather data is left out rather than estimated.",
+                        "Missing road and weather data is excluded.",
                         systemImage: "checkmark.shield.fill"
                     )
                     .font(.caption)
@@ -701,10 +700,7 @@ struct ResultsView: View {
     @ViewBuilder
     private var departureComparisonSection: some View {
         VStack(alignment: .leading, spacing: AppDesign.space12) {
-            SectionHeader(
-                title: "Calmest departure",
-                subtitle: "A comparison of nearby departure times."
-            )
+            SectionHeader(title: "Departure times")
 
             if isComparingDepartures {
                 HStack(spacing: 10) {
@@ -727,7 +723,7 @@ struct ResultsView: View {
                 }
                 Label(
                     calmestDepartureID == nil
-                        ? "Calmest available needs comparable traffic, after-dark, and weather data for every time."
+                        ? "Calmest time needs comparable traffic, light, and weather data."
                         : "Each time uses the best available route at that departure time.",
                     systemImage: "checkmark.shield"
                 )
@@ -748,8 +744,8 @@ struct ResultsView: View {
             SectionHeader(
                 title: "Route choices",
                 subtitle: routeChoiceRanking?.comparisonLimitedByHistory == true
-                    ? "Recorded history is still building, so choices are ordered by route difficulty."
-                    : "Ranked by route demands and evidence recorded on this device."
+                    ? "Limited driving history. Sorted by difficulty."
+                    : "Ranked using your recorded drives."
             )
 
             if let ranking = routeChoiceRanking {

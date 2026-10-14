@@ -7,7 +7,7 @@ enum DriveHistoryPolicy {
     static let minimumSavedDriveSeconds: TimeInterval = 30
 
     static func shouldSave(duration: TimeInterval) -> Bool {
-        duration >= minimumSavedDriveSeconds
+        duration.isFinite && duration >= minimumSavedDriveSeconds
     }
 
     static func removing<T: Identifiable>(id: UUID, from items: [T]) -> [T] where T.ID == UUID {

@@ -25,11 +25,11 @@ enum FeatureWalkthroughStep: String, CaseIterable, Identifiable {
         case .plan:
             "In Routes, enter your destination and compare options before you leave."
         case .understand:
-            "See what may make a route demanding, including turns, traffic, and weather."
+            "Check turns, traffic, and weather along the way."
         case .drive:
-            "Drive records your trip when you choose and keeps the live view focused on the road."
+            "Start recording in Drive before you set off. Review your trip when you arrive."
         case .grow:
-            "Progress turns completed drives into practice goals. Profile keeps your settings and milestones in one place."
+            "Track your practice in Progress. Find settings and milestones in Profile."
         }
     }
 

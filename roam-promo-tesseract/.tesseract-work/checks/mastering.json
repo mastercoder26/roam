@@ -1,0 +1,16 @@
+{
+  "firstPass": {
+    "input_i": "-16.60",
+    "input_tp": "-1.63",
+    "input_lra": "2.80",
+    "input_thresh": "-26.97",
+    "output_i": "-14.99",
+    "output_tp": "-1.50",
+    "output_lra": "0.80",
+    "output_thresh": "-25.20",
+    "normalization_type": "dynamic",
+    "target_offset": "-0.01"
+  },
+  "secondPassFilter": "loudnorm=I=-15:TP=-1.5:LRA=7:measured_I=-16.60:measured_TP=-1.63:measured_LRA=2.80:measured_thresh=-26.97:offset=-0.01:linear=true:print_format=json",
+  "note": "Final audio finishing only. Pictures are stream-copied. Tesseract document retains the independent keys/bass, drums and motion accents."
+}

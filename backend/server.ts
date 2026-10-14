@@ -48,7 +48,7 @@ if (!isDatabaseConfigured()) {
 
 if (!process.env.CLERK_SECRET_KEY) {
   console.error(
-    "CLERK_SECRET_KEY is not configured. Account and profile requests will return 503 until it is set."
+    "CLERK_SECRET_KEY is not configured. Authenticated API requests, including route analysis and address autocomplete, will return 503 until it is set."
   );
 }
 
@@ -157,7 +157,7 @@ function authRateLimit(req: Request, res: Response, next: NextFunction): void {
 
 app.get("/health", async (_req, res) => {
   const database = await checkDatabase();
-  res.status(200).json({
+  res.status(database === "down" ? 503 : 200).json({
     status: database === "up" ? "ok" : "degraded",
     database,
     version: process.env.npm_package_version ?? "1.0.0",

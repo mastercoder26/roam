@@ -188,14 +188,15 @@ export function estimateSolarWindow(
   let utcOffsetMinutes =
     Math.round((departureLocalMinutes - utcMinutes) / UTC_OFFSET_GRANULARITY_MINUTES) *
     UTC_OFFSET_GRANULARITY_MINUTES;
-  if (utcOffsetMinutes > 12 * 60) utcOffsetMinutes -= MINUTES_PER_DAY;
-  if (utcOffsetMinutes < -12 * 60) utcOffsetMinutes += MINUTES_PER_DAY;
+  const longitudeOffsetMinutes = Math.round(longitude / 15) * 60;
+  utcOffsetMinutes += Math.round(
+    (longitudeOffsetMinutes - utcOffsetMinutes) / MINUTES_PER_DAY
+  ) * MINUTES_PER_DAY;
 
   // `departureLocalMinutes` is authoritative for scoring, even if an older
   // client sent an unrelated or stale timestamp. Solar timing needs a real
   // location/timezone pairing, however, so use the deterministic clock
   // fallback rather than manufacturing a sunrise when they disagree wildly.
-  const longitudeOffsetMinutes = Math.round(longitude / 15) * 60;
   if (Math.abs(utcOffsetMinutes - longitudeOffsetMinutes) > 3 * 60) {
     return FALLBACK_SOLAR_WINDOW;
   }

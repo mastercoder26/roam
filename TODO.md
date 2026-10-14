@@ -5,8 +5,10 @@
 - [x] **Fix drive-deletion sync.** `DriveHistorySyncService` merges local and
       server drives with a local tombstone set pushed as deletes and excluded
       from the merge until confirmed.
-- [ ] **Render free plan expires 2026-09-05.** Render *deletes* the instance, it
-      isn't merely suspended. Upgrade or recreate `roam-db` before then.
+- [ ] **Verify the Render database plan and retention.** The recorded free-plan
+      expiration date (2026-09-05) has passed. The public data API health check
+      reported `database: up` on 2026-09-22, but that does not establish the
+      database plan or whether a future deletion is scheduled. Confirm in Render.
 - [ ] **Rotate `CLERK_SECRET_KEY`.** The current `sk_test_` key was pasted into a
       chat transcript on 2026-08-06. Roll it from Clerk's API Keys page and
       update `backend/.env.local` and the `roam-data-api` env vars.

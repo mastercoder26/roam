@@ -26,7 +26,7 @@ import {
 import { computeTurnClustering, computeHighwayShare, computeManeuverComplexity } from "../signals.js";
 import { smoothstep } from "../helpers.js";
 import { aggregateMeanOnly, scoreSegmentLocal, segmentRoute } from "../segments.js";
-import { buildFeaturesFromRoute } from "../features.js";
+import { buildFeaturesFromRoute, estimateSolarWindow } from "../features.js";
 import { FACTOR_WEIGHTS, generateReasons } from "../explain.js";
 import { BASE_SCORE_WEIGHTS } from "../baseScore.js";
 
@@ -86,6 +86,32 @@ describe("score evidence provenance", () => {
 });
 
 describe("after-dark timing", () => {
+  it("estimates summer daylight in UTC+13 instead of falling back to 8 PM", () => {
+    const aucklandBounds = {
+      southwest: { lat: -36.9, lng: 174.7 },
+      northeast: { lat: -36.8, lng: 174.8 },
+    };
+    const solar = estimateSolarWindow(
+      aucklandBounds,
+      "2026-01-14T07:00:00.000Z",
+      20 * 60
+    );
+
+    expect(solar.usesClockFallback).toBe(false);
+    expect(solar.sunsetLocalMinutes).toBeGreaterThan(20 * 60);
+    const { features } = buildFeaturesFromRoute({
+      ...highwayRoute,
+      bounds: aucklandBounds,
+      durationSeconds: 600,
+      staticDurationSeconds: 600,
+      steps: [{ ...highwayRoute.steps[0], staticDurationSeconds: 600 }],
+    }, {
+      departureTime: "2026-01-14T07:00:00.000Z",
+      departureLocalMinutes: 20 * 60,
+    });
+    expect(features.nighttimeShare).toBe(0);
+  });
+
   const chicagoCorridor = {
     ...highwayRoute,
     bounds: {
@@ -137,6 +163,11 @@ describe("score calibration", () => {
 });
 
 describe("traffic scoring", () => {
+  it.each([0, -1, NaN, Infinity])("does not invent traffic delay without a usable baseline (%s)", (staticDurationSeconds) => {
+    const result = scoreRoute({ ...highwayRoute, staticDurationSeconds });
+    expect(result.trafficDelaySeconds).toBe(0);
+  });
+
   it("adds 0.5–4 points for heavy traffic vs light", () => {
     const light = scoreRoute(trafficLightRoute);
     const heavy = scoreRoute(trafficHeavyRoute);
@@ -151,6 +182,9 @@ describe("traffic scoring", () => {
   it("computes delay ratio for heavy traffic", () => {
     const { features } = buildFeaturesFromRoute(trafficHeavyRoute);
     expect(features.delayRatio).toBeGreaterThanOrEqual(0.25);
+    expect(scoreRoute(trafficHeavyRoute).trafficDelaySeconds).toBe(
+      trafficHeavyRoute.durationSeconds - trafficHeavyRoute.staticDurationSeconds
+    );
   });
 });
 

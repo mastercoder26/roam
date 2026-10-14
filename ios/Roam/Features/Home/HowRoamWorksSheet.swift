@@ -12,11 +12,13 @@ struct HowRoamWorksSheet: View {
                 VStack(alignment: .leading, spacing: CGFloat(HowRoamWorksLayoutSpec.sectionSpacing)) {
                     introduction
                     processSection
-                    factorsSection
-                    evidenceSection
-                    recordedDriveSection
-                    scoreSection
-                    privacySection
+                    VStack(alignment: .leading, spacing: AppDesign.space12) {
+                        scoreSection
+                        factorsSection
+                        evidenceSection
+                        recordedDriveSection
+                        privacySection
+                    }
                     limitsSection
                 }
                 .padding(.horizontal, AppDesign.contentPadding)
@@ -52,7 +54,7 @@ struct HowRoamWorksSheet: View {
                 .tracking(-0.4)
                 .foregroundStyle(AppDesign.Ink.primary)
 
-            Text("Roam evaluates the route and departure time, then shows which parts may need more attention. It does not decide whether someone is safe or allowed to drive.")
+            Text("See the demanding parts of a route before you leave, then review your practice after each drive.")
                 .font(.subheadline)
                 .foregroundStyle(AppDesign.Ink.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -62,24 +64,24 @@ struct HowRoamWorksSheet: View {
     }
 
     private var processSection: some View {
-        HowItWorksSection(title: "How a route is scored") {
+        HowItWorksSection(title: "Before you go", expandable: false) {
             VStack(spacing: 0) {
                 ProcessStepRow(
                     number: 1,
-                    title: "Build the route",
-                    detail: "Roam maps the route, distance, travel time, maneuvers, and available alternatives."
+                    title: "Choose a route",
+                    detail: "Enter your start, destination, and departure time."
                 )
                 Divider().padding(.leading, 52)
                 ProcessStepRow(
                     number: 2,
-                    title: "Add context",
-                    detail: "Roam checks traffic, daylight, weather, road details, and mapped turn controls for your departure time."
+                    title: "Check the conditions",
+                    detail: "See traffic, weather, daylight, and difficult turns."
                 )
                 Divider().padding(.leading, 52)
                 ProcessStepRow(
                     number: 3,
-                    title: "Explain the demand",
-                    detail: "The result shows the difficulty score, its main factors, route hotspots, and calmer alternatives when available."
+                    title: "Compare options",
+                    detail: "Review the difficulty and alternatives before choosing."
                 )
             }
             .premiumCard()
@@ -105,21 +107,21 @@ struct HowRoamWorksSheet: View {
             VStack(alignment: .leading, spacing: 0) {
                 EvidenceLevelRow(
                     title: "Well supported",
-                    detail: "The key route inputs were available and support the explanation.",
+                    detail: "Key route data is available.",
                     symbol: "checkmark.seal.fill",
                     color: AppDesign.positive
                 )
                 Divider()
                 EvidenceLevelRow(
                     title: "Partial evidence",
-                    detail: "Some live or mapped inputs were unavailable. Roam shows the result and identifies what is missing.",
+                    detail: "Some data is missing. Check the gaps listed with the score.",
                     symbol: "circle.lefthalf.filled",
                     color: AppDesign.safety
                 )
                 Divider()
                 EvidenceLevelRow(
                     title: "Limited evidence",
-                    detail: "The score relies on fewer route facts. Treat the explanation as an early estimate.",
+                    detail: "Little route data is available. Treat the score as an early estimate.",
                     symbol: "exclamationmark.circle.fill",
                     color: AppDesign.Ink.secondary
                 )
@@ -139,7 +141,7 @@ struct HowRoamWorksSheet: View {
 
                 Divider()
 
-                Text("Scores compare route demand, not driver quality. A higher number means more demanding conditions or more of them.")
+                Text("Higher means a harder route. This score does not rate the driver.")
                     .font(.footnote)
                     .foregroundStyle(AppDesign.Ink.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -189,14 +191,14 @@ struct HowRoamWorksSheet: View {
                     .background(AppDesign.accent.opacity(0.12), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
 
                 VStack(alignment: .leading, spacing: AppDesign.space8) {
-                    Text("Readiness uses local evidence")
+                    Text("Based on your practice")
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(AppDesign.Ink.primary)
-                    Text("When recorded drives are available, Roam compares measured experience with the route's demands. GPS overlap, continuous driving, after-dark miles, faster-road miles, and measured behavior can contribute to that comparison.")
+                    Text("Roam compares each route with your recorded practice, including familiar roads, longer drives, night driving, and faster roads.")
                         .font(.footnote)
                         .foregroundStyle(AppDesign.Ink.secondary)
                         .fixedSize(horizontal: false, vertical: true)
-                    Text("Profile details such as your name and licensing stage never change a route score or driving score.")
+                    Text("Your name and license stage do not affect scores.")
                         .font(.footnote.weight(.semibold))
                         .foregroundStyle(AppDesign.Ink.primary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -207,13 +209,11 @@ struct HowRoamWorksSheet: View {
     }
 
     private var limitsSection: some View {
-        HowItWorksSection(title: "Important limits") {
+        HowItWorksSection(title: "Before you drive", expandable: false) {
             VStack(alignment: .leading, spacing: AppDesign.space12) {
-                LimitRow(text: "Roam is a planning and coaching tool, not a safety guarantee.")
-                LimitRow(text: "Conditions can change after analysis. Check the road and weather before leaving.")
-                LimitRow(text: "Map and live-data coverage varies by location and departure time.")
-                LimitRow(text: "Follow local laws, license restrictions, supervision rules, and your own judgment.")
-                LimitRow(text: "If a route feels beyond your experience, choose an alternative or travel with a qualified supervising driver.")
+                LimitRow(text: "A score is not a safety guarantee. Road data may be incomplete and conditions can change.")
+                LimitRow(text: "Check conditions before leaving. Follow license restrictions and supervision rules.")
+                LimitRow(text: "Choose an easier route or a qualified supervising driver when needed.")
             }
             .premiumCard()
         }
@@ -222,16 +222,33 @@ struct HowRoamWorksSheet: View {
 
 private struct HowItWorksSection<Content: View>: View {
     let title: String
+    var expandable = true
     @ViewBuilder var content: Content
 
+    @ViewBuilder
     var body: some View {
-        VStack(alignment: .leading, spacing: CGFloat(HowRoamWorksLayoutSpec.titleContentSpacing)) {
-            Text(title)
-                .font(AppDesign.Typography.sectionTitle)
-                .foregroundStyle(AppDesign.Ink.primary)
-                .accessibilityAddTraits(.isHeader)
-            content
+        if expandable {
+            DisclosureGroup {
+                content
+                    .padding(.top, AppDesign.space8)
+            } label: {
+                sectionTitle
+                    .frame(minHeight: 44, alignment: .leading)
+            }
+            .tint(AppDesign.Ink.secondary)
+        } else {
+            VStack(alignment: .leading, spacing: CGFloat(HowRoamWorksLayoutSpec.titleContentSpacing)) {
+                sectionTitle
+                content
+            }
         }
+    }
+
+    private var sectionTitle: some View {
+        Text(title)
+            .font(AppDesign.Typography.sectionTitle)
+            .foregroundStyle(AppDesign.Ink.primary)
+            .accessibilityAddTraits(.isHeader)
     }
 }
 

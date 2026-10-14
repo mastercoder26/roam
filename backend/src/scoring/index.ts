@@ -112,10 +112,11 @@ export function scoreRoute(
 
   // A provider that omits either duration must not produce a NaN delay:
   // `Math.max(0, NaN)` is NaN, which would serialize as `null` on the client.
-  const trafficDelaySeconds = Math.max(
-    0,
-    finiteOr(route.durationSeconds) - finiteOr(route.staticDurationSeconds)
-  );
+  const liveSeconds = finiteOr(route.durationSeconds);
+  const staticSeconds = finiteOr(route.staticDurationSeconds);
+  const trafficDelaySeconds = liveSeconds > 0 && staticSeconds > 0
+    ? Math.max(0, liveSeconds - staticSeconds)
+    : 0;
 
   return {
     score,

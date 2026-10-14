@@ -147,9 +147,8 @@ export async function computeRoutes(
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
 
-  let response: Response;
   try {
-    response = await fetch(ROUTES_URL, {
+    const response = await fetch(ROUTES_URL, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -159,29 +158,20 @@ export async function computeRoutes(
       body: JSON.stringify(body),
       signal: controller.signal,
     });
-  } catch {
-    // Covers network failures and the abort fired by the timeout above.
-    clearTimeout(timer);
+
+    if (!response.ok) throw new RouteProviderError(response.status);
+
+    const data: unknown = await response.json();
+    const parsed = computeRoutesResponse.safeParse(data);
+    if (!parsed.success) throw new RouteProviderError(response.status);
+
+    return parsed.data.routes.map(parseRoute);
+  } catch (error) {
+    if (error instanceof RouteProviderError) throw error;
+    // Covers network failures, malformed response bodies, and aborts while
+    // either waiting for headers or reading the body.
     throw new RouteProviderError();
+  } finally {
+    clearTimeout(timer);
   }
-
-  clearTimeout(timer);
-
-  if (!response.ok) {
-    throw new RouteProviderError(response.status);
-  }
-
-  let data: unknown;
-  try {
-    data = await response.json();
-  } catch {
-    throw new RouteProviderError(response.status);
-  }
-
-  const parsed = computeRoutesResponse.safeParse(data);
-  if (!parsed.success) {
-    throw new RouteProviderError(response.status);
-  }
-
-  return parsed.data.routes.map(parseRoute);
 }

@@ -515,6 +515,7 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = A80000000000000000000003 /* Build configuration list for PBXNativeTarget "Roam" */;
 			buildPhases = (
+				A70000000000000000000008 /* Validate Release API Hosts */,
 				A70000000000000000000001 /* Sources */,
 				A40000000000000000000001 /* Frameworks */,
 				A70000000000000000000002 /* Resources */,
@@ -656,6 +657,25 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		A70000000000000000000008 /* Validate Release API Hosts */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+				"$(SRCROOT)/scripts/validate-release-hosts.sh",
+			);
+			name = "Validate Release API Hosts";
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "/bin/sh \"$SRCROOT/scripts/validate-release-hosts.sh\"";
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		A70000000000000000000001 /* Sources */ = {

@@ -10,6 +10,7 @@ struct HomeView: View {
     @State private var isLoading = false
     @State private var isCompletingLoading = false
     @State private var pendingResult: RouteAnalysisResult?
+    @State private var analysisTask: Task<Void, Never>?
     @State private var errorMessage: String?
     @State private var navigationPath = NavigationPath()
     @State private var mapPreview: RoutePlanningMapSummary?
@@ -121,6 +122,7 @@ struct HomeView: View {
                     .padding(.bottom, AppDesign.tabBarClearance)
                 }
                 .scrollDismissesKeyboard(.interactively)
+                .disabled(isLoading)
                 if isLoading {
                     RouteAnalysisLoadingView(isFinishing: isCompletingLoading) { completeLoading() }
                         .transition(.premiumFocus(reduceMotion: reduceMotion))
@@ -144,10 +146,12 @@ struct HomeView: View {
             }
             .onChange(of: form.importedRouteID) { _, importedRouteID in
                 guard importedRouteID != nil else { return }
+                cancelAnalysis()
                 navigationPath = NavigationPath()
                 mapPreview = nil
             }
         }
+        .onDisappear { cancelAnalysis() }
         .sheet(isPresented: $showingHowRoamWorks) {
             HowRoamWorksSheet()
         }
@@ -512,7 +516,8 @@ struct HomeView: View {
             case .signIn:
                 authIsPresented = true
             case .analyze:
-                Task { await analyzeRoute() }
+                guard analysisTask == nil else { return }
+                analysisTask = Task { await analyzeRoute() }
             case .chooseOrigin, .chooseDestination, .waitingForAccount, .analyzing:
                 break
             }
@@ -552,9 +557,9 @@ struct HomeView: View {
         case .waitingForAccount:
             "Preparing your account"
         case .signIn:
-            "Sign in to analyze"
+            "Sign in to check route"
         case .analyze:
-            "Analyze difficulty"
+            "Check route"
         case .analyzing:
             "Analyzing route"
         }
@@ -564,7 +569,7 @@ struct HomeView: View {
         switch primaryAction {
         case .signIn: "person.crop.circle.badge.plus"
         case .waitingForAccount: "person.crop.circle"
-        case .chooseOrigin, .chooseDestination, .analyze, .analyzing: "sparkles"
+        case .chooseOrigin, .chooseDestination, .analyze, .analyzing: "point.topleft.down.to.point.bottomright.curvepath"
         }
     }
 
@@ -697,7 +702,12 @@ struct HomeView: View {
     }
 
     private func analyzeRoute() async {
+        guard !isLoading, !Task.isCancelled else { return }
+        let origin = form.origin
+        let destination = form.destination
+        let departureTime = form.departureTime
         withAnimation(AppAnimation.quick) { errorMessage = nil }
+        pendingResult = nil
         isCompletingLoading = false
         withAnimation(loadingTransitionAnimation) {
             isLoading = true
@@ -705,24 +715,25 @@ struct HomeView: View {
         do {
             let response = try await authSession.performAuthenticated { token in
                 try await apiClient.analyzeRoute(
-                    origin: form.origin,
-                    destination: form.destination,
-                    departureTime: form.departureTime,
+                    origin: origin,
+                    destination: destination,
+                    departureTime: departureTime,
                     accessToken: token,
                     includeAlternates: true
                 )
             }
+            guard !Task.isCancelled else { return }
             pendingResult = RouteAnalysisResult(
-                origin: form.origin,
-                destination: form.destination,
-                departureTime: form.departureTime,
+                origin: origin,
+                destination: destination,
+                departureTime: departureTime,
                 primaryRoute: response.primaryRoute,
                 alternateRoutes: response.alternateRoutes
             )
             recentRoutes.record(
-                origin: form.origin,
-                destination: form.destination,
-                departureTime: form.departureTime,
+                origin: origin,
+                destination: destination,
+                departureTime: departureTime,
                 route: response.primaryRoute
             )
             UINotificationFeedbackGenerator().notificationOccurred(.success)
@@ -730,6 +741,8 @@ struct HomeView: View {
                 isCompletingLoading = true
             }
         } catch {
+            guard !Task.isCancelled else { return }
+            analysisTask = nil
             UINotificationFeedbackGenerator().notificationOccurred(.error)
             withAnimation(AppAnimation.quick) {
                 errorMessage = error.localizedDescription
@@ -740,8 +753,17 @@ struct HomeView: View {
         }
     }
 
+    private func cancelAnalysis() {
+        analysisTask?.cancel()
+        analysisTask = nil
+        pendingResult = nil
+        isCompletingLoading = false
+        isLoading = false
+    }
+
     private func completeLoading() {
         guard let pendingResult else { return }
+        analysisTask = nil
         withAnimation(loadingTransitionAnimation) {
             isCompletingLoading = false
             isLoading = false

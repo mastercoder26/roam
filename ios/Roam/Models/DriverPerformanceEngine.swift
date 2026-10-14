@@ -104,7 +104,7 @@ struct DriveRouteAnalysis: Codable, Hashable {
     }
 
     var isUsableForPerformance: Bool {
-        status == .available && difficultyScore != nil
+        status == .available && difficultyScore.map { $0.isFinite && (0...10).contains($0) } == true
     }
 
     /// Network retries are deliberately bounded and spaced so opening the app

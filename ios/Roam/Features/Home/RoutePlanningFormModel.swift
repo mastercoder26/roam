@@ -172,7 +172,7 @@ enum RoutePlanningFormReducer {
             importedRouteID: route.id,
             importNotice: RouteImportNotice(
                 title: "Imported from \(route.provider.displayName)",
-                message: "Review the route, then analyze it. Roam recalculates a driving route from these locations.\(extraStopsMessage)",
+                message: "Check the start and destination. Roam may choose a different route.\(extraStopsMessage)",
                 isError: false
             )
         )

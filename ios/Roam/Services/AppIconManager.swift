@@ -53,7 +53,8 @@ final class AppIconManager: ObservableObject {
 
     private let application: UIApplication
 
-    init(application: UIApplication = .shared) {
+    init(application: UIApplication? = nil) {
+        let application = application ?? .shared
         self.application = application
         let alternateName = application.alternateIconName
         currentID = AppIconID.allCases.first { $0.alternateIconName == alternateName } ?? .primary

@@ -7,6 +7,35 @@ struct DriveScoringEngineChecks {
         let poorGPS = sample(0, speed: 8, accuracy: 70)
         expect(!DriveScoringEngine.accepts(poorGPS), "poor GPS fixes must be rejected")
         expect(!DriveScoringEngine.accepts(sample(0, speed: -1)), "negative GPS speed must be rejected")
+        expect(!DriveScoringEngine.accepts(sample(0, speed: .infinity)), "non-finite GPS speed must be rejected")
+        for invalidDuration in [Double.infinity, Double.nan, -Double.infinity] {
+            expect(
+                DriveScoringEngine.score(duration: 600, distanceMeters: 6_437.376, events: [], acceptedLocationSamples: 40, rejectedLocationSamples: 0, motionSamples: 2_000, usableTraceDuration: invalidDuration).quality.confidence == .low,
+                "invalid trace duration must remain preliminary before normalization"
+            )
+            expect(
+                DriveScoringEngine.score(duration: invalidDuration, distanceMeters: 6_437.376, events: [], acceptedLocationSamples: 40, rejectedLocationSamples: 0, motionSamples: 2_000, usableTraceDuration: 600).quality.confidence == .low,
+                "invalid drive duration must remain preliminary even with a finite trace"
+            )
+        }
+        expect(
+            DriveScoringEngine.acceptedLocationSampleShare(acceptedLocationSamples: Int.max, rejectedLocationSamples: Int.max) == 0.5,
+            "sample-share calculation must not overflow for large counters"
+        )
+        for invalidCourse in [-1.0, 360.0, Double.infinity] {
+            expect(
+                DriveScoringEngine.detectEvents(previous: sample(0, speed: 12, course: invalidCourse), current: sample(2, speed: 12, course: 80), nearbyMotionG: nil).isEmpty,
+                "invalid course readings must not produce corner events"
+            )
+        }
+        expect(
+            DriveScoringEngine.detectEvents(previous: sample(0, speed: 12, course: 5, courseAccuracy: -1), current: sample(2, speed: 12, course: 80), nearbyMotionG: nil).isEmpty,
+            "Core Location's unavailable course accuracy must not produce corner events"
+        )
+        expect(
+            DriveScoringEngine.score(duration: 600, distanceMeters: .infinity, events: [], acceptedLocationSamples: 40, rejectedLocationSamples: 0, motionSamples: 2_000).quality.confidence == .low,
+            "invalid distance must not earn strong confidence"
+        )
 
         let stationaryBrake = DriveScoringEngine.detectEvents(
             previous: sample(0, speed: 3.9), current: sample(2, speed: 0), nearbyMotionG: 0.6

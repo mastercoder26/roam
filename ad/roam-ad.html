@@ -1,0 +1,206 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Roam · hand-drawn ad</title>
+<style>body{margin:0;background:#141414;color:#ccc;font:13px/1.4 ui-monospace,Menlo,monospace;display:flex;flex-direction:column;align-items:center;gap:10px;padding:12px}canvas#c{width:min(96vw,1280px);height:auto}.bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:center}button{background:#222;color:#ddd;border:1px solid #444;padding:4px 10px;cursor:pointer;font:inherit}input[type=range]{width:420px}</style>
+<canvas id="c"></canvas>
+<script src="core.js"></script>
+<script src="studio.js"></script>
+<script src="cels.js"></script>
+<script src="materials.js"></script>
+<script src="brand.js"></script>
+<script src="route-data.js"></script>
+<script src="assets/app-route.js"></script>
+<script src="car.js"></script>
+<script src="guy.js"></script>
+<script src="scene-room.js"></script>
+<script src="scene-check.js"></script>
+<script src="scene-drive.js"></script>
+<script src="scene-after.js"></script>
+<script src="scene-close.js"></script>
+<script>
+'use strict';
+// ===================== BRIEF =====================
+// Subject: an ad for Roam, the iPhone driving coach for new drivers.
+// Story: a new driver has to drive to Wrigley tomorrow at rush hour, alone, and is worried. He checks
+// the route in Roam the night before, sees exactly where it gets hard, drives it the next day without
+// the app on screen, and afterwards Roam scores the drive. Roam helps before and after, never during.
+// Real product material: the route screen is a simulator screenshot of the Roam app; the route geometry,
+// score (6/10 Hard), distance, time, reasons and hotspots come from Roam's own scoring code. The drive
+// review is redrawn in the app's style with the app's own grade and summary copy.
+// Look: brush-pen ink and opaque gouache in Roam colours, handwriting for his notes, the system font
+// only where it is the app's own text. Character: whole poses keyed from acting controls, on twos.
+//
+// ===================== BEAT SHEET =====================
+// t      dur   shot      viewer notices                                    camera            sound
+// 0.0    6.0   night     "tmrw 5:30pm, drive to Wrigley, alone." He worries push into phone    clock, minor pad, swell
+// 6.0    7.4   check     real app screen, tap Analyze, 6/10 Hard, the hard  still             tap, piano climbs, pen
+//                        parts circled on the real route
+// 13.4   3.2   relief    he exhales: "ok. I know where it gets hard."       still             breath, chord resolves
+// 16.6   8.0   drive     next day; he remembers the turn, eases off, stops  tracking          groove, drums rest at stop
+// 24.6   5.4   after     parked; Roam's drive review: 86, Steady            still             score chime, pen
+// 30.0   5.0   sign-off  brush wipe to navy, ROAM, before/after line        wipe, hold        final chord
+
+const WIPE = .85, _wipe = [];
+function shotEnd(c, tau) {
+  if (tau >= WIPE) { endFrame(c, tau); return; }
+  if (!_wipe.length) _wipe.push(layer(), layer());
+  const [L, M] = _wipe, g = L.getContext('2d'), m = M.getContext('2d'), u = tau / WIPE;
+  g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, L.width, L.height); resetT(g); endFrame(g, tau);
+  m.setTransform(1, 0, 0, 1, 0, 0); m.clearRect(0, 0, M.width, M.height); resetT(m);
+  for (let i = 0; i < 6; i++) {
+    const y = 60 + i * 196, row = [[-160, y + 24], [W * .5, y - 18], [W + 160, y + 12]];
+    brush(m, i % 2 ? row.reverse() : row, { w: 310, color: '#000', p: sm(i * .07, .55 + i * .07, u, easeInOutSine), seed: 900 + i, taper: .12, amp: 2 });
+  }
+  g.setTransform(1, 0, 0, 1, 0, 0); g.globalCompositeOperation = 'destination-in'; g.drawImage(M, 0, 0); g.globalCompositeOperation = 'source-over';
+  blit(c, heldFrame('after', h => afterFrame(h, AFTER.dur - 1e-3)));
+  resetT(c); c.drawImage(L, 0, 0, W, H);
+}
+
+const TIMELINE = [
+  { name: 'night', dur: NIGHT.dur, fn: nightFrame },
+  { name: 'check', dur: CHECK.dur, fn: checkFrame },
+  { name: 'relief', dur: RELIEF.dur, fn: reliefFrame },
+  { name: 'drive', dur: DRIVE.dur, fn: driveFrame },
+  { name: 'after', dur: AFTER.dur, fn: afterFrame },
+  { name: 'sign-off', dur: END.dur, fn: shotEnd },
+];
+const T = {}; TIMELINE.reduce((t, s) => (T[s.name] = t, t + s.dur), 0);
+T.end = T['sign-off'];
+T.end = T['sign-off'];
+const T_ALL = TIMELINE.reduce((t, s) => t + s.dur, 0);
+
+// ===================== SCORE =====================
+// A minor, clock-ticking night that brightens once he sees the route; a light groove for the drive
+// that rests while the car waits at the stop; a resolved chord under the sign-off.
+const hz = m => 440 * Math.pow(2, (m - 69) / 12);
+function noiseBuf(ac, d, seed) { const b = ac.createBuffer(1, Math.max(1, Math.ceil(ac.sampleRate * d)), ac.sampleRate), ch = b.getChannelData(0), r = rng(seed); for (let i = 0; i < ch.length; i++) ch[i] = r() * 2 - 1; return b; }
+function env(ac, g, t, a, peak, d, curve = 'exp') { g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(peak, t + a); if (curve === 'exp') g.gain.exponentialRampToValueAtTime(.0005, t + a + d); else g.gain.linearRampToValueAtTime(0, t + a + d); }
+function voice(ac, out, type, f, t, a, peak, d, filter) { const o = ac.createOscillator(), g = ac.createGain(); o.type = type; o.frequency.value = f; env(ac, g, t, a, peak, d); if (filter) { o.connect(filter); filter.connect(g); } else o.connect(g); g.connect(out); o.start(t); o.stop(t + a + d + .05); return o; }
+function lowpass(ac, f, q = .7) { const b = ac.createBiquadFilter(); b.type = 'lowpass'; b.frequency.value = f; b.Q.value = q; return b; }
+
+function keys(A, t, m, d = 1.4, g = .1) {
+  const { ac, out } = A, lp = lowpass(ac, 2400);
+  lp.connect(out);
+  voice(ac, lp, 'sine', hz(m), t, .006, g, d);
+  voice(ac, lp, 'triangle', hz(m), t, .006, g * .3, d * .6);
+  voice(ac, lp, 'sine', hz(m + 12), t, .004, g * .12, d * .35);
+}
+function pad(A, t, ms, d, g = .035) {
+  const { ac, out } = A;
+  for (const m of ms) for (const det of [-7, 7]) {
+    const o = ac.createOscillator(), lp = lowpass(ac, 750), e = ac.createGain();
+    o.type = 'sawtooth'; o.frequency.value = hz(m); o.detune.value = det;
+    e.gain.setValueAtTime(0, t); e.gain.linearRampToValueAtTime(g, t + .9); e.gain.setValueAtTime(g, t + d - .6); e.gain.linearRampToValueAtTime(0, t + d + .4);
+    o.connect(lp); lp.connect(e); e.connect(out); o.start(t); o.stop(t + d + .5);
+  }
+}
+function bass(A, t, m, d = .9, g = .2) { voice(A.ac, A.dry, 'sine', hz(m), t, .01, g, d); voice(A.ac, A.dry, 'triangle', hz(m + 12), t, .01, g * .12, d * .5); }
+function kick(A, t, g = .5) { const { ac, dry } = A, o = ac.createOscillator(), e = ac.createGain(); o.frequency.setValueAtTime(130, t); o.frequency.exponentialRampToValueAtTime(42, t + .14); env(ac, e, t, .004, g, .3); o.connect(e); e.connect(dry); o.start(t); o.stop(t + .4); }
+function noise(A, t, d, g, seed, type, f, q = 1, a = .003, dest = A.out) {
+  const { ac } = A, s = ac.createBufferSource(), b = ac.createBiquadFilter(), e = ac.createGain();
+  s.buffer = noiseBuf(ac, d + a + .02, seed); b.type = type; b.frequency.value = f; b.Q.value = q;
+  env(ac, e, t, a, g, d); s.connect(b); b.connect(e); e.connect(dest); s.start(t); return b;
+}
+const shaker = (A, t, g = .05, seed = 1) => noise(A, t, .06, g, seed, 'highpass', 6500);
+const tick = (A, t, g = .05, seed = 1) => noise(A, t, .02, g, seed, 'bandpass', 2600, 7, .001, A.dry);
+function swell(A, t, d, g, f0, f1, seed) {
+  const { ac, out } = A, s = ac.createBufferSource(), b = ac.createBiquadFilter(), e = ac.createGain();
+  s.buffer = noiseBuf(ac, d + .05, seed); b.type = 'bandpass'; b.Q.value = .8;
+  b.frequency.setValueAtTime(f0, t); b.frequency.exponentialRampToValueAtTime(f1, t + d);
+  e.gain.setValueAtTime(0, t); e.gain.linearRampToValueAtTime(g, t + d * .78); e.gain.linearRampToValueAtTime(0, t + d);
+  s.connect(b); b.connect(e); e.connect(out); s.start(t); s.stop(t + d + .05);
+}
+function bell(A, t, m, g = .08) { [[1, 1, 2.2], [2.76, .35, 1.2], [5.4, .15, .6]].forEach(([r, k, d]) => voice(A.ac, A.out, 'sine', hz(m) * r, t, .003, g * k, d)); }
+function scratch(A, t, d, g = .05, seed = 1) {
+  const { ac, dry } = A, n = Math.ceil(ac.sampleRate * d), b = ac.createBuffer(1, n, ac.sampleRate), ch = b.getChannelData(0), r = rng(seed);
+  let amp = 0, target = 0;
+  for (let i = 0; i < n; i++) { if (i % 900 === 0) target = r() < .25 ? 0 : .4 + r() * .6; amp += (target - amp) * .004; ch[i] = (r() * 2 - 1) * amp; }
+  const s = ac.createBufferSource(), bp = ac.createBiquadFilter(), e = ac.createGain();
+  s.buffer = b; bp.type = 'bandpass'; bp.frequency.value = 3800; bp.Q.value = 1.2; e.gain.value = g;
+  s.connect(bp); bp.connect(e); e.connect(dry); s.start(t);
+}
+function engine(A, t0, dur, speedAt, gain) {
+  const { ac, dry } = A, o = ac.createOscillator(), lp = lowpass(ac, 220), e = ac.createGain();
+  o.type = 'sawtooth'; o.connect(lp); lp.connect(e); e.connect(dry); e.gain.setValueAtTime(0, t0);
+  for (let t = 0; t <= dur + 1e-6; t += .05) { const v = speedAt(t), f = Math.min(1, t / .4, (dur - t) / .3); o.frequency.linearRampToValueAtTime(38 + v * .045, t0 + t); e.gain.linearRampToValueAtTime(Math.max(0, gain(v) * f), t0 + t); }
+  o.start(t0); o.stop(t0 + dur + .05);
+}
+
+const CH = { C: [48, [60, 64, 67, 72]], Am: [45, [57, 60, 64, 69]], F: [41, [53, 57, 60, 65]], G: [43, [55, 59, 62, 67]], E: [40, [56, 59, 64, 68]], Dm: [50, [57, 62, 65, 69]] };
+const BAR = 2.4, EIGHTH = .3;
+
+function score(ac, t0, dest) {
+  const comp = ac.createDynamicsCompressor(); comp.threshold.value = -14; comp.ratio.value = 3; comp.connect(dest);
+  const master = ac.createGain(); master.gain.value = 1.0; master.connect(comp);
+  const verb = ac.createConvolver(), ir = ac.createBuffer(2, Math.ceil(ac.sampleRate * 2.6), ac.sampleRate);
+  for (let k = 0; k < 2; k++) { const ch = ir.getChannelData(k), r = rng(31 + k); for (let i = 0; i < ch.length; i++) ch[i] = (r() * 2 - 1) * Math.pow(1 - i / ch.length, 3.2); }
+  verb.buffer = ir; const wet = ac.createGain(); wet.gain.value = .32; verb.connect(wet); wet.connect(master);
+  const out = ac.createGain(); out.connect(master); out.connect(verb);
+  const A = { ac, out, dry: master };
+  const at = t => t0 + t;
+
+  // Night: minor pad, a ticking clock, a hesitant piano line, a swell into the phone.
+  pad(A, at(0), CH.Am[1].slice(0, 3).map(m => m - 12), 2.4); pad(A, at(2.4), CH.F[1].slice(0, 3).map(m => m - 12), 2.4); pad(A, at(4.8), CH.E[1].slice(0, 3).map(m => m - 12), 1.3);
+  for (let t = .25; t < 5.3; t += .5) tick(A, at(t), .06, Math.round(t * 10));
+  [[.6, 76], [1.5, 72], [2.1, 71], [2.9, 69], [3.3, 72], [3.9, 76], [4.4, 74]].forEach(([t, m]) => keys(A, at(t), m, 1.8, .07));
+  scratch(A, at(.3), .7, .05, 3); scratch(A, at(.9), .8, .05, 4); scratch(A, at(1.6), .7, .05, 5);
+  swell(A, at(4.9), 1.15, .16, 260, 3200, 7);
+
+  // Check: tap, loading shimmer, the route climbs in C, pen notes land on the circled parts.
+  const c0 = T.check;
+  pad(A, at(c0), CH.C[1].slice(0, 3).map(m => m - 12), 2.4); pad(A, at(c0 + 2.4), CH.G[1].slice(0, 3).map(m => m - 12), 2.4); pad(A, at(c0 + 4.8), CH.Am[1].slice(0, 3).map(m => m - 12), 2.6);
+  voice(ac, out, 'sine', 1900, at(c0 + 1.64), .002, .07, .05); noise(A, at(c0 + 1.64), .03, .08, 11, 'lowpass', 1800);
+  [84, 88, 91].forEach((m, i) => keys(A, at(c0 + 2.1 + i * .14), m, .5, .035));
+  bell(A, at(c0 + 2.65), 81, .07); bell(A, at(c0 + 2.8), 88, .05);
+  [60, 64, 67, 72, 71, 67, 74, 76].forEach((m, i) => keys(A, at(c0 + 2.6 + i * .2), m, 1.1, .075));
+  bass(A, at(c0 + 2.4), 43, 2.2, .12); bass(A, at(c0 + 4.8), 45, 2.4, .12);
+  bell(A, at(c0 + 4.4), 76, .06);
+  [[2.6, .5], [4.2, .4], [4.6, .7], [5.3, .8], [5.7, .4], [6.1, .6]].forEach(([t, d], i) => scratch(A, at(c0 + t), d, .045, 20 + i));
+  [[4.3, .5], [5.0, .4], [5.8, .4]].forEach(([t, d], i) => scratch(A, at(c0 + t), d, .03, 30 + i));
+
+  // Relief: a breath out, the chord resolves to C.
+  const r0 = T.relief;
+  pad(A, at(r0), CH.F[1].slice(0, 3).map(m => m - 12), 1.4); pad(A, at(r0 + 1.3), CH.C[1].map(m => m - 12), 2.2);
+  noise(A, at(r0 + 1.0), .8, .09, 41, 'lowpass', 700, .5, .35);
+  bass(A, at(r0 + 1.3), 36, 2.2, .16);
+  [72, 76, 79, 84].forEach((m, i) => keys(A, at(r0 + 1.35 + i * .09), m, 2.0, .06));
+  [[1.7, .6], [2.3, .6]].forEach(([t, d], i) => scratch(A, at(r0 + t), d, .04, 50 + i));
+  swell(A, at(r0 + 2.55), .7, .08, 400, 2400, 51);
+
+  // Drive: one chord per bar, drums rest from the brake until he pulls away.
+  const d0 = T.drive, prog = ['C', 'Am', 'F', 'G'], rest = [d0 + DRIVE.brake[0], d0 + DRIVE.go[0]];
+  for (let bar = 0; bar * BAR < DRIVE.dur + AFTER.dur - .1; bar++) {
+    const tb = d0 + bar * BAR, [root, arp] = CH[prog[bar % 4]], inAfter = tb >= T.after;
+    for (let s = 0; s < 8; s++) {
+      const t = tb + s * EIGHTH; if (t >= T.end - .2) break;
+      keys(A, at(t), arp[[0, 1, 2, 3, 2, 1, 2, 1][s]], .6, inAfter ? .045 : .055);
+      const resting = t >= rest[0] && t < rest[1];
+      if (!resting && !inAfter) { if (s % 4 === 0) kick(A, at(t), .42); if (s % 2 === 1) shaker(A, at(t), .04, bar * 8 + s); }
+      if (inAfter && s % 2 === 1) shaker(A, at(t), .025, bar * 8 + s);
+    }
+    if (tb < T.end - .5) { bass(A, at(tb), root, 1.0, .18); bass(A, at(tb + 1.2), root, .9, .14); }
+  }
+  engine(A, at(d0), DRIVE.dur, driveSpeed, v => .012 + v / 640 * .03);
+  bell(A, at(d0 + 1.0), 84, .04); bell(A, at(d0 + 1.25), 88, .035);
+  [[2.0, .6], [2.4, .6]].forEach(([t, d], i) => scratch(A, at(d0 + t), d, .035, 60 + i));
+
+  // After: the score ring fills, "Steady" chimes, his note.
+  const a0 = T.after;
+  [72, 76, 79].forEach((m, i) => keys(A, at(a0 + .8 + i * .22), m, 1.0, .06));
+  bell(A, at(a0 + 1.55), 88, .09); bell(A, at(a0 + 1.62), 91, .07);
+  [[3.2, .6], [3.7, .5]].forEach(([t, d], i) => scratch(A, at(a0 + t), d, .045, 70 + i));
+  swell(A, at(T.end - .45), 1.1, .15, 220, 2800, 71);
+
+  // Sign-off: F, G, then a held C under the wordmark; the car and its two blinks.
+  const e0 = T.end;
+  pad(A, at(e0 + .3), CH.F[1].map(m => m - 12), 1.3); pad(A, at(e0 + 1.5), CH.G[1].map(m => m - 12), 1.2); pad(A, at(e0 + 2.6), CH.C[1].map(m => m - 12), 2.2, .04);
+  bass(A, at(e0 + .3), 41, 1.2, .16); bass(A, at(e0 + 1.5), 43, 1.1, .16); bass(A, at(e0 + 2.6), 36, 2.3, .2);
+  [65, 69, 72].forEach((m, i) => keys(A, at(e0 + .9 + i * .12), m, 1.2, .05));
+  [67, 71, 74].forEach((m, i) => keys(A, at(e0 + 1.6 + i * .12), m, 1.2, .05));
+  [60, 64, 67, 72, 76, 79].forEach((m, i) => keys(A, at(e0 + 2.6 + i * .07), m, 2.2, .06));
+  engine(A, at(e0 + 2.0), 1.8, t => endCar(2.0 + t).v * .25, v => Math.min(.03, v / 3000));
+  bell(A, at(e0 + 3.76), 96, .05); bell(A, at(e0 + 4.03), 96, .05);
+}
+
+defineFilm({ palette: ROAM_PALETTE, timeline: TIMELINE, score, format: { ar: '16:9', width: 1920 }, fps: 24 });
+</script>

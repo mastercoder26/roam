@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256" role="img" aria-labelledby="title">
+  <title id="title">Roundabout 28</title>
+  <path fill="#000" d="M36,42 H98 V222 H36 Z"/>
+  <path fill="#000" fill-rule="evenodd" d="M56,108 A74,74 0 1 1 204,108 A74,74 0 1 1 56,108 Z M105,107 A30,30 0 1 0 165,107 A30,30 0 1 0 105,107 Z"/>
+  <path fill="#000" d="M182.08,134.59 L231.52,160.88 L206.17,208.56 L156.73,182.27 Z"/>
+</svg>

@@ -1,17 +1,18 @@
 # Deployment
 
 The `backend/` codebase is deployed twice, each deployment doing one job. This
-works with no code changes because `server.ts` degrades by design: when
-`DATABASE_URL` and `CLERK_SECRET_KEY` are absent it warns at boot and the
-account endpoints return `503`, while route analysis keeps working.
+works with no code changes because `server.ts` degrades by design: without
+`DATABASE_URL` the account endpoints return `503`, while authenticated route
+analysis remains available when `CLERK_SECRET_KEY` is configured.
 
 | Deployment | Host | Job | Needs |
 |---|---|---|---|
-| `roam-backend` | Cloud Run, `us-central1` | route difficulty only | `GOOGLE_MAPS_API_KEY` |
+| `roam-backend` | Cloud Run, `us-central1` | route difficulty only | `GOOGLE_MAPS_API_KEY`, `CLERK_SECRET_KEY` |
 | `roam-data-api` | Render, `oregon` | accounts, profiles, drive history | `CLERK_SECRET_KEY`, `DATABASE_URL` |
 
-`POST /api/route/difficulty` sits behind rate limiting rather than `requireAuth`,
-which is why Cloud Run needs no Clerk credentials.
+`POST /api/route/difficulty` uses `requireVerifiedIdentity` to verify a Clerk
+token without creating a database user. Cloud Run needs Clerk credentials but
+does not need a database connection.
 
 The iOS app can't talk to Postgres directly — it would have to ship database
 credentials in the app binary. `roam-data-api` sits in between.
@@ -47,8 +48,8 @@ gcloud run services describe roam-backend --region us-central1 \
   --format='value(status.latestReadyRevisionName)'
 ```
 
-Do not give this service `DATABASE_URL` or `CLERK_SECRET_KEY`. The point of the
-split is that it holds neither.
+Configure `CLERK_SECRET_KEY` securely on this service; without it, route requests
+return `503`. Do not give the route-only service `DATABASE_URL`.
 
 ## Render
 
@@ -79,8 +80,8 @@ npm --prefix backend run migrate
 ```
 
 Set `DATABASE_URL` and `PGSSLMODE=disable` in `backend/.env.local` first.
-Without `DATABASE_URL` and `CLERK_SECRET_KEY` the backend still starts and route
-analysis behaves normally; account endpoints return `503`.
+Without `DATABASE_URL` the backend still starts and account endpoints return
+`503`. Route analysis needs `CLERK_SECRET_KEY` as well as `GOOGLE_MAPS_API_KEY`.
 
 ## Device configuration
 

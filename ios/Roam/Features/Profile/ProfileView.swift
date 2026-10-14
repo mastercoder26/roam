@@ -732,7 +732,7 @@ struct ProfileView: View {
             showingFeatureWalkthrough = true
         } label: {
             HStack(spacing: AppDesign.space12) {
-                IconTile(symbol: "sparkles")
+                IconTile(symbol: "map")
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Explore Roam")

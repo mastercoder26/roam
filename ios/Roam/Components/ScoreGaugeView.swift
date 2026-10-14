@@ -43,7 +43,7 @@ struct ScoreGaugeView: View {
                     .tracking(1.2)
                     .foregroundStyle(AppDesign.Ink.tertiary)
             }
-            .scaleEffect(hasAppeared ? 1 : 0.95)
+            .scaleEffect(hasAppeared || reduceMotion ? 1 : 0.95)
             .opacity(hasAppeared ? 1 : 0)
         }
         .frame(width: 204, height: 204)

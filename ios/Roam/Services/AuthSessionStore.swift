@@ -54,16 +54,25 @@ final class AuthSessionStore: ObservableObject {
     @Published private(set) var syncStatus: SyncStatus = .synced
 
     private let client: ClerkBackendClient
+    private let profileStore: DriverProfileStore
     private var testAccessToken: String?
     private var hasStartedRestore = false
     private var isProfileSyncInFlight = false
+    /// Invalidates profile and identity requests that finish after a session
+    /// transition. The remote request may ignore task cancellation.
+    private var sessionGeneration = 0
+    /// Clerk's identity and the data API's user ID are different namespaces.
+    /// Keep Clerk's ID separately while app state contains the backend user.
+    private var activeClerkUserID: String?
     private var driveHistorySyncRequest: (() -> Void)?
 
     init(
         client: ClerkBackendClient = ClerkBackendClient(),
+        profileStore: DriverProfileStore? = nil,
         automaticallyRestore: Bool = true
     ) {
         self.client = client
+        self.profileStore = profileStore ?? .shared
         guard automaticallyRestore else { return }
         Task { @MainActor [weak self] in
             await self?.restoreIfNeeded()
@@ -84,6 +93,14 @@ final class AuthSessionStore: ObservableObject {
         }
     }
 
+    /// Stable owner for cloud-drive sync. `/api/auth/me` returns a database UUID,
+    /// while an offline Clerk session initially has only the Clerk user ID.
+    /// The Clerk ID stays the same across that transition.
+    var driveHistoryAccountID: String? {
+        guard isSignedIn else { return nil }
+        return activeClerkUserID ?? currentUser?.id
+    }
+
     /// Synchronizes the app-facing state with Clerk's observable user. This is
     /// called on launch and whenever the prebuilt views activate or end a
     /// Clerk session.
@@ -102,16 +119,26 @@ final class AuthSessionStore: ObservableObject {
                 .joined(separator: " ")
                 .nilIfEmpty
         )
+        sessionGeneration &+= 1
+        let generation = sessionGeneration
+        isProfileSyncInFlight = false
+        activeClerkUserID = clerkIdentity.id
         state = .signedIn(clerkIdentity)
 
         do {
             let backendUser = try await performAuthenticated { token in
                 try await self.client.currentUser(accessToken: token)
             }
-            state = .signedIn(backendUser)
-            await syncProfile()
+            guard applyBackendIdentity(
+                backendUser,
+                generation: generation,
+                replacingUserID: clerkIdentity.id
+            ) else { return }
+            await syncProfile(expectedGeneration: generation)
+            guard isCurrentSession(generation: generation, userID: backendUser.id) else { return }
             requestDriveHistorySync()
         } catch {
+            guard isCurrentSession(generation: generation, userID: clerkIdentity.id) else { return }
             state = .signedInOffline(clerkIdentity)
             syncStatus = .workingOffline
             requestDriveHistorySync()
@@ -143,7 +170,7 @@ final class AuthSessionStore: ObservableObject {
         try await performAuthenticated { token in
             try await self.client.deleteAccount(accessToken: token)
         }
-        DriverProfileStore.shared.reset()
+        profileStore.reset()
         #if canImport(ClerkKit)
         try await Clerk.shared.auth.signOut()
         #endif
@@ -166,13 +193,18 @@ final class AuthSessionStore: ObservableObject {
     /// name — stayed local until the app was fully killed and relaunched.
     /// `syncProfile()` resolves conflicts in both directions, so repeating it
     /// on foreground is safe and simply converges.
-    func requestProfileSync() {
-        guard isSignedIn, !isProfileSyncInFlight else { return }
+    @discardableResult
+    func requestProfileSync() -> Task<Void, Never>? {
+        guard let userID = currentUser?.id, !isProfileSyncInFlight else { return nil }
         isProfileSyncInFlight = true
-        Task { [weak self] in
+        let generation = sessionGeneration
+        return Task { [weak self] in
             guard let self else { return }
-            defer { self.isProfileSyncInFlight = false }
-            await self.syncProfile()
+            defer {
+                if self.sessionGeneration == generation { self.isProfileSyncInFlight = false }
+            }
+            guard self.isCurrentSession(generation: generation, userID: userID) else { return }
+            await self.syncProfile(expectedGeneration: generation)
         }
     }
 
@@ -205,20 +237,60 @@ final class AuthSessionStore: ObservableObject {
 
     /// Test-only state injection for the standalone drive-sync checks. It does
     /// not persist credentials or participate in production Clerk state.
-    func setSignedInForTesting(user: AuthUser, accessToken: String) {
+    func setSignedInForTesting(
+        user: AuthUser,
+        accessToken: String,
+        stableAccountID: String? = nil
+    ) {
+        sessionGeneration &+= 1
+        isProfileSyncInFlight = false
+        activeClerkUserID = stableAccountID
         testAccessToken = accessToken
         state = .signedIn(user)
     }
 
-    private func syncProfile() async {
+    /// Exercises the same identity transition as `/api/auth/me` without
+    /// requiring ClerkKit in the standalone Swift checks.
+    func applyBackendIdentityForTesting(_ backendUser: AuthUser) -> Bool {
+        guard let currentID = currentUser?.id else { return false }
+        return applyBackendIdentity(
+            backendUser,
+            generation: sessionGeneration,
+            replacingUserID: currentID
+        )
+    }
+
+    private func applyBackendIdentity(
+        _ backendUser: AuthUser,
+        generation: Int,
+        replacingUserID: String
+    ) -> Bool {
+        guard isCurrentSession(generation: generation, userID: replacingUserID) else { return false }
+        state = .signedIn(backendUser)
+        return true
+    }
+
+    private func isCurrentSession(generation: Int, userID: String) -> Bool {
+        guard sessionGeneration == generation, currentUser?.id == userID else { return false }
+        #if canImport(ClerkKit)
+        guard let activeClerkUserID else { return false }
+        return Clerk.shared.user?.id == activeClerkUserID
+        #else
+        return testAccessToken != nil
+        #endif
+    }
+
+    private func syncProfile(expectedGeneration: Int) async {
         guard let user = currentUser else { return }
+        guard isCurrentSession(generation: expectedGeneration, userID: user.id) else { return }
         syncStatus = .syncing
 
         do {
             let remote = try await performAuthenticated { token in
                 try await self.client.profile(accessToken: token)
             }
-            let localStore = DriverProfileStore.shared
+            guard isCurrentSession(generation: expectedGeneration, userID: user.id) else { return }
+            let localStore = profileStore
             switch ProfileSyncConflictResolver.resolve(
                 local: localStore.snapshot,
                 localUpdatedAt: localStore.lastUpdatedAt,
@@ -240,6 +312,7 @@ final class AuthSessionStore: ObservableObject {
                         payload: nil
                     )
                 }
+                guard isCurrentSession(generation: expectedGeneration, userID: user.id) else { return }
                 localStore.applyRemoteProfile(
                     displayName: updated.displayName,
                     stage: updated.stage,
@@ -251,6 +324,7 @@ final class AuthSessionStore: ObservableObject {
             state = .signedIn(user)
             syncStatus = .synced
         } catch let error as AuthError {
+            guard isCurrentSession(generation: expectedGeneration, userID: user.id) else { return }
             if error.isTransient {
                 state = .signedInOffline(user)
                 syncStatus = .workingOffline
@@ -258,11 +332,15 @@ final class AuthSessionStore: ObservableObject {
                 syncStatus = .failed(error.localizedDescription)
             }
         } catch {
+            guard isCurrentSession(generation: expectedGeneration, userID: user.id) else { return }
             syncStatus = .failed("Profile sync failed. Try again.")
         }
     }
 
     private func markSignedOut() {
+        sessionGeneration &+= 1
+        isProfileSyncInFlight = false
+        activeClerkUserID = nil
         testAccessToken = nil
         state = .signedOut
         syncStatus = .synced

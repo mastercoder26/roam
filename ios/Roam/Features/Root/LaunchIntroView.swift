@@ -51,6 +51,8 @@ struct LaunchIntroView: View {
     @State private var isWordmarkDocked = false
     @State private var wordmarkWidth: CGFloat = 0
     @State private var wordmarkSliceProgress: Double = 0
+    @State private var handOffTask: Task<Void, Never>?
+    @State private var coldDockTargetFrame: CGRect = .zero
 
     private var choreography: LaunchIntroChoreography.Type { LaunchIntroChoreography.self }
 
@@ -93,6 +95,27 @@ struct LaunchIntroView: View {
                 }
             }
         }
+        .overlay(alignment: .top) {
+            HStack {
+                BrandWordmark(compact: true)
+                    .background {
+                        GeometryReader { proxy in
+                            Color.clear.preference(
+                                key: ColdDockFrameKey.self,
+                                value: proxy.frame(in: .named(LaunchIntroDockSpace.name))
+                            )
+                        }
+                    }
+                Spacer(minLength: 0)
+            }
+            .frame(minHeight: 44)
+            .padding(.horizontal, 20)
+            .padding(.vertical, 4)
+            .frame(maxWidth: .infinity)
+            .hidden()
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+        }
         // Nobody should be held hostage by a brand moment. A tap finishes it.
         .contentShape(Rectangle())
         .onTapGesture(perform: handOff)
@@ -104,7 +127,12 @@ struct LaunchIntroView: View {
             guard wordmarkWidth == 0, width > 0 else { return }
             wordmarkWidth = width
         }
-        .onAppear(perform: start)
+        .onPreferenceChange(ColdDockFrameKey.self) { coldDockTargetFrame = $0 }
+        .task { await start() }
+        .onDisappear {
+            handOffTask?.cancel()
+            handOffTask = nil
+        }
         .onChange(of: isLockupVisible) { _, visible in
             guard visible, !reduceMotion else { return }
             UIImpactFeedbackGenerator(style: .soft).impactOccurred(intensity: 0.6)
@@ -124,14 +152,19 @@ struct LaunchIntroView: View {
     /// dims it out from underneath as the mark lands.
     private var globeWordmarkOverlay: some View {
         GeometryReader { geometry in
+            let localFrame = geometry.frame(in: .named(LaunchIntroDockSpace.name))
+            let targetFrame = dockTargetFrame == .zero ? coldDockTargetFrame : dockTargetFrame
             let origin = choreography.wordmarkOrigin(
                 docked: isWordmarkDocked,
                 screenWidth: Double(geometry.size.width),
                 screenHeight: Double(geometry.size.height),
                 wordmarkWidth: Double(wordmarkWidth),
-                measuredDockedTarget: dockTargetFrame == .zero
+                measuredDockedTarget: targetFrame == .zero
                     ? nil
-                    : IntroPoint(x: dockTargetFrame.origin.x, y: dockTargetFrame.origin.y)
+                    : IntroPoint(
+                        x: targetFrame.origin.x - localFrame.origin.x,
+                        y: targetFrame.origin.y - localFrame.origin.y
+                    )
             )
 
             introWordmark
@@ -176,7 +209,7 @@ struct LaunchIntroView: View {
     private var atmosphere: some View {
         MapGridTexture()
         .opacity(isLockupVisible ? 1 : 0.35)
-        .scaleEffect(isLockupVisible ? 1 : 0.9)
+        .scaleEffect(isLockupVisible || reduceMotion ? 1 : 0.9)
         .animation(reduceMotion ? .easeOut(duration: 0.3) : AppAnimation.reveal, value: isLockupVisible)
         .ignoresSafeArea()
         .accessibilityHidden(true)
@@ -206,13 +239,15 @@ struct LaunchIntroView: View {
     /// Reduce Motion skips straight to the native trace/wordmark beat.
     /// Everyone else gets the ASCII globe, with the wordmark fading in on
     /// top of it partway through.
-    private func start() {
+    @MainActor
+    private func start() async {
         guard usesGlobeIntro else {
             play()
             return
         }
         isGlobeIntroActive = true
-        DispatchQueue.main.asyncAfter(deadline: .now() + choreography.videoWordmarkDelay) {
+        do {
+            try await Task.sleep(for: .seconds(choreography.videoWordmarkDelay))
             guard !hasSignaledVisualCompletion else { return }
             withAnimation(.easeOut(duration: choreography.videoWordmarkFadeDuration)) {
                 isGlobeWordmarkVisible = true
@@ -220,8 +255,7 @@ struct LaunchIntroView: View {
             withAnimation(AppAnimation.wordmarkResolve) {
                 wordmarkSliceProgress = 1
             }
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + choreography.wordmarkDockDelay) {
+            try await Task.sleep(for: .seconds(choreography.wordmarkDockDelay - choreography.videoWordmarkDelay))
             guard !hasSignaledVisualCompletion else { return }
             // One animation drives both scale and offset, so the mark reads
             // as a single object moving rather than a size change racing a
@@ -231,6 +265,8 @@ struct LaunchIntroView: View {
             ) {
                 isWordmarkDocked = true
             }
+        } catch {
+            return
         }
     }
 
@@ -238,6 +274,7 @@ struct LaunchIntroView: View {
     /// canvas color, so there's nothing left to transition to — just hold on
     /// the mark for a beat, then hand off.
     private func handOffFromGlobeIntro() {
+        guard !hasSignaledVisualCompletion else { return }
         isGlobeIntroActive = false
         scheduleHandOff(after: choreography.videoWordmarkHoldDuration)
     }
@@ -269,7 +306,15 @@ struct LaunchIntroView: View {
     }
 
     private func scheduleHandOff(after delay: TimeInterval) {
-        DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: handOff)
+        handOffTask?.cancel()
+        handOffTask = Task { @MainActor in
+            do {
+                try await Task.sleep(for: .seconds(delay))
+            } catch {
+                return
+            }
+            handOff()
+        }
     }
 
     /// Idempotent: tap-to-skip and the scheduled finish can both arrive. The
@@ -278,6 +323,7 @@ struct LaunchIntroView: View {
     private func handOff() {
         guard !hasSignaledVisualCompletion else { return }
         hasSignaledVisualCompletion = true
+        handOffTask?.cancel()
         onVisualComplete()
     }
 }
@@ -288,6 +334,15 @@ private struct WordmarkWidthKey: PreferenceKey {
 
     static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
         value = max(value, nextValue())
+    }
+}
+
+private struct ColdDockFrameKey: PreferenceKey {
+    static let defaultValue: CGRect = .zero
+
+    static func reduce(value: inout CGRect, nextValue: () -> CGRect) {
+        let next = nextValue()
+        if next != .zero { value = next }
     }
 }
 
@@ -426,7 +481,7 @@ private struct MilestoneMarker: View {
                 .stroke(AppDesign.safety, lineWidth: 2)
                 .frame(width: 13, height: 13)
                 .scaleEffect(pulseActive ? 2.4 : 1)
-                .opacity(pulseActive ? 0 : 0.8)
+                .opacity(reduceMotion || pulseActive ? 0 : 0.8)
                 .position(center)
 
             Circle()
@@ -436,10 +491,10 @@ private struct MilestoneMarker: View {
                     Circle()
                         .stroke(isLit ? AppDesign.safety : AppDesign.cardStrokeStrong, lineWidth: 3)
                 }
-                .scaleEffect(isLit ? 1 : 0.55)
+                .scaleEffect(isLit || reduceMotion ? 1 : 0.55)
                 .shadow(color: AppDesign.safety.opacity(isLit ? 0.6 : 0), radius: 8)
                 .position(center)
-                .animation(AppAnimation.selection, value: isLit)
+                .animation(reduceMotion ? .easeOut(duration: 0.18) : AppAnimation.selection, value: isLit)
         }
         .onChange(of: isLit) { _, lit in
             guard lit, !hasPulsed, !reduceMotion else { return }

@@ -6,16 +6,15 @@ export default function HomePage() {
     <div className="flex flex-col gap-10 sm:gap-14">
       <section className="roam-enter grid gap-8 border-b border-card pb-10 lg:grid-cols-[1.15fr_0.85fr] lg:items-end lg:pb-12">
         <div>
-          <p className="mb-4 text-[11px] font-semibold uppercase tracking-[0.14em] text-accent">Route intelligence</p>
+          <p className="mb-4 text-[11px] font-semibold uppercase tracking-[0.14em] text-accent">Route planning</p>
           <h1 className="max-w-3xl text-[clamp(3rem,7vw,6.4rem)] font-semibold leading-[0.92] tracking-[-0.055em] text-ink-primary">
             Know the drive before you take it.
           </h1>
         </div>
         <div className="max-w-xl lg:justify-self-end lg:pb-1">
           <p className="text-base leading-7 text-ink-secondary sm:text-lg">
-            Compare routes by the attention they demand, not only the minutes
-            they save. Roam reads traffic, weather, road geometry, and turns in
-            one clear view.
+            Compare routes by how demanding they may feel, not just how long
+            they take. See traffic, weather, road layout, and turns together.
           </p>
           <div className="mt-6 flex flex-wrap gap-x-6 gap-y-2 border-t border-card pt-4 text-xs font-medium text-ink-secondary">
             <SignalLabel index="01" label="Live conditions" />
@@ -32,7 +31,7 @@ export default function HomePage() {
             <h2 className="text-2xl font-semibold tracking-[-0.035em] text-ink-primary sm:text-3xl">Where are you headed?</h2>
           </div>
           <p className="max-w-md text-sm leading-6 text-ink-secondary">
-            Enter two places. We’ll rank the available routes from least to most demanding.
+            Enter two places. We’ll score the primary route and compare its alternatives.
           </p>
         </div>
         <div className="roam-reveal roam-enter-delay-1">

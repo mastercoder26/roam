@@ -58,7 +58,7 @@ struct RouteAnalysisDebugInfo: Equatable {
             case .decodingError(let underlying):
                 return .decodingError(underlying.localizedDescription)
             case .invalidURL, .invalidResponse:
-                return .other(apiError.localizedDescription ?? "Invalid response")
+                return .other(apiError.localizedDescription)
             }
         case let authError as AuthError:
             return .unauthorized(authError.errorDescription ?? "Not signed in")

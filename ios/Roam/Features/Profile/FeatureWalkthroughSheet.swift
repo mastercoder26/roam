@@ -11,21 +11,35 @@ struct FeatureWalkthroughSheet: View {
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 0) {
-                progressRail
-                    .padding(.horizontal, AppDesign.space20)
-                    .padding(.top, AppDesign.space12)
+            GeometryReader { geometry in
+                VStack(spacing: AppDesign.space16) {
+                    progressRail
+                        .padding(.horizontal, AppDesign.space20)
+                        .padding(.top, AppDesign.space12)
 
-                Spacer(minLength: AppDesign.space24)
-
-                featureStory
-                    .padding(.horizontal, AppDesign.contentPadding)
-
-                Spacer(minLength: AppDesign.space24)
-
-                primaryAction
-                    .padding(.horizontal, AppDesign.contentPadding)
-                    .padding(.bottom, AppDesign.space20)
+                    ScrollViewReader { scrollProxy in
+                        ScrollView {
+                            featureStory(step: currentStep, cardHeight: max(360, geometry.size.height - 155))
+                                .id("walkthrough.story")
+                                .padding(.horizontal, AppDesign.contentPadding)
+                                .padding(.bottom, AppDesign.space24)
+                        }
+                        .onChange(of: currentStep) { _, _ in
+                            var transaction = Transaction()
+                            transaction.disablesAnimations = true
+                            withTransaction(transaction) {
+                                scrollProxy.scrollTo("walkthrough.story", anchor: .top)
+                            }
+                        }
+                    }
+                }
+                .safeAreaInset(edge: .bottom, spacing: 0) {
+                    primaryAction
+                        .padding(.horizontal, AppDesign.contentPadding)
+                        .padding(.top, AppDesign.space12)
+                        .padding(.bottom, AppDesign.space20)
+                        .background(AppDesign.canvas)
+                }
             }
             .background(AppCanvasBackground())
             .toolbar {
@@ -59,63 +73,95 @@ struct FeatureWalkthroughSheet: View {
         .accessibilityIdentifier("walkthrough.progress")
     }
 
-    private var featureStory: some View {
-        VStack(alignment: .leading, spacing: AppDesign.space20) {
-            walkthroughIllustration
+    private func featureStory(step: FeatureWalkthroughStep, cardHeight: CGFloat) -> some View {
+        ZStack {
+            VStack(alignment: .leading, spacing: AppDesign.space20) {
+                Spacer(minLength: 200)
 
-            VStack(alignment: .leading, spacing: AppDesign.space8) {
-                Text(currentStep.progressLabel.uppercased())
-                    .font(AppDesign.Typography.microLabel)
-                    .tracking(1.1)
-                    .foregroundStyle(AppDesign.accent)
+                VStack(alignment: .leading, spacing: AppDesign.space12) {
+                    Text(step.progressLabel.uppercased())
+                        .font(AppDesign.Typography.microLabel)
+                        .tracking(1.1)
+                        .foregroundStyle(.white.opacity(0.75))
 
-                Text(currentStep.title)
-                    .font(AppDesign.Typography.display)
-                    .tracking(-0.9)
-                    .foregroundStyle(AppDesign.Ink.primary)
-                    .fixedSize(horizontal: false, vertical: true)
+                    Text(step.title)
+                        .font(AppDesign.Typography.display)
+                        .tracking(-0.9)
+                        .foregroundStyle(.white)
+                        .fixedSize(horizontal: false, vertical: true)
 
-                Text(currentStep.detail)
-                    .font(AppDesign.Typography.body)
-                    .foregroundStyle(AppDesign.Ink.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+                    Text(step.detail)
+                        .font(AppDesign.Typography.body)
+                        .foregroundStyle(.white.opacity(0.88))
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(AppDesign.space24)
+                .background(textBackdrop)
             }
+            .frame(maxWidth: .infinity, minHeight: cardHeight, alignment: .bottomLeading)
+            .background(walkthroughIllustration(for: step))
+            .id(step)
+            .zIndex(Double(FeatureWalkthroughStep.allCases.firstIndex(of: step) ?? 0) + 1)
+            .transition(storyTransition)
         }
-        .id(currentStep)
-        .transition(reduceMotion ? .opacity : .opacity.combined(with: .move(edge: .trailing)))
-        .animation(reduceMotion ? AppAnimation.quick : AppAnimation.content, value: currentStep)
+        .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 28, style: .continuous)
+                .strokeBorder(.white.opacity(0.12), lineWidth: 0.75)
+        }
         .accessibilityElement(children: .combine)
     }
 
-    private var walkthroughIllustration: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: AppDesign.cornerRadiusHero, style: .continuous)
-                .fill(AppDesign.cardSurfaceElevated)
-
-            Circle()
-                .fill(AppDesign.accent.opacity(0.14))
-                .frame(width: 168, height: 168)
-                .offset(x: 82, y: -48)
-                .accessibilityHidden(true)
-
-            Image(systemName: currentStep.symbol)
-                .font(.system(size: 62, weight: .medium))
-                .symbolRenderingMode(.hierarchical)
-                .foregroundStyle(AppDesign.accent)
-                .frame(width: 116, height: 116)
-                .background(AppDesign.cardSurface, in: Circle())
-                .overlay(Circle().stroke(AppDesign.cardStrokeStrong, lineWidth: 0.75))
-                .elevation(AppDesign.Elevation.medium)
-                .accessibilityHidden(true)
+    private var storyTransition: AnyTransition {
+        if reduceMotion {
+            return .opacity
         }
-        .frame(maxWidth: .infinity)
-        .frame(height: 245)
-        .clipShape(RoundedRectangle(cornerRadius: AppDesign.cornerRadiusHero, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: AppDesign.cornerRadiusHero, style: .continuous)
-                .stroke(AppDesign.cardStrokeStrong, lineWidth: 0.75)
+        return .asymmetric(
+            insertion: .opacity.combined(with: .offset(x: 32)).combined(with: .scale(scale: 0.98)),
+            removal: .opacity.combined(with: .offset(x: -24))
+        )
+    }
+
+    private var textBackdrop: some View {
+        GeometryReader { geometry in
+            LinearGradient(
+                stops: [
+                    .init(color: .clear, location: 0),
+                    .init(color: .black.opacity(0.7), location: 64 / (geometry.size.height + 64)),
+                    .init(color: .black.opacity(0.85), location: 1),
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .frame(width: geometry.size.width, height: geometry.size.height + 64)
+            .offset(y: -64)
         }
-        .elevation(AppDesign.Elevation.hero)
+        .accessibilityHidden(true)
+    }
+
+    private func artworkName(for step: FeatureWalkthroughStep) -> String {
+        switch step {
+        case .plan: "WalkthroughPlan"
+        case .understand: "WalkthroughUnderstand"
+        case .drive: "WalkthroughDrive"
+        case .grow: "WalkthroughGrow"
+        }
+    }
+
+    private func walkthroughIllustration(for step: FeatureWalkthroughStep) -> some View {
+        GeometryReader { geometry in
+            ZStack {
+                Image(artworkName(for: step))
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: geometry.size.width, height: geometry.size.height)
+
+                Color.black.opacity(0.04)
+            }
+            .clipped()
+        }
+        .accessibilityHidden(true)
     }
 
     private var primaryAction: some View {
@@ -141,7 +187,7 @@ struct FeatureWalkthroughSheet: View {
             dismiss()
             return
         }
-        withAnimation(reduceMotion ? AppAnimation.quick : AppAnimation.content) {
+        withAnimation(reduceMotion ? .easeOut(duration: 0.15) : .spring(response: 0.42, dampingFraction: 1)) {
             currentStep = next
         }
     }

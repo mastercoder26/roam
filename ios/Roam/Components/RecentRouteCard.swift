@@ -19,20 +19,25 @@ struct RecentRouteRow: View {
     var body: some View {
         Button(action: action) {
             HStack(alignment: .center, spacing: AppDesign.space12) {
-                Text(entry.formattedScore)
-                    .font(.system(.title2, design: .rounded, weight: .bold))
-                    .monospacedDigit()
-                    .foregroundStyle(AppDesign.Ink.primary)
-                    .frame(width: 44, alignment: .leading)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(entry.formattedScore)
+                        .font(.system(.title2, design: .rounded, weight: .bold))
+                        .monospacedDigit()
+                        .foregroundStyle(AppDesign.Ink.primary)
+                    Text(entry.label.rawValue)
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(labelColor)
+                }
+                .frame(minWidth: 44, alignment: .leading)
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(entry.origin)
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(AppDesign.Ink.primary)
-                        .lineLimit(1)
                     Text(entry.destination)
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(AppDesign.Ink.primary)
+                        .lineLimit(1)
+                    Text("From \(entry.origin)")
+                        .font(.caption)
+                        .foregroundStyle(AppDesign.Ink.secondary)
                         .lineLimit(1)
                     Text("\(relativeTime) · \(entry.formattedDuration) · \(entry.formattedDistance)")
                         .font(.caption)
@@ -43,12 +48,9 @@ struct RecentRouteRow: View {
 
                 Spacer(minLength: AppDesign.space8)
 
-                Text(entry.label.rawValue)
+                Image(systemName: "chevron.right")
                     .font(.caption.weight(.semibold))
-                    .foregroundStyle(labelColor)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .background(labelColor.opacity(0.12), in: Capsule())
+                    .foregroundStyle(AppDesign.Ink.tertiary)
             }
             .padding(.horizontal, AppDesign.space16)
             .padding(.vertical, AppDesign.space12)

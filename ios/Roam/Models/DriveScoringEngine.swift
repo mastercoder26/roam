@@ -218,7 +218,9 @@ enum DriveScoringEngine {
     static let minimumAcceptedLocationSampleShare = 0.5
 
     static func accepts(_ sample: DriveLocationSample) -> Bool {
-        sample.horizontalAccuracyMeters > 0 &&
+        sample.timestamp.timeIntervalSinceReferenceDate.isFinite &&
+            sample.speedMetersPerSecond.isFinite &&
+            sample.horizontalAccuracyMeters > 0 &&
             sample.horizontalAccuracyMeters <= maximumLocationAccuracyMeters &&
             sample.speedMetersPerSecond >= 0
     }
@@ -228,7 +230,7 @@ enum DriveScoringEngine {
         current: DriveLocationSample,
         distanceMeters: Double
     ) -> Bool {
-        guard accepts(previous), accepts(current), distanceMeters >= 0 else { return false }
+        guard accepts(previous), accepts(current), distanceMeters.isFinite, distanceMeters >= 0 else { return false }
         let elapsed = current.timestamp.timeIntervalSince(previous.timestamp)
         guard elapsed >= minimumSampleGap, elapsed <= maximumSampleGap else { return false }
 
@@ -250,7 +252,7 @@ enum DriveScoringEngine {
         guard elapsed >= minimumSampleGap, elapsed <= maximumSampleGap else { return [] }
 
         let acceleration = (current.speedMetersPerSecond - previous.speedMetersPerSecond) / elapsed
-        let motionCorroborates = (nearbyMotionG ?? 0) >= 0.18
+        let motionCorroborates = nearbyMotionG.map { $0.isFinite && $0 >= 0.18 } ?? false
         let source: DrivingEventSource = motionCorroborates ? .fused : .gpsSpeed
         var events: [DetectedDrivingEvent] = []
 
@@ -268,6 +270,9 @@ enum DriveScoringEngine {
            let currentCourse = current.courseDegrees,
            let previousCourseAccuracy = previous.courseAccuracyDegrees,
            let currentCourseAccuracy = current.courseAccuracyDegrees,
+           previousCourse.isFinite, currentCourse.isFinite,
+           (0..<360).contains(previousCourse), (0..<360).contains(currentCourse),
+           previousCourseAccuracy >= 0, currentCourseAccuracy >= 0,
            previousCourseAccuracy <= maximumCourseAccuracyDegrees,
            currentCourseAccuracy <= maximumCourseAccuracyDegrees {
             let courseRate = abs(normalizedAngle(currentCourse - previousCourse)) / elapsed
@@ -288,7 +293,7 @@ enum DriveScoringEngine {
         window: TimeInterval = 0.35
     ) -> Double? {
         let values = samples
-            .filter { abs($0.timestamp.timeIntervalSince(timestamp)) <= window }
+            .filter { $0.horizontalAccelerationG.isFinite && $0.horizontalAccelerationG >= 0 && abs($0.timestamp.timeIntervalSince(timestamp)) <= window }
             .map(\.horizontalAccelerationG)
             .sorted()
         guard values.count >= 3 else { return nil }
@@ -307,9 +312,10 @@ enum DriveScoringEngine {
         acceptedLocationSamples: Int,
         rejectedLocationSamples: Int
     ) -> Double? {
-        let delivered = max(0, acceptedLocationSamples) + max(0, rejectedLocationSamples)
+        let accepted = Double(max(0, acceptedLocationSamples))
+        let delivered = accepted + Double(max(0, rejectedLocationSamples))
         guard delivered > 0 else { return nil }
-        return Double(max(0, acceptedLocationSamples)) / Double(delivered)
+        return accepted / delivered
     }
 
     /// The honest confidence label. `usableTraceDuration` is the measured time
@@ -322,6 +328,7 @@ enum DriveScoringEngine {
         rejectedLocationSamples: Int,
         motionSamples: Int
     ) -> DriveScoreConfidence {
+        guard usableTraceDuration.isFinite, distanceMiles.isFinite else { return .low }
         if let share = acceptedLocationSampleShare(
             acceptedLocationSamples: acceptedLocationSamples,
             rejectedLocationSamples: rejectedLocationSamples
@@ -356,7 +363,7 @@ enum DriveScoringEngine {
         motionSamples: Int,
         usableTraceDuration: TimeInterval? = nil
     ) -> (score: Int, quality: DriveDataQuality) {
-        let distanceMiles = distanceMeters / 1_609.344
+        let distanceMiles = distanceMeters.isFinite ? max(0, distanceMeters) / 1_609.344 : 0
         // Use a 3-mile floor so a single event in a brief trip does not turn
         // into a misleadingly severe grade. The confidence label handles the
         // remaining uncertainty explicitly.
@@ -380,6 +387,7 @@ enum DriveScoringEngine {
         // caller without a measured trace falls back to wall-clock time.
         let measuredTraceDuration = usableTraceDuration
             .map { max(0, min($0, max(0, duration))) } ?? duration
+        let hasValidDurations = duration.isFinite && (usableTraceDuration?.isFinite ?? true)
 
         return (
             score: max(20, Int((100 - penalty).rounded())),
@@ -387,13 +395,13 @@ enum DriveScoringEngine {
                 acceptedLocationSamples: acceptedLocationSamples,
                 rejectedLocationSamples: rejectedLocationSamples,
                 motionSamples: motionSamples,
-                confidence: confidence(
+                confidence: hasValidDurations ? confidence(
                     usableTraceDuration: measuredTraceDuration,
                     distanceMiles: distanceMiles,
                     acceptedLocationSamples: acceptedLocationSamples,
                     rejectedLocationSamples: rejectedLocationSamples,
                     motionSamples: motionSamples
-                )
+                ) : .low
             )
         )
     }

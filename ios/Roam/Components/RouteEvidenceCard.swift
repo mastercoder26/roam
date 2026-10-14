@@ -18,7 +18,7 @@ struct RouteEvidenceCard: View {
                     .accessibilityHidden(true)
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Evidence coverage")
+                    Text("Route data")
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(AppDesign.Ink.primary)
                     Text(evidence?.level.title ?? "Coverage unavailable")
@@ -41,24 +41,20 @@ struct RouteEvidenceCard: View {
                     .tint(evidenceColor)
                     .accessibilityHidden(true)
 
-                Text("\(evidence.verifiedInputCount) of \(evidence.totalInputCount) route inputs verified.")
-                    .font(.caption)
-                    .foregroundStyle(AppDesign.Ink.secondary)
-
                 if !evidence.missingSignals.isEmpty {
-                    Text("Unavailable now: \(evidence.unavailableInputTitles).")
+                    Text("Missing: \(evidence.unavailableInputTitles).")
                         .font(.caption)
                         .foregroundStyle(AppDesign.Ink.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             } else {
-                Text("This route came from an older analysis service that did not report which inputs were verified.")
+                Text("This analysis did not report verified inputs.")
                     .font(.caption)
                     .foregroundStyle(AppDesign.Ink.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
 
-            Text("Coverage describes available route inputs, not a prediction of safety or whether someone should drive.")
+            Text("Data coverage does not predict safety or readiness to drive.")
                 .font(.caption2)
                 .foregroundStyle(AppDesign.Ink.tertiary)
                 .fixedSize(horizontal: false, vertical: true)
