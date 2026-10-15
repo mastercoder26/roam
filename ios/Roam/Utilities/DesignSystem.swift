@@ -127,6 +127,63 @@ struct AppCanvasBackground: View {
     }
 }
 
+/// Oil-pastel art behind instructional content. Decorative only.
+///
+/// `ThemePalette.appearance` is available on the live palette and on
+/// `ThemeManager.cachedPalette`. Secondary ink is translucent, so the theme
+/// default scrim is heavier than a light wash: dark appearances use 0.80 and
+/// light appearances use 0.74, which keeps body text at 4.5:1 over this art
+/// in Light, Dark, Ember, and Sequoia. Reduced transparency uses 0.85.
+struct PastelBackdrop: View {
+    let imageName: String
+    /// `nil` uses the theme default above.
+    var scrimOpacity: Double? = nil
+    /// Screen backgrounds extend under the safe area. Card backgrounds do not.
+    var fullBleed: Bool = true
+    /// Draws this far past the view so the painting fills a surrounding card's padding.
+    var cardOutset: CGFloat = 0
+
+    @ObservedObject private var theme = ThemeManager.shared
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+
+    var body: some View {
+        AppDesign.canvas
+            .overlay {
+                Image(imageName)
+                    .resizable()
+                    .scaledToFill()
+                    .accessibilityHidden(true)
+            }
+            .overlay(AppDesign.canvas.opacity(resolvedScrimOpacity))
+            .clipped()
+            .padding(-cardOutset)
+            .modifier(PastelBleedModifier(fullBleed: fullBleed))
+            .allowsHitTesting(false)
+    }
+
+    private var resolvedScrimOpacity: Double {
+        if reduceTransparency {
+            return 0.85
+        }
+        if let scrimOpacity {
+            return scrimOpacity
+        }
+        return theme.palette.appearance == .dark ? 0.80 : 0.74
+    }
+}
+
+private struct PastelBleedModifier: ViewModifier {
+    var fullBleed: Bool
+
+    func body(content: Content) -> some View {
+        if fullBleed {
+            content.ignoresSafeArea()
+        } else {
+            content
+        }
+    }
+}
+
 // MARK: - Difficulty color
 
 extension DifficultyLabel {

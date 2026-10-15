@@ -41,7 +41,7 @@ struct FeatureWalkthroughSheet: View {
                         .background(AppDesign.canvas)
                 }
             }
-            .background(AppCanvasBackground())
+            .background(PastelBackdrop(imageName: "PastelWalkthroughBackdrop", scrimOpacity: 0.7))
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Skip") { dismiss() }

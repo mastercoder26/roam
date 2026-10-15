@@ -179,6 +179,13 @@ struct DriverProgressView: View {
             .buttonStyle(PressableScaleStyle())
             .accessibilityHint("Opens the Drive tab")
         }
+        .background(
+            PastelBackdrop(
+                imageName: "PastelProgressEmpty",
+                fullBleed: false,
+                cardOutset: AppDesign.cardPadding
+            )
+        )
         .premiumCard()
     }
 

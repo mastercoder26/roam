@@ -66,6 +66,13 @@ struct DriveDetailView: View {
                     )
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 36)
+                    .background(
+                        PastelBackdrop(
+                            imageName: "PastelRouteUnavailable",
+                            fullBleed: false,
+                            cardOutset: AppDesign.cardPadding
+                        )
+                    )
                     .premiumCard()
                 }
 

@@ -27,7 +27,7 @@ struct HowRoamWorksSheet: View {
                 .frame(maxWidth: CGFloat(HowRoamWorksLayoutSpec.maximumContentWidth))
                 .frame(maxWidth: .infinity)
             }
-            .background(AppCanvasBackground())
+            .background(PastelBackdrop(imageName: "PastelHowRoamWorks"))
             .navigationTitle("How Roam works")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
