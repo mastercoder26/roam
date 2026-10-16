@@ -6,9 +6,9 @@ import ClerkKitUI
 /// drive.
 ///
 /// Everything measured here is derived from locally recorded drives: this tab
-/// introduces no network calls and stores no new measurement. The only things
-/// it persists are the display name and licensing stage, both user-declared
-/// and deliberately excluded from every score.
+/// introduces no network calls and stores no new measurement. Identity stays
+/// user-declared and excluded from every score; artwork selection is only a
+/// local display preference.
 struct ProfileView: View {
     @ObservedObject private var theme = ThemeManager.shared
     @ObservedObject private var appIcon = AppIconManager.shared
@@ -17,6 +17,11 @@ struct ProfileView: View {
     @ObservedObject private var profile = DriverProfileStore.shared
     @ObservedObject private var driveHistorySync = DriveHistorySyncService.shared
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.scenePhase) private var scenePhase
+    @AppStorage("roam.profile-landscape-v1") private var lastLandscape = ""
+    @State private var landscape: ProfileLandscape = .valley
+    @State private var isProfileVisible = false
+    @State private var didEnterBackground = false
 
     @State private var showingThemePicker = false
     @State private var showingAppIconPicker = false
@@ -32,6 +37,8 @@ struct ProfileView: View {
     private enum IdentityField: Hashable {
         case name
     }
+
+    private static let scrollSpace = "profile.scroll"
 
     /// A cheap fingerprint of everything that can change the aggregated
     /// insights: drive count, the most recent drive's identity, each drive's
@@ -65,33 +72,46 @@ struct ProfileView: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: AppDesign.sectionSpacing) {
-                    profileHeader
-                    identityCard
+            GeometryReader { geometry in
+                ScrollView {
+                    VStack(spacing: 0) {
+                        profileHeader(topInset: geometry.safeAreaInsets.top)
 
-                    WeekCadenceStrip(
-                        title: "Driving rhythm",
-                        days: CadenceDay.recentWeek(completedDates: driveSession.recordedDrives.map(\.startedAt))
-                    )
-                    .animation(reduceMotion ? .easeOut(duration: 0.16) : AppAnimation.selection, value: driveSession.recordedDrives.map(\.id))
-
-                    if driveSession.isRecording {
-                        LiveDriveBanner(driveSession: driveSession)
+                        VStack(alignment: .leading, spacing: 28) {
+                            if driveSession.isRecording {
+                                LiveDriveBanner(driveSession: driveSession)
+                            }
+                            profileNavigation
+                            if isSignedIn { accountSection }
+                        }
+                        .padding(.horizontal, AppDesign.contentPadding)
+                        .padding(.bottom, AppDesign.space24)
+                        .frame(maxWidth: AppDesign.maximumContentWidth)
+                        .frame(maxWidth: .infinity)
                     }
-
-                    profileNavigation
-                    accountSection
                 }
-                .padding(.horizontal, AppDesign.space20)
-                .padding(.vertical, AppDesign.space16)
+                .contentMargins(.bottom, AppDesign.tabBarClearance, for: .scrollContent)
+                .coordinateSpace(name: Self.scrollSpace)
+                .scrollBounceBehavior(.always, axes: .vertical)
+                .ignoresSafeArea(.container, edges: .top)
+                .background(profileCanvas.ignoresSafeArea())
             }
-            .safeAreaPadding(.bottom, AppDesign.tabBarClearance)
-            .background(AppCanvasBackground())
             .navigationTitle("Profile")
             .toolbar(.hidden, for: .navigationBar)
         }
         .prefetchClerkImages()
+        .onAppear {
+            isProfileVisible = true
+            didEnterBackground = false
+            refreshLandscape()
+        }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .background { didEnterBackground = true }
+            if phase == .active && didEnterBackground && isProfileVisible {
+                didEnterBackground = false
+                refreshLandscape()
+            }
+        }
         .onChange(of: insightsSignature, initial: true) { _, _ in
             refreshInsights()
         }
@@ -99,6 +119,7 @@ struct ProfileView: View {
         // a name typed but never confirmed keeps the untrimmed spacing the
         // editing rules deliberately allow through on each keystroke.
         .onDisappear {
+            isProfileVisible = false
             guard isEditingIdentity else { return }
             profile.commitDisplayNameEdit()
             isEditingIdentity = false
@@ -116,6 +137,12 @@ struct ProfileView: View {
         }
         .sheet(isPresented: $authIsPresented) {
             AuthView()
+        }
+        .sheet(isPresented: $isEditingIdentity, onDismiss: {
+            profile.commitDisplayNameEdit()
+            focusedIdentityField = nil
+        }) {
+            identityEditor
         }
         .confirmationDialog(
             "Delete your Roam account?",
@@ -136,34 +163,141 @@ struct ProfileView: View {
         )
     }
 
-    private var profileHeader: some View {
-        ScreenHeader(
-            title: "Profile",
-            symbol: "person.crop.circle.fill"
-        )
+    private var profileCanvas: Color {
+        theme.preferredColorScheme == .dark ? .black : AppDesign.canvas
+    }
+
+    private func refreshLandscape() {
+        landscape = ProfileLandscape.next(excluding: lastLandscape)
+        lastLandscape = landscape.rawValue
+    }
+
+    private func profileHeader(topInset: CGFloat) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack {
+                Color.clear.frame(width: 44, height: 44)
+                    .accessibilityHidden(true)
+                Spacer(minLength: 8)
+                Text("Profile")
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(.white)
+                Spacer(minLength: 8)
+                Button(action: refreshLandscape) {
+                    Image(systemName: "arrow.triangle.2.circlepath")
+                        .font(.system(size: 17, weight: .medium))
+                        .foregroundStyle(.white)
+                        .frame(width: 44, height: 44)
+                        .profileGlassSurface(cornerRadius: 22)
+                        .environment(\.colorScheme, .dark)
+                }
+                .buttonStyle(PressableScaleStyle())
+                .accessibilityLabel("Change landscape")
+                .accessibilityIdentifier("profile.refreshLandscape")
+            }
+
+            Text(isSignedIn ? profile.snapshot.greeting : "Welcome")
+                .font(.system(.largeTitle, design: .default, weight: .bold))
+                .tracking(-0.7)
+                .foregroundStyle(AppDesign.Ink.primary)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.top, 12)
+                .padding(.bottom, 22)
+                .accessibilityAddTraits(.isHeader)
+                .accessibilityIdentifier("profile.greeting")
+
+            if isSignedIn {
+                ProfileDrivingSummary(insights: insights)
+                    .padding(.bottom, 22)
+            }
+
+            heroAccountCard
+            persistenceErrorNote
+        }
+        .padding(.horizontal, AppDesign.contentPadding)
+        .padding(.top, topInset + 8)
+        .padding(.bottom, 28)
+        .frame(maxWidth: AppDesign.maximumContentWidth)
+        .frame(maxWidth: .infinity)
+        .profileGlassContainer()
+        .background {
+            GeometryReader { geometry in
+                let pull = ProfileHeaderPull(
+                    offset: geometry.frame(in: .named(Self.scrollSpace)).minY,
+                    reduceMotion: reduceMotion
+                )
+                Image(landscape.rawValue)
+                    .resizable()
+                    .scaledToFill()
+                    // Extra image bleed keeps blurred edges filled while
+                    // the header remains anchored to the top of the screen.
+                    .frame(
+                        width: geometry.size.width + pull.blurRadius * 4,
+                        height: geometry.size.height + pull.expansion + pull.blurRadius * 4
+                    )
+                    .blur(radius: pull.blurRadius, opaque: true)
+                    .frame(width: geometry.size.width, height: geometry.size.height + pull.expansion)
+                    .clipped()
+                    .overlay {
+                        LinearGradient(
+                            stops: [
+                                .init(color: .black.opacity(0.08), location: 0),
+                                .init(color: profileCanvas.opacity(0.10), location: 0.22),
+                                .init(color: profileCanvas.opacity(0.38), location: 0.40),
+                                .init(color: profileCanvas.opacity(0.80), location: 0.70),
+                                .init(color: profileCanvas, location: 1)
+                            ],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    }
+                    .clipped()
+                    .offset(y: pull.verticalOffset)
+                    .accessibilityHidden(true)
+            }
+        }
+    }
+
+    private func profileSection<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(title)
+                .font(.footnote)
+                .foregroundStyle(AppDesign.Ink.secondary)
+                .padding(.leading, 4)
+                .accessibilityAddTraits(.isHeader)
+            content()
+        }
     }
 
     // MARK: - Navigation
 
     private var profileNavigation: some View {
-        VStack(alignment: .leading, spacing: AppDesign.space24) {
+        VStack(alignment: .leading, spacing: 28) {
             profileFolderSection(.explore)
-            profileFolderSection(.appearance)
+            profileSection("Preferences") { preferencesCard }
+            profileSection("Help") { walkthroughCard.profileSettingsSurface() }
         }
     }
 
     private func profileFolderSection(_ section: ProfileHomeSection) -> some View {
-        VStack(alignment: .leading, spacing: AppDesign.space12) {
-            SectionHeader(title: section.title)
-
+        profileSection(section == .explore ? "Driving" : "Preferences") {
             VStack(spacing: 0) {
+                if !isSignedIn {
+                    Button { isEditingIdentity = true } label: {
+                        ProfileSettingsRow(title: "Driver profile", symbol: "person.crop.circle")
+                    }
+                    .buttonStyle(PressableScaleStyle())
+                    .accessibilityHint("Edit your name and licensing stage on this device")
+                    .accessibilityIdentifier("profile.editIdentity")
+                    Divider().padding(.leading, 50)
+                }
                 ForEach(section.folders) { folder in
                     NavigationLink {
                         folderDestination(folder)
                     } label: {
-                        ProfileFolderCard(folder: folder, summary: folderSummary(folder))
+                        ProfileSettingsRow(title: folder.title, symbol: folder.symbol)
                     }
                     .buttonStyle(PressableScaleStyle())
+                    .accessibilityHint(folderSummary(folder))
 
                     if folder != section.folders.last {
                         Divider()
@@ -171,16 +305,20 @@ struct ProfileView: View {
                     }
                 }
             }
-            .premiumCard()
+            .profileSettingsSurface()
         }
     }
 
     @ViewBuilder
     private var accountSection: some View {
         VStack(alignment: .leading, spacing: AppDesign.space12) {
-            SectionHeader(title: ProfileHomeSection.account.title)
+            Text("Account")
+                .font(.footnote)
+                .foregroundStyle(AppDesign.Ink.secondary)
+                .padding(.leading, 4)
+                .accessibilityAddTraits(.isHeader)
 
-            accountCard
+            signedInAccountCard
 
             if isSignedIn {
                 deleteAccountSection
@@ -188,53 +326,13 @@ struct ProfileView: View {
         }
     }
 
-    @ViewBuilder
-    private var accountCard: some View {
-        switch authSession.state {
-        case .signedIn, .signedInOffline:
-            signedInAccountCard
-        case .restoring, .signedOut, .authenticating:
-            signedOutAccountCard
-        }
-    }
-
-    private var signedOutAccountCard: some View {
-        Button {
-            authIsPresented = true
-        } label: {
-            HStack(spacing: AppDesign.space12) {
-                IconTile(symbol: "person.crop.circle.badge.plus")
-
-                VStack(alignment: .leading, spacing: AppDesign.space4) {
-                    Text("Sign in to Roam")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(AppDesign.Ink.primary)
-                    Text("Back up your profile and saved drives.")
-                        .font(.caption)
-                        .foregroundStyle(AppDesign.Ink.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-
-                Spacer(minLength: 0)
-
-                Image(systemName: "chevron.right")
-                    .font(.caption.weight(.bold))
-                    .foregroundStyle(AppDesign.Ink.tertiary)
-                    .frame(width: 24, height: 24)
-            }
-            .frame(maxWidth: .infinity, minHeight: 56, alignment: .leading)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(PressableScaleStyle())
-        .premiumCard()
-        .accessibilityLabel("Sign in to Roam")
-        .accessibilityHint("Back up your profile and saved drives")
-    }
-
     private var signedInAccountCard: some View {
         VStack(alignment: .leading, spacing: AppDesign.space8) {
             HStack(spacing: AppDesign.space12) {
-                IconTile(symbol: "person.crop.circle.fill")
+                Image(systemName: "person.crop.circle")
+                    .font(.title2)
+                    .foregroundStyle(AppDesign.Ink.primary)
+                    .accessibilityHidden(true)
 
                 VStack(alignment: .leading, spacing: AppDesign.space4) {
                     Text(accountDisplayName)
@@ -274,22 +372,20 @@ struct ProfileView: View {
                     }
                     .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                 }
-                .foregroundStyle(AppDesign.accent)
+                .foregroundStyle(AppDesign.danger)
                 .disabled(isAccountActionRunning)
             }
         }
-        .padding(.vertical, AppDesign.space8)
-        .premiumCard()
+        .padding(16)
+        .profileSettingsSurface()
     }
 
     private var deleteAccountSection: some View {
         VStack(alignment: .leading, spacing: AppDesign.space8) {
-            SectionHeader(title: "Delete account")
-
             Button(role: .destructive, action: { showingDeleteConfirmation = true }) {
                 HStack {
                     VStack(alignment: .leading, spacing: AppDesign.space4) {
-                        Text("Delete your Roam account")
+                        Text("Delete account")
                             .font(.subheadline.weight(.semibold))
                         Text("This cannot be undone. Your local drives stay on this device.")
                             .font(.caption)
@@ -305,7 +401,8 @@ struct ProfileView: View {
             .buttonStyle(PressableScaleStyle())
             .foregroundStyle(AppDesign.danger)
             .disabled(isAccountActionRunning)
-            .premiumCard()
+            .padding(16)
+            .profileSettingsSurface()
         }
     }
 
@@ -488,6 +585,11 @@ struct ProfileView: View {
             VStack(alignment: .leading, spacing: AppDesign.sectionSpacing) {
                 switch folder {
                 case .progress:
+                    measuredExperience
+                    WeekCadenceStrip(
+                        title: "Driving rhythm",
+                        days: CadenceDay.recentWeek(completedDates: driveSession.recordedDrives.map(\.startedAt))
+                    )
                     MilestonesSection(milestones: insights.milestones)
                     stageCard
                 case .drivingInsights:
@@ -499,9 +601,12 @@ struct ProfileView: View {
                 }
             }
             .padding(.horizontal, AppDesign.contentPadding)
-            .padding(.vertical, 12)
+            .padding(.top, AppDesign.space16)
+            .padding(.bottom, AppDesign.space24)
+            .frame(maxWidth: AppDesign.maximumContentWidth)
+            .frame(maxWidth: .infinity)
         }
-        .safeAreaPadding(.bottom, AppDesign.tabBarClearance)
+        .contentMargins(.bottom, AppDesign.tabBarClearance, for: .scrollContent)
         .background(AppDesign.canvas.ignoresSafeArea())
         .navigationTitle(folder.title)
         .navigationBarTitleDisplayMode(.inline)
@@ -523,130 +628,173 @@ struct ProfileView: View {
 
     // MARK: - Identity
 
-    private var identityCard: some View {
-        VStack(alignment: .leading, spacing: AppDesign.space12) {
-            HStack(alignment: .top, spacing: AppDesign.space12) {
-                monogram
+    @ViewBuilder
+    private var heroAccountCard: some View {
+        switch authSession.state {
+        case .signedIn, .signedInOffline:
+            identityCard
+        case .signedOut:
+            Button { authIsPresented = true } label: {
+                HStack(spacing: 14) {
+                    Image(systemName: "person.crop.circle.badge.plus")
+                        .font(.system(size: 26, weight: .regular))
+                        .frame(width: 52, height: 52)
+                        .accessibilityHidden(true)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Sign in to Roam")
+                            .font(.body.weight(.semibold))
+                        Text("Back up your profile and drives.")
+                            .font(.subheadline)
+                            .opacity(0.72)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .multilineTextAlignment(.leading)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 12, weight: .semibold))
+                        .opacity(0.6)
+                        .accessibilityHidden(true)
+                }
+                .foregroundStyle(AppDesign.Ink.primary)
+                .padding(18)
+                .frame(maxWidth: .infinity, minHeight: 88, alignment: .leading)
+                .profileGlassSurface(cornerRadius: 28)
+            }
+            .buttonStyle(PressableScaleStyle())
+            .accessibilityLabel("Sign in to Roam")
+            .accessibilityHint("Back up your profile and drives. You can keep using Roam without signing in.")
+            .accessibilityIdentifier("profile.signIn")
+        case .restoring, .authenticating:
+            HStack(spacing: 14) {
+                ProgressView()
+                Text(authSession.state == .restoring ? "Restoring account" : "Signing in")
+                    .font(.body)
+            }
+            .foregroundStyle(AppDesign.Ink.primary)
+            .padding(18)
+            .frame(maxWidth: .infinity, minHeight: 88, alignment: .leading)
+            .profileGlassSurface(cornerRadius: 28)
+        }
+    }
 
-                VStack(alignment: .leading, spacing: 2) {
-                    if isEditingIdentity {
-                        TextField("Add your name", text: $profile.displayName)
-                            .font(AppDesign.Typography.bodyEmphasized)
-                            .foregroundStyle(AppDesign.primarySurfaceForeground)
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 8)
-                            .background(AppDesign.primarySurfaceForeground.opacity(0.10), in: RoundedRectangle(cornerRadius: AppDesign.cornerRadiusSmall, style: .continuous))
-                            .overlay {
-                                RoundedRectangle(cornerRadius: AppDesign.cornerRadiusSmall, style: .continuous)
-                                    .stroke(AppDesign.primarySurfaceForeground.opacity(0.18), lineWidth: 1)
-                            }
+    private var identityCard: some View {
+        Button {
+            isEditingIdentity = true
+        } label: {
+            HStack(spacing: 14) {
+                monogram
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(profile.resolvedDisplayName)
+                        .font(.body.weight(.semibold))
+                    Text("Edit profile")
+                        .font(.subheadline)
+                        .opacity(0.72)
+                }
+                .foregroundStyle(AppDesign.Ink.primary)
+                .multilineTextAlignment(.leading)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(AppDesign.Ink.secondary)
+                    .accessibilityHidden(true)
+            }
+            .padding(18)
+            .frame(maxWidth: .infinity, minHeight: 88, alignment: .leading)
+            .contentShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+            .profileGlassSurface(cornerRadius: 28)
+        }
+        .buttonStyle(PressableScaleStyle())
+        .accessibilityLabel("\(profile.resolvedDisplayName), edit profile")
+        .accessibilityHint("Edit your name and licensing stage")
+        .accessibilityIdentifier("profile.editIdentity")
+    }
+
+    private var identityEditor: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 24) {
+                    profileSection("Name") {
+                        TextField("Your name", text: $profile.displayName)
+                            .font(.body)
+                            .textContentType(.name)
                             .textInputAutocapitalization(.words)
                             .submitLabel(.done)
                             .focused($focusedIdentityField, equals: .name)
-                            .onSubmit {
-                                profile.commitDisplayNameEdit()
-                                isEditingIdentity = false
-                                focusedIdentityField = nil
-                            }
-                    } else {
-                        Text(profile.displayName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Add your name" : profile.resolvedDisplayName)
-                            .font(.title3.weight(.semibold))
-                            .foregroundStyle(AppDesign.primarySurfaceForeground)
+                            .onSubmit { profile.commitDisplayNameEdit() }
+                            .padding(16)
+                            .profileSettingsSurface()
+                            .accessibilityLabel("Your name")
+                            .accessibilityIdentifier("profile.displayName")
                     }
-
-                    Text(profile.stage.title)
-                        .font(.footnote)
-                        .foregroundStyle(AppDesign.primarySurfaceForeground.opacity(0.64))
+                    persistenceErrorNote
+                    stageCard
                 }
-
-                Spacer(minLength: 8)
-
-                Button {
-                    if isEditingIdentity {
+                .padding(20)
+                .frame(maxWidth: AppDesign.maximumContentWidth)
+                .frame(maxWidth: .infinity)
+            }
+            .background(AppDesign.canvas.ignoresSafeArea())
+            .navigationTitle("Edit profile")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") {
                         profile.commitDisplayNameEdit()
                         focusedIdentityField = nil
-                        withAnimation(AppAnimation.quick) { isEditingIdentity = false }
-                        return
+                        isEditingIdentity = false
                     }
-                    withAnimation(AppAnimation.quick) { isEditingIdentity = true }
-                    DispatchQueue.main.async {
-                        focusedIdentityField = .name
-                    }
-                } label: {
-                    Image(systemName: isEditingIdentity ? "checkmark" : "pencil")
-                        .font(.subheadline.weight(.semibold))
-                        .contentTransition(.symbolEffect(.replace))
-                        .foregroundStyle(AppDesign.primarySurfaceForeground.opacity(0.88))
-                        .frame(width: 36, height: 36)
-                        .background(AppDesign.primarySurfaceForeground.opacity(0.12), in: Circle())
-                        .frame(minWidth: 44, minHeight: 44)
-                        .contentShape(Rectangle())
                 }
-                .buttonStyle(PressableScaleStyle())
-                .accessibilityLabel(
-                    isEditingIdentity
-                        ? "Save name"
-                        : (profile.displayName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Add your name" : "Edit name")
-                )
-            }
-
-            persistenceErrorNote
-
-            Divider().overlay(AppDesign.primarySurfaceForeground.opacity(0.18))
-
-            if insights.hasEvidence {
-                VStack(alignment: .leading, spacing: 0) {
-                    KineticMetricText(
-                        value: String(format: "%.1f", insights.measuredMiles),
-                        fontSize: 34,
-                        foreground: AppDesign.primarySurfaceForeground,
-                        context: .completedDrive
-                    )
-                    Text("MEASURED MILES")
-                        .font(.caption2.weight(.bold))
-                        .tracking(1.1)
-                        .foregroundStyle(AppDesign.primarySurfaceForeground.opacity(0.64))
-                }
-                .accessibilityElement(children: .combine)
-                .accessibilityLabel("\(String(format: "%.1f", insights.measuredMiles)) measured miles")
-            } else {
-                Text("No measured miles yet")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(AppDesign.primarySurfaceForeground.opacity(0.64))
             }
         }
-        .padding(AppDesign.space20)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background {
-            RoundedRectangle(cornerRadius: AppDesign.cornerRadiusHero, style: .continuous)
-                .fill(AppDesign.Ink.primary)
-        }
-        .clipShape(RoundedRectangle(cornerRadius: AppDesign.cornerRadiusHero, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: AppDesign.cornerRadiusHero, style: .continuous)
-                .stroke(AppDesign.primarySurfaceForeground.opacity(0.10), lineWidth: 0.75)
-        }
-        .elevation(AppDesign.Elevation.hero)
     }
 
     private var monogram: some View {
         Group {
             if profile.monogram.isEmpty {
                 Image(systemName: "person.fill")
-                    .font(.title2.weight(.semibold))
+                    .font(.system(size: 24, weight: .medium))
             } else {
                 Text(profile.monogram)
-                    .font(.title.weight(.bold))
+                    .font(.system(size: 24, weight: .medium))
+                    .minimumScaleFactor(0.7)
+                    .lineLimit(1)
+            }
+        }
+        .foregroundStyle(Color.black.opacity(0.76))
+        .frame(width: 52, height: 52)
+        .background(
+            LinearGradient(
+                colors: [Color(red: 0.94, green: 0.84, blue: 0.79), Color(red: 0.72, green: 0.64, blue: 0.71)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            ),
+            in: Circle()
+        )
+        .accessibilityHidden(true)
+    }
+
+    private var measuredExperience: some View {
+        HStack(alignment: .firstTextBaseline) {
+            Text("Measured miles")
+                .font(.body)
+            Spacer(minLength: 12)
+            if insights.hasEvidence {
+                KineticMetricText(
+                    value: String(format: "%.1f", insights.measuredMiles),
+                    fontSize: 28,
+                    foreground: AppDesign.Ink.primary,
+                    context: .completedDrive
+                )
+            } else {
+                Text("No drives yet")
+                    .font(.subheadline)
+                    .foregroundStyle(AppDesign.Ink.secondary)
             }
         }
         .foregroundStyle(AppDesign.Ink.primary)
-        .frame(width: 64, height: 64)
-        .background(AppDesign.primarySurfaceForeground, in: Circle())
-        .overlay {
-            Circle().stroke(AppDesign.canvas, lineWidth: 3)
-        }
-        .elevation(AppDesign.Elevation.low)
-        .accessibilityHidden(true)
+        .padding(18)
+        .profileSettingsSurface()
     }
 
     /// Surfaces a failed save quietly: a small tertiary-ink caption, never an
@@ -657,7 +805,7 @@ struct ProfileView: View {
         if let message = profile.lastPersistenceError {
             Label("Not saved on this device: \(message)", systemImage: "exclamationmark.circle")
                 .font(.caption2)
-                .foregroundStyle(AppDesign.primarySurfaceForeground.opacity(0.58))
+                .foregroundStyle(AppDesign.Ink.secondary)
                 .accessibilityLabel("Your profile changes could not be saved. \(message)")
         }
     }
@@ -716,43 +864,21 @@ struct ProfileView: View {
 
     private var preferencesCard: some View {
         VStack(spacing: 0) {
-            walkthroughCard
-            Divider()
-                .padding(.leading, 46)
             appearanceCard
             Divider()
-                .padding(.leading, 46)
+                .padding(.leading, 50)
             appIconCard
         }
-        .premiumCard()
+        .profileSettingsSurface()
     }
 
     private var walkthroughCard: some View {
         Button {
             showingFeatureWalkthrough = true
         } label: {
-            HStack(spacing: AppDesign.space12) {
-                IconTile(symbol: "map")
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Explore Roam")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(AppDesign.Ink.primary)
-                    Text("A quick guide to every feature")
-                        .font(.caption)
-                        .foregroundStyle(AppDesign.Ink.secondary)
-                }
-
-                Spacer(minLength: 8)
-
-                Image(systemName: "chevron.right")
-                    .font(.caption.weight(.bold))
-                    .foregroundStyle(AppDesign.Ink.tertiary)
-            }
-            .frame(minHeight: 44)
+            ProfileSettingsRow(title: "Explore Roam", symbol: "map")
         }
         .buttonStyle(PressableScaleStyle())
-        .padding(.vertical, AppDesign.space8)
         .accessibilityLabel("Explore Roam")
         .accessibilityHint("Opens a quick guide to every Roam feature")
         .accessibilityIdentifier("settings.startWalkthrough")
@@ -762,28 +888,9 @@ struct ProfileView: View {
         Button {
             showingThemePicker = true
         } label: {
-            HStack(spacing: AppDesign.space12) {
-                IconTile(symbol: "paintpalette.fill")
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Color scheme")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(AppDesign.Ink.primary)
-                    Text(theme.currentID.title)
-                        .font(.caption)
-                        .foregroundStyle(AppDesign.Ink.secondary)
-                }
-
-                Spacer(minLength: 8)
-
-                Image(systemName: "chevron.right")
-                    .font(.caption.weight(.bold))
-                    .foregroundStyle(AppDesign.Ink.tertiary)
-            }
-            .frame(minHeight: 44)
+            ProfileSettingsRow(title: "Appearance", symbol: "circle.lefthalf.filled", value: theme.currentID.title)
         }
         .buttonStyle(PressableScaleStyle())
-        .padding(.vertical, AppDesign.space8)
         .accessibilityLabel("Color scheme, currently \(theme.currentID.title)")
     }
 
@@ -791,28 +898,9 @@ struct ProfileView: View {
         Button {
             showingAppIconPicker = true
         } label: {
-            HStack(spacing: AppDesign.space12) {
-                IconTile(symbol: "app.badge")
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("App icon")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(AppDesign.Ink.primary)
-                    Text(appIcon.currentID.title)
-                        .font(.caption)
-                        .foregroundStyle(AppDesign.Ink.secondary)
-                }
-
-                Spacer(minLength: 8)
-
-                Image(systemName: "chevron.right")
-                    .font(.caption.weight(.bold))
-                    .foregroundStyle(AppDesign.Ink.tertiary)
-            }
-            .frame(minHeight: 44)
+            ProfileSettingsRow(title: "App icon", symbol: "app", value: appIcon.currentID.title)
         }
         .buttonStyle(PressableScaleStyle())
-        .padding(.vertical, AppDesign.space8)
         .accessibilityLabel("App icon, currently \(appIcon.currentID.title)")
     }
 }
@@ -822,3 +910,27 @@ struct ProfileView: View {
         .environmentObject(DriveSessionManager.shared)
         .environmentObject(AuthSessionStore.shared)
 }
+
+#if DEBUG
+/// A read-only layout fixture. It owns an isolated session, never restores
+/// Clerk credentials, and never starts account or drive-history sync.
+struct ProfileSignedInPreview: View {
+    @StateObject private var session: AuthSessionStore
+
+    init() {
+        let session = AuthSessionStore(automaticallyRestore: false)
+        session.setSignedInForTesting(
+            user: AuthUser(id: "profile-layout-preview", email: "", displayName: nil),
+            accessToken: ""
+        )
+        _session = StateObject(wrappedValue: session)
+    }
+
+    var body: some View {
+        ProfileView()
+            .environmentObject(DriveSessionManager.shared)
+            .environmentObject(session)
+            .allowsHitTesting(false)
+    }
+}
+#endif

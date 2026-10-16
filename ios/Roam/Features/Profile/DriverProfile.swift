@@ -1,6 +1,35 @@
 import Combine
 import Foundation
 
+/// Bundled artwork keeps opening Profile instant and available offline.
+enum ProfileLandscape: String, CaseIterable {
+    case valley = "ProfileLandscapeValley"
+    case coast = "ProfileLandscapeCoast"
+    case lake = "ProfileLandscapeLake"
+    case forest = "ProfileLandscapeForest"
+    case desert = "ProfileLandscapeDesert"
+    case hills = "ProfileLandscapeHills"
+
+    static func next(excluding previous: String) -> Self {
+        allCases.filter { $0.rawValue != previous }.randomElement() ?? .valley
+    }
+}
+
+/// The scroll view supplies the rubber band and settling physics. These
+/// values only stretch and soften the artwork during positive overscroll.
+struct ProfileHeaderPull: Equatable {
+    let expansion: CGFloat
+    let blurRadius: CGFloat
+    let verticalOffset: CGFloat
+
+    init(offset: CGFloat, reduceMotion: Bool) {
+        let pull = max(0, offset)
+        expansion = reduceMotion ? 0 : pull
+        blurRadius = reduceMotion ? 0 : min(pull / 12, 12)
+        verticalOffset = -pull
+    }
+}
+
 /// The small, stable information architecture for the Profile tab. Keeping
 /// this separate from SwiftUI makes the order and user-facing copy testable.
 enum ProfileFolder: String, CaseIterable, Identifiable {
@@ -108,6 +137,13 @@ struct DriverProfile: Equatable, Codable {
 
     var displayName: String
     var stage: Stage
+
+    var greeting: String {
+        guard let firstName = displayName.split(whereSeparator: \.isWhitespace).first else {
+            return "Hello"
+        }
+        return "Hello, \(firstName)"
+    }
 
     static let empty = DriverProfile(displayName: "", stage: .permit)
 }

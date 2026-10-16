@@ -1,5 +1,156 @@
 import SwiftUI
 
+/// Uses the same qualifying drives as Goals & progress so all three totals
+/// describe the same locally recorded evidence, including a new driver's zeros.
+struct ProfileDrivingSummary: View {
+    @ObservedObject private var theme = ThemeManager.shared
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @ScaledMetric(relativeTo: .title2) private var valueSize: CGFloat = 25
+    let insights: DriverProfileInsights
+
+    var body: some View {
+        let layout = dynamicTypeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 16))
+            : AnyLayout(HStackLayout(alignment: .top, spacing: 15))
+
+        layout {
+            metric("Miles driven", value: insights.measuredMiles.formatted(.number.precision(.fractionLength(1))), id: "miles")
+            metric("Drives", value: insights.qualifyingDriveCount.formatted(), id: "drives")
+            metric("Days driven", value: insights.drivingDayCount.formatted(), id: "days")
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("profile.drivingSummary")
+    }
+
+    private func metric(_ title: String, value: String, id: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(value)
+                .font(.system(size: valueSize, weight: .semibold))
+                .monospacedDigit()
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+                .foregroundStyle(AppDesign.Ink.primary)
+            Text(title)
+                .font(.caption)
+                .foregroundStyle(AppDesign.Ink.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(title)
+        .accessibilityValue(value)
+        .accessibilityHint("From recorded drives that count toward driving progress")
+        .accessibilityIdentifier("profile.summary.\(id)")
+    }
+}
+
+/// Compact settings geometry stays local to Profile instead of changing
+/// the larger menu rows used by the rest of the app.
+struct ProfileSettingsRow: View {
+    @ObservedObject private var theme = ThemeManager.shared
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    let title: String
+    let symbol: String
+    var value: String? = nil
+    var subtitle: String? = nil
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: symbol)
+                .font(.system(size: 20, weight: .regular))
+                .frame(width: 24)
+                .accessibilityHidden(true)
+
+            VStack(alignment: .leading, spacing: 4) {
+                if dynamicTypeSize.isAccessibilitySize {
+                    Text(title)
+                    if let value { Text(value).foregroundStyle(AppDesign.Ink.secondary) }
+                } else {
+                    HStack(spacing: 8) {
+                        Text(title)
+                        Spacer(minLength: 4)
+                        if let value {
+                            Text(value)
+                                .foregroundStyle(AppDesign.Ink.secondary)
+                                .layoutPriority(-1)
+                        }
+                    }
+                }
+                if let subtitle {
+                    Text(subtitle)
+                        .font(.footnote)
+                        .foregroundStyle(AppDesign.Ink.secondary)
+                }
+            }
+            .font(.body)
+            .multilineTextAlignment(.leading)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            Image(systemName: "chevron.right")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(AppDesign.Ink.tertiary)
+                .accessibilityHidden(true)
+        }
+        .foregroundStyle(AppDesign.Ink.primary)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
+        .frame(minHeight: 52)
+        .contentShape(Rectangle())
+        .accessibilityElement(children: .combine)
+    }
+}
+
+private struct ProfileSettingsSurface: ViewModifier {
+    @ObservedObject private var theme = ThemeManager.shared
+
+    func body(content: Content) -> some View {
+        content
+            .background(
+                theme.currentID == .dark ? Color(white: 0.11) : AppDesign.cardSurface,
+                in: RoundedRectangle(cornerRadius: 24, style: .continuous)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+    }
+}
+
+private struct ProfileGlassSurface: ViewModifier {
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.colorScheme) private var colorScheme
+    let cornerRadius: CGFloat
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+        if reduceTransparency {
+            content.background(colorScheme == .dark ? Color(white: 0.13) : Color(white: 0.97), in: shape)
+                .overlay { shape.strokeBorder(.primary.opacity(0.15), lineWidth: 0.5) }
+        } else if #available(iOS 26.0, *) {
+            content.glassEffect(.regular.interactive(), in: shape)
+        } else {
+            content.background(.ultraThinMaterial, in: shape)
+                .overlay { shape.strokeBorder(.white.opacity(0.22), lineWidth: 0.5) }
+        }
+    }
+}
+
+extension View {
+    func profileSettingsSurface() -> some View { modifier(ProfileSettingsSurface()) }
+
+    func profileGlassSurface(cornerRadius: CGFloat) -> some View {
+        modifier(ProfileGlassSurface(cornerRadius: cornerRadius))
+    }
+
+    @ViewBuilder
+    func profileGlassContainer() -> some View {
+        if #available(iOS 26.0, *) {
+            GlassEffectContainer(spacing: 16) { self }
+        } else {
+            self
+        }
+    }
+}
+
 /// Presentational subviews for `ProfileView`. Split out to keep the main file
 /// focused on state and layout: every view here is a pure function of the
 /// `DriverProfileInsights` (or, for the live banner, the session) it is

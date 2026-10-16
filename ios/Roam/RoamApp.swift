@@ -49,51 +49,66 @@ struct RoamApp: App {
 
     var body: some Scene {
         WindowGroup {
-            let presentation = LaunchPresentationState.resolve(
-                hasMountedRoot: hasMountedRoot,
-                servicesAvailable: driveSession != nil && authSession != nil,
-                isIntroPlaying: isIntroPlaying
-            )
-
-            ZStack {
-                if presentation.shouldMountRoot,
-                   let driveSession,
-                   let authSession {
-                    RoamRootView()
-                        .environmentObject(themeManager)
-                        .environmentObject(driveSession)
-                        .environmentObject(authSession)
-                        .environment(Clerk.shared)
-                        .opacity(presentation.rootIsVisuallyHidden ? 0 : 1)
-                        .allowsHitTesting(presentation.rootAllowsInteraction)
-                        .accessibilityHidden(presentation.rootIsAccessibilityHidden)
-                        .transition(.opacity)
-                }
-
-                if presentation.showsIntro {
-                    LaunchIntroView(
-                        onVisualComplete: { finishIntro(for: visualGeneration) },
-                        dockTargetFrame: headerWordmarkFrame,
-                        isWaitingForBootstrap: !hasBootstrapTerminalState
-                    )
+            #if DEBUG
+            if ProcessInfo.processInfo.arguments.contains("--preview-profile-signed-in") {
+                ProfileSignedInPreview()
                     .environmentObject(themeManager)
-                    // The opaque generation token is Hashable, so it can
-                    // restart the intro without reaching into gate internals.
-                    .id(visualGeneration)
+                    .environment(Clerk.shared)
+                    .preferredColorScheme(themeManager.preferredColorScheme)
+            } else {
+                launchContent
+            }
+            #else
+            launchContent
+            #endif
+        }
+    }
+
+    private var launchContent: some View {
+        let presentation = LaunchPresentationState.resolve(
+            hasMountedRoot: hasMountedRoot,
+            servicesAvailable: driveSession != nil && authSession != nil,
+            isIntroPlaying: isIntroPlaying
+        )
+
+        return ZStack {
+            if presentation.shouldMountRoot,
+               let driveSession,
+               let authSession {
+                RoamRootView()
+                    .environmentObject(themeManager)
+                    .environmentObject(driveSession)
+                    .environmentObject(authSession)
+                    .environment(Clerk.shared)
+                    .opacity(presentation.rootIsVisuallyHidden ? 0 : 1)
+                    .allowsHitTesting(presentation.rootAllowsInteraction)
+                    .accessibilityHidden(presentation.rootIsAccessibilityHidden)
                     .transition(.opacity)
-                    .zIndex(1)
-                }
             }
-            .coordinateSpace(name: LaunchIntroDockSpace.name)
-            .onPreferenceChange(HeaderWordmarkFrameKey.self) { headerWordmarkFrame = $0 }
-            .preferredColorScheme(themeManager.preferredColorScheme)
-            .onOpenURL(perform: handleIncomingURL)
-            .task {
-                await prepareLaunch()
+
+            if presentation.showsIntro {
+                LaunchIntroView(
+                    onVisualComplete: { finishIntro(for: visualGeneration) },
+                    dockTargetFrame: headerWordmarkFrame,
+                    isWaitingForBootstrap: !hasBootstrapTerminalState
+                )
+                .environmentObject(themeManager)
+                // The opaque generation token is Hashable, so it can
+                // restart the intro without reaching into gate internals.
+                .id(visualGeneration)
+                .transition(.opacity)
+                .zIndex(1)
             }
-            .onChange(of: scenePhase) { _, phase in
-                handleScenePhase(phase)
-            }
+        }
+        .coordinateSpace(name: LaunchIntroDockSpace.name)
+        .onPreferenceChange(HeaderWordmarkFrameKey.self) { headerWordmarkFrame = $0 }
+        .preferredColorScheme(themeManager.preferredColorScheme)
+        .onOpenURL(perform: handleIncomingURL)
+        .task {
+            await prepareLaunch()
+        }
+        .onChange(of: scenePhase) { _, phase in
+            handleScenePhase(phase)
         }
     }
 

@@ -86,6 +86,7 @@ enum AppDesign {
     static let cardPadding: CGFloat = 18
     static let sectionSpacing: CGFloat = 28
     static let contentPadding: CGFloat = 20
+    static let maximumContentWidth: CGFloat = 640
     /// Clearance below the last element on a scrolling tab so it clears the
     /// floating tab bar.
     static let tabBarClearance: CGFloat = 44

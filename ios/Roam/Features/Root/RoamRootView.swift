@@ -48,7 +48,13 @@ struct RoamRootView: View {
         }
     }
 
-    @State private var selectedTab: AppTab = .routes
+    @State private var selectedTab: AppTab = {
+        #if DEBUG
+        // Open the actual screen directly for repeatable simulator reviews.
+        if ProcessInfo.processInfo.arguments.contains("--preview-profile") { return .profile }
+        #endif
+        return .routes
+    }()
     @EnvironmentObject private var driveSession: DriveSessionManager
     @EnvironmentObject private var themeManager: ThemeManager
     @EnvironmentObject private var authSession: AuthSessionStore
@@ -60,7 +66,7 @@ struct RoamRootView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            if !driveSession.isRecording {
+            if !driveSession.isRecording && selectedTab != .profile {
                 topBrandBar
                     .transition(reduceMotion ? .opacity : .move(edge: .top).combined(with: .opacity))
             }

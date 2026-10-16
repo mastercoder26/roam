@@ -10,6 +10,7 @@
 		1EBFCB6E4464444BB2936C89 /* AppIconManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D5BFA4B25844B26BFE25E88 /* AppIconManager.swift */; };
 		40A6EEF1D2F24291A3621A0C /* AppIconAlt-40x40@3x.png in Resources */ = {isa = PBXBuildFile; fileRef = 0E9EAF96588049B0852628E9 /* AppIconAlt-40x40@3x.png */; };
 		506AEF7FDE8E4C71BBB23780 /* AppIconAlt-20x20@3x.png in Resources */ = {isa = PBXBuildFile; fileRef = CDA55DDA2E744AFAACA46532 /* AppIconAlt-20x20@3x.png */; };
+		61D204BDD8992C87A76F1F60 /* ProfileSettingsUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC1D3C0DC0DD2B00B578E8FE /* ProfileSettingsUITests.swift */; };
 		63A5E297A33C464B9853C815 /* AppIconAlt-60x60@3x.png in Resources */ = {isa = PBXBuildFile; fileRef = 2D17157632DC46C1A30100A6 /* AppIconAlt-60x60@3x.png */; };
 		70FDA62F7B8C44DBA86A4DAE /* AppIconAlt-60x60@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = 2D2C27CEE3F9471F88F3BF3B /* AppIconAlt-60x60@2x.png */; };
 		717A8982D0B14159A7B333CA /* AppIconAlt-29x29@3x.png in Resources */ = {isa = PBXBuildFile; fileRef = D74B14B7666A4BE9BDED45FE /* AppIconAlt-29x29@3x.png */; };
@@ -21,7 +22,6 @@
 		A10000000000000000000004 /* RouteDifficultyModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000004 /* RouteDifficultyModels.swift */; };
 		A10000000000000000000005 /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000005 /* APIClient.swift */; };
 		A10000000000000000000007 /* ScoreGaugeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000007 /* ScoreGaugeView.swift */; };
-		A10000000000000000000106 /* LiveDriveScoreViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000106 /* LiveDriveScoreViews.swift */; };
 		A10000000000000000000009 /* RouteMapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000009 /* RouteMapView.swift */; };
 		A1000000000000000000000A /* AlternateRouteCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000A /* AlternateRouteCard.swift */; };
 		A1000000000000000000000B /* AddressSearchField.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000B /* AddressSearchField.swift */; };
@@ -33,8 +33,6 @@
 		A10000000000000000000014 /* DriveSessionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000014 /* DriveSessionManager.swift */; };
 		A10000000000000000000015 /* DrivingScore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000015 /* DrivingScore.swift */; };
 		A10000000000000000000016 /* DriveScoringEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000016 /* DriveScoringEngine.swift */; };
-		A10000000000000000000105 /* LiveDriveCanvasLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000105 /* LiveDriveCanvasLayout.swift */; };
-		A10000000000000000000104 /* LiveDriveScoreEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000104 /* LiveDriveScoreEngine.swift */; };
 		A10000000000000000000017 /* RouteAnalysisLoadingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000017 /* RouteAnalysisLoadingView.swift */; };
 		A10000000000000000000018 /* RoutePlanningLocationCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000018 /* RoutePlanningLocationCoordinator.swift */; };
 		A10000000000000000000019 /* DriverReadinessEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000019 /* DriverReadinessEngine.swift */; };
@@ -85,11 +83,14 @@
 		A100000000000000000000F6 /* FeatureWalkthrough.swift in Sources */ = {isa = PBXBuildFile; fileRef = A200000000000000000000F6 /* FeatureWalkthrough.swift */; };
 		A100000000000000000000F8 /* AuthSessionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A200000000000000000000F8 /* AuthSessionStore.swift */; };
 		A100000000000000000000FB /* DriveHistorySyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A200000000000000000000FB /* DriveHistorySyncService.swift */; };
-		A100000000000000000000FD /* HowRoamWorksSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A200000000000000000000FD /* HowRoamWorksSheet.swift */; };
 		A100000000000000000000FC /* DriveStatusMessageEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = A200000000000000000000FC /* DriveStatusMessageEngine.swift */; };
+		A100000000000000000000FD /* HowRoamWorksSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A200000000000000000000FD /* HowRoamWorksSheet.swift */; };
 		A10000000000000000000101 /* DriveHistoryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000101 /* DriveHistoryStore.swift */; };
 		A10000000000000000000102 /* DriveSnapshotPersistence.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000102 /* DriveSnapshotPersistence.swift */; };
 		A10000000000000000000103 /* DriveRouteAnalysisCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000103 /* DriveRouteAnalysisCoordinator.swift */; };
+		A10000000000000000000104 /* LiveDriveScoreEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000104 /* LiveDriveScoreEngine.swift */; };
+		A10000000000000000000105 /* LiveDriveCanvasLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000105 /* LiveDriveCanvasLayout.swift */; };
+		A10000000000000000000106 /* LiveDriveScoreViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000106 /* LiveDriveScoreViews.swift */; };
 		B13E761EC74FF647592495EE /* RecentRouteStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BFEBB66D3200D17CE62D949 /* RecentRouteStore.swift */; };
 		B394ED9480F5622A90F861C2 /* RecentRouteCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EE6FB48592CABAD118EBAA1 /* RecentRouteCard.swift */; };
 		B6E1CC5F1AA94E00A21E97E2 /* AppIconAlt-29x29@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = B5BE4FA90FE34147B917E18D /* AppIconAlt-29x29@2x.png */; };
@@ -97,14 +98,21 @@
 		D10000000000000000000001 /* PremiumMotionSpec.swift in Sources */ = {isa = PBXBuildFile; fileRef = D20000000000000000000001 /* PremiumMotionSpec.swift */; };
 		D10000000000000000000002 /* PremiumMotion.swift in Sources */ = {isa = PBXBuildFile; fileRef = D20000000000000000000002 /* PremiumMotion.swift */; };
 		D10000000000000000000003 /* HowRoamWorksLayoutSpec.swift in Sources */ = {isa = PBXBuildFile; fileRef = D20000000000000000000003 /* HowRoamWorksLayoutSpec.swift */; };
-		E10000000000000000000001 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000001 /* PrivacyInfo.xcprivacy */; };
 		D9D36F5330327C4E00AB29F8 /* ClerkKit in Frameworks */ = {isa = PBXBuildFile; productRef = C30000000000000000000001 /* ClerkKit */; };
 		D9D36F5430327C4E00AB29F8 /* ClerkKitUI in Frameworks */ = {isa = PBXBuildFile; productRef = C30000000000000000000002 /* ClerkKitUI */; };
+		E10000000000000000000001 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000001 /* PrivacyInfo.xcprivacy */; };
 		F12F741FFF4B406383961998 /* AppIconAlt-20x20@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = 9AFE5C0E53A840129B30EA00 /* AppIconAlt-20x20@2x.png */; };
 		F38A1F7818134DBFA869E6BE /* AppIconPickerSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25396EAAE4294CDAACC5E8D4 /* AppIconPickerSheet.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
+		8AE3C53284196E28FC777CC9 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A90000000000000000000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A60000000000000000000001;
+			remoteInfo = Roam;
+		};
 		AB00000000000000000000002 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = A90000000000000000000001 /* Project object */;
@@ -146,6 +154,7 @@
 		36634240979564F16074C612 /* AsciiGlobeIntroLayer.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AsciiGlobeIntroLayer.swift; sourceTree = "<group>"; };
 		3EE6FB48592CABAD118EBAA1 /* RecentRouteCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecentRouteCard.swift; sourceTree = "<group>"; };
 		6BFEBB66D3200D17CE62D949 /* RecentRouteStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecentRouteStore.swift; sourceTree = "<group>"; };
+		796AB9AEFC77ADDCF167BA22 /* RoamUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RoamUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		9AFE5C0E53A840129B30EA00 /* AppIconAlt-20x20@2x.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "AppIconAlt-20x20@2x.png"; sourceTree = "<group>"; };
 		A20000000000000000000001 /* RoamApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoamApp.swift; sourceTree = "<group>"; };
 		A20000000000000000000002 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
@@ -153,7 +162,6 @@
 		A20000000000000000000004 /* RouteDifficultyModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RouteDifficultyModels.swift; sourceTree = "<group>"; };
 		A20000000000000000000005 /* APIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClient.swift; sourceTree = "<group>"; };
 		A20000000000000000000007 /* ScoreGaugeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScoreGaugeView.swift; sourceTree = "<group>"; };
-		A20000000000000000000106 /* LiveDriveScoreViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveDriveScoreViews.swift; sourceTree = "<group>"; };
 		A20000000000000000000009 /* RouteMapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RouteMapView.swift; sourceTree = "<group>"; };
 		A2000000000000000000000A /* AlternateRouteCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlternateRouteCard.swift; sourceTree = "<group>"; };
 		A2000000000000000000000B /* AddressSearchField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddressSearchField.swift; sourceTree = "<group>"; };
@@ -168,8 +176,6 @@
 		A20000000000000000000014 /* DriveSessionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriveSessionManager.swift; sourceTree = "<group>"; };
 		A20000000000000000000015 /* DrivingScore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DrivingScore.swift; sourceTree = "<group>"; };
 		A20000000000000000000016 /* DriveScoringEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriveScoringEngine.swift; sourceTree = "<group>"; };
-		A20000000000000000000105 /* LiveDriveCanvasLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveDriveCanvasLayout.swift; sourceTree = "<group>"; };
-		A20000000000000000000104 /* LiveDriveScoreEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveDriveScoreEngine.swift; sourceTree = "<group>"; };
 		A20000000000000000000017 /* RouteAnalysisLoadingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RouteAnalysisLoadingView.swift; sourceTree = "<group>"; };
 		A20000000000000000000018 /* RoutePlanningLocationCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoutePlanningLocationCoordinator.swift; sourceTree = "<group>"; };
 		A20000000000000000000019 /* DriverReadinessEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriverReadinessEngine.swift; sourceTree = "<group>"; };
@@ -220,22 +226,26 @@
 		A200000000000000000000F6 /* FeatureWalkthrough.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeatureWalkthrough.swift; sourceTree = "<group>"; };
 		A200000000000000000000F8 /* AuthSessionStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthSessionStore.swift; sourceTree = "<group>"; };
 		A200000000000000000000FB /* DriveHistorySyncService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriveHistorySyncService.swift; sourceTree = "<group>"; };
-		A200000000000000000000FD /* HowRoamWorksSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HowRoamWorksSheet.swift; sourceTree = "<group>"; };
 		A200000000000000000000FC /* DriveStatusMessageEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriveStatusMessageEngine.swift; sourceTree = "<group>"; };
+		A200000000000000000000FD /* HowRoamWorksSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HowRoamWorksSheet.swift; sourceTree = "<group>"; };
 		A20000000000000000000101 /* DriveHistoryStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriveHistoryStore.swift; sourceTree = "<group>"; };
 		A20000000000000000000102 /* DriveSnapshotPersistence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriveSnapshotPersistence.swift; sourceTree = "<group>"; };
 		A20000000000000000000103 /* DriveRouteAnalysisCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriveRouteAnalysisCoordinator.swift; sourceTree = "<group>"; };
+		A20000000000000000000104 /* LiveDriveScoreEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveDriveScoreEngine.swift; sourceTree = "<group>"; };
+		A20000000000000000000105 /* LiveDriveCanvasLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveDriveCanvasLayout.swift; sourceTree = "<group>"; };
+		A20000000000000000000106 /* LiveDriveScoreViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveDriveScoreViews.swift; sourceTree = "<group>"; };
 		A30000000000000000000001 /* Roam.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Roam.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A30000000000000000000002 /* RoamDriveActivityExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = RoamDriveActivityExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		A30000000000000000000003 /* RoamRouteShareExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = RoamRouteShareExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		B5BE4FA90FE34147B917E18D /* AppIconAlt-29x29@2x.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "AppIconAlt-29x29@2x.png"; sourceTree = "<group>"; };
 		C20000000000000000000001 /* ClerkBackendClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClerkBackendClient.swift; sourceTree = "<group>"; };
+		CC1D3C0DC0DD2B00B578E8FE /* ProfileSettingsUITests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ProfileSettingsUITests.swift; sourceTree = "<group>"; };
 		CDA55DDA2E744AFAACA46532 /* AppIconAlt-20x20@3x.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "AppIconAlt-20x20@3x.png"; sourceTree = "<group>"; };
 		D20000000000000000000001 /* PremiumMotionSpec.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PremiumMotionSpec.swift; sourceTree = "<group>"; };
 		D20000000000000000000002 /* PremiumMotion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PremiumMotion.swift; sourceTree = "<group>"; };
 		D20000000000000000000003 /* HowRoamWorksLayoutSpec.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HowRoamWorksLayoutSpec.swift; sourceTree = "<group>"; };
-		E20000000000000000000001 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		D74B14B7666A4BE9BDED45FE /* AppIconAlt-29x29@3x.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "AppIconAlt-29x29@3x.png"; sourceTree = "<group>"; };
+		E20000000000000000000001 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		F4B7F709301E7D5F003C2863 /* Debug.local.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Debug.local.xcconfig; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -263,9 +273,25 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		A6B7AE82634900714C1E7DE0 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		6ABEBC74DCF39BE9B17A1D43 /* RoamUITests */ = {
+			isa = PBXGroup;
+			children = (
+				CC1D3C0DC0DD2B00B578E8FE /* ProfileSettingsUITests.swift */,
+			);
+			name = RoamUITests;
+			path = RoamUITests;
+			sourceTree = "<group>";
+		};
 		825F10D7936841F4BE8AA4CD /* AlternateAppIcons */ = {
 			isa = PBXGroup;
 			children = (
@@ -288,6 +314,7 @@
 				A5000000000000000000000F /* RoamDriveActivityExtension */,
 				A50000000000000000000010 /* RoamRouteShareExtension */,
 				A50000000000000000000003 /* Products */,
+				6ABEBC74DCF39BE9B17A1D43 /* RoamUITests */,
 			);
 			sourceTree = "<group>";
 		};
@@ -316,6 +343,7 @@
 				A30000000000000000000001 /* Roam.app */,
 				A30000000000000000000002 /* RoamDriveActivityExtension.appex */,
 				A30000000000000000000003 /* RoamRouteShareExtension.appex */,
+				796AB9AEFC77ADDCF167BA22 /* RoamUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -570,6 +598,24 @@
 			productReference = A30000000000000000000003 /* RoamRouteShareExtension.appex */;
 			productType = "com.apple.product-type.app-extension";
 		};
+		E7EF5504C5E67D3BFCFFA36A /* RoamUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = B5982155019E152841336C22 /* Build configuration list for PBXNativeTarget "RoamUITests" */;
+			buildPhases = (
+				F1C3598819358297C837D11B /* Sources */,
+				A6B7AE82634900714C1E7DE0 /* Frameworks */,
+				C412CE211436BF7F216565CF /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				FEA163175DD526E9B8909F57 /* PBXTargetDependency */,
+			);
+			name = RoamUITests;
+			productName = RoamUITests;
+			productReference = 796AB9AEFC77ADDCF167BA22 /* RoamUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -599,6 +645,9 @@
 							};
 						};
 					};
+					E7EF5504C5E67D3BFCFFA36A = {
+						TestTargetID = A60000000000000000000001;
+					};
 				};
 			};
 			buildConfigurationList = A80000000000000000000001 /* Build configuration list for PBXProject "Roam" */;
@@ -620,6 +669,7 @@
 				A60000000000000000000001 /* Roam */,
 				A60000000000000000000002 /* RoamDriveActivityExtension */,
 				A60000000000000000000003 /* RoamRouteShareExtension */,
+				E7EF5504C5E67D3BFCFFA36A /* RoamUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -650,6 +700,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		A70000000000000000000007 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		C412CE211436BF7F216565CF /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -780,6 +837,14 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		F1C3598819358297C837D11B /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				61D204BDD8992C87A76F1F60 /* ProfileSettingsUITests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -793,9 +858,32 @@
 			target = A60000000000000000000003 /* RoamRouteShareExtension */;
 			targetProxy = AB00000000000000000000003 /* PBXContainerItemProxy */;
 		};
+		FEA163175DD526E9B8909F57 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = Roam;
+			target = A60000000000000000000001 /* Roam */;
+			targetProxy = 8AE3C53284196E28FC777CC9 /* PBXContainerItemProxy */;
+		};
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
+		1B759FF187253200092D8ED0 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = 6RT6KBS4G9;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.akhilk.roam.uitests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				TEST_TARGET_NAME = Roam;
+			};
+			name = Debug;
+		};
 		AA0000000000000000000001 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = A2000000000000000000000E /* Debug.xcconfig */;
@@ -1065,6 +1153,24 @@
 			};
 			name = Release;
 		};
+		D42E02D0A388A817B58F0F40 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = 6RT6KBS4G9;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.akhilk.roam.uitests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				TEST_TARGET_NAME = Roam;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -1100,6 +1206,15 @@
 			buildConfigurations = (
 				AA0000000000000000000007 /* Debug */,
 				AA0000000000000000000008 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		B5982155019E152841336C22 /* Build configuration list for PBXNativeTarget "RoamUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				D42E02D0A388A817B58F0F40 /* Release */,
+				1B759FF187253200092D8ED0 /* Debug */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
