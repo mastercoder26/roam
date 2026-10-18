@@ -100,9 +100,9 @@ enum AppDesign {
     }
 
     enum Typography {
-        /// Screen-opening statement. Tight and heavy, in the manner of a big
-        /// consumer app's first line of copy.
-        static let display = Font.system(size: 34, weight: .bold, design: .default)
+        /// Shared screen title in the app's standard system face. Scales with
+        /// Dynamic Type alongside the surrounding text.
+        static let display = Font.system(.largeTitle, design: .default, weight: .bold)
         static let heroTitle = Font.system(.largeTitle, design: .rounded, weight: .bold)
         static let sectionTitle = Font.system(size: 20, weight: .semibold)
         static let railTitle = Font.system(size: 17, weight: .semibold)
@@ -302,8 +302,8 @@ struct ScreenHeader: View {
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: AppDesign.space12) {
             Text(title)
-                .font(.system(size: 31, weight: .bold, design: .rounded))
-                .tracking(-1.1)
+                .font(AppDesign.Typography.display)
+                .tracking(-0.7)
                 .foregroundStyle(AppDesign.Ink.primary)
                 .fixedSize(horizontal: false, vertical: true)
 
