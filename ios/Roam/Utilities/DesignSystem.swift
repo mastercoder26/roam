@@ -298,7 +298,6 @@ struct SectionHeader: View {
 struct ScreenHeader: View {
     @ObservedObject private var theme = ThemeManager.shared
     let title: String
-    let symbol: String
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: AppDesign.space12) {
@@ -309,12 +308,6 @@ struct ScreenHeader: View {
                 .fixedSize(horizontal: false, vertical: true)
 
             Spacer(minLength: AppDesign.space8)
-
-            Image(systemName: symbol)
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(AppDesign.Ink.tertiary)
-                .frame(width: 32, height: 32)
-                .accessibilityHidden(true)
         }
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isHeader)

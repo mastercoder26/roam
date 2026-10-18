@@ -173,10 +173,7 @@ struct HomeView: View {
     }
 
     private var headerSection: some View {
-        ScreenHeader(
-            title: "Where to?",
-            symbol: "location.north.circle.fill"
-        )
+        ScreenHeader(title: "Where to?")
     }
 
     private var routeCard: some View {

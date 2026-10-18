@@ -36,10 +36,7 @@ struct DriverProgressView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: AppDesign.sectionSpacing) {
-                    ScreenHeader(
-                        title: "Progress",
-                        symbol: "chart.line.uptrend.xyaxis"
-                    )
+                    ScreenHeader(title: "Progress")
                     overallScoreCard
 
                     WeekCadenceStrip(
