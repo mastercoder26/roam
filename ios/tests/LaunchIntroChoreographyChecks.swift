@@ -11,7 +11,7 @@ struct LaunchIntroChoreographyChecks {
         theSweepBandStaysOrderedAndInsideItsMask()
         theWholeSequenceStaysShortEnoughToNotAnnoy()
         aReturningDriverOnlySeesItAfterARealAbsence()
-        theWordmarkIsBigAndCenteredBeforeItDocks()
+        theWordmarkStaysCenteredAboveTheGlobe()
         theNoPathGlobeRevealKeepsItsVisualBeatsOrdered()
         theGlobeSpinsUpFromRestAndNeverRunsBackwards()
         theGlobeSettlesToFullSizeAndStaysThere()
@@ -172,7 +172,7 @@ struct LaunchIntroChoreographyChecks {
         )
     }
 
-    private static func theWordmarkIsBigAndCenteredBeforeItDocks() {
+    private static func theWordmarkStaysCenteredAboveTheGlobe() {
         let screenWidth = 390.0
         let screenHeight = 844.0
         // The mark is drawn at hero size, so its measured width is already the
@@ -180,7 +180,6 @@ struct LaunchIntroChoreographyChecks {
         let markWidth = 210.0
 
         let hero = LaunchIntroChoreography.wordmarkOrigin(
-            docked: false,
             screenWidth: screenWidth,
             screenHeight: screenHeight,
             wordmarkWidth: markWidth
@@ -193,45 +192,15 @@ struct LaunchIntroChoreographyChecks {
             hero.y < screenHeight / 2 - 40,
             "the hero wordmark must sit clear above the centered globe"
         )
-        expect(
-            LaunchIntroChoreography.wordmarkDockedScale < 0.5,
-            "the hero wordmark must be markedly bigger than the docked one"
-        )
-        expect(
-            nearlyEqual(
-                LaunchIntroChoreography.wordmarkHeroFontSize
-                    * LaunchIntroChoreography.wordmarkDockedScale,
-                LaunchIntroChoreography.wordmarkDockedFontSize
-            ),
-            "the docked mark must land at exactly the app header's wordmark size"
-        )
-        expect(
-            LaunchIntroChoreography.wordmarkDockedScale < 1,
-            "the mark must be scaled down to dock, never blown up from a small raster"
-        )
-
-        let docked = LaunchIntroChoreography.wordmarkOrigin(
-            docked: true,
-            screenWidth: screenWidth,
-            screenHeight: screenHeight,
-            wordmarkWidth: markWidth
-        )
-        expect(
-            docked == LaunchIntroChoreography.wordmarkDockedInset,
-            "the docked wordmark must land on the app's own top-left inset"
-        )
-        expect(docked.y < hero.y, "the wordmark must travel upward as it docks")
-
         // A mark too wide to center must still clear the left safe-area inset
         // rather than sliding off the edge of a narrow screen.
         let oversized = LaunchIntroChoreography.wordmarkOrigin(
-            docked: false,
             screenWidth: 320,
             screenHeight: screenHeight,
             wordmarkWidth: 400
         )
         expect(
-            oversized.x >= LaunchIntroChoreography.wordmarkDockedInset.x,
+            oversized.x >= LaunchIntroChoreography.wordmarkHorizontalInset,
             "an oversized hero wordmark must not be pushed off the left edge"
         )
     }
@@ -247,14 +216,13 @@ struct LaunchIntroChoreographyChecks {
         )
         expect(
             LaunchIntroChoreography.videoFadeStartsAt
-                > LaunchIntroChoreography.wordmarkDockDelay,
-            "the globe must not begin fading until the wordmark starts docking"
+                > LaunchIntroChoreography.videoWordmarkDelay
+                    + LaunchIntroChoreography.videoWordmarkFadeDuration,
+            "the centered wordmark must be fully visible before the globe fades"
         )
         expect(
-            LaunchIntroChoreography.wordmarkDockDelay
-                + LaunchIntroChoreography.wordmarkDockDuration
-                < LaunchIntroChoreography.videoDuration,
-            "the globe duration must leave the docked wordmark visible before handoff"
+            LaunchIntroChoreography.videoFadeStartsAt < LaunchIntroChoreography.videoDuration,
+            "the globe must finish its fade before handoff"
         )
     }
 

@@ -44,8 +44,7 @@ struct ProfileDrivingSummary: View {
     }
 }
 
-/// Compact settings geometry stays local to Profile instead of changing
-/// the larger menu rows used by the rest of the app.
+/// Compact settings geometry shared by Profile and its nested menus.
 struct ProfileSettingsRow: View {
     @ObservedObject private var theme = ThemeManager.shared
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
@@ -55,7 +54,7 @@ struct ProfileSettingsRow: View {
     var subtitle: String? = nil
 
     var body: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: AppDesign.Menu.iconSpacing) {
             Image(systemName: symbol)
                 .font(.system(size: 20, weight: .regular))
                 .frame(width: 24)
@@ -93,9 +92,9 @@ struct ProfileSettingsRow: View {
                 .accessibilityHidden(true)
         }
         .foregroundStyle(AppDesign.Ink.primary)
-        .padding(.horizontal, 16)
-        .padding(.vertical, 14)
-        .frame(minHeight: 52)
+        .padding(.horizontal, AppDesign.contentPadding)
+        .padding(.vertical, AppDesign.Menu.rowPadding)
+        .frame(minHeight: AppDesign.Menu.minimumRowHeight)
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
     }
@@ -106,25 +105,21 @@ private struct ProfileSettingsSurface: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .background(
-                theme.currentID == .dark ? Color(white: 0.11) : AppDesign.cardSurface,
-                in: RoundedRectangle(cornerRadius: 24, style: .continuous)
-            )
-            .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .menuSurface()
     }
 }
 
 private struct ProfileGlassSurface: ViewModifier {
+    @ObservedObject private var theme = ThemeManager.shared
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
-    @Environment(\.colorScheme) private var colorScheme
     let cornerRadius: CGFloat
 
     @ViewBuilder
     func body(content: Content) -> some View {
         let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
         if reduceTransparency {
-            content.background(colorScheme == .dark ? Color(white: 0.13) : Color(white: 0.97), in: shape)
-                .overlay { shape.strokeBorder(.primary.opacity(0.15), lineWidth: 0.5) }
+            content.background(AppDesign.cardSurfaceElevated, in: shape)
+                .overlay { shape.strokeBorder(AppDesign.cardStrokeStrong, lineWidth: 0.5) }
         } else if #available(iOS 26.0, *) {
             content.glassEffect(.regular.interactive(), in: shape)
         } else {
@@ -178,32 +173,7 @@ struct ProfileFolderCard: View {
     let summary: String
 
     var body: some View {
-        HStack(spacing: AppDesign.space16) {
-            IconTile(symbol: folder.symbol)
-
-            VStack(alignment: .leading, spacing: AppDesign.space4) {
-                Text(folder.title)
-                    .font(.headline)
-                    .foregroundStyle(AppDesign.Ink.primary)
-
-                Text(summary)
-                    .font(.caption)
-                    .foregroundStyle(AppDesign.Ink.secondary)
-                    .lineLimit(2)
-                    .multilineTextAlignment(.leading)
-            }
-
-            Spacer(minLength: AppDesign.space8)
-
-            Image(systemName: "chevron.right")
-                .font(.caption.weight(.bold))
-                .foregroundStyle(AppDesign.Ink.tertiary)
-                .frame(width: 24, height: 24)
-        }
-        .padding(.vertical, AppDesign.space8)
-        .frame(maxWidth: .infinity, minHeight: 60, alignment: .leading)
-        .contentShape(Rectangle())
-        .accessibilityElement(children: .combine)
+        AppMenuRow(title: folder.title, subtitle: summary, symbol: folder.symbol)
         .accessibilityLabel("\(folder.title). \(summary)")
         .accessibilityHint("Opens \(folder.subtitle.lowercased())")
     }

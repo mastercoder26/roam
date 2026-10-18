@@ -451,6 +451,7 @@ struct FlipClock: View {
 
     let elapsed: TimeInterval
     let style: Style
+    @ScaledMetric(relativeTo: .largeTitle) private var previewFontSize: CGFloat = 58
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     private var digits: [String] {
@@ -461,7 +462,17 @@ struct FlipClock: View {
 
     var body: some View {
         Group {
-            if dynamicTypeSize.isAccessibilitySize {
+            if style == .preview {
+                Text(String(format: "%02d:%02d", Int(elapsed) / 60, Int(elapsed) % 60))
+                    .font(.system(size: min(previewFontSize, 92), weight: .medium))
+                    .tracking(-2)
+                    .monospacedDigit()
+                    .foregroundStyle(AppDesign.Ink.primary)
+                    .frame(maxWidth: .infinity)
+                    .minimumScaleFactor(0.6)
+                    .lineLimit(1)
+                    .padding(.vertical, AppDesign.space8)
+            } else if dynamicTypeSize.isAccessibilitySize {
                 Text("\(Int(elapsed) / 60):\(String(format: "%02d", Int(elapsed) % 60))")
                     .font(.system(.largeTitle, design: .rounded, weight: .bold))
                     .monospacedDigit()

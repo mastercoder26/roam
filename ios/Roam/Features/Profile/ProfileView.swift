@@ -143,6 +143,7 @@ struct ProfileView: View {
             focusedIdentityField = nil
         }) {
             identityEditor
+                .presentationDragIndicator(.visible)
         }
         .confirmationDialog(
             "Delete your Roam account?",
@@ -288,7 +289,7 @@ struct ProfileView: View {
                     .buttonStyle(PressableScaleStyle())
                     .accessibilityHint("Edit your name and licensing stage on this device")
                     .accessibilityIdentifier("profile.editIdentity")
-                    Divider().padding(.leading, 50)
+                    Divider().padding(.leading, AppDesign.Menu.dividerInset)
                 }
                 ForEach(section.folders) { folder in
                     NavigationLink {
@@ -301,7 +302,7 @@ struct ProfileView: View {
 
                     if folder != section.folders.last {
                         Divider()
-                            .padding(.leading, 50)
+                            .padding(.leading, AppDesign.Menu.dividerInset)
                     }
                 }
             }
@@ -713,7 +714,7 @@ struct ProfileView: View {
     private var identityEditor: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 24) {
+                VStack(alignment: .leading, spacing: AppDesign.sectionSpacing) {
                     profileSection("Name") {
                         TextField("Your name", text: $profile.displayName)
                             .font(.body)
@@ -730,7 +731,9 @@ struct ProfileView: View {
                     persistenceErrorNote
                     stageCard
                 }
-                .padding(20)
+                .padding(.horizontal, AppDesign.contentPadding)
+                .padding(.top, AppDesign.space16)
+                .padding(.bottom, AppDesign.space24)
                 .frame(maxWidth: AppDesign.maximumContentWidth)
                 .frame(maxWidth: .infinity)
             }
@@ -744,6 +747,7 @@ struct ProfileView: View {
                         focusedIdentityField = nil
                         isEditingIdentity = false
                     }
+                    .fontWeight(.semibold)
                 }
             }
         }
@@ -775,26 +779,28 @@ struct ProfileView: View {
     }
 
     private var measuredExperience: some View {
-        HStack(alignment: .firstTextBaseline) {
+        VStack(alignment: .leading, spacing: AppDesign.space8) {
             Text("Measured miles")
-                .font(.body)
-            Spacer(minLength: 12)
+                .font(.subheadline)
+                .foregroundStyle(AppDesign.Ink.secondary)
             if insights.hasEvidence {
-                KineticMetricText(
-                    value: String(format: "%.1f", insights.measuredMiles),
-                    fontSize: 28,
-                    foreground: AppDesign.Ink.primary,
-                    context: .completedDrive
-                )
+                Text(String(format: "%.1f", insights.measuredMiles))
+                    .font(AppDesign.Typography.display)
+                    .monospacedDigit()
+                Text("\(insights.qualifyingDriveCount) qualifying \(insights.qualifyingDriveCount == 1 ? "drive" : "drives")")
+                    .font(.footnote)
+                    .foregroundStyle(AppDesign.Ink.secondary)
             } else {
                 Text("No drives yet")
-                    .font(.subheadline)
+                    .font(.title2.weight(.semibold))
+                Text("Record a drive to start building your measured experience.")
+                    .font(.footnote)
                     .foregroundStyle(AppDesign.Ink.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
         .foregroundStyle(AppDesign.Ink.primary)
-        .padding(18)
-        .profileSettingsSurface()
+        .heroCard()
     }
 
     /// Surfaces a failed save quietly: a small tertiary-ink caption, never an
@@ -813,51 +819,37 @@ struct ProfileView: View {
     // MARK: - Stage
 
     private var stageCard: some View {
-        VStack(alignment: .leading, spacing: AppDesign.space12) {
-            SectionHeader(
-                title: "Licensing stage",
-                subtitle: "Self-declared, and never used in a score."
-            )
-
-            ForEach(DriverProfile.Stage.allCases) { stage in
-                Button {
-                    withAnimation(reduceMotion ? .easeOut(duration: 0.16) : AppAnimation.selection) {
-                        profile.stage = stage
-                    }
-                } label: {
-                    HStack(spacing: AppDesign.space12) {
-                        Image(systemName: profile.stage == stage ? "largecircle.fill.circle" : "circle")
-                            .font(.title3)
-                            .foregroundStyle(profile.stage == stage ? AppDesign.accent : AppDesign.Ink.tertiary)
-                            .contentTransition(.symbolEffect(.replace))
-
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(stage.title)
-                                .font(.subheadline.weight(.semibold))
-                                .foregroundStyle(AppDesign.Ink.primary)
-                            Text(stage.detail)
-                                .font(.caption)
-                                .foregroundStyle(AppDesign.Ink.secondary)
-                                .fixedSize(horizontal: false, vertical: true)
+        profileSection("Licensing stage") {
+            VStack(spacing: 0) {
+                ForEach(DriverProfile.Stage.allCases) { stage in
+                    Button {
+                        withAnimation(reduceMotion ? .easeOut(duration: 0.16) : AppAnimation.selection) {
+                            profile.stage = stage
                         }
-
-                        Spacer(minLength: 0)
+                    } label: {
+                        AppSelectionRow(title: stage.title, detail: stage.detail, isSelected: profile.stage == stage) {
+                            EmptyView()
+                        }
                     }
-                    .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-                    .contentShape(Rectangle())
+                    .buttonStyle(PressableScaleStyle())
+                    .accessibilityLabel(stage.title)
+                    .accessibilityValue(profile.stage == stage ? "Selected" : "Not selected")
+                    .accessibilityHint(stage.detail)
+                    .accessibilityIdentifier("profile.stage.\(stage.id)")
+
+                    if stage != DriverProfile.Stage.allCases.last {
+                        Divider().padding(.leading, AppDesign.contentPadding)
+                    }
                 }
-                .buttonStyle(PressableScaleStyle())
-                .accessibilityValue(profile.stage == stage ? "Selected" : "Not selected")
             }
+            .menuSurface()
 
-            Divider()
-
-            Label(profile.stage.supervisionNote, systemImage: "info.circle")
-                .font(.caption)
+            Text("Self-declared and never used in a score. \(profile.stage.supervisionNote)")
+                .font(.footnote)
                 .foregroundStyle(AppDesign.Ink.secondary)
                 .fixedSize(horizontal: false, vertical: true)
+                .padding(.horizontal, AppDesign.space4)
         }
-        .premiumCard()
     }
 
     // MARK: - Appearance
@@ -866,7 +858,7 @@ struct ProfileView: View {
         VStack(spacing: 0) {
             appearanceCard
             Divider()
-                .padding(.leading, 50)
+                .padding(.leading, AppDesign.Menu.dividerInset)
             appIconCard
         }
         .profileSettingsSurface()

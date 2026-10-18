@@ -1,26 +1,6 @@
 import SwiftUI
 import UIKit
 
-/// Coordinate space the launch intro and the real header share. If the root
-/// has already supplied a preference, the intro can dock to that exact frame;
-/// cold launch uses the authored inset until the preference exists.
-enum LaunchIntroDockSpace {
-    static let name = "launchIntroDock"
-}
-
-/// The real header wordmark's on-screen frame, when the root has supplied it.
-/// During cold launch this is `.zero`, and the choreography's safe authored
-/// inset keeps the docking pose stable before root preferences exist.
-struct HeaderWordmarkFrameKey: PreferenceKey {
-    static let defaultValue: CGRect = .zero
-
-    static func reduce(value: inout CGRect, nextValue: () -> CGRect) {
-        let next = nextValue()
-        guard next != .zero else { return }
-        value = next
-    }
-}
-
 /// Roam's launch sequence.
 ///
 /// A road draws itself across the canvas with a lit head running along it,
@@ -33,10 +13,6 @@ struct LaunchIntroView: View {
     /// Signals that this visual generation has completed (or was skipped).
     /// Readiness and root handoff belong to `RoamApp`'s launch gate.
     let onVisualComplete: () -> Void
-    /// The real header wordmark's live on-screen frame, when available. On a
-    /// cold launch it is `.zero`, so docking uses the same authored safe inset
-    /// as the header until its preference data exists.
-    let dockTargetFrame: CGRect
     /// The intro remains on screen after its authored beat when services are
     /// still bootstrapping. This state is also exposed to VoiceOver.
     let isWaitingForBootstrap: Bool
@@ -48,11 +24,9 @@ struct LaunchIntroView: View {
     @State private var hasSignaledVisualCompletion = false
     @State private var isGlobeIntroActive = false
     @State private var isGlobeWordmarkVisible = false
-    @State private var isWordmarkDocked = false
     @State private var wordmarkWidth: CGFloat = 0
     @State private var wordmarkSliceProgress: Double = 0
     @State private var handOffTask: Task<Void, Never>?
-    @State private var coldDockTargetFrame: CGRect = .zero
 
     private var choreography: LaunchIntroChoreography.Type { LaunchIntroChoreography.self }
 
@@ -95,27 +69,6 @@ struct LaunchIntroView: View {
                 }
             }
         }
-        .overlay(alignment: .top) {
-            HStack {
-                BrandWordmark(compact: true)
-                    .background {
-                        GeometryReader { proxy in
-                            Color.clear.preference(
-                                key: ColdDockFrameKey.self,
-                                value: proxy.frame(in: .named(LaunchIntroDockSpace.name))
-                            )
-                        }
-                    }
-                Spacer(minLength: 0)
-            }
-            .frame(minHeight: 44)
-            .padding(.horizontal, 20)
-            .padding(.vertical, 4)
-            .frame(maxWidth: .infinity)
-            .hidden()
-            .allowsHitTesting(false)
-            .accessibilityHidden(true)
-        }
         // Nobody should be held hostage by a brand moment. A tap finishes it.
         .contentShape(Rectangle())
         .onTapGesture(perform: handOff)
@@ -127,7 +80,6 @@ struct LaunchIntroView: View {
             guard wordmarkWidth == 0, width > 0 else { return }
             wordmarkWidth = width
         }
-        .onPreferenceChange(ColdDockFrameKey.self) { coldDockTargetFrame = $0 }
         .task { await start() }
         .onDisappear {
             handOffTask?.cancel()
@@ -145,44 +97,24 @@ struct LaunchIntroView: View {
 
     // MARK: - Layers
 
-    /// The wordmark arrives large and centered above the still-turning globe,
-    /// holds for a beat, then glides down to the top-left corner it occupies
-    /// everywhere else in the app — so the intro hands the brand over to the
-    /// header instead of cutting to it. The globe's own fade to canvas color
-    /// dims it out from underneath as the mark lands.
+    /// The hero mark stays centered above the globe until the intro fades.
     private var globeWordmarkOverlay: some View {
         GeometryReader { geometry in
-            let localFrame = geometry.frame(in: .named(LaunchIntroDockSpace.name))
-            let targetFrame = dockTargetFrame == .zero ? coldDockTargetFrame : dockTargetFrame
             let origin = choreography.wordmarkOrigin(
-                docked: isWordmarkDocked,
                 screenWidth: Double(geometry.size.width),
                 screenHeight: Double(geometry.size.height),
-                wordmarkWidth: Double(wordmarkWidth),
-                measuredDockedTarget: targetFrame == .zero
-                    ? nil
-                    : IntroPoint(
-                        x: targetFrame.origin.x - localFrame.origin.x,
-                        y: targetFrame.origin.y - localFrame.origin.y
-                    )
+                wordmarkWidth: Double(wordmarkWidth)
             )
 
             introWordmark
-                .scaleEffect(
-                    isWordmarkDocked ? choreography.wordmarkDockedScale : 1,
-                    anchor: .topLeading
-                )
+                .blur(radius: isGlobeWordmarkVisible ? 0 : 5)
                 .offset(x: CGFloat(origin.x), y: CGFloat(origin.y))
                 .opacity(isGlobeWordmarkVisible ? 1 : 0)
         }
         .allowsHitTesting(false)
     }
 
-    /// Drawn once at hero size and rasterized, so the dock is a single GPU
-    /// transform on a finished image. Scaling `Text` itself re-lays out and
-    /// re-renders the glyphs on every frame, which is what makes the move
-    /// stutter; it also means the mark that lands in the corner was rendered
-    /// large and shrunk, never blown up.
+    /// Rasterize the resolved hero wordmark once for a smooth reveal.
     private var introWordmark: some View {
         RoamWordmark(
             fontSize: choreography.wordmarkHeroFontSize,
@@ -191,12 +123,11 @@ struct LaunchIntroView: View {
             reduceMotion: reduceMotion
         )
             .fixedSize()
+            .drawingGroup()
             .background(wordmarkWidthReader)
     }
 
-    /// The hero mark is centered by arithmetic rather than by layout, because
-    /// it has to end up left-aligned; that needs the mark's own width. Read
-    /// once — a width change arriving mid-glide would re-target the animation.
+    /// Read the hero width once to keep its centered placement stable.
     private var wordmarkWidthReader: some View {
         GeometryReader { proxy in
             Color.clear.preference(key: WordmarkWidthKey.self, value: proxy.size.width)
@@ -254,16 +185,6 @@ struct LaunchIntroView: View {
             }
             withAnimation(AppAnimation.wordmarkResolve) {
                 wordmarkSliceProgress = 1
-            }
-            try await Task.sleep(for: .seconds(choreography.wordmarkDockDelay - choreography.videoWordmarkDelay))
-            guard !hasSignaledVisualCompletion else { return }
-            // One animation drives both scale and offset, so the mark reads
-            // as a single object moving rather than a size change racing a
-            // position change.
-            withAnimation(
-                .timingCurve(0.32, 0, 0.16, 1, duration: choreography.wordmarkDockDuration)
-            ) {
-                isWordmarkDocked = true
             }
         } catch {
             return
@@ -334,15 +255,6 @@ private struct WordmarkWidthKey: PreferenceKey {
 
     static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
         value = max(value, nextValue())
-    }
-}
-
-private struct ColdDockFrameKey: PreferenceKey {
-    static let defaultValue: CGRect = .zero
-
-    static func reduce(value: inout CGRect, nextValue: () -> CGRect) {
-        let next = nextValue()
-        if next != .zero { value = next }
     }
 }
 
@@ -526,7 +438,6 @@ private struct SweptWordmark: View {
 #Preview {
     LaunchIntroView(
         onVisualComplete: {},
-        dockTargetFrame: .zero,
         isWaitingForBootstrap: false
     )
         .environmentObject(ThemeManager.shared)

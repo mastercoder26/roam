@@ -7,8 +7,10 @@ struct DriverProgressView: View {
     @ObservedObject private var theme = ThemeManager.shared
     @EnvironmentObject private var session: DriveSessionManager
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.showDriveTab) private var showDriveTab
     @State private var showsMeasurementDetails = false
+    @ScaledMetric(relativeTo: .largeTitle) private var scoreSize: CGFloat = 64
 
     private var summary: DriverProgressSummary {
         DriverProgressEngine.makeSummary(from: session.recordedDrives)
@@ -61,72 +63,60 @@ struct DriverProgressView: View {
                     }
                 }
                 .padding(.horizontal, AppDesign.contentPadding)
-                .padding(.vertical, 12)
+                .padding(.top, AppDesign.screenTopPadding)
+                .padding(.bottom, AppDesign.space24)
+                .frame(maxWidth: AppDesign.maximumContentWidth)
+                .frame(maxWidth: .infinity)
             }
-            .safeAreaPadding(.bottom, AppDesign.tabBarClearance)
+            .contentMargins(.bottom, AppDesign.tabBarClearance, for: .scrollContent)
             .background(AppCanvasBackground())
             .toolbar(.hidden, for: .navigationBar)
         }
     }
 
     private var overallScoreCard: some View {
-        VStack(alignment: .leading, spacing: AppDesign.space12) {
-            HStack(alignment: .top, spacing: 12) {
-                Image(systemName: "steeringwheel.and.heat.waves")
-                    .font(.title3.weight(.semibold))
-                    .foregroundStyle(AppDesign.primarySurfaceForeground)
-                    .frame(width: 42, height: 42)
-                    .background(AppDesign.primarySurfaceForeground.opacity(0.14), in: RoundedRectangle(cornerRadius: AppDesign.cornerRadiusSmall, style: .continuous))
-
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("Overall driving score")
-                        .font(.headline)
-                        .foregroundStyle(AppDesign.primarySurfaceForeground)
-                    Text(performance.evidence.title)
-                        .font(.footnote.weight(.semibold))
-                        .foregroundStyle(AppDesign.primarySurfaceForeground.opacity(0.7))
-                }
-                Spacer(minLength: 8)
-
-                if let score = performance.score {
-                    HStack(alignment: .firstTextBaseline, spacing: 2) {
-                        Text("\(score)")
-                            .font(.system(size: 40, weight: .bold, design: .rounded))
-                            .tracking(-1)
-                            .monospacedDigit()
-                            .foregroundStyle(AppDesign.primarySurfaceForeground)
-                        Text("/100")
-                            .font(.caption.weight(.medium))
-                            .foregroundStyle(AppDesign.primarySurfaceForeground.opacity(0.62))
-                    }
-                    .accessibilityLabel("Overall driving score \(score) out of 100")
-                }
-            }
+        VStack(alignment: .leading, spacing: AppDesign.space16) {
+            Text("Overall driving score")
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(AppDesign.Ink.secondary)
 
             if let score = performance.score {
-                ProgressView(value: Double(score), total: 100)
-                    .tint(AppDesign.primarySurfaceForeground)
-                    .accessibilityHidden(true)
+                HStack(alignment: .firstTextBaseline, spacing: AppDesign.space8) {
+                    Text("\(score)")
+                        .font(.system(size: min(scoreSize, 112), weight: .semibold))
+                        .tracking(-2)
+                        .monospacedDigit()
+                        .minimumScaleFactor(0.7)
+                    Text("/ 100")
+                        .font(.body)
+                        .foregroundStyle(AppDesign.Ink.secondary)
+                }
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("Overall driving score \(score) out of 100")
 
-                ViewThatFits(in: .horizontal) {
-                    HStack(spacing: 10) {
+                if dynamicTypeSize.isAccessibilitySize {
+                    VStack(alignment: .leading, spacing: AppDesign.space8) {
                         performanceSignals
                     }
-                    VStack(alignment: .leading, spacing: 8) {
+                } else {
+                    HStack(alignment: .top, spacing: AppDesign.space12) {
                         performanceSignals
                     }
                 }
+            } else {
+                Text(performance.evidence.title)
+                    .font(.title2.weight(.semibold))
+                    .fixedSize(horizontal: false, vertical: true)
             }
 
             Text(performance.detail)
                 .font(.footnote)
-                .foregroundStyle(AppDesign.primarySurfaceForeground.opacity(0.68))
+                .foregroundStyle(AppDesign.Ink.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
-        .padding(AppDesign.cardPadding)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(AppDesign.Ink.primary, in: RoundedRectangle(cornerRadius: AppDesign.cornerRadiusLarge, style: .continuous))
-        .elevation(AppDesign.Elevation.hero)
+        .foregroundStyle(AppDesign.Ink.primary)
+        .heroCard()
+        .accessibilityIdentifier("progress.overallScore")
     }
 
     @ViewBuilder
@@ -149,12 +139,6 @@ struct DriverProgressView: View {
 
     private var emptyEvidenceState: some View {
         VStack(alignment: .leading, spacing: AppDesign.space12) {
-            Image(systemName: "chart.line.uptrend.xyaxis")
-                .font(.system(size: 28, weight: .semibold))
-                .foregroundStyle(AppDesign.accent)
-                .frame(width: 52, height: 52)
-                .background(AppDesign.accent.opacity(0.12), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-
             Text("No recorded evidence yet")
                 .font(.headline)
             Text("Complete a drive with usable GPS and motion to start building history.")
@@ -176,13 +160,6 @@ struct DriverProgressView: View {
             .buttonStyle(PressableScaleStyle())
             .accessibilityHint("Opens the Drive tab")
         }
-        .background(
-            PastelBackdrop(
-                imageName: "PastelProgressEmpty",
-                fullBleed: false,
-                cardOutset: AppDesign.cardPadding
-            )
-        )
         .premiumCard()
     }
 
@@ -193,9 +170,9 @@ struct DriverProgressView: View {
             HStack(alignment: .top, spacing: AppDesign.space12) {
                 Image(systemName: coaching.focus.symbol)
                     .font(.title3.weight(.semibold))
-                    .foregroundStyle(AppDesign.accentForeground)
-                    .frame(width: 46, height: 46)
-                    .background(AppDesign.accent, in: RoundedRectangle(cornerRadius: AppDesign.cornerRadiusSmall, style: .continuous))
+                    .foregroundStyle(AppDesign.accent)
+                    .frame(width: 42, height: 42)
+                    .background(AppDesign.accent.opacity(0.12), in: RoundedRectangle(cornerRadius: AppDesign.cornerRadiusSmall, style: .continuous))
 
                 VStack(alignment: .leading, spacing: AppDesign.space4) {
                     Text(coaching.focus.title)
@@ -216,8 +193,8 @@ struct DriverProgressView: View {
                     .font(.subheadline.weight(.semibold))
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 12)
-                    .foregroundStyle(AppDesign.accentForeground)
-                    .background(AppDesign.accent, in: RoundedRectangle(cornerRadius: AppDesign.cornerRadiusSmall, style: .continuous))
+                    .foregroundStyle(AppDesign.Ink.primary)
+                    .background(AppDesign.trackSurface, in: Capsule())
             }
             .buttonStyle(PressableScaleStyle())
             .accessibilityHint("Opens the Drive tab with this coaching focus in mind")
@@ -447,15 +424,15 @@ private struct ProgressScoreSignal: View {
         VStack(alignment: .leading, spacing: 2) {
             Text(value)
                 .font(.caption.weight(.bold).monospacedDigit())
-                .foregroundStyle(AppDesign.primarySurfaceForeground)
+                .foregroundStyle(AppDesign.Ink.primary)
             Text(label)
                 .font(.caption2)
-                .foregroundStyle(AppDesign.primarySurfaceForeground.opacity(0.62))
+                .foregroundStyle(AppDesign.Ink.secondary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
-        .background(AppDesign.primarySurfaceForeground.opacity(0.10), in: RoundedRectangle(cornerRadius: AppDesign.cornerRadiusTiny, style: .continuous))
+        .background(AppDesign.Ink.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: AppDesign.cornerRadiusTiny, style: .continuous))
         .accessibilityElement(children: .combine)
     }
 }

@@ -153,28 +153,17 @@ enum LaunchIntroChoreography {
 
     /// The clip's own timing, mirrored from `tools/intro-render/capture.mjs`.
     /// The wordmark beats are placed against it: the mark arrives while the
-    /// globe is fully lit, and finishes docking as the clip fades to canvas.
-    static let videoDuration: TimeInterval = 2.4
+    /// globe is fully lit, then stays centered as the clip fades to canvas.
+    static let videoDuration: TimeInterval = 2.15
     static let videoGlobeSettledAt: TimeInterval = 0.34
-    static let videoFadeStartsAt: TimeInterval = 2.02
+    static let videoFadeStartsAt: TimeInterval = 1.78
 
     /// How long after the globe clip starts before the wordmark fades in
     /// above it, large and centered.
-    static let videoWordmarkDelay: TimeInterval = 0.6
-    static let videoWordmarkFadeDuration: TimeInterval = 0.45
-    /// A beat at hero size, so the big mark reads before it moves.
-    static let wordmarkHeroHoldDuration: TimeInterval = 0.45
-    /// The glide from above-the-globe to the top-left corner it occupies
-    /// everywhere else in the app.
-    static let wordmarkDockDuration: TimeInterval = 0.7
-    /// A short beat with the docked wordmark alone on the now-solid canvas
-    /// before handing off, so it reads rather than flashing past.
-    static let videoWordmarkHoldDuration: TimeInterval = 0.5
-
-    /// When the dock glide begins, measured from the start of the clip.
-    static var wordmarkDockDelay: TimeInterval {
-        videoWordmarkDelay + videoWordmarkFadeDuration + wordmarkHeroHoldDuration
-    }
+    static let videoWordmarkDelay: TimeInterval = 0.48
+    static let videoWordmarkFadeDuration: TimeInterval = 0.32
+    /// A short beat with the centered wordmark on the canvas before handoff.
+    static let videoWordmarkHoldDuration: TimeInterval = 0.12
 
     // MARK: - Globe motion
 
@@ -228,43 +217,18 @@ enum LaunchIntroChoreography {
 
     // MARK: - Wordmark placement
 
-    /// The mark is *drawn* at hero size and scaled down to dock, never up.
-    /// Rasterizing at the larger of the two sizes is what keeps the docked
-    /// mark crisp, and scaling a fixed raster is what keeps the glide smooth —
-    /// re-laying out text at a new size every frame is not.
     static let wordmarkHeroFontSize: Double = 72
-    /// Matches `BrandWordmark(compact:)`, so the mark lands at exactly the
-    /// size the app's own header wears.
-    static let wordmarkDockedFontSize: Double = 23
-    static var wordmarkDockedScale: Double { wordmarkDockedFontSize / wordmarkHeroFontSize }
-
-    /// Where the docked mark sits, inset from the safe area's top left — the
-    /// same inset the app's header uses.
-    static let wordmarkDockedInset = IntroPoint(x: 24, y: 20)
-    /// Vertical placement of the hero mark, as a fraction of screen height.
-    /// High enough to sit clear above the centered globe.
+    /// Keep the hero above the centered globe throughout the intro.
     static let wordmarkHeroTopFraction: Double = 0.12
+    static let wordmarkHorizontalInset: Double = 24
 
-    /// Top-left origin of the wordmark for the current phase. `wordmarkWidth`
-    /// is the mark's width as drawn — i.e. at hero size — and scaling is
-    /// anchored at the same top-left corner this origin places.
-    ///
-    /// `measuredDockedTarget`, when supplied, is the real header wordmark's
-    /// on-screen frame (read live via a preference from `RoamRootView`, which
-    /// sits behind the intro the whole time) — so the docked mark lands in
-    /// its exact usual spot instead of an inset that has to be kept in sync
-    /// by hand whenever the header's own padding changes.
     static func wordmarkOrigin(
-        docked: Bool,
         screenWidth: Double,
         screenHeight: Double,
-        wordmarkWidth: Double,
-        measuredDockedTarget: IntroPoint? = nil
+        wordmarkWidth: Double
     ) -> IntroPoint {
-        guard !docked else { return measuredDockedTarget ?? wordmarkDockedInset }
-
-        return IntroPoint(
-            x: max(wordmarkDockedInset.x, (screenWidth - wordmarkWidth) / 2),
+        IntroPoint(
+            x: max(wordmarkHorizontalInset, (screenWidth - wordmarkWidth) / 2),
             y: screenHeight * wordmarkHeroTopFraction
         )
     }

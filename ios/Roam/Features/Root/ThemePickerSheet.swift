@@ -7,24 +7,16 @@ struct ThemePickerSheet: View {
     @EnvironmentObject private var driveSession: DriveSessionManager
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     private var canChangeTheme: Bool {
         !driveSession.isRecording
     }
 
-    private var usesAccessibilityText: Bool {
-        dynamicTypeSize.isAccessibilitySize
-    }
-
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 14) {
-                    Text("Color schemes")
-                        .font(.title2.weight(.bold))
-                        .foregroundStyle(AppDesign.Ink.primary)
-                    Text("Tap Roam anytime to change the look.")
+                VStack(alignment: .leading, spacing: AppDesign.space12) {
+                    Text("Choose the colors that feel right for you.")
                         .font(.footnote)
                         .foregroundStyle(AppDesign.Ink.secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -38,13 +30,27 @@ struct ThemePickerSheet: View {
                             .background(AppDesign.safety.opacity(0.12), in: RoundedRectangle(cornerRadius: AppDesign.cornerRadiusSmall, style: .continuous))
                     }
 
-                    ForEach(ThemeID.allCases) { themeID in
-                        themeRow(themeID)
+                    VStack(spacing: 0) {
+                        ForEach(ThemeID.allCases) { themeID in
+                            themeRow(themeID)
+                            if themeID != ThemeID.allCases.last {
+                                Divider()
+                                    .padding(.leading, 80)
+                            }
+                        }
                     }
+                    .menuSurface()
                 }
-                .padding(20)
+                .padding(.horizontal, AppDesign.contentPadding)
+                .padding(.top, AppDesign.space16)
+                .padding(.bottom, AppDesign.space24)
+                .frame(maxWidth: AppDesign.maximumContentWidth)
+                .frame(maxWidth: .infinity)
             }
             .background(AppDesign.canvas.ignoresSafeArea())
+            .navigationTitle("Color scheme")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbarColorScheme(themeManager.preferredColorScheme, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Done") { dismiss() }
@@ -52,8 +58,9 @@ struct ThemePickerSheet: View {
                 }
             }
         }
-        .presentationDetents([.medium, .large])
+        .presentationDetents([.large])
         .presentationDragIndicator(.visible)
+        .preferredColorScheme(themeManager.preferredColorScheme)
         .environmentObject(driveSession)
     }
 
@@ -68,18 +75,8 @@ struct ThemePickerSheet: View {
                 themeManager.select(themeID)
             }
         } label: {
-            themeRowContent(themeID, palette: palette, isSelected: isSelected)
-            .padding(14)
-            .background(
-                RoundedRectangle(cornerRadius: AppDesign.cornerRadius, style: .continuous)
-                    .fill(AppDesign.cardSurface)
-            )
-            .overlay {
-                RoundedRectangle(cornerRadius: AppDesign.cornerRadius, style: .continuous)
-                    .stroke(
-                        isSelected ? AppDesign.accent.opacity(0.45) : AppDesign.cardStroke,
-                        lineWidth: isSelected ? 1.5 : 1
-                    )
+            AppSelectionRow(title: themeID.title, detail: themeID.subtitle, isSelected: isSelected) {
+                themeSwatch(palette)
             }
             .opacity(canChangeTheme || isSelected ? 1 : 0.55)
         }
@@ -88,52 +85,6 @@ struct ThemePickerSheet: View {
         .accessibilityLabel(themeID.title)
         .accessibilityValue(isSelected ? "Selected" : "Not selected")
         .accessibilityHint(canChangeTheme ? themeID.subtitle : "Unavailable while a drive is in progress")
-    }
-
-    @ViewBuilder
-    private func themeRowContent(
-        _ themeID: ThemeID,
-        palette: ThemePalette,
-        isSelected: Bool
-    ) -> some View {
-        if usesAccessibilityText {
-            VStack(alignment: .leading, spacing: 10) {
-                HStack(alignment: .top, spacing: 14) {
-                    themeSwatch(palette)
-                    themeCopy(themeID)
-                }
-
-                Label(
-                    isSelected ? "Selected" : "Select this color scheme",
-                    systemImage: isSelected ? "checkmark.circle.fill" : "circle"
-                )
-                .font(.footnote.weight(.semibold))
-                .foregroundStyle(isSelected ? AppDesign.accent : AppDesign.Ink.secondary)
-            }
-        } else {
-            HStack(spacing: 14) {
-                themeSwatch(palette)
-                themeCopy(themeID)
-                Spacer(minLength: 8)
-                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                    .font(.title3)
-                    .foregroundStyle(isSelected ? AppDesign.accent : AppDesign.Ink.tertiary)
-            }
-        }
-    }
-
-    private func themeCopy(_ themeID: ThemeID) -> some View {
-        VStack(alignment: .leading, spacing: 3) {
-            Text(themeID.title)
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(AppDesign.Ink.primary)
-            Text(themeID.subtitle)
-                .font(.caption)
-                .foregroundStyle(AppDesign.Ink.secondary)
-                .multilineTextAlignment(.leading)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func themeSwatch(_ palette: ThemePalette) -> some View {

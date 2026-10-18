@@ -2,21 +2,14 @@ import SwiftUI
 import UIKit
 
 struct AppIconPickerSheet: View {
+    @ObservedObject private var theme = ThemeManager.shared
     @ObservedObject var iconManager: AppIconManager
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-
-    private var usesAccessibilityText: Bool {
-        dynamicTypeSize.isAccessibilitySize
-    }
 
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 14) {
-                    Text("App icon")
-                        .font(.title2.weight(.bold))
-                        .foregroundStyle(AppDesign.Ink.primary)
+                VStack(alignment: .leading, spacing: AppDesign.space12) {
                     Text("Pick the icon shown on your Home Screen.")
                         .font(.footnote)
                         .foregroundStyle(AppDesign.Ink.secondary)
@@ -38,13 +31,26 @@ struct AppIconPickerSheet: View {
                             .background(AppDesign.danger.opacity(0.12), in: RoundedRectangle(cornerRadius: AppDesign.cornerRadiusSmall, style: .continuous))
                     }
 
-                    ForEach(AppIconID.allCases) { iconID in
-                        iconRow(iconID)
+                    VStack(spacing: 0) {
+                        ForEach(AppIconID.allCases) { iconID in
+                            iconRow(iconID)
+                            if iconID != AppIconID.allCases.last {
+                                Divider()
+                                    .padding(.leading, 80)
+                            }
+                        }
                     }
+                    .menuSurface()
                 }
-                .padding(20)
+                .padding(.horizontal, AppDesign.contentPadding)
+                .padding(.top, AppDesign.space16)
+                .padding(.bottom, AppDesign.space24)
+                .frame(maxWidth: AppDesign.maximumContentWidth)
+                .frame(maxWidth: .infinity)
             }
             .background(AppDesign.canvas.ignoresSafeArea())
+            .navigationTitle("App icon")
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Done") { dismiss() }
@@ -52,7 +58,7 @@ struct AppIconPickerSheet: View {
                 }
             }
         }
-        .presentationDetents([.medium, .large])
+        .presentationDetents([.large])
         .presentationDragIndicator(.visible)
     }
 
@@ -65,19 +71,9 @@ struct AppIconPickerSheet: View {
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
             iconManager.select(iconID)
         } label: {
-            iconRowContent(iconID, isSelected: isSelected)
-                .padding(14)
-                .background(
-                    RoundedRectangle(cornerRadius: AppDesign.cornerRadius, style: .continuous)
-                        .fill(AppDesign.cardSurface)
-                )
-                .overlay {
-                    RoundedRectangle(cornerRadius: AppDesign.cornerRadius, style: .continuous)
-                        .stroke(
-                            isSelected ? AppDesign.accent.opacity(0.45) : AppDesign.cardStroke,
-                            lineWidth: isSelected ? 1.5 : 1
-                        )
-                }
+            AppSelectionRow(title: iconID.title, detail: iconID.subtitle, isSelected: isSelected) {
+                iconThumbnail(iconID)
+            }
                 .opacity(canSelect || isSelected ? 1 : 0.55)
         }
         .buttonStyle(PressableScaleStyle())
@@ -85,48 +81,6 @@ struct AppIconPickerSheet: View {
         .accessibilityLabel(iconID.title)
         .accessibilityValue(isSelected ? "Selected" : "Not selected")
         .accessibilityHint(canSelect ? iconID.subtitle : "Unavailable on this device")
-    }
-
-    @ViewBuilder
-    private func iconRowContent(_ iconID: AppIconID, isSelected: Bool) -> some View {
-        if usesAccessibilityText {
-            VStack(alignment: .leading, spacing: 10) {
-                HStack(alignment: .top, spacing: 14) {
-                    iconThumbnail(iconID)
-                    iconCopy(iconID)
-                }
-
-                Label(
-                    isSelected ? "Selected" : "Select this icon",
-                    systemImage: isSelected ? "checkmark.circle.fill" : "circle"
-                )
-                .font(.footnote.weight(.semibold))
-                .foregroundStyle(isSelected ? AppDesign.accent : AppDesign.Ink.secondary)
-            }
-        } else {
-            HStack(spacing: 14) {
-                iconThumbnail(iconID)
-                iconCopy(iconID)
-                Spacer(minLength: 8)
-                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                    .font(.title3)
-                    .foregroundStyle(isSelected ? AppDesign.accent : AppDesign.Ink.tertiary)
-            }
-        }
-    }
-
-    private func iconCopy(_ iconID: AppIconID) -> some View {
-        VStack(alignment: .leading, spacing: 3) {
-            Text(iconID.title)
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(AppDesign.Ink.primary)
-            Text(iconID.subtitle)
-                .font(.caption)
-                .foregroundStyle(AppDesign.Ink.secondary)
-                .multilineTextAlignment(.leading)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func iconThumbnail(_ iconID: AppIconID) -> some View {

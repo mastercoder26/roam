@@ -95,7 +95,7 @@ struct HomeView: View {
                         VStack(alignment: .leading, spacing: AppDesign.space16) {
                             routeCard
                             mapPreviewSection
-                            if let mapPreview {
+                            if planningStage == .readyToAnalyze, let mapPreview {
                                 mapSummaryRow(mapPreview)
                                     .transition(.opacity)
                             }
@@ -116,12 +116,14 @@ struct HomeView: View {
 
                         routeChecksSection
                     }
-                    .padding(.horizontal, AppDesign.space20)
-                    .padding(.top, AppDesign.space8)
-                    // Extra clearance so "What Roam checks" clears the floating tab bar.
-                    .padding(.bottom, AppDesign.tabBarClearance)
+                    .padding(.horizontal, AppDesign.contentPadding)
+                    .padding(.top, AppDesign.screenTopPadding)
+                    .padding(.bottom, AppDesign.space24)
+                    .frame(maxWidth: AppDesign.maximumContentWidth)
+                    .frame(maxWidth: .infinity)
                 }
                 .scrollDismissesKeyboard(.interactively)
+                .contentMargins(.bottom, AppDesign.tabBarClearance, for: .scrollContent)
                 .disabled(isLoading)
                 if isLoading {
                     RouteAnalysisLoadingView(isFinishing: isCompletingLoading) { completeLoading() }
@@ -168,10 +170,6 @@ struct HomeView: View {
         }
     }
 
-    private var routeSurface: Color {
-        AppDesign.cardSurface
-    }
-
     private var headerSection: some View {
         ScreenHeader(title: "Where to?")
     }
@@ -189,12 +187,7 @@ struct HomeView: View {
             }
         }
         .padding(.vertical, AppDesign.space8)
-        .background(routeSurface)
-        .clipShape(RoundedRectangle(cornerRadius: AppDesign.cornerRadiusLarge, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: AppDesign.cornerRadiusLarge, style: .continuous)
-                .stroke(AppDesign.cardStrokeStrong, lineWidth: 0.5)
-        }
+        .featuredSurface()
         .overlay(alignment: .trailing) {
             if canSwapEndpoints {
                 Button(action: swapEndpoints) {
@@ -215,7 +208,6 @@ struct HomeView: View {
                 .accessibilityLabel("Swap starting location and destination")
             }
         }
-        .elevation(AppDesign.Elevation.low)
         .animation(reduceMotion ? .easeOut(duration: 0.16) : AppAnimation.selection, value: canSwapEndpoints)
     }
 
@@ -366,9 +358,8 @@ struct HomeView: View {
     }
 
     private func routeFieldLabel(_ value: String) -> some View {
-        Text(value)
-            .font(AppDesign.Typography.microLabel)
-            .tracking(1.1)
+        Text(value.capitalized)
+            .font(.caption.weight(.medium))
             .foregroundStyle(AppDesign.Ink.label)
     }
 
@@ -386,24 +377,45 @@ struct HomeView: View {
     }
 
     private var mapPreviewSection: some View {
-        RoutePlanningMapPreview(
-            origin: form.origin,
-            destination: form.destination,
-            usesCurrentLocation: form.usesCurrentLocation,
-            showsCurrentLocation: shouldShowCurrentLocationOnMap,
-            summary: $mapPreview
-        )
-        .allowsHitTesting(mapPreview != nil)
-        .frame(height: 250)
-        .background(AppDesign.cardSurfaceElevated)
+        Group {
+            if planningStage == .readyToAnalyze {
+                RoutePlanningMapPreview(
+                    origin: form.origin,
+                    destination: form.destination,
+                    usesCurrentLocation: form.usesCurrentLocation,
+                    showsCurrentLocation: shouldShowCurrentLocationOnMap,
+                    summary: $mapPreview
+                )
+                .allowsHitTesting(mapPreview != nil)
+                .frame(height: 230)
+                .accessibilityLabel(mapPreviewAccessibilityLabel)
+                .accessibilityHint(mapPreview == nil ? "Preparing your route preview" : "Pan or zoom to inspect the route")
+            } else {
+                VStack(spacing: AppDesign.space8) {
+                    Image(systemName: "map")
+                        .font(.system(size: 24))
+                        .foregroundStyle(AppDesign.Ink.secondary)
+                        .accessibilityHidden(true)
+                    Text("Route preview")
+                        .font(.headline)
+                        .foregroundStyle(AppDesign.Ink.primary)
+                    Text("Add your start and destination to see your route.")
+                        .font(.footnote)
+                        .foregroundStyle(AppDesign.Ink.secondary)
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(AppDesign.cardPadding)
+                .frame(maxWidth: .infinity, minHeight: 148)
+                .accessibilityElement(children: .combine)
+            }
+        }
+        .background(AppDesign.cardSurface)
         .clipShape(RoundedRectangle(cornerRadius: AppDesign.cornerRadiusLarge, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: AppDesign.cornerRadiusLarge, style: .continuous)
-                .stroke(AppDesign.cardStroke, lineWidth: 0.5)
+                .strokeBorder(AppDesign.cardStroke, lineWidth: 0.5)
         }
-        .elevation(AppDesign.Elevation.medium)
-        .accessibilityLabel(mapPreviewAccessibilityLabel)
-        .accessibilityHint(mapPreview == nil ? "Enter a route to preview it" : "Pan or zoom to inspect the route")
     }
 
     private func mapSummaryRow(_ summary: RoutePlanningMapSummary) -> some View {
@@ -523,7 +535,7 @@ struct HomeView: View {
                 if isLoading {
                     ProgressView()
                         .tint(AppDesign.Ink.tertiary)
-                } else {
+                } else if primaryAction == .signIn {
                     Image(systemName: primaryActionSymbol)
                 }
                 Text(primaryActionTitle)
@@ -589,39 +601,15 @@ struct HomeView: View {
         Button {
             showingHowRoamWorks = true
         } label: {
-            HStack(spacing: 14) {
-                Image(systemName: "info.circle")
-                    .font(.body.weight(.semibold))
-                    .foregroundStyle(AppDesign.accent)
-                    .frame(width: 40, height: 40)
-                    .background(AppDesign.accent.opacity(0.12), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-
-                Text("How Roam works")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(AppDesign.Ink.primary)
-
-                Spacer(minLength: AppDesign.space8)
-
-                Text("8 factors")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(AppDesign.Ink.secondary)
-
-                Image(systemName: "chevron.right")
-                    .font(.caption.weight(.bold))
-                    .foregroundStyle(AppDesign.Ink.tertiary)
-            }
-            .padding(.horizontal, AppDesign.space16)
-            .padding(.vertical, CGFloat(HowRoamWorksLayoutSpec.entryRowVerticalPadding))
-            .contentShape(Rectangle())
+            AppMenuRow(
+                title: "How Roam works",
+                subtitle: "Route scores, recorded drives, and your data",
+                symbol: "info.circle"
+            )
         }
         .buttonStyle(PressableScaleStyle())
-        .background(AppDesign.cardSurface, in: RoundedRectangle(cornerRadius: AppDesign.cornerRadius, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: AppDesign.cornerRadius, style: .continuous)
-                .stroke(AppDesign.cardStroke, lineWidth: 0.75)
-        }
-        .padding(.top, AppDesign.space4)
-        .padding(.bottom, AppDesign.space8)
+        .menuSurface()
+        .accessibilityIdentifier("routes.howRoamWorks")
         .accessibilityHint("Shows route inputs, scoring, privacy, and limitations")
     }
 
@@ -671,7 +659,7 @@ struct HomeView: View {
             .accessibilityLabel("Dismiss imported route notice")
         }
         .padding(14)
-        .background(routeSurface, in: RoundedRectangle(cornerRadius: AppDesign.cornerRadius, style: .continuous))
+        .background(AppDesign.cardSurface, in: RoundedRectangle(cornerRadius: AppDesign.cornerRadius, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: AppDesign.cornerRadius, style: .continuous)
                 .stroke((notice.isError ? AppDesign.safety : AppDesign.accent).opacity(0.28), lineWidth: 1)

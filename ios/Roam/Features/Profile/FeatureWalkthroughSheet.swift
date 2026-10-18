@@ -41,13 +41,10 @@ struct FeatureWalkthroughSheet: View {
                         .background(AppDesign.canvas)
                 }
             }
-            .background(PastelBackdrop(imageName: "PastelWalkthroughBackdrop", scrimOpacity: 0.7))
+            .background(AppCanvasBackground())
+            .navigationTitle("Explore Roam")
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button("Skip") { dismiss() }
-                        .fontWeight(.semibold)
-                        .accessibilityIdentifier("walkthrough.skip")
-                }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Done") { dismiss() }
                         .fontWeight(.semibold)
@@ -74,43 +71,42 @@ struct FeatureWalkthroughSheet: View {
     }
 
     private func featureStory(step: FeatureWalkthroughStep, cardHeight: CGFloat) -> some View {
-        ZStack {
-            VStack(alignment: .leading, spacing: AppDesign.space20) {
-                Spacer(minLength: 200)
+        VStack(alignment: .leading, spacing: AppDesign.space20) {
+            Image(systemName: featureSymbol(for: step))
+                .font(.title2.weight(.medium))
+                .foregroundStyle(AppDesign.accent)
+                .frame(width: 52, height: 52)
+                .background(AppDesign.accent.opacity(0.12), in: RoundedRectangle(cornerRadius: AppDesign.cornerRadiusSmall, style: .continuous))
+                .accessibilityHidden(true)
 
-                VStack(alignment: .leading, spacing: AppDesign.space12) {
-                    Text(step.progressLabel.uppercased())
-                        .font(AppDesign.Typography.microLabel)
-                        .tracking(1.1)
-                        .foregroundStyle(.white.opacity(0.75))
-
-                    Text(step.title)
-                        .font(AppDesign.Typography.display)
-                        .tracking(-0.9)
-                        .foregroundStyle(.white)
-                        .fixedSize(horizontal: false, vertical: true)
-
-                    Text(step.detail)
-                        .font(AppDesign.Typography.body)
-                        .foregroundStyle(.white.opacity(0.88))
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(AppDesign.space24)
-                .background(textBackdrop)
+            VStack(alignment: .leading, spacing: AppDesign.space12) {
+                Text(step.progressLabel)
+                    .font(.footnote)
+                    .foregroundStyle(AppDesign.Ink.secondary)
+                Text(step.title)
+                    .font(.title2.weight(.bold))
+                    .foregroundStyle(AppDesign.Ink.primary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text(step.detail)
+                    .font(.body)
+                    .foregroundStyle(AppDesign.Ink.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
-            .frame(maxWidth: .infinity, minHeight: cardHeight, alignment: .bottomLeading)
-            .background(walkthroughIllustration(for: step))
-            .id(step)
-            .zIndex(Double(FeatureWalkthroughStep.allCases.firstIndex(of: step) ?? 0) + 1)
-            .transition(storyTransition)
         }
-        .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 28, style: .continuous)
-                .strokeBorder(.white.opacity(0.12), lineWidth: 0.75)
-        }
+        .frame(maxWidth: .infinity, minHeight: min(cardHeight, 360), alignment: .topLeading)
+        .heroCard()
+        .id(step)
+        .transition(storyTransition)
         .accessibilityElement(children: .combine)
+    }
+
+    private func featureSymbol(for step: FeatureWalkthroughStep) -> String {
+        switch step {
+        case .plan: "map"
+        case .understand: "slider.horizontal.3"
+        case .drive: "steeringwheel"
+        case .grow: "chart.line.uptrend.xyaxis"
+        }
     }
 
     private var storyTransition: AnyTransition {
@@ -123,47 +119,6 @@ struct FeatureWalkthroughSheet: View {
         )
     }
 
-    private var textBackdrop: some View {
-        GeometryReader { geometry in
-            LinearGradient(
-                stops: [
-                    .init(color: .clear, location: 0),
-                    .init(color: .black.opacity(0.7), location: 64 / (geometry.size.height + 64)),
-                    .init(color: .black.opacity(0.85), location: 1),
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .frame(width: geometry.size.width, height: geometry.size.height + 64)
-            .offset(y: -64)
-        }
-        .accessibilityHidden(true)
-    }
-
-    private func artworkName(for step: FeatureWalkthroughStep) -> String {
-        switch step {
-        case .plan: "WalkthroughPlan"
-        case .understand: "WalkthroughUnderstand"
-        case .drive: "WalkthroughDrive"
-        case .grow: "WalkthroughGrow"
-        }
-    }
-
-    private func walkthroughIllustration(for step: FeatureWalkthroughStep) -> some View {
-        GeometryReader { geometry in
-            ZStack {
-                Image(artworkName(for: step))
-                    .resizable()
-                    .scaledToFill()
-                    .frame(width: geometry.size.width, height: geometry.size.height)
-
-                Color.black.opacity(0.04)
-            }
-            .clipped()
-        }
-        .accessibilityHidden(true)
-    }
-
     private var primaryAction: some View {
         Button(action: advance) {
             HStack(spacing: AppDesign.space8) {
@@ -173,9 +128,9 @@ struct FeatureWalkthroughSheet: View {
             }
             .font(.body.weight(.semibold))
             .foregroundStyle(AppDesign.primarySurfaceForeground)
-            .padding(.horizontal, AppDesign.space16)
+            .padding(.horizontal, AppDesign.space20)
             .frame(maxWidth: .infinity, minHeight: 54)
-            .background(AppDesign.accent, in: RoundedRectangle(cornerRadius: AppDesign.cornerRadius, style: .continuous))
+            .background(AppDesign.Ink.primary, in: Capsule())
         }
         .buttonStyle(PressableScaleStyle())
         .accessibilityHint(currentStep.next == nil ? "Closes the Roam guide" : "Shows the next part of the Roam guide")

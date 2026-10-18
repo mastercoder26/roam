@@ -27,7 +27,8 @@ struct HowRoamWorksSheet: View {
                 .frame(maxWidth: CGFloat(HowRoamWorksLayoutSpec.maximumContentWidth))
                 .frame(maxWidth: .infinity)
             }
-            .background(PastelBackdrop(imageName: "PastelHowRoamWorks"))
+            .background(AppCanvasBackground())
+            .accessibilityIdentifier("howRoamWorks.content")
             .navigationTitle("How Roam works")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -50,12 +51,12 @@ struct HowRoamWorksSheet: View {
                 .background(AppDesign.accent.opacity(0.12), in: RoundedRectangle(cornerRadius: 15, style: .continuous))
 
             Text("Know what to expect")
-                .font(.title2.weight(.bold))
+                .font(.largeTitle.weight(.bold))
                 .tracking(-0.4)
                 .foregroundStyle(AppDesign.Ink.primary)
 
             Text("See the demanding parts of a route before you leave, then review your practice after each drive.")
-                .font(.subheadline)
+                .font(.body)
                 .foregroundStyle(AppDesign.Ink.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -71,20 +72,22 @@ struct HowRoamWorksSheet: View {
                     title: "Choose a route",
                     detail: "Enter your start, destination, and departure time."
                 )
-                Divider().padding(.leading, 52)
+                ExplanationDivider()
                 ProcessStepRow(
                     number: 2,
                     title: "Check the conditions",
                     detail: "See traffic, weather, daylight, and difficult turns."
                 )
-                Divider().padding(.leading, 52)
+                ExplanationDivider()
                 ProcessStepRow(
                     number: 3,
                     title: "Compare options",
                     detail: "Review the difficulty and alternatives before choosing."
                 )
             }
-            .premiumCard()
+            .padding(.horizontal, AppDesign.cardPadding)
+            .padding(.vertical, AppDesign.space4)
+            .menuSurface()
         }
     }
 
@@ -94,11 +97,10 @@ struct HowRoamWorksSheet: View {
                 ForEach(Array(factors.enumerated()), id: \.element.id) { index, factor in
                     RouteFactorRow(factor: factor)
                     if index < factors.count - 1 {
-                        Divider().padding(.leading, 52)
+                        ExplanationDivider()
                     }
                 }
             }
-            .premiumCard()
         }
     }
 
@@ -111,14 +113,14 @@ struct HowRoamWorksSheet: View {
                     symbol: "checkmark.seal.fill",
                     color: AppDesign.positive
                 )
-                Divider()
+                ExplanationDivider()
                 EvidenceLevelRow(
                     title: "Partial evidence",
                     detail: "Some data is missing. Check the gaps listed with the score.",
                     symbol: "circle.lefthalf.filled",
                     color: AppDesign.safety
                 )
-                Divider()
+                ExplanationDivider()
                 EvidenceLevelRow(
                     title: "Limited evidence",
                     detail: "Little route data is available. Treat the score as an early estimate.",
@@ -126,7 +128,6 @@ struct HowRoamWorksSheet: View {
                     color: AppDesign.Ink.secondary
                 )
             }
-            .premiumCard()
         }
     }
 
@@ -146,7 +147,6 @@ struct HowRoamWorksSheet: View {
                     .foregroundStyle(AppDesign.Ink.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            .premiumCard()
         }
     }
 
@@ -158,36 +158,35 @@ struct HowRoamWorksSheet: View {
                     detail: "GPS continuity, distance, speed, duration, and overlap with a planned practice route.",
                     symbol: "location.fill"
                 )
-                Divider().padding(.leading, 52)
+                ExplanationDivider()
                 RecordedSignalRow(
                     title: "Speed changes",
                     detail: "Measured changes in speed can identify rapid acceleration and hard braking events.",
                     symbol: "speedometer"
                 )
-                Divider().padding(.leading, 52)
+                ExplanationDivider()
                 RecordedSignalRow(
                     title: "Turning motion",
                     detail: "Motion and course changes can identify sharper cornering when sensor quality is sufficient.",
                     symbol: "arrow.turn.up.right"
                 )
-                Divider().padding(.leading, 52)
+                ExplanationDivider()
                 RecordedSignalRow(
                     title: "Experience coverage",
                     detail: "Qualifying miles can contribute to after-dark, faster-road, continuous-driving, and weekly progress totals.",
                     symbol: "chart.line.uptrend.xyaxis"
                 )
             }
-            .premiumCard()
         }
     }
 
     private var privacySection: some View {
         HowItWorksSection(title: "Your recorded drives") {
-            HStack(alignment: .top, spacing: AppDesign.space12) {
+            ExplanationRowLayout {
                 Image(systemName: "lock.shield.fill")
-                    .font(.title3.weight(.semibold))
+                    .font(.system(size: 20, weight: .semibold))
                     .foregroundStyle(AppDesign.accent)
-                    .frame(width: 40, height: 40)
+                    .frame(width: CGFloat(HowRoamWorksLayoutSpec.iconSize), height: CGFloat(HowRoamWorksLayoutSpec.iconSize))
                     .background(AppDesign.accent.opacity(0.12), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
 
                 VStack(alignment: .leading, spacing: AppDesign.space8) {
@@ -204,7 +203,6 @@ struct HowRoamWorksSheet: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
-            .premiumCard()
         }
     }
 
@@ -221,6 +219,9 @@ struct HowRoamWorksSheet: View {
 }
 
 private struct HowItWorksSection<Content: View>: View {
+    @ObservedObject private var theme = ThemeManager.shared
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var isExpanded = false
     let title: String
     var expandable = true
     @ViewBuilder var content: Content
@@ -228,14 +229,46 @@ private struct HowItWorksSection<Content: View>: View {
     @ViewBuilder
     var body: some View {
         if expandable {
-            DisclosureGroup {
-                content
-                    .padding(.top, AppDesign.space8)
-            } label: {
-                sectionTitle
-                    .frame(minHeight: 44, alignment: .leading)
+            VStack(alignment: .leading, spacing: 0) {
+                Button {
+                    withAnimation(reduceMotion ? .easeOut(duration: 0.15) : AppAnimation.selection) {
+                        isExpanded.toggle()
+                    }
+                } label: {
+                    HStack(spacing: AppDesign.space16) {
+                        Text(title)
+                            .font(.body.weight(.semibold))
+                            .foregroundStyle(AppDesign.Ink.primary)
+                            .multilineTextAlignment(.leading)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(AppDesign.Ink.tertiary)
+                            .rotationEffect(.degrees(isExpanded ? 180 : 0))
+                            .frame(width: 16, height: 24)
+                            .accessibilityHidden(true)
+                    }
+                    .padding(.horizontal, AppDesign.cardPadding)
+                    .padding(.vertical, AppDesign.Menu.rowPadding)
+                    .frame(minHeight: AppDesign.Menu.minimumRowHeight)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(PressableScaleStyle())
+                .accessibilityValue(isExpanded ? "Expanded" : "Collapsed")
+                .accessibilityHint(isExpanded ? "Hides this explanation" : "Shows this explanation")
+
+                if isExpanded {
+                    Divider().padding(.horizontal, AppDesign.cardPadding)
+                    content
+                        .padding(.horizontal, AppDesign.cardPadding)
+                        .padding(.top, AppDesign.space12)
+                        .padding(.bottom, AppDesign.space16)
+                        .transition(.opacity)
+                }
             }
-            .tint(AppDesign.Ink.secondary)
+            .menuSurface()
         } else {
             VStack(alignment: .leading, spacing: CGFloat(HowRoamWorksLayoutSpec.titleContentSpacing)) {
                 sectionTitle
@@ -252,19 +285,41 @@ private struct HowItWorksSection<Content: View>: View {
     }
 }
 
+/// Keep the copy in a full-width column when accessibility text is large.
+private struct ExplanationRowLayout<Content: View>: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        let layout = dynamicTypeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: AppDesign.space12))
+            : AnyLayout(HStackLayout(alignment: .top, spacing: AppDesign.space12))
+        layout { content }
+    }
+}
+
+private struct ExplanationDivider: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
+    var body: some View {
+        Divider()
+            .padding(.leading, dynamicTypeSize.isAccessibilitySize ? 0 : CGFloat(HowRoamWorksLayoutSpec.rowTextInset))
+    }
+}
+
 private struct RecordedSignalRow: View {
     let title: String
     let detail: String
     let symbol: String
 
     var body: some View {
-        HStack(alignment: .top, spacing: AppDesign.space12) {
+        ExplanationRowLayout {
             Image(systemName: symbol)
-                .font(.subheadline.weight(.semibold))
+                .font(.system(size: 17, weight: .semibold))
                 .foregroundStyle(AppDesign.Ink.secondary)
                 .frame(width: 36, height: 36)
                 .background(AppDesign.trackSurface, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: AppDesign.space4) {
                 Text(title)
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(AppDesign.Ink.primary)
@@ -274,6 +329,7 @@ private struct RecordedSignalRow: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.vertical, CGFloat(HowRoamWorksLayoutSpec.rowVerticalPadding))
         .accessibilityElement(children: .combine)
     }
@@ -285,14 +341,14 @@ private struct ProcessStepRow: View {
     let detail: String
 
     var body: some View {
-        HStack(alignment: .top, spacing: AppDesign.space12) {
+        ExplanationRowLayout {
             Text("\(number)")
-                .font(.subheadline.weight(.bold).monospacedDigit())
+                .font(.system(size: 16, weight: .bold).monospacedDigit())
                 .foregroundStyle(AppDesign.accentForeground)
-                .frame(width: 32, height: 32)
+                .frame(width: CGFloat(HowRoamWorksLayoutSpec.iconSize), height: CGFloat(HowRoamWorksLayoutSpec.iconSize))
                 .background(AppDesign.accent, in: Circle())
 
-            VStack(alignment: .leading, spacing: 3) {
+            VStack(alignment: .leading, spacing: AppDesign.space4) {
                 Text(title)
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(AppDesign.Ink.primary)
@@ -302,6 +358,7 @@ private struct ProcessStepRow: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.vertical, CGFloat(HowRoamWorksLayoutSpec.rowVerticalPadding))
         .accessibilityElement(children: .combine)
     }
@@ -329,14 +386,14 @@ private struct RouteFactorRow: View {
     let factor: RouteFactorExplanation
 
     var body: some View {
-        HStack(alignment: .top, spacing: AppDesign.space12) {
+        ExplanationRowLayout {
             Image(systemName: factor.symbol)
-                .font(.subheadline.weight(.semibold))
+                .font(.system(size: 17, weight: .semibold))
                 .foregroundStyle(AppDesign.accent)
                 .frame(width: 36, height: 36)
                 .background(AppDesign.accent.opacity(0.10), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
 
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: AppDesign.space4) {
                 Text(factor.title)
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(AppDesign.Ink.primary)
@@ -346,6 +403,7 @@ private struct RouteFactorRow: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.vertical, CGFloat(HowRoamWorksLayoutSpec.rowVerticalPadding))
         .accessibilityElement(children: .combine)
     }
@@ -358,11 +416,12 @@ private struct EvidenceLevelRow: View {
     let color: Color
 
     var body: some View {
-        HStack(alignment: .top, spacing: AppDesign.space12) {
+        ExplanationRowLayout {
             Image(systemName: symbol)
                 .foregroundStyle(color)
-                .frame(width: 24)
-            VStack(alignment: .leading, spacing: 2) {
+                .font(.system(size: 17, weight: .semibold))
+                .frame(width: CGFloat(HowRoamWorksLayoutSpec.iconSize), height: CGFloat(HowRoamWorksLayoutSpec.iconSize))
+            VStack(alignment: .leading, spacing: AppDesign.space4) {
                 Text(title).font(.subheadline.weight(.semibold))
                 Text(detail)
                     .font(.caption)
@@ -370,6 +429,7 @@ private struct EvidenceLevelRow: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.vertical, CGFloat(HowRoamWorksLayoutSpec.rowVerticalPadding))
         .accessibilityElement(children: .combine)
     }
@@ -381,19 +441,34 @@ private struct ScoreMeaningRow: View {
     let color: Color
 
     var body: some View {
-        HStack {
-            Text(range)
-                .font(.subheadline.weight(.semibold).monospacedDigit())
-                .foregroundStyle(AppDesign.Ink.primary)
-            Spacer()
-            Text(label)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(color)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 5)
-                .background(color.opacity(0.12), in: Capsule())
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: AppDesign.space12) {
+                rangeText.fixedSize()
+                Spacer(minLength: AppDesign.space12)
+                difficultyBadge.fixedSize()
+            }
+            VStack(alignment: .leading, spacing: AppDesign.space8) {
+                rangeText
+                difficultyBadge
+            }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .combine)
+    }
+
+    private var rangeText: some View {
+        Text(range)
+            .font(.subheadline.weight(.semibold).monospacedDigit())
+            .foregroundStyle(AppDesign.Ink.primary)
+    }
+
+    private var difficultyBadge: some View {
+        Text(label)
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(color)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+            .background(color.opacity(0.12), in: Capsule())
     }
 }
 
@@ -403,7 +478,7 @@ private struct LimitRow: View {
     var body: some View {
         HStack(alignment: .top, spacing: AppDesign.space8) {
             Image(systemName: "checkmark")
-                .font(.caption.weight(.bold))
+                .font(.system(size: 12, weight: .bold))
                 .foregroundStyle(AppDesign.Ink.secondary)
                 .frame(width: 18, height: 18)
             Text(text)

@@ -34,11 +34,6 @@ struct RoamApp: App {
     @State private var launchGate: LaunchReadinessGate
     @State private var visualGeneration: LaunchReadinessGate.VisualGeneration
     @State private var leftForegroundAt: Date?
-    /// The header frame is normally supplied by the root after handoff. The
-    /// intro therefore starts with `.zero`, which makes its choreography use
-    /// the authored inset until real preference data exists.
-    @State private var headerWordmarkFrame: CGRect = .zero
-
     init() {
         Clerk.configure(publishableKey: "pk_test_Y2FwYWJsZS1zd2FuLTM1LmNsZXJrLmFjY291bnRzLmRldiQ")
 
@@ -89,7 +84,6 @@ struct RoamApp: App {
             if presentation.showsIntro {
                 LaunchIntroView(
                     onVisualComplete: { finishIntro(for: visualGeneration) },
-                    dockTargetFrame: headerWordmarkFrame,
                     isWaitingForBootstrap: !hasBootstrapTerminalState
                 )
                 .environmentObject(themeManager)
@@ -100,8 +94,6 @@ struct RoamApp: App {
                 .zIndex(1)
             }
         }
-        .coordinateSpace(name: LaunchIntroDockSpace.name)
-        .onPreferenceChange(HeaderWordmarkFrameKey.self) { headerWordmarkFrame = $0 }
         .preferredColorScheme(themeManager.preferredColorScheme)
         .onOpenURL(perform: handleIncomingURL)
         .task {

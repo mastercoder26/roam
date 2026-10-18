@@ -66,15 +66,7 @@ struct RoamRootView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            if !driveSession.isRecording && selectedTab != .profile {
-                topBrandBar
-                    .transition(reduceMotion ? .opacity : .move(edge: .top).combined(with: .opacity))
-            }
-
-            // Keep the four destinations stable. The minimized iOS 26 bar can
-            // retain only the selected icon while a nested NavigationStack is
-            // scrolling, which obscures content and makes switching tabs much
-            // harder precisely when someone is reading a detail screen.
+            // Keep the system tab bar and its native scrolling behavior.
             TabView(selection: $selectedTab) {
                 Tab(AppTab.routes.title, systemImage: AppTab.routes.symbol, value: AppTab.routes) {
                     HomeView(form: routeForm)
@@ -89,7 +81,7 @@ struct RoamRootView: View {
                     ProfileView()
                 }
             }
-            .tabBarMinimizeBehavior(.never)
+            .tabBarMinimizeBehavior(.onScrollDown)
             .toolbar(driveSession.isRecording ? .hidden : .visible, for: .tabBar)
             .environment(
                 \.showDriveTab,
@@ -135,30 +127,6 @@ struct RoamRootView: View {
         .onChange(of: clerk.user?.id, initial: true) { _, _ in
             Task { await authSession.synchronizeWithClerk() }
         }
-    }
-
-    /// A compact, ordinary layout element rather than an overlay. That makes
-    /// its occupied height explicit to every tab and prevents the active
-    /// screen's title from disappearing behind a safe-area inset.
-    private var topBrandBar: some View {
-        HStack {
-            BrandWordmark(compact: true)
-                .background(
-                    GeometryReader { proxy in
-                        Color.clear.preference(
-                            key: HeaderWordmarkFrameKey.self,
-                            value: proxy.frame(in: .named(LaunchIntroDockSpace.name))
-                        )
-                    }
-                )
-
-            Spacer(minLength: 0)
-        }
-        .frame(minHeight: 44)
-        .padding(.horizontal, 20)
-        .padding(.vertical, 4)
-        .frame(maxWidth: .infinity)
-        .background(themeManager.palette.canvas.color)
     }
 
     private func refreshSharedRouteIfSafe() {

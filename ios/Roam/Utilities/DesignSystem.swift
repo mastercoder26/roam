@@ -63,10 +63,10 @@ enum AppDesign {
     static let space32: CGFloat = 32
 
     /// Radius ladder — keep cards, buttons and pills on these rungs.
-    static let cornerRadius: CGFloat = 16
-    static let cornerRadiusSmall: CGFloat = 11
-    static let cornerRadiusLarge: CGFloat = 20
-    static let cornerRadiusHero: CGFloat = 22
+    static let cornerRadius: CGFloat = 24
+    static let cornerRadiusSmall: CGFloat = 12
+    static let cornerRadiusLarge: CGFloat = 24
+    static let cornerRadiusHero: CGFloat = 28
     /// Icon tiles and other sub-32pt chips, which read as over-rounded at 12.
     static let cornerRadiusTiny: CGFloat = 10
 
@@ -83,10 +83,19 @@ enum AppDesign {
         static let hero = (radius: CGFloat(18), y: CGFloat(8), opacity: 0.7)
     }
 
-    static let cardPadding: CGFloat = 18
-    static let sectionSpacing: CGFloat = 28
+    static let cardPadding: CGFloat = 20
+    static let sectionSpacing: CGFloat = 24
     static let contentPadding: CGFloat = 20
+    static let screenTopPadding: CGFloat = 12
     static let maximumContentWidth: CGFloat = 640
+
+    enum Menu {
+        static let iconWidth: CGFloat = 24
+        static let iconSpacing: CGFloat = 16
+        static let rowPadding: CGFloat = 16
+        static let minimumRowHeight: CGFloat = 56
+        static let dividerInset = AppDesign.contentPadding + iconWidth + iconSpacing
+    }
     /// Clearance below the last element on a scrolling tab so it clears the
     /// floating tab bar.
     static let tabBarClearance: CGFloat = 44
@@ -103,9 +112,9 @@ enum AppDesign {
         /// Shared screen title in the app's standard system face. Scales with
         /// Dynamic Type alongside the surrounding text.
         static let display = Font.system(.largeTitle, design: .default, weight: .bold)
-        static let heroTitle = Font.system(.largeTitle, design: .rounded, weight: .bold)
-        static let sectionTitle = Font.system(size: 20, weight: .semibold)
-        static let railTitle = Font.system(size: 17, weight: .semibold)
+        static let heroTitle = Font.system(.largeTitle, design: .default, weight: .bold)
+        static let sectionTitle = Font.system(.headline, weight: .semibold)
+        static let railTitle = Font.system(.headline, weight: .semibold)
         static let metricValue = Font.system(size: 22, weight: .semibold)
         static let metricLabel = Font.caption
         static let body = Font.system(.body, design: .default, weight: .regular)
@@ -230,17 +239,60 @@ struct HeroCardModifier: ViewModifier {
         content
             .padding(AppDesign.space20)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(AppDesign.cardSurfaceElevated)
-            .clipShape(RoundedRectangle(cornerRadius: AppDesign.cornerRadiusHero, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: AppDesign.cornerRadiusHero, style: .continuous)
-                    .stroke(AppDesign.cardStrokeStrong, lineWidth: 0.5)
+            .featuredSurface()
+    }
+}
+
+/// A quiet featured surface. Content supplies its own padding so forms,
+/// metrics and the recording control can share the same material treatment.
+private struct FeaturedSurfaceModifier: ViewModifier {
+    @ObservedObject private var theme = ThemeManager.shared
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.colorSchemeContrast) private var contrast
+
+    func body(content: Content) -> some View {
+        let shape = RoundedRectangle(cornerRadius: AppDesign.cornerRadiusHero, style: .continuous)
+        content
+            .background {
+                shape.fill(AppDesign.cardSurfaceElevated)
+                    .overlay {
+                        if !reduceTransparency {
+                            shape.fill(
+                                LinearGradient(
+                                    colors: [AppDesign.Ink.primary.opacity(0.06), .clear],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                        }
+                    }
             }
-            .elevation(AppDesign.Elevation.hero)
+            .clipShape(shape)
+            .overlay {
+                shape.strokeBorder(
+                    contrast == .increased ? AppDesign.Ink.secondary : AppDesign.cardStrokeStrong,
+                    lineWidth: contrast == .increased ? 1 : 0.5
+                )
+                .allowsHitTesting(false)
+            }
     }
 }
 
 extension View {
+    func featuredSurface() -> some View {
+        modifier(FeaturedSurfaceModifier())
+    }
+
+    /// Menu rows own their padding; the containing surface only supplies its edge.
+    func menuSurface() -> some View {
+        background(AppDesign.cardSurface, in: RoundedRectangle(cornerRadius: AppDesign.cornerRadius, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: AppDesign.cornerRadius, style: .continuous)
+                    .strokeBorder(AppDesign.cardStroke, lineWidth: 0.5)
+            }
+            .clipShape(RoundedRectangle(cornerRadius: AppDesign.cornerRadius, style: .continuous))
+    }
+
     func premiumCard() -> some View {
         modifier(PremiumCardModifier())
     }
@@ -311,6 +363,50 @@ struct ScreenHeader: View {
         }
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isHeader)
+    }
+}
+
+/// Shared geometry for navigation and settings entries. Symbols occupy one
+/// column, and descriptions grow vertically with Dynamic Type.
+struct AppMenuRow: View {
+    @ObservedObject private var theme = ThemeManager.shared
+    let title: String
+    var subtitle: String? = nil
+    let symbol: String
+
+    var body: some View {
+        HStack(spacing: AppDesign.Menu.iconSpacing) {
+            Image(systemName: symbol)
+                .font(.system(size: 21, weight: .regular))
+                .foregroundStyle(AppDesign.Ink.primary)
+                .frame(width: AppDesign.Menu.iconWidth, height: 28)
+                .accessibilityHidden(true)
+
+            VStack(alignment: .leading, spacing: AppDesign.space4) {
+                Text(title)
+                        .font(.body)
+                    .foregroundStyle(AppDesign.Ink.primary)
+                if let subtitle {
+                    Text(subtitle)
+                        .font(.footnote)
+                        .foregroundStyle(AppDesign.Ink.secondary)
+                }
+            }
+            .multilineTextAlignment(.leading)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            Image(systemName: "chevron.right")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(AppDesign.Ink.tertiary)
+                .frame(width: 16, height: 24)
+                .accessibilityHidden(true)
+        }
+        .padding(.horizontal, AppDesign.contentPadding)
+        .padding(.vertical, AppDesign.Menu.rowPadding)
+        .frame(maxWidth: .infinity, minHeight: AppDesign.Menu.minimumRowHeight, alignment: .leading)
+        .contentShape(Rectangle())
+        .accessibilityElement(children: .combine)
     }
 }
 
@@ -532,15 +628,77 @@ struct StatRow: View {
     @ObservedObject private var theme = ThemeManager.shared
 
     var body: some View {
-        HStack(spacing: AppDesign.space12) {
-            IconTile(symbol: symbol)
-            Text(title).font(.subheadline).foregroundStyle(AppDesign.Ink.secondary)
-            Spacer()
-            Text(value)
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(AppDesign.Ink.primary)
-                .monospacedDigit()
+        HStack(alignment: .top, spacing: AppDesign.space12) {
+            Image(systemName: symbol)
+                .font(.system(size: 20))
+                .foregroundStyle(AppDesign.Ink.secondary)
+                .frame(width: AppDesign.Menu.iconWidth)
+                .frame(minHeight: 24)
+                .accessibilityHidden(true)
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .firstTextBaseline, spacing: AppDesign.space16) {
+                    titleText.fixedSize()
+                    Spacer(minLength: AppDesign.space8)
+                    valueText.fixedSize()
+                }
+                VStack(alignment: .leading, spacing: AppDesign.space4) {
+                    titleText
+                    valueText
+                }
+            }
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .accessibilityElement(children: .combine)
+    }
+
+    private var titleText: some View {
+        Text(title).font(.subheadline).foregroundStyle(AppDesign.Ink.secondary)
+    }
+
+    private var valueText: some View {
+        Text(value)
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(AppDesign.Ink.primary)
+            .monospacedDigit()
+    }
+}
+
+/// The same native selection geometry is used for themes, icons and profile
+/// choices. The containing group owns its surface and inset separators.
+struct AppSelectionRow<Leading: View>: View {
+    let title: String
+    let detail: String
+    let isSelected: Bool
+    @ViewBuilder var leading: Leading
+    @ObservedObject private var theme = ThemeManager.shared
+
+    var body: some View {
+        HStack(alignment: .center, spacing: AppDesign.space16) {
+            leading.accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: AppDesign.space4) {
+                Text(title)
+                    .font(.body)
+                    .foregroundStyle(AppDesign.Ink.primary)
+                Text(detail)
+                    .font(.footnote)
+                    .foregroundStyle(AppDesign.Ink.secondary)
+            }
+            .multilineTextAlignment(.leading)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            Image(systemName: "checkmark")
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundStyle(AppDesign.accent)
+                .frame(width: 24, height: 24)
+                .opacity(isSelected ? 1 : 0)
+                .accessibilityHidden(true)
+        }
+        .padding(.horizontal, AppDesign.contentPadding)
+        .padding(.vertical, AppDesign.Menu.rowPadding)
+        .frame(maxWidth: .infinity, minHeight: AppDesign.Menu.minimumRowHeight)
+        .contentShape(Rectangle())
+        .accessibilityElement(children: .combine)
     }
 }
 
@@ -685,19 +843,23 @@ struct CadenceDay: Identifiable {
 /// today keeps an accent ring, allowing the state to survive every theme.
 struct WeekCadenceStrip: View {
     @ObservedObject private var theme = ThemeManager.shared
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let title: String
     let days: [CadenceDay]
 
     var body: some View {
         VStack(alignment: .leading, spacing: AppDesign.space12) {
-            HStack {
-                Text(title)
-                    .font(AppDesign.Typography.railTitle)
-                    .foregroundStyle(AppDesign.Ink.primary)
-                Spacer(minLength: AppDesign.space8)
-                Text("\(days.filter(\.isComplete).count) days")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(AppDesign.Ink.secondary)
+            if dynamicTypeSize.isAccessibilitySize {
+                VStack(alignment: .leading, spacing: AppDesign.space4) {
+                    cadenceTitle
+                    cadenceCount
+                }
+            } else {
+                HStack {
+                    cadenceTitle
+                    Spacer(minLength: AppDesign.space8)
+                    cadenceCount
+                }
             }
 
             HStack(spacing: AppDesign.space4) {
@@ -712,7 +874,8 @@ struct WeekCadenceStrip: View {
                                     .foregroundStyle(AppDesign.primarySurfaceForeground)
                             }
                         }
-                        .frame(width: 34, height: 34)
+                        .frame(maxWidth: 34)
+                        .frame(height: 34)
                         .overlay {
                             if day.isToday {
                                 Circle().stroke(AppDesign.accent, lineWidth: 2)
@@ -735,6 +898,19 @@ struct WeekCadenceStrip: View {
             RoundedRectangle(cornerRadius: AppDesign.cornerRadius, style: .continuous)
                 .stroke(AppDesign.cardStroke, lineWidth: 0.75)
         }
+    }
+
+    private var cadenceTitle: some View {
+        Text(title)
+            .font(AppDesign.Typography.railTitle)
+            .foregroundStyle(AppDesign.Ink.primary)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private var cadenceCount: some View {
+        Text("\(days.filter(\.isComplete).count) days")
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(AppDesign.Ink.secondary)
     }
 }
 

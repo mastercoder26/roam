@@ -112,3 +112,191 @@ final class ProfileSettingsUITests: XCTestCase {
         add(attachment)
     }
 }
+
+
+@MainActor
+final class NavigationChromeUITests: XCTestCase {
+    func testTabsRemainReachableAfterScrolling() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = ["--preview-profile", "-roam.theme-id-v1", "dark"]
+        app.launch()
+        let routes = app.tabBars.buttons["Routes"]
+        XCTAssertTrue(routes.waitForExistence(timeout: 30))
+        XCTAssertTrue(routes.isHittable)
+        app.swipeUp(velocity: .slow)
+        // A short page may fit without minimizing. Navigation must remain
+        // reachable when scrolling returns upward in either native state.
+        attach(app, "Profile after scrolling down")
+        app.swipeDown(velocity: .slow)
+        let expanded = NSPredicate { _, _ in routes.isHittable }
+        expectation(for: expanded, evaluatedWith: app)
+        waitForExpectations(timeout: 5)
+        routes.tap()
+        XCTAssertTrue(app.staticTexts["Where to?"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.staticTexts["Roam"].exists, "The persistent brand header has been removed")
+        attach(app, "Title-only Routes with restored navigation")
+    }
+
+    private func attach(_ app: XCUIApplication, _ name: String) {
+        let attachment = XCTAttachment(screenshot: app.screenshot())
+        attachment.name = name
+        attachment.lifetime = .keepAlways
+        add(attachment)
+    }
+}
+
+
+@MainActor
+final class DesignConsistencyUITests: XCTestCase {
+    private let app = XCUIApplication()
+
+    func testAllThemesAcrossTabsAndAppearanceMenu() {
+        continueAfterFailure = false
+        launch()
+        for title in ["Dark", "Light", "Goldfish", "Midnight", "Ember", "Sequoia"] {
+            switchTab("Profile")
+            let appearance = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Color scheme, currently")).firstMatch
+            reveal(appearance)
+            appearance.tap()
+            XCTAssertTrue(app.navigationBars["Color scheme"].waitForExistence(timeout: 5))
+            let choice = app.buttons[title]
+            reveal(choice)
+            choice.tap()
+            XCTAssertEqual(choice.value as? String, "Selected")
+            attach("\(title) — Appearance")
+            app.buttons["Done"].tap()
+
+            switchTab("Routes")
+            XCTAssertTrue(app.staticTexts["Where to?"].waitForExistence(timeout: 5))
+            XCTAssertFalse(app.staticTexts["Roam"].exists)
+            attach("\(title) — Routes")
+
+            switchTab("Drive")
+            XCTAssertTrue(app.buttons["Start drive"].waitForExistence(timeout: 5))
+            XCTAssertTrue(app.buttons["Start drive"].isHittable)
+            attach("\(title) — Drive")
+
+            switchTab("Progress")
+            XCTAssertTrue(app.staticTexts["Overall driving score"].waitForExistence(timeout: 5))
+            XCTAssertTrue(app.buttons["Record your first drive"].exists)
+            attach("\(title) — Progress")
+        }
+    }
+
+    func testProfileMenusWithAccessibilityText() {
+        continueAfterFailure = false
+        launch(largeText: true)
+        let editor = app.buttons["profile.editIdentity"]
+        reveal(editor)
+        editor.tap()
+        XCTAssertTrue(app.textFields["profile.displayName"].waitForExistence(timeout: 5))
+        attach("Large text — Edit profile")
+        app.swipeUp()
+        let stage = app.buttons["profile.stage.provisional"]
+        reveal(stage)
+        stage.tap()
+        XCTAssertEqual(stage.value as? String, "Selected")
+        attach("Large text — Licensing stage")
+        app.buttons["Done"].tap()
+
+        for title in ["Goals & progress", "Driving insights"] {
+            let destination = app.buttons[title]
+            reveal(destination)
+            destination.tap()
+            XCTAssertTrue(app.navigationBars[title].waitForExistence(timeout: 5))
+            attach("Large text — \(title)")
+            app.swipeUp()
+            attach("Large text — \(title) scrolled")
+            app.navigationBars.buttons.firstMatch.tap()
+        }
+
+        let appearance = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Color scheme, currently")).firstMatch
+        reveal(appearance)
+        appearance.tap()
+        XCTAssertTrue(app.navigationBars["Color scheme"].waitForExistence(timeout: 5))
+        reveal(app.buttons["Light"])
+        app.buttons["Light"].tap()
+        XCTAssertEqual(app.buttons["Light"].value as? String, "Selected")
+        attach("Large text — Light appearance")
+        app.buttons["Done"].tap()
+
+        let icon = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "App icon, currently")).firstMatch
+        reveal(icon)
+        icon.tap()
+        XCTAssertTrue(app.navigationBars["App icon"].waitForExistence(timeout: 5))
+        attach("Large text — App icon")
+        app.buttons["Done"].tap()
+
+        let guide = app.buttons["settings.startWalkthrough"]
+        reveal(guide)
+        guide.tap()
+        XCTAssertTrue(app.buttons["walkthrough.next"].waitForExistence(timeout: 5))
+        attach("Large text — Explore Roam")
+        app.buttons["walkthrough.next"].tap()
+        XCTAssertTrue(app.buttons["walkthrough.next"].exists)
+        app.buttons["Done"].tap()
+    }
+
+    func testMainMenuDestinationsAndCoachingAction() {
+        continueAfterFailure = false
+        launch()
+        switchTab("Routes")
+        attach("Final — Routes")
+        let explanation = app.buttons["routes.howRoamWorks"]
+        reveal(explanation)
+        explanation.tap()
+        XCTAssertTrue(app.navigationBars["How Roam works"].waitForExistence(timeout: 5))
+        attach("Routes — How Roam works")
+        app.buttons["Done"].tap()
+
+        switchTab("Drive")
+        attach("Final — Drive")
+        app.buttons["Get help"].tap()
+        XCTAssertTrue(app.buttons["Close"].waitForExistence(timeout: 5))
+        app.buttons["Close"].tap()
+        app.buttons["Plan a recovery stop"].tap()
+        XCTAssertTrue(app.navigationBars["Recovery stop"].waitForExistence(timeout: 5))
+        attach("Drive — Recovery stop")
+        app.buttons["Done"].tap()
+
+        switchTab("Progress")
+        attach("Final — Progress")
+        let record = app.buttons["Record your first drive"]
+        reveal(record)
+        record.tap()
+        XCTAssertTrue(app.buttons["Start drive"].waitForExistence(timeout: 5))
+    }
+
+    private func launch(largeText: Bool = false) {
+        app.launchArguments = [
+            "--preview-profile", "-roam.theme-id-v1", "dark",
+            "-UIPreferredContentSizeCategoryName",
+            largeText ? "UICTContentSizeCategoryAccessibilityXXXL" : "UICTContentSizeCategoryL"
+        ]
+        app.launch()
+        XCTAssertTrue(app.buttons["profile.signIn"].waitForExistence(timeout: 30))
+    }
+
+    private func reveal(_ element: XCUIElement) {
+        for _ in 0..<6 {
+            if element.isHittable { return }
+            app.swipeUp()
+        }
+        XCTAssertTrue(element.isHittable)
+    }
+
+    private func switchTab(_ title: String) {
+        let tab = app.tabBars.buttons[title]
+        if !tab.isHittable { app.swipeDown() }
+        XCTAssertTrue(tab.waitForExistence(timeout: 5))
+        tab.tap()
+    }
+
+    private func attach(_ name: String) {
+        let attachment = XCTAttachment(screenshot: app.screenshot())
+        attachment.name = name
+        attachment.lifetime = .keepAlways
+        add(attachment)
+    }
+}
