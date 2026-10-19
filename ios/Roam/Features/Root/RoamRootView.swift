@@ -52,6 +52,8 @@ struct RoamRootView: View {
         #if DEBUG
         // Open the actual screen directly for repeatable simulator reviews.
         if ProcessInfo.processInfo.arguments.contains("--preview-profile") { return .profile }
+        if ProcessInfo.processInfo.arguments.contains("--preview-drive") { return .drive }
+        if ProcessInfo.processInfo.arguments.contains("--preview-progress") { return .progress }
         #endif
         return .routes
     }()
@@ -60,16 +62,18 @@ struct RoamRootView: View {
     @EnvironmentObject private var authSession: AuthSessionStore
     @Environment(Clerk.self) private var clerk
     @StateObject private var routeForm = RoutePlanningFormModel()
+    @StateObject private var routeAnalysis = RoutePlanningAnalysisModel()
     @StateObject private var sharedRouteImport = SharedRouteImportCoordinator()
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         VStack(spacing: 0) {
-            // Keep the system tab bar and its native scrolling behavior.
+            // Native minimization keeps the selected tab in a compact control
+            // while reading and restores all destinations on upward scroll.
             TabView(selection: $selectedTab) {
                 Tab(AppTab.routes.title, systemImage: AppTab.routes.symbol, value: AppTab.routes) {
-                    HomeView(form: routeForm)
+                    HomeView(form: routeForm, analysis: routeAnalysis)
                 }
                 Tab(AppTab.drive.title, systemImage: AppTab.drive.symbol, value: AppTab.drive) {
                     DriveView()
@@ -81,6 +85,7 @@ struct RoamRootView: View {
                     ProfileView()
                 }
             }
+            .id(authSession.accountDataGeneration)
             .tabBarMinimizeBehavior(.onScrollDown)
             .toolbar(driveSession.isRecording ? .hidden : .visible, for: .tabBar)
             .environment(
@@ -127,6 +132,10 @@ struct RoamRootView: View {
         .onChange(of: clerk.user?.id, initial: true) { _, _ in
             Task { await authSession.synchronizeWithClerk() }
         }
+        .onChange(of: authSession.accountDataGeneration) { _, _ in
+            routeAnalysis.cancel()
+            routeForm.reset()
+        }
     }
 
     private func refreshSharedRouteIfSafe() {
@@ -143,6 +152,7 @@ struct RoamRootView: View {
 
         switch state {
         case let .ready(route):
+            routeAnalysis.cancel()
             routeForm.apply(route)
             sharedRouteImport.acknowledgeReadyRoute(id: route.id)
             selectedTab = .routes

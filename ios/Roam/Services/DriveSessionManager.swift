@@ -11,6 +11,10 @@ final class DriveSessionManager: NSObject, ObservableObject {
     static let shared = DriveSessionManager()
 
     @Published private(set) var isRecording = false
+    @Published private(set) var isPaused = false
+    private var recordingClock = DriveRecordingClock()
+    private var beginsNewRouteSegment = false
+    private var acceptsLocationsAfter = Date.distantPast
     @Published private(set) var elapsed: TimeInterval = 0
     @Published private(set) var currentSpeedMetersPerSecond: CLLocationSpeed = 0
     @Published private(set) var motionSamples = 0
@@ -112,6 +116,11 @@ final class DriveSessionManager: NSObject, ObservableObject {
     /// pending-analysis resumption happen at most once per manager instance.
     private var bootstrapTask: Task<Void, Never>?
     private var didBootstrap = false
+
+    var currentRoute: [DriveRoutePoint] { routePoints }
+    var hasReliableGPS: Bool {
+        !isPaused && latestAcceptedLocationAt.map { abs(Date().timeIntervalSince($0)) < 12 } == true
+    }
 
     var currentDistanceMiles: Double { distanceMeters / 1_609.344 }
     var currentSpeedMilesPerHour: Int { Int((max(currentSpeedMetersPerSecond, 0) * 2.23694).rounded()) }
@@ -219,6 +228,8 @@ final class DriveSessionManager: NSObject, ObservableObject {
         recordingTimeZoneIdentifier = TimeZone.autoupdatingCurrent.identifier
         isRecording = true
         startDate = driveStart
+        recordingClock.start(at: driveStart)
+        acceptsLocationsAfter = driveStart
         phonePlacementAnalyzer.reset(startedAt: driveStart)
         phonePlacementAssessment = .inconclusive
         lastCompletedDrive = nil
@@ -252,10 +263,57 @@ final class DriveSessionManager: NSObject, ObservableObject {
         }
     }
 
+    func pauseDrive() {
+        guard isRecording, !isPaused else { return }
+        let now = Date()
+        recordingClock.pause(at: now)
+        elapsed = recordingClock.elapsed(at: now)
+        isPaused = true
+        currentSpeedMetersPerSecond = 0
+        previousLocation = nil
+        latestAcceptedLocationAt = nil
+        latestCoordinate = nil
+        recentMotionSamples = []
+        phoneMovementDetector.reset()
+        motionManager.stopDeviceMotionUpdates()
+        locationManager.stopUpdatingLocation()
+        locationManager.allowsBackgroundLocationUpdates = false
+        statusMessage = "Drive paused"
+        // A system timer cannot freeze. Remove this activity while paused and
+        // recreate it against active elapsed time when recording resumes.
+        DriveLiveActivityManager.shared.end(speedMetersPerSecond: 0, distanceMeters: distanceMeters,
+            eventCount: events.count, status: statusMessage)
+        persistInProgressSnapshot(force: true)
+    }
+
+    func resumeDrive() {
+        guard isRecording, isPaused else { return }
+        let now = Date()
+        recordingClock.resume(at: now)
+        acceptsLocationsAfter = now
+        isPaused = false
+        beginsNewRouteSegment = true
+        previousLocation = nil
+        phonePlacementAnalyzer.reset(startedAt: now)
+        phonePlacementAssessment = .inconclusive
+        statusMessage = "Recording this drive"
+        startMotionUpdates()
+        if locationManager.authorizationStatus == .authorizedAlways || locationManager.authorizationStatus == .authorizedWhenInUse {
+            locationManager.allowsBackgroundLocationUpdates = locationManager.authorizationStatus == .authorizedAlways
+            locationManager.startUpdatingLocation()
+        }
+        DriveLiveActivityManager.shared.start(startedAt: now.addingTimeInterval(-elapsed),
+            speedMetersPerSecond: 0, distanceMeters: distanceMeters, eventCount: events.count, status: statusMessage)
+        persistInProgressSnapshot(force: true)
+    }
+
     func endDrive() {
         guard isRecording else { return }
         let driveEndedAt = Date()
-        let duration = driveEndedAt.timeIntervalSince(startDate ?? driveEndedAt)
+        let duration = recordingClock.elapsed(at: driveEndedAt)
+        elapsed = duration
+        let wasPaused = isPaused
+        isPaused = false
         isRecording = false
         timer?.invalidate()
         timer = nil
@@ -297,7 +355,7 @@ final class DriveSessionManager: NSObject, ObservableObject {
             return
         }
 
-        noteTrailingLocationGap(endedAt: driveEndedAt)
+        if !wasPaused { noteTrailingLocationGap(endedAt: driveEndedAt) }
         let result = DriveScoringEngine.score(
             duration: duration,
             distanceMeters: distanceMeters,
@@ -496,6 +554,32 @@ final class DriveSessionManager: NSObject, ObservableObject {
         saveRecordedDrives()
     }
 
+    /// Ends device work without saving the previous account's drive into a
+    /// guest session. Persisted account caches are removed by the auth boundary.
+    func clearAccountData() {
+        routeAnalysisCoordinator.cancelAll()
+        timer?.invalidate()
+        timer = nil
+        motionManager.stopDeviceMotionUpdates()
+        locationManager.stopUpdatingLocation()
+        locationManager.allowsBackgroundLocationUpdates = false
+        isRecording = false
+        snapshotPersistence.clearSnapshot()
+        DriveLiveActivityManager.shared.end(
+            speedMetersPerSecond: 0, distanceMeters: 0, eventCount: 0, status: "Signed out"
+        )
+        DriveLiveActivityManager.shared.endOrphanedActivities()
+        resetCurrentDrive()
+        recordedDrives = []
+        lastCompletedDrive = nil
+        lastScore = nil
+        activePracticeRoute = nil
+        activePracticeRoutePolyline = nil
+        clearPlannedPracticeRoute()
+        isHistoryUnreadable = false
+        statusMessage = "Ready when you are"
+    }
+
     private func requestDriveHistorySync() {
         DriveHistorySyncService.shared.sync(
             localDrives: recordedDrives,
@@ -539,6 +623,9 @@ final class DriveSessionManager: NSObject, ObservableObject {
 
     private func resetCurrentDrive() {
         startDate = nil
+        recordingClock = DriveRecordingClock()
+        isPaused = false
+        beginsNewRouteSegment = false
         elapsed = 0
         currentSpeedMetersPerSecond = 0
         motionSamples = 0
@@ -573,8 +660,8 @@ final class DriveSessionManager: NSObject, ObservableObject {
         timer?.invalidate()
         timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
             Task { @MainActor [weak self] in
-                guard let self, let startDate = self.startDate else { return }
-                self.elapsed = Date().timeIntervalSince(startDate)
+                guard let self, self.isRecording, !self.isPaused else { return }
+                self.elapsed = self.recordingClock.elapsed(at: Date())
                 self.refreshLiveScore(force: true)
                 self.publishLiveDriveSnapshot()
                 // Persist from the clock, not only from accepted GPS samples and
@@ -600,7 +687,7 @@ final class DriveSessionManager: NSObject, ObservableObject {
 
         motionManager.deviceMotionUpdateInterval = 1.0 / 20.0
         motionManager.startDeviceMotionUpdates(using: .xArbitraryZVertical, to: .main) { [weak self] motion, _ in
-            guard let self, let motion, self.isRecording else { return }
+            guard let self, let motion, self.isRecording, !self.isPaused else { return }
             self.record(motion: motion)
         }
     }
@@ -668,6 +755,7 @@ final class DriveSessionManager: NSObject, ObservableObject {
     // MARK: - Private — Location Recording
 
     private func record(location: CLLocation) {
+        guard isRecording, !isPaused, location.timestamp >= acceptsLocationsAfter else { return }
         let sample = DriveLocationSample(
             timestamp: location.timestamp,
             speedMetersPerSecond: location.speed,
@@ -685,7 +773,7 @@ final class DriveSessionManager: NSObject, ObservableObject {
         let speed = max(location.speed, 0)
         currentSpeedMetersPerSecond = speed
         topSpeed = max(topSpeed, speed)
-        let routePoint = DriveRoutePoint(timestamp: location.timestamp, coordinate: DriveCoordinate(location.coordinate), speedMetersPerSecond: speed)
+        let routePoint = DriveRoutePoint(timestamp: location.timestamp, coordinate: DriveCoordinate(location.coordinate), speedMetersPerSecond: speed, startsNewSegment: beginsNewRouteSegment ? true : nil)
 
         if let previousLocation {
             let time = location.timestamp.timeIntervalSince(previousLocation.timestamp)
@@ -730,6 +818,7 @@ final class DriveSessionManager: NSObject, ObservableObject {
             appendRoutePoint(routePoint)
         }
 
+        beginsNewRouteSegment = false
         previousLocation = location
         latestCoordinate = routePoint.coordinate
         latestAcceptedLocationAt = location.timestamp
@@ -766,7 +855,8 @@ final class DriveSessionManager: NSObject, ObservableObject {
     private func appendRoutePoint(_ point: DriveRoutePoint) {
         // One point per ~5 m from CLLocation plus a time-based escape hatch is
         // enough to draw a faithful route without unbounded storage.
-        if let last = routePoints.last,
+        if point.startsNewSegment != true,
+           let last = routePoints.last,
            point.timestamp.timeIntervalSince(last.timestamp) < 1,
            CLLocation(latitude: last.coordinate.latitude, longitude: last.coordinate.longitude)
                 .distance(from: CLLocation(latitude: point.coordinate.latitude, longitude: point.coordinate.longitude)) < 5 {
@@ -894,6 +984,7 @@ final class DriveSessionManager: NSObject, ObservableObject {
             topSpeedMetersPerSecond: topSpeed,
             plannedRouteContext: activePracticeRoute,
             didSuspendRecordingInBackground: didSuspendRecordingInBackground,
+            activeDuration: recordingClock.elapsed(at: Date()),
             force: force
         )
     }
@@ -904,7 +995,7 @@ final class DriveSessionManager: NSObject, ObservableObject {
 extension DriveSessionManager: CLLocationManagerDelegate {
     nonisolated func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
         Task { @MainActor [weak self] in
-            guard let self, self.isRecording else { return }
+            guard let self, self.isRecording, !self.isPaused else { return }
             switch manager.authorizationStatus {
             case .authorizedAlways:
                 manager.allowsBackgroundLocationUpdates = true

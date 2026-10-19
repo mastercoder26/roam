@@ -120,6 +120,11 @@ struct RoamApp: App {
         self.driveSession = driveSession
         self.authSession = authSession
 
+        authSession.configureAccountDataReset {
+            driveSession.clearAccountData()
+            RecentRouteStore.shared.clear()
+        }
+
         authSession.configureDriveHistorySync {
             DriveHistorySyncService.shared.sync(
                 localDrives: driveSession.recordedDrives,
@@ -133,6 +138,10 @@ struct RoamApp: App {
         // may finish with a degraded result, but it must never cancel an auth
         // restore that can still make the signed-in session usable later.
         let driveBootstrap = Task { @MainActor in
+            // Establish the cache owner before recovering any persisted drive.
+            await authSession.restoreIfNeeded()
+            await waitForAuthTerminalState(authSession)
+            guard authSession.state != .restoring else { return }
             await driveSession.bootstrap()
         }
         let authRestore = Task { @MainActor in

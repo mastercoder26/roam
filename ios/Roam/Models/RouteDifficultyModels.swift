@@ -695,7 +695,7 @@ struct RouteBounds: Decodable {
     }
 }
 
-struct Coordinate: Decodable {
+struct Coordinate: Decodable, Equatable {
     let latitude: Double
     let longitude: Double
 

@@ -52,6 +52,7 @@ final class AuthSessionStore: ObservableObject {
 
     @Published private(set) var state: State = .restoring
     @Published private(set) var syncStatus: SyncStatus = .synced
+    @Published private(set) var accountDataGeneration = 0
 
     private let client: ClerkBackendClient
     private let profileStore: DriverProfileStore
@@ -65,14 +66,18 @@ final class AuthSessionStore: ObservableObject {
     /// Keep Clerk's ID separately while app state contains the backend user.
     private var activeClerkUserID: String?
     private var driveHistorySyncRequest: (() -> Void)?
+    private var resetAccountData: (() -> Void)?
+    private let accountData: AccountLocalDataBoundary
 
     init(
         client: ClerkBackendClient = ClerkBackendClient(),
         profileStore: DriverProfileStore? = nil,
+        userDefaults: UserDefaults = .standard,
         automaticallyRestore: Bool = true
     ) {
         self.client = client
         self.profileStore = profileStore ?? .shared
+        self.accountData = AccountLocalDataBoundary(defaults: userDefaults)
         guard automaticallyRestore else { return }
         Task { @MainActor [weak self] in
             await self?.restoreIfNeeded()
@@ -122,6 +127,7 @@ final class AuthSessionStore: ObservableObject {
         sessionGeneration &+= 1
         let generation = sessionGeneration
         isProfileSyncInFlight = false
+        transitionAccountData(to: clerkIdentity.id)
         activeClerkUserID = clerkIdentity.id
         state = .signedIn(clerkIdentity)
 
@@ -144,7 +150,7 @@ final class AuthSessionStore: ObservableObject {
             requestDriveHistorySync()
         }
         #else
-        if !isSignedIn { state = .signedOut }
+        if !isSignedIn { markSignedOut() }
         #endif
     }
 
@@ -213,6 +219,20 @@ final class AuthSessionStore: ObservableObject {
         if isSignedIn { request() }
     }
 
+    /// Installed before launch restoration; clears live services along with
+    /// persisted caches before a different identity becomes visible.
+    func configureAccountDataReset(_ reset: @escaping () -> Void) {
+        resetAccountData = reset
+    }
+
+    private func transitionAccountData(to accountID: String?) {
+        guard accountData.transition(to: accountID) else { return }
+        DriveHistorySyncService.shared.didSignOut()
+        profileStore.reset()
+        resetAccountData?()
+        accountDataGeneration &+= 1
+    }
+
     /// Stable contract used by DriveHistorySyncService. Clerk returns a
     /// short-lived session token and refreshes it internally; this method only
     /// hands that current token to the authenticated operation.
@@ -244,6 +264,7 @@ final class AuthSessionStore: ObservableObject {
     ) {
         sessionGeneration &+= 1
         isProfileSyncInFlight = false
+        transitionAccountData(to: stableAccountID ?? user.id)
         activeClerkUserID = stableAccountID
         testAccessToken = accessToken
         state = .signedIn(user)
@@ -342,6 +363,7 @@ final class AuthSessionStore: ObservableObject {
         isProfileSyncInFlight = false
         activeClerkUserID = nil
         testAccessToken = nil
+        transitionAccountData(to: nil)
         state = .signedOut
         syncStatus = .synced
         DriveHistorySyncService.shared.didSignOut()
@@ -353,3 +375,39 @@ private extension String {
 }
 
 typealias AuthSessionState = AuthSessionStore.State
+
+/// Only account content is cleared. Appearance preferences and the cloud
+/// account survive sign-out. A persisted owner also protects cold launches
+/// after a Clerk session expires or is replaced on another device.
+@MainActor
+final class AccountLocalDataBoundary {
+    private let defaults: UserDefaults
+    private static let ownerKey = "roam.local-data-owner-v1"
+    private static let guest = "__guest__"
+    static let contentKeys = [
+        "recorded-drives-v1", "recorded-drives-v1-quarantined",
+        "in-progress-drive-v1", "in-progress-drive-v1-quarantined",
+        "recentRoutes.v1", "roam.driver-profile-v1", "roam.driver-profile-updated-at-v1"
+    ]
+
+    init(defaults: UserDefaults) { self.defaults = defaults }
+
+    @discardableResult
+    func transition(to accountID: String?) -> Bool {
+        let owner = accountID ?? Self.guest
+        // Adopt an existing installation only when its sync metadata confirms
+        // the same owner. Unowned legacy caches must never appear to a guest.
+        if defaults.string(forKey: Self.ownerKey) == nil,
+           let accountID,
+           let data = defaults.data(forKey: "drive-history-sync-v2"),
+           let saved = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+           saved["lastActiveAccountID"] as? String == accountID {
+            defaults.set(owner, forKey: Self.ownerKey)
+            return false
+        }
+        guard defaults.string(forKey: Self.ownerKey) != owner else { return false }
+        for key in Self.contentKeys { defaults.removeObject(forKey: key) }
+        defaults.set(owner, forKey: Self.ownerKey)
+        return true
+    }
+}

@@ -11,6 +11,7 @@ struct AddressSearchField: View {
     var maximumSuggestions = 2
     @Binding var text: String
     var onSuggestionsVisibilityChanged: ((Bool) -> Void)?
+    var onFocusChanged: ((Bool) -> Void)?
 
     @StateObject private var completer = AddressSearchCompleter()
     @FocusState private var isFocused: Bool
@@ -76,7 +77,9 @@ struct AddressSearchField: View {
         .onChange(of: showSuggestions) { _, isVisible in
             onSuggestionsVisibilityChanged?(isVisible)
         }
+        .onChange(of: isFocused) { _, focused in onFocusChanged?(focused) }
         .onDisappear {
+            onFocusChanged?(false)
             onSuggestionsVisibilityChanged?(false)
         }
         .accessibilityElement(children: .contain)

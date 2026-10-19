@@ -19,6 +19,7 @@ struct RouteMapView: UIViewRepresentable {
     let polyline: String
     let bounds: RouteBounds
     var routeColor: UIColor = AppDesign.UIKitColor.accent
+    var contentInsets = UIEdgeInsets(top: 32, left: 24, bottom: 32, right: 24)
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.colorScheme) private var colorScheme
 
@@ -40,6 +41,7 @@ struct RouteMapView: UIViewRepresentable {
         mapView.overrideUserInterfaceStyle = interfaceStyle
         mapView.repaintThemedOverlays(stroke: routeColor)
         context.coordinator.routeColor = routeColor
+        context.coordinator.contentInsets = contentInsets
         context.coordinator.reduceMotion = reduceMotion
         context.coordinator.update(mapView: mapView, polyline: polyline, bounds: bounds)
     }
@@ -52,6 +54,7 @@ struct RouteMapView: UIViewRepresentable {
         private var renderedKey: String?
         var routeColor: UIColor = AppDesign.UIKitColor.accent
         var reduceMotion = false
+        var contentInsets = UIEdgeInsets(top: 32, left: 24, bottom: 32, right: 24)
 
         func update(mapView: MKMapView, polyline: String, bounds: RouteBounds) {
             let renderKey = makeRenderKey(polyline: polyline, bounds: bounds)
@@ -79,7 +82,7 @@ struct RouteMapView: UIViewRepresentable {
             let region = region(for: bounds, polyline: polyline)
             mapView.setVisibleMapRect(
                 region,
-                edgePadding: UIEdgeInsets(top: 32, left: 24, bottom: 32, right: 24),
+                edgePadding: contentInsets,
                 animated: !reduceMotion
             )
             CATransaction.commit()
@@ -418,6 +421,7 @@ private final class DriveReplayAnnotation: MKPointAnnotation {
 struct RoutePlanningMapSummary: Equatable {
     let distanceMeters: CLLocationDistance
     let expectedTravelTime: TimeInterval
+    var coordinates: [Coordinate] = []
 
     var displayText: String {
         "\(distanceText) · \(durationText)"
@@ -688,7 +692,11 @@ struct RoutePlanningMapPreview: UIViewRepresentable {
             onSummaryChange(
                 RoutePlanningMapSummary(
                     distanceMeters: route.distance,
-                    expectedTravelTime: route.expectedTravelTime
+                    expectedTravelTime: route.expectedTravelTime,
+                    coordinates: (0..<route.polyline.pointCount).map { index in
+                        let c = route.polyline.points()[index].coordinate
+                        return Coordinate(latitude: c.latitude, longitude: c.longitude)
+                    }
                 )
             )
 
@@ -703,7 +711,7 @@ struct RoutePlanningMapPreview: UIViewRepresentable {
             }
             map.setVisibleMapRect(
                 route.polyline.boundingMapRect,
-                edgePadding: UIEdgeInsets(top: 36, left: 28, bottom: 44, right: 28),
+                edgePadding: UIEdgeInsets(top: 120, left: 38, bottom: 360, right: 38),
                 animated: !reduceMotion
             )
             CATransaction.commit()

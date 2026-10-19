@@ -38,6 +38,12 @@ final class DriveRouteAnalysisCoordinator {
         tasks[driveID] = nil
     }
 
+    func cancelAll() {
+        for task in tasks.values { task.cancel() }
+        tasks = [:]
+        debugInfo = [:]
+    }
+
     /// Analyzes only the start and destination of a completed drive after its
     /// local record is safely persisted. Any unavailable network or provider
     /// result is recorded as analysis context; it never removes the drive.

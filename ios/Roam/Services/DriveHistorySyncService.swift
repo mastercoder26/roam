@@ -532,10 +532,8 @@ final class DriveHistorySyncService: ObservableObject {
         persistMetadata()
     }
 
-    /// Stops account work without erasing it. Local history intentionally
-    /// remains available after sign-out, and account-scoped metadata must also
-    /// remain so offline uploads and explicit deletions resume if that account
-    /// returns later.
+    /// Invalidates work before account caches are cleared. Retain only scoped
+    /// sync metadata so an explicit deletion can still reach its owning account.
     func didSignOut() {
         syncGeneration &+= 1
         syncTask?.cancel()

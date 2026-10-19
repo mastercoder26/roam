@@ -46,6 +46,8 @@ struct DriveRoutePoint: Codable, Identifiable, Hashable {
     let timestamp: Date
     let coordinate: DriveCoordinate
     let speedMetersPerSecond: Double
+    /// An explicit pause must not be bridged by replay, coverage or distance.
+    var startsNewSegment: Bool? = nil
 
     var id: Date { timestamp }
 }

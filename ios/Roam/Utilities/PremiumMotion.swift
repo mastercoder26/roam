@@ -8,32 +8,39 @@ struct RoamWordmark: View {
     let foreground: Color
     var sliceProgress: Double = 1
     var reduceMotion = false
+    var usesSlices = true
 
     var body: some View {
-        ZStack {
-            ForEach(Array(PremiumMotionSpec.wordmarkSlices.enumerated()), id: \.offset) { _, slice in
-                wordmarkText
-                    .mask {
-                        GeometryReader { proxy in
-                            Rectangle()
-                                // A half-point overlap avoids hairline seams
-                                // between antialiased masks at odd pixel scales.
-                                .frame(
-                                    width: proxy.size.width,
-                                    height: proxy.size.height * CGFloat(slice.upperBound - slice.lowerBound) + 0.5
+        Group {
+            if usesSlices {
+                ZStack {
+                    ForEach(Array(PremiumMotionSpec.wordmarkSlices.enumerated()), id: \.offset) { _, slice in
+                        wordmarkText
+                            .mask {
+                                GeometryReader { proxy in
+                                    Rectangle()
+                                        // A half-point overlap avoids hairline seams
+                                        // between antialiased masks at odd pixel scales.
+                                        .frame(
+                                            width: proxy.size.width,
+                                            height: proxy.size.height * CGFloat(slice.upperBound - slice.lowerBound) + 0.5
+                                        )
+                                        .offset(y: proxy.size.height * CGFloat(slice.lowerBound) - 0.25)
+                                }
+                            }
+                            .offset(
+                                x: fontSize * CGFloat(
+                                    PremiumMotionSpec.wordmarkOffsetFactor(
+                                        for: slice,
+                                        progress: sliceProgress,
+                                        reduceMotion: reduceMotion
+                                    )
                                 )
-                                .offset(y: proxy.size.height * CGFloat(slice.lowerBound) - 0.25)
-                        }
-                    }
-                    .offset(
-                        x: fontSize * CGFloat(
-                            PremiumMotionSpec.wordmarkOffsetFactor(
-                                for: slice,
-                                progress: sliceProgress,
-                                reduceMotion: reduceMotion
                             )
-                        )
-                    )
+                    }
+                }
+            } else {
+                wordmarkText
             }
         }
         .fixedSize()

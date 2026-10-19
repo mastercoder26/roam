@@ -257,8 +257,7 @@ final class DriverProfileStore: ObservableObject {
         defaults.set(updatedAt, forKey: Self.updateDateKey)
     }
 
-    /// Account deletion clears only the local profile preference. Recorded
-    /// drives and other local app features remain available in guest mode.
+    /// Removes the local identity when an account ends or changes.
     func reset() {
         isApplyingRemoteUpdate = true
         displayName = DriverProfile.empty.displayName

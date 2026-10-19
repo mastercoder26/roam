@@ -19,6 +19,7 @@ struct InProgressDriveSnapshot: Codable {
     /// Optional so snapshots written before this field existed still decode —
     /// an undecodable snapshot is a lost drive, not a lost flag.
     let recordingSuspendedInBackground: Bool?
+    var activeDuration: TimeInterval? = nil
 }
 
 /// Manages the throttled, incremental persistence of a drive in progress and
@@ -52,6 +53,7 @@ struct DriveSnapshotPersistence {
         topSpeedMetersPerSecond: Double,
         plannedRouteContext: PlannedRouteContext?,
         didSuspendRecordingInBackground: Bool,
+        activeDuration: TimeInterval? = nil,
         force: Bool = false
     ) {
         guard isRecording, let startDate else { return }
@@ -73,7 +75,8 @@ struct DriveSnapshotPersistence {
             topSpeedMetersPerSecond: topSpeedMetersPerSecond,
             plannedRouteContext: plannedRouteContext,
             lastUpdatedAt: now,
-            recordingSuspendedInBackground: didSuspendRecordingInBackground ? true : nil
+            recordingSuspendedInBackground: didSuspendRecordingInBackground ? true : nil,
+            activeDuration: activeDuration
         )
         guard let data = try? JSONEncoder().encode(snapshot) else { return }
         UserDefaults.standard.set(data, forKey: Self.inProgressDriveKey)
@@ -112,7 +115,7 @@ struct DriveSnapshotPersistence {
         }
         UserDefaults.standard.removeObject(forKey: inProgressDriveKey)
 
-        let duration = snapshot.lastUpdatedAt.timeIntervalSince(snapshot.startedAt)
+        let duration = snapshot.activeDuration ?? snapshot.lastUpdatedAt.timeIntervalSince(snapshot.startedAt)
         guard duration > 0, DriveHistoryPolicy.shouldSave(duration: duration) else { return nil }
 
         let usableTraceDuration = DriveExperienceEngine.validTraceSegments(for: snapshot.route)

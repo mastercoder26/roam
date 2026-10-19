@@ -5,6 +5,8 @@ struct DriveView: View {
     @EnvironmentObject private var session: DriveSessionManager
     @EnvironmentObject private var authSession: AuthSessionStore
     @State private var showingHelp = false
+    @State private var showingPracticeGoals = false
+    @State private var showsSavedSummary = false
     @State private var showingBreakPlanner = false
     @State private var presentationState = DrivePresentationState()
     @State private var transitionToken = UUID()
@@ -15,82 +17,69 @@ struct DriveView: View {
     @State private var plannedBreakRoute: ScoredRoute?
     @State private var breakPlanningError: String?
     @State private var usesCurrentRouteOrigin = true
-    /// Visible viewport height above the tab bar.
-    @State private var viewportHeight: CGFloat = 640
     @State private var pendingDeletionID: UUID?
     @State private var breakPlanningControlsWidth: CGFloat = 0
-    /// Set for one beat when a clean-streak badge is earned, then cleared.
-    /// Held here rather than read straight from the session so the flourish
-    /// fires exactly once per badge, whatever else redraws.
-    @State private var streakCelebration: CleanStreakCelebration?
-    @State private var streakCelebrationToken = UUID()
     @StateObject private var routeLocationCoordinator = RoutePlanningLocationCoordinator()
-    /// Ties the clock and the primary action across the compact and expanded
-    /// branches below. Those are two separate `if`/`else` hierarchies, so
-    /// without this SwiftUI destroys and rebuilds both controls instead of
-    /// carrying them between positions.
-    @Namespace private var driveTransition
     private let apiClient = APIClient()
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: AppDesign.sectionSpacing) {
-                    if showsSupportingContent {
-                        driveToolbar
-                    }
-
-                    recordingCard(availableHeight: viewportHeight)
-                        .id("drive-recording-surface")
-
-                    if showsSupportingContent {
-                        breakPlanningEntry
-                        if session.queuedPracticeRoute != nil {
-                            practiceRouteReadyCard
-                                .transition(reduceMotion ? .opacity : .opacity.combined(with: .move(edge: .top)))
-                        }
-
-                        if let score = session.lastScore {
-                            if let drive = session.lastCompletedDrive,
-                               drive.plannedRouteContext?.debrief != nil {
-                                PracticeDebriefCard(drive: drive)
-                                    .transition(reduceMotion ? .opacity : .opacity.combined(with: .move(edge: .top)))
+            Group {
+                if session.isRecording {
+                    LiveDriveRecordingView(onEnd: endDrive)
+                } else {
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: AppDesign.sectionSpacing) {
+                            if showsSupportingContent {
+                                driveToolbar
                             }
-                            DriveScoreCard(score: score)
-                        }
 
-                        if !session.recordedDrives.isEmpty {
-                            driveHistory
+                            if showsSavedSummary, let drive = session.lastCompletedDrive {
+                                savedDriveSummary(drive)
+                                Button("New drive") { showsSavedSummary = false }
+                                    .buttonStyle(.bordered)
+                                    .buttonBorderShape(.capsule)
+                                    .controlSize(.large)
+                            } else {
+                                recordingCard
+                                    .id("drive-recording-surface")
+                            }
+
+                            if showsSupportingContent {
+                                SectionHeader(title: "Before you go")
+                                breakPlanningEntry
+                                if session.queuedPracticeRoute != nil {
+                                    practiceRouteReadyCard
+                                        .transition(reduceMotion ? .opacity : .opacity.combined(with: .move(edge: .top)))
+                                }
+
+                                if let drive = session.lastCompletedDrive,
+                                   drive.plannedRouteContext?.debrief != nil {
+                                    PracticeDebriefCard(drive: drive)
+                                }
+
+                                if !session.recordedDrives.isEmpty {
+                                    driveHistory
+                                }
+                            }
                         }
+                        // Drop outer padding while focused so the canvas height matches
+                        // the viewport exactly. That keeps the End Drive path vertical
+                        // and prevents the control from sliding under the tab bar.
+                        .padding(.horizontal, isFocusedCanvas ? 0 : AppDesign.contentPadding)
+                        .padding(.top, isFocusedCanvas ? 0 : AppDesign.screenTopPadding)
+                        .padding(.bottom, isFocusedCanvas ? 0 : AppDesign.space24)
+                        .frame(maxWidth: isFocusedCanvas ? .infinity : AppDesign.maximumContentWidth, alignment: .leading)
+                        .frame(maxWidth: .infinity)
                     }
+                    .scrollDisabled(isTransitioningDriveSurface)
                 }
-                // Drop outer padding while focused so the canvas height matches
-                // the viewport exactly. That keeps the End Drive path vertical
-                // and prevents the control from sliding under the tab bar.
-                .padding(.horizontal, isFocusedCanvas ? 0 : AppDesign.contentPadding)
-                .padding(.top, isFocusedCanvas ? 0 : AppDesign.screenTopPadding)
-                .padding(.bottom, isFocusedCanvas ? 0 : AppDesign.space24)
-                .frame(maxWidth: isFocusedCanvas ? .infinity : AppDesign.maximumContentWidth, alignment: .leading)
-                .frame(maxWidth: .infinity)
             }
-            .scrollDisabled(isTransitioningDriveSurface)
             .contentMargins(.bottom, isFocusedCanvas ? 0 : AppDesign.tabBarClearance, for: .scrollContent)
-            // Measure the viewport without imposing GeometryReader's layout
-            // on the scrolling content.
             .background(AppCanvasBackground())
-            .background {
-                GeometryReader { geometry in
-                    Color.clear
-                        .onAppear { viewportHeight = geometry.size.height }
-                        .onChange(of: geometry.size.height) { _, height in
-                            withAnimation(driveModeAnimation) {
-                                viewportHeight = height
-                            }
-                        }
-                }
-            }
+            .toolbar(session.isRecording ? .hidden : .visible, for: .tabBar)
             .toolbar(.hidden, for: .navigationBar)
             .confirmationDialog(
                 "Delete this drive?",
@@ -113,6 +102,23 @@ struct DriveView: View {
             } message: {
                 Text("This drive will be permanently deleted.")
             }
+        }
+        .sheet(isPresented: $showingPracticeGoals) {
+            NavigationStack {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 20) {
+                        Text("Practice goals").font(.largeTitle.bold())
+                        if session.queuedPracticeRoute != nil { practiceRouteReadyCard }
+                        else {
+                            Text("Choose a route in Routes, then select Practice this route to use its goals on your next drive.")
+                                .foregroundStyle(AppDesign.Ink.secondary)
+                        }
+                    }.padding(20)
+                }
+                .toolbar { ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { showingPracticeGoals = false }
+                } }
+            }.presentationDetents([.medium, .large])
         }
         .sheet(isPresented: $showingHelp) {
             DriveHelpSheet()
@@ -143,15 +149,14 @@ struct DriveView: View {
         .onAppear {
             syncPresentationState(isRecording: session.isRecording, animated: false)
         }
+        .onChange(of: session.lastCompletedDrive?.id) { _, id in
+            if id != nil { showsSavedSummary = true }
+        }
         .onChange(of: session.isRecording) { _, isRecording in
             syncPresentationState(isRecording: isRecording, animated: true)
         }
         .onChange(of: routeLocationCoordinator.state) { _, state in
             if case .resolved(let address) = state { routeOrigin = address }
-        }
-        .onChange(of: session.cleanStreakCelebration) { _, celebration in
-            guard let celebration else { return }
-            celebrateStreak(celebration)
         }
         .onChange(of: session.liveEvents.count) { previous, current in
             // A coaching event is the one thing on this screen the driver must
@@ -159,27 +164,6 @@ struct DriveView: View {
             // so resetting the list between drives stays silent.
             guard current > previous else { return }
             UINotificationFeedbackGenerator().notificationOccurred(.warning)
-        }
-    }
-
-    /// Fires the badge flourish, then clears it so the overlay is a one-shot
-    /// beat rather than a permanent ring. The token guards against a second
-    /// badge arriving before the first has finished clearing.
-    private func celebrateStreak(_ celebration: CleanStreakCelebration) {
-        streakCelebrationToken = UUID()
-        let token = streakCelebrationToken
-
-        withAnimation(AppAnimation.selection) {
-            streakCelebration = celebration
-        }
-        UINotificationFeedbackGenerator().notificationOccurred(.success)
-
-        Task { @MainActor in
-            try? await Task.sleep(nanoseconds: 700_000_000)
-            guard streakCelebrationToken == token else { return }
-            withAnimation(AppAnimation.content) {
-                streakCelebration = nil
-            }
         }
     }
 
@@ -203,53 +187,6 @@ struct DriveView: View {
         }
     }
 
-    /// Speed and the clean-streak badge on one line.
-    ///
-    /// Speed used to be a 62pt hero numeral here. The car already shows the
-    /// driver their speed; what it cannot show is how this drive is being
-    /// scored, so the score ring takes the hero slot and speed keeps a smaller
-    /// — still glanceable — one.
-    private var activeVitalsRow: some View {
-        HStack(alignment: .center, spacing: AppDesign.space12) {
-            activeSpeed
-            Spacer(minLength: AppDesign.space8)
-            LiveCleanStreakChip(
-                live: session.liveScore,
-                celebration: streakCelebration
-            )
-        }
-    }
-
-    private var activeSpeed: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 4) {
-            Text("\(session.currentSpeedMilesPerHour)")
-                .font(.system(size: 38, weight: .semibold, design: .rounded))
-                .monospacedDigit()
-                .contentTransition(reduceMotion ? .identity : .numericText())
-                .foregroundStyle(AppDesign.Ink.primary)
-            Text("mph")
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(AppDesign.Ink.secondary)
-        }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Current speed \(session.currentSpeedMilesPerHour) miles per hour")
-    }
-
-    private var compactPlacementWarning: some View {
-        StatusBadge(text: "Secure the phone when it is safe", symbol: "iphone.gen3.radiowaves.left.and.right", tint: AppDesign.safety)
-            .accessibilityLabel("Sensor placement may be unstable. Secure the phone when it is safe.")
-    }
-
-    /// Which live-coaching modules this canvas can afford. Recomputed as the
-    /// viewport changes so rotation and large text drop readouts rather than
-    /// pushing End Drive off-screen.
-    private var liveModules: LiveDriveCanvasLayout.Modules {
-        LiveDriveCanvasLayout.modules(
-            availableHeight: viewportHeight,
-            usesLargeText: dynamicTypeSize.isAccessibilitySize
-        )
-    }
-
     private var driveModeAnimation: Animation {
         reduceMotion ? .easeOut(duration: 0.18) : AppAnimation.driveMode
     }
@@ -268,12 +205,8 @@ struct DriveView: View {
         reduceMotion ? 180_000_000 : 320_000_000
     }
 
-    private var isExpandedDriveSurface: Bool {
-        presentationState.isExpanded
-    }
-
     private var isFocusedCanvas: Bool {
-        presentationState.preservesFocusedCanvas
+        session.isRecording
     }
 
     private var isTransitioningDriveSurface: Bool {
@@ -281,13 +214,13 @@ struct DriveView: View {
     }
 
     private var showsSupportingContent: Bool {
-        presentationState.showsSupportingContent
+        !session.isRecording
     }
 
     private var driveToolbar: some View {
         HStack(alignment: .center, spacing: AppDesign.space12) {
             VStack(alignment: .leading, spacing: AppDesign.space4) {
-                Text("Drive")
+                Text(showsSavedSummary ? "Drive saved" : "Drive")
                     .font(AppDesign.Typography.display)
                     .tracking(-0.7)
                     .foregroundStyle(AppDesign.Ink.primary)
@@ -315,6 +248,12 @@ struct DriveView: View {
 
 
     private var breakPlanningEntry: some View {
+        VStack(spacing: 0) {
+            Button { showingPracticeGoals = true } label: {
+                AppMenuRow(title: "Practice goals", subtitle: "Choose what to work on", symbol: "checklist")
+            }
+            .buttonStyle(.plain)
+            Divider().padding(.leading, 60)
         Button {
             showingBreakPlanner = true
         } label: {
@@ -324,9 +263,10 @@ struct DriveView: View {
                 symbol: "cup.and.saucer"
             )
         }
-        .buttonStyle(PressableScaleStyle())
+        .buttonStyle(.plain)
+        }
         .menuSurface()
-        .accessibilityLabel("Plan a recovery stop")
+        .accessibilityLabel("Before you go")
         .accessibilityValue(plannedBreakRoute == nil ? "Optional" : "Recommendation ready")
         .accessibilityHint("Opens break timing options")
     }
@@ -593,104 +533,73 @@ struct DriveView: View {
         .accessibilityLabel("Practice route ready")
     }
 
-    private func recordingCard(availableHeight: CGFloat) -> some View {
-        // Never force a taller canvas than the visible area. A floor here used
-        // to push End Drive under the floating tab bar once the brand mark and
-        // tab inset reduced available height.
-        let expandedHeight = max(availableHeight, 0)
-        let keepsFocusedCanvas = presentationState.preservesFocusedCanvas
-        let actionShowsEnd = presentationState.action == .end
-        // Leave breathing room below the status bar on the focused canvas.
-        let focusedTopClearance: CGFloat = 28
-
-        return VStack(spacing: isExpandedDriveSurface ? 0 : 18) {
-            if isExpandedDriveSurface {
-                Spacer(minLength: 8)
-
-                VStack(spacing: AppDesign.space16) {
-                    FlipClock(elapsed: session.elapsed, style: .active)
-                        .matchedGeometryEffect(id: DriveTransitionID.clock, in: driveTransition)
-
-                    if liveModules.showsScoreRing {
-                        LiveDriveScoreRing(live: session.liveScore)
-                    }
-
-                    activeVitalsRow
-                        .padding(.horizontal, AppDesign.contentPadding)
-
-                    if liveModules.showsSmoothnessBadge {
-                        LiveSmoothnessBadge(state: session.liveScore.smoothness)
-                    }
-
-                    if liveModules.showsMetricStrip {
-                        // Sensor counts belong to the saved drive's detail
-                        // screen. Behind the wheel they are numbers the driver
-                        // can do nothing with, changing every second.
-                        DashboardMetricStrip(metrics: [
-                            DashboardMetric(value: String(format: "%.1f", session.distanceMeters / 1_609.344), label: "miles"),
-                            DashboardMetric(value: "\(session.liveScore.eventCount)", label: "events")
-                        ])
-                        .padding(.horizontal, AppDesign.contentPadding)
-                    }
-
-                    if session.phonePlacementAssessment == .needsAdjustment {
-                        compactPlacementWarning
-                            .transition(.opacity)
-                    }
-                }
-                .animation(driveModeAnimation, value: liveModules)
-
-                Spacer(minLength: 16)
-
-                driveActionButton(showsEnd: actionShowsEnd)
-                    .matchedGeometryEffect(id: DriveTransitionID.action, in: driveTransition)
-                    .padding(.horizontal, AppDesign.contentPadding)
-                    .padding(.bottom, CGFloat(DrivePresentationEngine.activeButtonBottomInset))
-            } else {
-                Text(actionShowsEnd ? "Finishing drive" : "Ready to record")
-                    .font(.subheadline.weight(.medium))
-                    .foregroundStyle(AppDesign.Ink.secondary)
-
-                FlipClock(elapsed: session.elapsed, style: .preview)
-                    .matchedGeometryEffect(id: DriveTransitionID.clock, in: driveTransition)
-
-                if !keepsFocusedCanvas {
-                    Text(session.statusMessage)
-                        .font(.footnote)
-                        .foregroundStyle(AppDesign.Ink.secondary)
-                        .multilineTextAlignment(.center)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-
-                driveActionButton(showsEnd: actionShowsEnd)
-                    .matchedGeometryEffect(id: DriveTransitionID.action, in: driveTransition)
-                    .padding(.horizontal, keepsFocusedCanvas ? AppDesign.contentPadding : 0)
-
-            }
+    private var recordingCard: some View {
+        VStack(spacing: 12) {
+            Text("Ready to record")
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(AppDesign.Ink.secondary)
+            FlipClock(elapsed: 0, style: .preview)
+            Text("Secure your phone before starting.")
+                .font(.footnote)
+                .foregroundStyle(AppDesign.Ink.secondary)
+            driveActionButton(showsEnd: false)
+                .accessibilityIdentifier("drive.start")
         }
-        .padding(.top, keepsFocusedCanvas ? focusedTopClearance : 0)
-        .padding(keepsFocusedCanvas ? 0 : 20)
         .frame(maxWidth: .infinity)
-        // Do not collapse the canvas while the End Drive control is travelling
-        // back to the compact position. That keeps the reverse path vertical.
-        .frame(height: keepsFocusedCanvas ? expandedHeight : nil, alignment: .top)
-        .background {
-            if keepsFocusedCanvas {
-                AppDesign.canvas
-            } else {
-                Color.clear.featuredSurface()
-            }
-        }
-        .accessibilityIdentifier("drive.recordingCard")
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel(actionShowsEnd ? "Drive in progress" : "Manual drive")
+        .heroCard()
     }
 
-    /// Shared identities for the controls that travel between the compact and
-    /// expanded drive layouts.
-    private enum DriveTransitionID {
-        static let clock = "drive.clock"
-        static let action = "drive.action"
+    private func savedDriveSummary(_ drive: RecordedDrive) -> some View {
+        VStack(alignment: .leading, spacing: 20) {
+            Text(drive.startedAt.formatted(date: .abbreviated, time: .shortened))
+                .font(.subheadline).foregroundStyle(AppDesign.Ink.secondary)
+            if !drive.route.isEmpty {
+                RecordedDriveMapView(route: drive.route, moments: [], onSelectMoment: { _ in })
+                    .frame(height: 184)
+                    .clipShape(RoundedRectangle(cornerRadius: 24))
+            }
+            VStack(alignment: .leading, spacing: 18) {
+                HStack(spacing: 16) {
+                    Text(drive.score.dataQuality.confidence == .low ? "—" : String(drive.score.score))
+                        .font(.system(size: 58, weight: .light))
+                        .foregroundStyle(AppDesign.positive)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(drive.score.dataQuality.confidence == .low ? "No score yet" : "Drive score").font(.headline)
+                        DriveRouteAnalysisBadge(analysis: drive.routeAnalysis)
+                    }
+                }
+                if dynamicTypeSize.isAccessibilitySize {
+                    VStack(alignment: .leading, spacing: 16) {
+                        savedMetric(String(format: "%.1f", drive.score.distanceMiles), "Miles")
+                        savedMetric(String(format: "%02d:%02d", Int(drive.score.duration) / 60, Int(drive.score.duration) % 60), "Drive time")
+                        savedMetric("\(drive.score.events.count)", "Events")
+                    }
+                } else {
+                    HStack {
+                        savedMetric(String(format: "%.1f", drive.score.distanceMiles), "Miles")
+                        savedMetric(String(format: "%02d:%02d", Int(drive.score.duration) / 60, Int(drive.score.duration) % 60), "Drive time")
+                        savedMetric("\(drive.score.events.count)", "Events")
+                    }
+                }
+            }
+            .premiumCard()
+            NavigationLink { DriveDetailView(drive: drive) } label: {
+                Text("Review this drive").font(.headline).frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.bordered)
+            .buttonBorderShape(.capsule)
+            .controlSize(.large)
+            .tint(AppDesign.Ink.primary)
+            .accessibilityIdentifier("drive.reviewSaved")
+        }
+        .accessibilityIdentifier("drive.savedSummary")
+    }
+
+    private func savedMetric(_ value: String, _ label: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(value).font(.title2.weight(.semibold)).monospacedDigit()
+            Text(label).font(.caption).foregroundStyle(AppDesign.Ink.secondary)
+        }.frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func driveActionButton(showsEnd: Bool) -> some View {
@@ -830,10 +739,10 @@ struct DriveView: View {
                         }
                         Spacer()
                         VStack(alignment: .trailing, spacing: 1) {
-                            Text("\(drive.score.score)")
+                            Text(drive.score.dataQuality.confidence == .low ? "—" : String(drive.score.score))
                                 .font(.headline.monospacedDigit())
-                                .foregroundStyle(drive.score.score >= 78 ? AppDesign.positive : AppDesign.safety)
-                            Text("drive score")
+                                .foregroundStyle(drive.score.dataQuality.confidence == .low ? AppDesign.Ink.secondary : drive.score.score >= 78 ? AppDesign.positive : AppDesign.safety)
+                            Text(drive.score.dataQuality.confidence == .low ? "Insufficient data" : "drive score")
                                 .font(.caption2)
                                 .foregroundStyle(AppDesign.Ink.secondary)
                         }
@@ -861,4 +770,224 @@ struct DriveView: View {
 #Preview {
     DriveView()
         .environmentObject(DriveSessionManager())
+}
+
+/// A focused recorder. Data continues to come from the shared manual session;
+/// the controls sheet never owns or resets recording state.
+private struct LiveDriveRecordingView: View {
+    @EnvironmentObject private var session: DriveSessionManager
+    @ObservedObject private var theme = ThemeManager.shared
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @State private var showsControls = false
+    @State private var controlsLocked = false
+    let onEnd: () -> Void
+
+    var body: some View {
+        GeometryReader { geometry in
+            let scale = min(1, max(0.55, geometry.size.height / 658))
+            VStack(spacing: 0) {
+                FlipClock(elapsed: session.elapsed, style: .active)
+                    .padding(.top, 16)
+                Spacer(minLength: 12)
+                metric(value: speed, label: "Speed (mph)", size: dynamicTypeSize.isAccessibilitySize ? 84 : 164 * scale)
+                    .accessibilityIdentifier("drive.liveSpeed")
+                Spacer(minLength: 12)
+                metric(value: String(format: "%.1f", session.currentDistanceMiles), label: "Distance (mi)", size: dynamicTypeSize.isAccessibilitySize ? 64 : 100 * scale)
+                    .accessibilityIdentifier("drive.liveDistance")
+                Spacer(minLength: 12)
+                Label(status, systemImage: session.isPaused ? "pause.circle.fill" : session.hasReliableGPS ? "record.circle.fill" : "location.slash")
+                    .font(.footnote.weight(.medium))
+                    .foregroundStyle(session.isPaused || session.hasReliableGPS ? AppDesign.Ink.secondary : AppDesign.safety)
+                    .padding(.bottom, 32)
+                    .accessibilityIdentifier("drive.recordingStatus")
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .padding(.horizontal, 20)
+        }
+        .background(AppCanvasBackground())
+        .safeAreaInset(edge: .bottom, spacing: 0) { dock }
+        .sheet(isPresented: $showsControls) {
+            DriveRecordingControls(onEnd: {
+                showsControls = false
+                onEnd()
+            }, onLock: {
+                controlsLocked = true
+                showsControls = false
+            })
+            .presentationDetents([.height(414), .large])
+            .presentationDragIndicator(.visible)
+            .presentationCornerRadius(36)
+            .presentationBackground(Color(.secondarySystemBackground))
+            .preferredColorScheme(.dark)
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("drive.liveRecording")
+    }
+
+    private var speed: String {
+        guard !session.isPaused, session.hasReliableGPS else { return "—" }
+        return String(session.currentSpeedMilesPerHour)
+    }
+
+    private var status: String {
+        if session.isPaused { return "Drive paused" }
+        if !session.hasReliableGPS { return "GPS signal is weak" }
+        if session.phonePlacementAssessment == .needsAdjustment { return "Secure the phone when it is safe" }
+        return "Recording"
+    }
+
+    private func metric(value: String, label: String, size: CGFloat) -> some View {
+        VStack(spacing: 0) {
+            Text(value)
+                .font(.system(size: size, weight: .black))
+                .fontWidth(.condensed)
+                .monospacedDigit()
+                .lineLimit(1)
+                .minimumScaleFactor(0.55)
+                .foregroundStyle(session.hasReliableGPS ? AppDesign.Ink.primary : AppDesign.Ink.tertiary)
+            Text(label)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(AppDesign.Ink.secondary)
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    private var dock: some View {
+        VStack(spacing: 14) {
+            if controlsLocked {
+                Label("Hold to unlock controls", systemImage: "lock.fill")
+                    .font(.headline)
+                    .frame(maxWidth: .infinity, minHeight: 62)
+                    .contentShape(Capsule())
+                    .onLongPressGesture(minimumDuration: 1) { unlock() }
+                    .accessibilityAddTraits(.isButton)
+                    .accessibilityAction { unlock() }
+                    .accessibilityIdentifier("drive.unlockControls")
+            } else {
+                Button { showsControls = true } label: {
+                    Capsule().fill(AppDesign.Ink.tertiary).frame(width: 38, height: 5)
+                        .frame(maxWidth: .infinity, minHeight: 24)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Drive controls")
+                .accessibilityIdentifier("drive.showControls")
+                Button {
+                    togglePause()
+                    showsControls = true
+                } label: {
+                    Label(session.isPaused ? "Resume" : "Pause", systemImage: session.isPaused ? "play.fill" : "pause.fill")
+                        .font(.title3.weight(.bold))
+                        .frame(maxWidth: .infinity, minHeight: 62)
+                        .foregroundStyle(AppDesign.recordingActionForeground)
+                        .background(AppDesign.recordingAction, in: Capsule())
+                }
+                .buttonStyle(PressableScaleStyle())
+                .accessibilityIdentifier("drive.pauseResume")
+            }
+        }
+        .padding(.horizontal, 24)
+        .padding(.top, 5)
+        .padding(.bottom, 16)
+        .background {
+            UnevenRoundedRectangle(topLeadingRadius: 28, topTrailingRadius: 28)
+                .fill(AppDesign.cardSurface)
+                .ignoresSafeArea(edges: .bottom)
+        }
+        .gesture(DragGesture(minimumDistance: 16).onEnded { value in
+            if !controlsLocked, value.translation.height < -20 { showsControls = true }
+        })
+    }
+
+    private func togglePause() {
+        UISelectionFeedbackGenerator().selectionChanged()
+        if session.isPaused { session.resumeDrive() } else { session.pauseDrive() }
+    }
+
+    private func unlock() {
+        controlsLocked = false
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+    }
+}
+
+private struct DriveRecordingControls: View {
+    @EnvironmentObject private var session: DriveSessionManager
+    @Environment(\.dismiss) private var dismiss
+    @State private var showsRoute = false
+    let onEnd: () -> Void
+    let onLock: () -> Void
+
+    var body: some View {
+        ScrollView {
+            VStack(spacing: 12) {
+                Text(String(format: "%02d:%02d", Int(session.elapsed) / 60, Int(session.elapsed) % 60))
+                    .font(.system(size: 34, weight: .medium)).monospacedDigit()
+                    .foregroundStyle(.yellow)
+                HStack {
+                    reading(String(format: "%.1f", session.currentDistanceMiles), "mi")
+                    Spacer()
+                    Button {
+                        if session.isPaused { session.resumeDrive() } else { session.pauseDrive() }
+                    } label: {
+                        Image(systemName: session.isPaused ? "play.fill" : "pause.fill")
+                            .font(.system(size: 30, weight: .medium))
+                            .frame(width: 66, height: 66)
+                    }
+                    .buttonStyle(.bordered)
+                    .buttonBorderShape(.circle)
+                    .tint(.white)
+                    .accessibilityLabel(session.isPaused ? "Resume drive" : "Pause drive")
+                    .accessibilityIdentifier("drive.controls.pauseResume")
+                    Spacer()
+                    reading(session.hasReliableGPS ? String(session.currentSpeedMilesPerHour) : "—", "mph")
+                }
+                .padding(.bottom, 2)
+                control("End drive", tint: .red, action: onEnd)
+                    .accessibilityIdentifier("drive.end")
+                control("View route", tint: .white) { showsRoute = true }
+                    .accessibilityIdentifier("drive.viewRoute")
+                control("Lock controls", tint: .white, action: onLock)
+                    .accessibilityIdentifier("drive.lockControls")
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 24)
+            .padding(.bottom, 16)
+        }
+        .scrollBounceBehavior(.basedOnSize)
+        .sheet(isPresented: $showsRoute) {
+            NavigationStack {
+                Group {
+                    if session.currentRoute.count > 1 {
+                        RecordedDriveMapView(route: session.currentRoute, moments: [], onSelectMoment: { _ in })
+                            .ignoresSafeArea(edges: .bottom)
+                    } else {
+                        ContentUnavailableView("Waiting for GPS", systemImage: "location.slash", description: Text("Your recorded route appears when location data is available."))
+                    }
+                }
+                .navigationTitle("Recorded route")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar { ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { showsRoute = false }
+                } }
+            }
+        }
+    }
+
+    private func reading(_ value: String, _ label: String) -> some View {
+        VStack(spacing: 4) {
+            Text(value).font(.title2.weight(.medium)).monospacedDigit()
+            Text(label).font(.caption).foregroundStyle(.secondary)
+        }.frame(width: 68)
+    }
+
+    private func control(_ title: String, tint: Color, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title).font(.body).frame(maxWidth: .infinity, minHeight: 24)
+        }
+        .buttonStyle(.bordered)
+        .buttonBorderShape(.capsule)
+        .tint(tint)
+        .controlSize(.large)
+    }
 }

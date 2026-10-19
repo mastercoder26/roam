@@ -219,6 +219,10 @@ final class RoutePlanningFormModel: ObservableObject {
         importNotice = nil
     }
 
+    func reset() {
+        apply(RoutePlanningFormState())
+    }
+
     private var state: RoutePlanningFormState {
         RoutePlanningFormState(
             origin: origin,
@@ -237,5 +241,90 @@ final class RoutePlanningFormModel: ObservableObject {
         departureTime = state.departureTime
         importedRouteID = state.importedRouteID
         importNotice = state.importNotice
+    }
+}
+
+struct RouteAnalysisResult: Hashable {
+    let origin: String
+    let destination: String
+    let departureTime: Date
+    let primaryRoute: ScoredRoute
+    let alternateRoutes: [ScoredRoute]
+}
+
+/// Owned by the root, so switching tabs cannot cancel work or discard results.
+@MainActor
+final class RoutePlanningAnalysisModel: ObservableObject {
+    typealias Analyze = (String, String, Date, String) async throws -> RouteDifficultyResponse
+
+    @Published private(set) var isLoading = false
+    @Published private(set) var result: RouteAnalysisResult?
+    @Published private(set) var errorMessage: String?
+    private var task: Task<Void, Never>?
+    private var accountObservation: AnyCancellable?
+    private var generation = 0
+    private let analyze: Analyze
+
+    init(analyze: @escaping Analyze = { origin, destination, departure, token in
+        try await APIClient().analyzeRoute(
+            origin: origin, destination: destination, departureTime: departure,
+            accessToken: token, includeAlternates: true
+        )
+    }) {
+        self.analyze = analyze
+    }
+
+    func start(form: RoutePlanningFormModel, auth: AuthSessionStore, recentRoutes: RecentRouteStore) {
+        guard !isLoading, auth.isSignedIn else { return }
+        let origin = form.origin
+        let destination = form.destination
+        let departure = form.departureTime
+        let accountGeneration = auth.accountDataGeneration
+        let requestGeneration = generation
+        isLoading = true
+        result = nil
+        errorMessage = nil
+        accountObservation = auth.$accountDataGeneration.dropFirst().sink { [weak self] _ in
+            self?.cancel()
+        }
+        task = Task { [weak self] in
+            guard let self else { return }
+            do {
+                let response = try await auth.performAuthenticated { token in
+                    try await self.analyze(origin, destination, departure, token)
+                }
+                guard !Task.isCancelled, self.generation == requestGeneration,
+                      auth.accountDataGeneration == accountGeneration, auth.isSignedIn else { return }
+                recentRoutes.record(origin: origin, destination: destination, departureTime: departure, route: response.primaryRoute)
+                self.result = RouteAnalysisResult(
+                    origin: origin, destination: destination, departureTime: departure,
+                    primaryRoute: response.primaryRoute, alternateRoutes: response.alternateRoutes
+                )
+            } catch {
+                guard !Task.isCancelled, self.generation == requestGeneration,
+                      auth.accountDataGeneration == accountGeneration, auth.isSignedIn else { return }
+                self.errorMessage = error.localizedDescription
+                self.isLoading = false
+            }
+            self.task = nil
+        }
+    }
+
+    func takeResult() -> RouteAnalysisResult? {
+        guard let result else { return nil }
+        self.result = nil
+        isLoading = false
+        accountObservation = nil
+        return result
+    }
+
+    func cancel() {
+        generation &+= 1
+        task?.cancel()
+        task = nil
+        accountObservation = nil
+        result = nil
+        errorMessage = nil
+        isLoading = false
     }
 }

@@ -22,6 +22,7 @@ struct ResultsView: View {
     @State private var result: RouteAnalysisResult
 
     @Environment(\.openURL) private var openURL
+    @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var driveSession: DriveSessionManager
     @EnvironmentObject private var authSession: AuthSessionStore
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -110,24 +111,50 @@ struct ResultsView: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: AppDesign.sectionSpacing) {
-                tripRouteHeader
-                resultsPagePicker
-                selectedPageContent
-                    .animation(
-                        reduceMotion
-                            ? .easeOut(duration: PremiumMotionSpec.reducedFocusTransition.duration)
-                            : AppAnimation.focus,
-                        value: selectedPage
-                    )
+        Group {
+            if selectedPage == .overview {
+                ZStack(alignment: .top) {
+                    RouteMapView(polyline: selectedRoute.polyline, bounds: selectedRoute.bounds,
+                        routeColor: AppDesign.UIKitColor.accent,
+                        contentInsets: UIEdgeInsets(top: 160, left: 32, bottom: 410, right: 32))
+                        .ignoresSafeArea(.container)
+                    HStack(alignment: .top, spacing: 16) {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("To \(result.destination)").font(.title.weight(.bold)).lineLimit(2)
+                            Text(result.origin).font(.subheadline).foregroundStyle(AppDesign.Ink.secondary).lineLimit(1)
+                        }
+                        Spacer(minLength: 0)
+                        Button { dismiss() } label: { Image(systemName: "xmark") }
+                            .buttonStyle(.glass).buttonBorderShape(.circle).controlSize(.large)
+                            .accessibilityLabel("Close routes")
+                    }
+                    .padding(20)
+                    .background(LinearGradient(colors: [AppDesign.canvas.opacity(0.85), .clear], startPoint: .top, endPoint: .bottom).ignoresSafeArea(edges: .top))
+                }
+                .safeAreaInset(edge: .bottom, spacing: 0) { comparisonSheet.padding(.horizontal, 16).padding(.bottom, 12) }
+            } else {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: AppDesign.sectionSpacing) {
+                        readinessSection
+                        departureComparisonSection
+                        selectedPageContent
+                        navigationSection
+                    }.padding(20)
+                }
+                .background(AppCanvasBackground())
             }
-            .padding(.horizontal, AppDesign.contentPadding)
-            .padding(.vertical, 12)
         }
-        .background(AppCanvasBackground())
-        .navigationTitle("Results")
+        .navigationTitle(selectedPage == .overview ? "" : "Route details")
         .navigationBarTitleDisplayMode(.inline)
+        .navigationBarBackButtonHidden()
+        .toolbar(selectedPage == .overview ? .hidden : .visible, for: .navigationBar)
+        .toolbar {
+            if selectedPage == .details {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Routes", systemImage: "chevron.left") { selectedPage = .overview }
+                }
+            }
+        }
         .onAppear {
             refreshRouteChoices()
             startDepartureComparison()
@@ -141,6 +168,48 @@ struct ResultsView: View {
         .onChange(of: selectedPage) { _, _ in
             UISelectionFeedbackGenerator().selectionChanged()
         }
+    }
+
+    private var comparisonSheet: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack {
+                Text("Routes").font(.title2.weight(.semibold))
+                Spacer()
+                Text(selectedRoute.label.rawValue).font(.footnote.weight(.medium))
+                    .foregroundStyle(labelColor).padding(.horizontal, 12).padding(.vertical, 7)
+                    .background(labelColor.opacity(0.1), in: Capsule())
+            }
+            ScrollView {
+                VStack(spacing: 6) {
+                    if let ranking = routeChoiceRanking {
+                        ForEach(ranking.choices) { choice in
+                            AlternateRouteCard(route: choice.route, isSelected: choice.route.id == selectedRoute.id,
+                                readinessHeadline: choice.assessment.headline, badges: choice.badges,
+                                comparisonLimitedByHistory: ranking.comparisonLimitedByHistory) { selectRouteChoice(choice) }
+                        }
+                    } else { ProgressView("Preparing routes") }
+                }
+            }
+            .scrollBounceBehavior(.basedOnSize)
+            .frame(maxHeight: 190)
+            HStack {
+                Text(selectedRoute.reasons.first ?? selectedRoute.label.rawValue)
+                    .font(.footnote).foregroundStyle(AppDesign.Ink.secondary).lineLimit(2)
+                Spacer(minLength: 8)
+                Button("Details") { selectedPage = .details }.font(.footnote.weight(.semibold))
+            }
+            Button { queuePracticeRoute() } label: {
+                Text("Practice this route").font(.headline).frame(maxWidth: .infinity, minHeight: 50)
+                    .foregroundStyle(AppDesign.primarySurfaceForeground)
+                    .background(AppDesign.Ink.primary, in: Capsule())
+            }
+            .buttonStyle(PressableScaleStyle())
+            .disabled(driveSession.isRecording)
+            .accessibilityIdentifier("routes.practiceSelected")
+        }
+        .padding(24)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 28))
+        .accessibilityIdentifier("routes.comparisonSheet")
     }
 
     private var resultsPagePicker: some View {

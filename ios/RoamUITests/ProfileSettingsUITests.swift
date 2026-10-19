@@ -242,6 +242,8 @@ final class DesignConsistencyUITests: XCTestCase {
         continueAfterFailure = false
         launch()
         switchTab("Routes")
+        XCTAssertTrue(app.maps.firstMatch.waitForExistence(timeout: 5))
+        XCTAssertFalse(app.staticTexts["Route preview"].exists)
         attach("Final — Routes")
         let explanation = app.buttons["routes.howRoamWorks"]
         reveal(explanation)
@@ -294,6 +296,91 @@ final class DesignConsistencyUITests: XCTestCase {
     }
 
     private func attach(_ name: String) {
+        let attachment = XCTAttachment(screenshot: app.screenshot())
+        attachment.name = name
+        attachment.lifetime = .keepAlways
+        add(attachment)
+    }
+}
+
+
+@MainActor
+final class RecordingDesignUITests: XCTestCase {
+    func testRecordingControlsPauseResumeLockAndEnd() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = ["--preview-drive", "-roam.theme-id-v1", "dark"]
+        app.launch()
+        let start = app.buttons["drive.start"]
+        XCTAssertTrue(start.waitForExistence(timeout: 30))
+        start.tap()
+        let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
+        let deny = springboard.buttons["Don’t Allow"]
+        if deny.waitForExistence(timeout: 3) { deny.tap() }
+        let pause = app.buttons["drive.pauseResume"]
+        let pauseExists = pause.waitForExistence(timeout: 8)
+        if !pauseExists { print(app.debugDescription) }
+        XCTAssertTrue(pauseExists)
+        pause.tap()
+        let toggle = app.buttons["drive.controls.pauseResume"]
+        XCTAssertTrue(toggle.waitForExistence(timeout: 5))
+        XCTAssertEqual(toggle.label, "Resume drive")
+        attach(app, "Paused drive controls")
+        toggle.tap()
+        XCTAssertEqual(toggle.label, "Pause drive")
+        app.buttons["drive.lockControls"].tap()
+        let unlock = app.descendants(matching: .any)["drive.unlockControls"].firstMatch
+        XCTAssertTrue(unlock.waitForExistence(timeout: 5))
+        unlock.press(forDuration: 1.3)
+        XCTAssertTrue(app.buttons["drive.showControls"].waitForExistence(timeout: 5))
+        app.buttons["drive.showControls"].tap()
+        XCTAssertTrue(app.buttons["drive.end"].waitForExistence(timeout: 5))
+        app.buttons["drive.end"].tap()
+        if app.buttons["New drive"].waitForExistence(timeout: 2) { app.buttons["New drive"].tap() }
+        XCTAssertTrue(start.waitForExistence(timeout: 8))
+        attach(app, "Ready after ending a short drive")
+    }
+
+    func testMapStaysBehindDestinationEntryAndProgressHasEmptyState() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = ["--preview-profile", "-roam.theme-id-v1", "dark"]
+        app.launch()
+        let routes = app.tabBars.buttons["Routes"]
+        XCTAssertTrue(routes.waitForExistence(timeout: 30))
+        routes.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["routes.backgroundMap"].firstMatch.waitForExistence(timeout: 8))
+        let destination = app.textFields["Enter a destination"]
+        XCTAssertTrue(destination.waitForExistence(timeout: 5))
+        destination.tap()
+        destination.typeText("Lincoln")
+        XCTAssertTrue(app.keyboards.firstMatch.exists)
+        XCTAssertTrue(app.descendants(matching: .any)["routes.backgroundMap"].firstMatch.exists)
+        attach(app, "Map behind native destination entry")
+        app.terminate()
+        app.launchArguments = ["--preview-progress", "-roam.theme-id-v1", "dark"]
+        app.launch()
+        XCTAssertTrue(app.descendants(matching: .any)["progress.overallScore"].firstMatch.waitForExistence(timeout: 30))
+        attach(app, "Progress state")
+    }
+
+    func testAccessibilityTextKeepsDestinationAndProgressReachable() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = ["--preview-routes", "-roam.theme-id-v1", "light",
+            "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"]
+        app.launch()
+        let destination = app.textFields["Enter a destination"]
+        XCTAssertTrue(destination.waitForExistence(timeout: 30))
+        if !destination.isHittable { app.scrollViews.firstMatch.swipeUp() }
+        XCTAssertTrue(destination.isHittable)
+        attach(app, "Route planning at accessibility text size")
+        app.tabBars.buttons["Progress"].tap()
+        XCTAssertTrue(app.descendants(matching: .any)["progress.overallScore"].firstMatch.waitForExistence(timeout: 10))
+        attach(app, "Progress at accessibility text size")
+    }
+
+    private func attach(_ app: XCUIApplication, _ name: String) {
         let attachment = XCTAttachment(screenshot: app.screenshot())
         attachment.name = name
         attachment.lifetime = .keepAlways

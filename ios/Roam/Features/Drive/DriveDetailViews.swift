@@ -442,11 +442,11 @@ struct FlipClock: View {
         case preview
         case active
 
-        var digitWidth: CGFloat { self == .active ? 68 : 56 }
-        var digitHeight: CGFloat { self == .active ? 96 : 76 }
-        var digitFontSize: CGFloat { self == .active ? 56 : 48 }
-        var colonFontSize: CGFloat { self == .active ? 38 : 30 }
-        var spacing: CGFloat { self == .active ? 6 : 5 }
+        var digitWidth: CGFloat { self == .active ? 52 : 56 }
+        var digitHeight: CGFloat { self == .active ? 72 : 76 }
+        var digitFontSize: CGFloat { self == .active ? 44 : 48 }
+        var colonFontSize: CGFloat { self == .active ? 32 : 30 }
+        var spacing: CGFloat { 5 }
     }
 
     let elapsed: TimeInterval
@@ -464,7 +464,7 @@ struct FlipClock: View {
         Group {
             if style == .preview {
                 Text(String(format: "%02d:%02d", Int(elapsed) / 60, Int(elapsed) % 60))
-                    .font(.system(size: min(previewFontSize, 92), weight: .medium))
+                    .font(.system(size: min(previewFontSize, 92), weight: .light))
                     .tracking(-2)
                     .monospacedDigit()
                     .foregroundStyle(AppDesign.Ink.primary)
@@ -474,16 +474,16 @@ struct FlipClock: View {
                     .padding(.vertical, AppDesign.space8)
             } else if dynamicTypeSize.isAccessibilitySize {
                 Text("\(Int(elapsed) / 60):\(String(format: "%02d", Int(elapsed) % 60))")
-                    .font(.system(.largeTitle, design: .rounded, weight: .bold))
+                    .font(.system(.largeTitle, design: .default, weight: .light))
                     .monospacedDigit()
                     .foregroundStyle(AppDesign.flipClockDigit)
             } else {
                 HStack(spacing: style.spacing) {
                     ForEach(Array(digits.enumerated()), id: \.offset) { index, digit in
-                        if index == 2 {
+                        if index == digits.count - 2 {
                             Text(":")
-                                .font(.system(size: style.colonFontSize, weight: .bold, design: .rounded))
-                                .foregroundStyle(AppDesign.flipClockDigit)
+                                .font(.system(size: style.colonFontSize, weight: .light))
+                                .foregroundStyle(AppDesign.Ink.primary)
                                 .padding(.horizontal, 1)
                         }
                         FlipClockDigit(digit: digit, style: style)
@@ -493,6 +493,8 @@ struct FlipClock: View {
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Drive time \(Int(elapsed) / 60) minutes, \(Int(elapsed) % 60) seconds")
+        .accessibilityValue(String(format: "%02d:%02d", Int(elapsed) / 60, Int(elapsed) % 60))
+        .accessibilityIdentifier("drive.flipClock")
     }
 }
 
@@ -508,9 +510,9 @@ private struct FlipDigitHalf: View {
 
     var body: some View {
         Text(digit)
-            .font(.system(size: style.digitFontSize, weight: .semibold, design: .rounded))
+            .font(.system(size: style.digitFontSize, weight: .light))
             .monospacedDigit()
-            .foregroundStyle(AppDesign.flipClockDigit)
+            .foregroundStyle(Color.white)
             .frame(width: style.digitWidth, height: style.digitHeight)
             .frame(height: style.digitHeight / 2, alignment: edge == .top ? .top : .bottom)
             .clipped()
@@ -559,7 +561,7 @@ private struct FlipClockDigit: View {
 
     var body: some View {
         ZStack {
-            tile.fill(AppDesign.cardSurface)
+            tile.fill(LinearGradient(colors: [Color(white: 0.16), Color(white: 0.105)], startPoint: .top, endPoint: .bottom))
 
             VStack(spacing: 0) {
                 FlipDigitHalf(digit: settledDigit, edge: .top, style: style)
@@ -568,7 +570,7 @@ private struct FlipClockDigit: View {
 
             if isLifting {
                 FlipDigitHalf(digit: outgoingDigit, edge: .top, style: style)
-                    .background(AppDesign.cardSurface)
+                    .background(Color(white: 0.13))
                     // A card lifting off the stack catches the light at a
                     // grazing angle right before it goes edge-on; the darker
                     // it gets here is what sells the rotation in flat 2D.
@@ -585,7 +587,7 @@ private struct FlipClockDigit: View {
 
             if isLanding {
                 FlipDigitHalf(digit: settledDigit, edge: .bottom, style: style)
-                    .background(AppDesign.cardSurface)
+                    .background(Color(white: 0.13))
                     .overlay(Color.black.opacity(min(abs(landAngle) / 90, 1) * 0.22))
                     .frame(width: style.digitWidth, height: style.digitHeight / 2)
                     .rotation3DEffect(
@@ -599,7 +601,7 @@ private struct FlipClockDigit: View {
 
             // The hinge line sits above everything so both flaps visibly pass
             // behind the axle, the way a real split-flap board reads.
-            Rectangle().fill(AppDesign.cardStroke).frame(height: 1)
+            Rectangle().fill(Color.black.opacity(0.55)).frame(height: 0.6)
         }
         .frame(width: style.digitWidth, height: style.digitHeight)
         .clipShape(tile)

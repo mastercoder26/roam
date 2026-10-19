@@ -225,7 +225,8 @@ enum DriveExperienceEngine {
         for index in 1..<route.count {
             let previous = route[index - 1]
             let current = route[index]
-            guard CLLocationCoordinate2DIsValid(previous.coordinate.clLocationCoordinate),
+            guard current.startsNewSegment != true,
+                  CLLocationCoordinate2DIsValid(previous.coordinate.clLocationCoordinate),
                   CLLocationCoordinate2DIsValid(current.coordinate.clLocationCoordinate),
                   previous.speedMetersPerSecond.isFinite,
                   current.speedMetersPerSecond.isFinite,

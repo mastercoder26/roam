@@ -25,6 +25,8 @@ enum AppDesign {
     static var danger: Color { palette.danger.color }
     static var dangerForeground: Color { palette.dangerForeground.color }
     static var positive: Color { palette.positive.color }
+    static let recordingAction = Color("RecordingAction")
+    static let recordingActionForeground = Color("RecordingActionForeground")
 
     static var canvas: Color { palette.canvas.color }
     static var cardSurface: Color { palette.cardSurface.color }
@@ -443,7 +445,8 @@ struct BrandWordmark: View {
     var body: some View {
         RoamWordmark(
             fontSize: compact ? 23 : 36,
-            foreground: themeManager.palette.inkPrimary.color.opacity(0.92)
+            foreground: themeManager.palette.inkPrimary.color.opacity(0.92),
+            usesSlices: !compact
         )
             // Hold the compact wordmark at a stable optical size so an
             // accessibility text setting leaves room for the route inputs.
@@ -846,9 +849,11 @@ struct WeekCadenceStrip: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let title: String
     let days: [CadenceDay]
+    var showsHeader = true
 
     var body: some View {
         VStack(alignment: .leading, spacing: AppDesign.space12) {
+            if showsHeader {
             if dynamicTypeSize.isAccessibilitySize {
                 VStack(alignment: .leading, spacing: AppDesign.space4) {
                     cadenceTitle
@@ -862,6 +867,7 @@ struct WeekCadenceStrip: View {
                 }
             }
 
+            }
             HStack(spacing: AppDesign.space4) {
                 ForEach(days) { day in
                     VStack(spacing: AppDesign.space4) {

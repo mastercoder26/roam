@@ -26,88 +26,30 @@ struct AlternateRouteCard: View {
 
     var body: some View {
         Button(action: onSelect) {
-            HStack(spacing: 14) {
-                VStack(alignment: .leading, spacing: AppDesign.space4) {
-                    HStack(spacing: AppDesign.space8) {
-                        Text(route.formattedScore)
-                            .font(.title3.weight(.bold).monospacedDigit())
-                            .foregroundStyle(accentColor)
-                            .contentTransition(.numericText())
-
-                        Text(route.label.rawValue)
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(AppDesign.Ink.secondary)
-                    }
-
-                    if let topReason = route.reasons.first {
-                        Text(topReason)
-                            .font(.subheadline)
-                            .foregroundStyle(AppDesign.Ink.primary)
-                            .lineLimit(2)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-
-                    if let readinessHeadline {
-                        Text(readinessHeadline)
-                            .font(.caption.weight(.medium))
-                            .foregroundStyle(comparisonLimitedByHistory ? .secondary : readinessColor)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-
-                    HStack(spacing: AppDesign.space12) {
-                        Label(route.formattedDuration, systemImage: "clock")
-                        Label(route.formattedDistance, systemImage: "arrow.left.and.right")
-                    }
-                    .font(.caption)
-                    .foregroundStyle(AppDesign.Ink.secondary)
-
-                    if !badges.isEmpty {
-                        FlowLayout(spacing: 6) {
-                            ForEach(badges, id: \.rawValue) { badge in
-                                Text(badge.title)
-                                    .font(.caption2.weight(.semibold))
-                                    .foregroundStyle(badge == .bestFit ? AppDesign.positive : AppDesign.accent)
-                                    .padding(.horizontal, 7)
-                                    .padding(.vertical, 4)
-                                    .background((badge == .bestFit ? AppDesign.positive : AppDesign.accent).opacity(0.11), in: Capsule())
-                            }
-                        }
-                    }
+            HStack(spacing: 16) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(route.formattedDuration).font(.title3.weight(.semibold)).monospacedDigit()
+                    Text(route.formattedDistance).font(.footnote).foregroundStyle(AppDesign.Ink.secondary)
                 }
-                .layoutPriority(1)
-
-                Spacer(minLength: 0)
-
-                if let delta = route.scoreDelta {
-                    Text(deltaText(delta))
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(delta >= 0 ? AppDesign.safety : AppDesign.positive)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(AppDesign.cardSurfaceElevated)
-                        .clipShape(Capsule())
+                Spacer(minLength: 8)
+                VStack(alignment: .trailing, spacing: 4) {
+                    Text(route.label.rawValue).font(.subheadline.weight(.medium)).foregroundStyle(accentColor)
+                    Text("\(route.formattedScore) / 10").font(.caption).foregroundStyle(AppDesign.Ink.secondary)
                 }
-
-                Image(systemName: isSelected ? "checkmark.circle.fill" : "chevron.right")
-                    .font(.body.weight(.medium))
-                    .foregroundStyle(isSelected ? AppDesign.accent : AppDesign.Ink.tertiary)
-                    .animation(AppAnimation.quick, value: isSelected)
             }
-            .padding(AppDesign.cardPadding)
-            .background(
-                isSelected
-                    ? AppDesign.accent.opacity(0.08)
-                    : AppDesign.cardSurface
-            )
-            .clipShape(RoundedRectangle(cornerRadius: AppDesign.cornerRadius, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: AppDesign.cornerRadius, style: .continuous)
-                    .strokeBorder(isSelected ? AppDesign.accent.opacity(0.5) : AppDesign.cardStroke, lineWidth: isSelected ? 1.5 : 0.5)
-            )
+            .foregroundStyle(AppDesign.Ink.primary)
+            .padding(16)
+            .frame(maxWidth: .infinity, minHeight: 84)
+            .background(isSelected ? AppDesign.cardSurfaceElevated : .clear, in: RoundedRectangle(cornerRadius: 22))
+            .overlay {
+                RoundedRectangle(cornerRadius: 22)
+                    .strokeBorder(isSelected ? AppDesign.cardStrokeStrong : .clear, lineWidth: 0.75)
+            }
         }
         .buttonStyle(PressableScaleStyle())
-        .animation(reduceMotion ? .easeOut(duration: 0.16) : AppAnimation.selection, value: isSelected)
-        .accessibilityLabel("Route, score \(route.formattedScore), \(route.label.rawValue)\(readinessHeadline.map { ", \($0)" } ?? "")")
+        .animation(reduceMotion ? nil : AppAnimation.selection, value: isSelected)
+        .accessibilityLabel("\(route.formattedDuration), \(route.formattedDistance), \(route.label.rawValue), difficulty \(route.formattedScore) out of 10")
+        .accessibilityValue(isSelected ? "Selected" : "Not selected")
     }
 
     private func deltaText(_ delta: Double) -> String {

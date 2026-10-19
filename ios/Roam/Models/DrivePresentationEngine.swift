@@ -100,3 +100,33 @@ enum DrivePresentationEngine {
         return DrivePresentationState(phase: nextPhase)
     }
 }
+
+/// Wall-clock timestamps remain attached to samples; this clock measures only
+/// the time the person has explicitly chosen to record.
+struct DriveRecordingClock {
+    private(set) var startedAt: Date?
+    private(set) var pausedAt: Date?
+    private(set) var pausedDuration: TimeInterval = 0
+
+    mutating func start(at date: Date) {
+        startedAt = date
+        pausedAt = nil
+        pausedDuration = 0
+    }
+
+    mutating func pause(at date: Date) {
+        guard startedAt != nil, pausedAt == nil else { return }
+        pausedAt = date
+    }
+
+    mutating func resume(at date: Date) {
+        guard let pausedAt else { return }
+        pausedDuration += max(0, date.timeIntervalSince(pausedAt))
+        self.pausedAt = nil
+    }
+
+    func elapsed(at date: Date) -> TimeInterval {
+        guard let startedAt else { return 0 }
+        return max(0, (pausedAt ?? date).timeIntervalSince(startedAt) - pausedDuration)
+    }
+}

@@ -7,19 +7,27 @@ struct HomeView: View {
     @EnvironmentObject private var authSession: AuthSessionStore
     @ObservedObject private var recentRoutes = RecentRouteStore.shared
     @ObservedObject var form: RoutePlanningFormModel
-    @State private var isLoading = false
-    @State private var isCompletingLoading = false
-    @State private var pendingResult: RouteAnalysisResult?
-    @State private var analysisTask: Task<Void, Never>?
-    @State private var errorMessage: String?
+    @ObservedObject var analysis: RoutePlanningAnalysisModel
+    @State private var isVisible = false
+
+    private var isLoading: Bool { analysis.isLoading }
+    private var isCompletingLoading: Bool { analysis.result != nil }
+    private var errorMessage: String? { analysis.errorMessage }
     @State private var navigationPath = NavigationPath()
     @State private var mapPreview: RoutePlanningMapSummary?
     @State private var showingHowRoamWorks = false
     @State private var authIsPresented = false
+    @State private var showingRecentRoutes = false
+    @State private var showingDeparturePicker = false
+    @State private var planningContentHeight: CGFloat = 330
+    @State private var availableHeight: CGFloat = 700
+    @State private var isEditingOrigin = false
+    @State private var isEditingDestination = false
+
+    private var isEditingRoute: Bool { isEditingOrigin || isEditingDestination }
     @StateObject private var locationCoordinator = RoutePlanningLocationCoordinator()
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    private let apiClient = APIClient()
 
     private var formPresentation: RoutePlanningFormPresentation {
         RoutePlanningFormPresentation(
@@ -31,10 +39,6 @@ struct HomeView: View {
 
     private var planningStage: RoutePlanningStage {
         formPresentation.stage
-    }
-
-    private var mapPreviewAccessibilityLabel: String {
-        mapPreview?.accessibilityLabel ?? "Apple Maps route preview"
     }
 
     private var primaryAction: RoutePlanningPrimaryAction {
@@ -82,56 +86,91 @@ struct HomeView: View {
 
     var body: some View {
         NavigationStack(path: $navigationPath) {
-            ZStack {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: AppDesign.sectionSpacing) {
-                        headerSection
+            ZStack(alignment: .bottom) {
+                RoutePlanningMapPreview(
+                    origin: form.origin,
+                    destination: form.destination,
+                    usesCurrentLocation: form.usesCurrentLocation,
+                    showsCurrentLocation: shouldShowCurrentLocationOnMap,
+                    summary: $mapPreview
+                )
+                .ignoresSafeArea(.container)
+                .accessibilityIdentifier("routes.backgroundMap")
 
-                        if let notice = form.importNotice {
-                            importNoticeBanner(notice)
-                                .transition(progressiveReveal)
-                        }
-
-                        VStack(alignment: .leading, spacing: AppDesign.space16) {
-                            routeCard
-                            mapPreviewSection
-                            if planningStage == .readyToAnalyze, let mapPreview {
-                                mapSummaryRow(mapPreview)
-                                    .transition(.opacity)
-                            }
-                            departureContainer
-                        }
-
-                        if let errorMessage {
-                            errorBanner(errorMessage)
-                                .transition(.opacity)
-                        }
-
-                        analyzeButton
-
+                VStack(alignment: .leading, spacing: 16) {
+                    HStack {
+                        ScreenHeader(title: "Routes")
+                        Spacer()
                         if !recentRoutes.entries.isEmpty {
-                            recentRoutesSection
-                                .transition(progressiveReveal)
+                            Button { showingRecentRoutes = true } label: {
+                                Image(systemName: "clock.arrow.circlepath")
+                            }
+                            .accessibilityLabel("Recent routes")
+                            .buttonStyle(.glass)
+                            .buttonBorderShape(.circle)
+                            .controlSize(.large)
                         }
-
-                        routeChecksSection
+                        Button { showingHowRoamWorks = true } label: {
+                            Image(systemName: "info.circle")
+                        }
+                        .accessibilityIdentifier("routes.howRoamWorks")
+                        .accessibilityLabel("How Roam works")
+                        .buttonStyle(.glass)
+                        .buttonBorderShape(.circle)
+                        .controlSize(.large)
                     }
                     .padding(.horizontal, AppDesign.contentPadding)
                     .padding(.top, AppDesign.screenTopPadding)
-                    .padding(.bottom, AppDesign.space24)
-                    .frame(maxWidth: AppDesign.maximumContentWidth)
-                    .frame(maxWidth: .infinity)
+                    .background(alignment: .top) {
+                        LinearGradient(colors: [AppDesign.canvas.opacity(0.9), .clear], startPoint: .top, endPoint: .bottom)
+                            .ignoresSafeArea(edges: .top)
+                            .padding(.bottom, -36)
+                    }
+                    Spacer(minLength: 16)
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("Where to?")
+                                .font(.system(.title, weight: .semibold))
+                            if let notice = form.importNotice { importNoticeBanner(notice) }
+                            routeCard
+                            if !isEditingRoute {
+                                departureContainer
+                                if let errorMessage { errorBanner(errorMessage) }
+                                analyzeButton
+                            }
+                        }
+                        .padding(20)
+                        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { planningContentHeight = $0 }
+                    }
+                    .scrollBounceBehavior(.basedOnSize)
+                    .scrollDismissesKeyboard(.interactively)
+                    .frame(height: min(planningContentHeight, max(160, availableHeight - 112)))
+                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 28, style: .continuous)
+                            .strokeBorder(AppDesign.glassHighlight.opacity(0.45), lineWidth: 0.5)
+                    }
+                    .shadow(color: AppDesign.cardShadow.opacity(0.35), radius: 18, y: 8)
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, isEditingRoute ? 12 : 18)
+                    .accessibilityIdentifier("routes.planningSheet")
+                    .disabled(isLoading)
                 }
-                .scrollDismissesKeyboard(.interactively)
-                .contentMargins(.bottom, AppDesign.tabBarClearance, for: .scrollContent)
-                .disabled(isLoading)
                 if isLoading {
-                    RouteAnalysisLoadingView(isFinishing: isCompletingLoading) { completeLoading() }
-                        .transition(.premiumFocus(reduceMotion: reduceMotion))
-                        .zIndex(1)
+                    RouteAnalysisLoadingView(
+                        isFinishing: isCompletingLoading,
+                        coordinates: mapPreview?.coordinates ?? [],
+                        destination: form.destination,
+                        routeSummary: mapPreview?.displayText,
+                        onCancel: { analysis.cancel() },
+                        onDepartureComplete: { completeLoading() }
+                    )
+                    .transition(.opacity)
+                    .zIndex(1)
                 }
             }
-            .background(AppCanvasBackground())
+            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { availableHeight = $0 }
+            .toolbar(isEditingRoute ? .hidden : .visible, for: .tabBar)
             .toolbar(.hidden, for: .navigationBar)
             .navigationDestination(for: RouteAnalysisResult.self) { ResultsView(result: $0) }
             .onChange(of: locationCoordinator.state) { _, state in
@@ -148,12 +187,39 @@ struct HomeView: View {
             }
             .onChange(of: form.importedRouteID) { _, importedRouteID in
                 guard importedRouteID != nil else { return }
-                cancelAnalysis()
+                analysis.cancel()
                 navigationPath = NavigationPath()
                 mapPreview = nil
             }
         }
-        .onDisappear { cancelAnalysis() }
+        .onAppear {
+            isVisible = true
+            completeLoading()
+        }
+        .onDisappear { isVisible = false }
+        .sheet(isPresented: $showingDeparturePicker) {
+            NavigationStack {
+                DatePicker("Departure time", selection: $form.departureTime, in: Date()..., displayedComponents: [.date, .hourAndMinute])
+                    .datePickerStyle(.graphical)
+                    .padding(20)
+                    .navigationTitle("Departure time")
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar { ToolbarItem(placement: .confirmationAction) {
+                        Button("Done") { showingDeparturePicker = false }
+                    } }
+            }.presentationDetents([.medium, .large])
+        }
+        .sheet(isPresented: $showingRecentRoutes) {
+            NavigationStack {
+                ScrollView { recentRoutesSection.padding(20) }
+                    .navigationTitle("Recent routes")
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar { ToolbarItem(placement: .confirmationAction) {
+                        Button("Done") { showingRecentRoutes = false }
+                    } }
+            }
+            .presentationDetents([.medium, .large])
+        }
         .sheet(isPresented: $showingHowRoamWorks) {
             HowRoamWorksSheet()
         }
@@ -170,15 +236,11 @@ struct HomeView: View {
         }
     }
 
-    private var headerSection: some View {
-        ScreenHeader(title: "Where to?")
-    }
-
     private var routeCard: some View {
         VStack(spacing: 0) {
             originRow
 
-            if formPresentation.showsDestination {
+            Group {
                 Divider()
                     .overlay(AppDesign.Ink.tertiary.opacity(0.4))
                     .padding(.leading, 68)
@@ -187,7 +249,7 @@ struct HomeView: View {
             }
         }
         .padding(.vertical, AppDesign.space8)
-        .featuredSurface()
+
         .overlay(alignment: .trailing) {
             if canSwapEndpoints {
                 Button(action: swapEndpoints) {
@@ -227,7 +289,7 @@ struct HomeView: View {
         if form.usesCurrentLocation {
             VStack(alignment: .leading, spacing: AppDesign.space8) {
                 HStack(alignment: .center, spacing: 14) {
-                    RoutePlanningFieldIcon(symbol: "location.circle.fill", tint: AppDesign.Ink.primary)
+                    RoutePlanningFieldIcon(symbol: "location.fill", tint: AppDesign.Ink.primary)
 
                     Button {
                         locationCoordinator.useCurrentLocation()
@@ -275,8 +337,8 @@ struct HomeView: View {
                         .transition(.opacity)
                 }
             }
-            .padding(.horizontal, 18)
-            .padding(.vertical, 17)
+            .padding(.horizontal, 0)
+            .padding(.vertical, 10)
         } else {
             HStack(alignment: .top, spacing: 14) {
                 RoutePlanningFieldIcon(symbol: "circle.inset.filled", tint: AppDesign.accent)
@@ -290,7 +352,8 @@ struct HomeView: View {
                         systemImage: "circle.fill",
                         iconColor: AppDesign.accent,
                         showsIcon: false,
-                        text: $form.origin
+                        text: $form.origin,
+                        onFocusChanged: { isEditingOrigin = $0 }
                     )
                     .layoutPriority(1)
 
@@ -317,14 +380,14 @@ struct HomeView: View {
                 .padding(.top, 8)
                 .accessibilityLabel("Use current location")
             }
-            .padding(.horizontal, 18)
-            .padding(.vertical, 15)
+            .padding(.horizontal, 0)
+            .padding(.vertical, 10)
         }
     }
 
     private var destinationRow: some View {
         HStack(alignment: .top, spacing: 14) {
-            RoutePlanningFieldIcon(symbol: "mappin.circle.fill", tint: AppDesign.Ink.secondary)
+            RoutePlanningFieldIcon(symbol: "mappin.and.ellipse", tint: AppDesign.Ink.secondary)
                 .padding(.top, 8)
 
             VStack(alignment: .leading, spacing: AppDesign.space4) {
@@ -335,13 +398,14 @@ struct HomeView: View {
                     systemImage: "mappin",
                     iconColor: AppDesign.Ink.secondary,
                     showsIcon: false,
-                    text: $form.destination
+                    text: $form.destination,
+                    onFocusChanged: { isEditingDestination = $0 }
                 )
                 .layoutPriority(1)
             }
         }
-        .padding(.horizontal, 18)
-        .padding(.vertical, 15)
+        .padding(.horizontal, 0)
+        .padding(.vertical, 10)
         .accessibilityElement(children: .contain)
     }
 
@@ -374,65 +438,6 @@ struct HomeView: View {
         case .awaitingOrigin:
             form.origin.isEmpty ? "Current location" : form.origin
         }
-    }
-
-    private var mapPreviewSection: some View {
-        Group {
-            if planningStage == .readyToAnalyze {
-                RoutePlanningMapPreview(
-                    origin: form.origin,
-                    destination: form.destination,
-                    usesCurrentLocation: form.usesCurrentLocation,
-                    showsCurrentLocation: shouldShowCurrentLocationOnMap,
-                    summary: $mapPreview
-                )
-                .allowsHitTesting(mapPreview != nil)
-                .frame(height: 230)
-                .accessibilityLabel(mapPreviewAccessibilityLabel)
-                .accessibilityHint(mapPreview == nil ? "Preparing your route preview" : "Pan or zoom to inspect the route")
-            } else {
-                VStack(spacing: AppDesign.space8) {
-                    Image(systemName: "map")
-                        .font(.system(size: 24))
-                        .foregroundStyle(AppDesign.Ink.secondary)
-                        .accessibilityHidden(true)
-                    Text("Route preview")
-                        .font(.headline)
-                        .foregroundStyle(AppDesign.Ink.primary)
-                    Text("Add your start and destination to see your route.")
-                        .font(.footnote)
-                        .foregroundStyle(AppDesign.Ink.secondary)
-                        .multilineTextAlignment(.center)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                .padding(AppDesign.cardPadding)
-                .frame(maxWidth: .infinity, minHeight: 148)
-                .accessibilityElement(children: .combine)
-            }
-        }
-        .background(AppDesign.cardSurface)
-        .clipShape(RoundedRectangle(cornerRadius: AppDesign.cornerRadiusLarge, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: AppDesign.cornerRadiusLarge, style: .continuous)
-                .strokeBorder(AppDesign.cardStroke, lineWidth: 0.5)
-        }
-    }
-
-    private func mapSummaryRow(_ summary: RoutePlanningMapSummary) -> some View {
-        HStack(spacing: AppDesign.space8) {
-            Image(systemName: "car.fill")
-                .foregroundStyle(AppDesign.accent)
-            Text(summary.displayText)
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(AppDesign.Ink.primary)
-            Spacer(minLength: AppDesign.space8)
-            Text("Apple Maps estimate")
-                .font(.caption)
-                .foregroundStyle(AppDesign.Ink.secondary)
-        }
-        .padding(.horizontal, AppDesign.space4)
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(summary.accessibilityLabel)
     }
 
     private var recentRoutesSection: some View {
@@ -469,54 +474,23 @@ struct HomeView: View {
             form.usesCurrentLocation = false
             form.origin = entry.origin
             form.destination = entry.destination
+            showingRecentRoutes = false
         }
-    }
-
-    private var departureSection: some View {
-        HStack(spacing: 10) {
-            Image(systemName: "calendar")
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(AppDesign.Ink.secondary)
-                .frame(width: 28, height: 28)
-                .background(AppDesign.Ink.primary.opacity(0.10), in: Circle())
-                .accessibilityHidden(true)
-
-            DatePicker(
-                "Departure time",
-                selection: $form.departureTime,
-                in: Date()...,
-                displayedComponents: [.date, .hourAndMinute]
-            )
-            .datePickerStyle(.compact)
-            .labelsHidden()
-            .tint(AppDesign.accent)
-
-            Image(systemName: "pencil")
-                .font(.caption.weight(.bold))
-                .foregroundStyle(AppDesign.Ink.tertiary)
-                .accessibilityHidden(true)
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 11)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            AppDesign.cardSurface,
-            in: RoundedRectangle(cornerRadius: AppDesign.cornerRadiusSmall, style: .continuous)
-        )
-        .elevation(AppDesign.Elevation.low)
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("Departure time")
-        .accessibilityHint("Double tap to change the date or time")
     }
 
     private var departureContainer: some View {
-        Group {
-            if planningStage == .readyToAnalyze {
-                departureSection
-                    .transition(progressiveReveal)
-            }
+        Menu {
+            Button("Leave now") { form.departureTime = Date() }
+            Button("Choose departure time") { showingDeparturePicker = true }
+        } label: {
+            Label(abs(form.departureTime.timeIntervalSinceNow) < 90 ? "Leave now" : form.departureTime.formatted(date: .omitted, time: .shortened), systemImage: "clock")
+                .font(.footnote)
         }
-        .animation(reduceMotion ? .easeOut(duration: 0.18) : AppAnimation.selection, value: planningStage)
+        .buttonStyle(.bordered)
+        .buttonBorderShape(.capsule)
+        .controlSize(.small)
+        .tint(AppDesign.Ink.primary)
+        .accessibilityLabel("Departure time")
     }
 
     private var analyzeButton: some View {
@@ -525,8 +499,9 @@ struct HomeView: View {
             case .signIn:
                 authIsPresented = true
             case .analyze:
-                guard analysisTask == nil else { return }
-                analysisTask = Task { await analyzeRoute() }
+                withAnimation(loadingTransitionAnimation) {
+                    analysis.start(form: form, auth: authSession, recentRoutes: recentRoutes)
+                }
             case .chooseOrigin, .chooseDestination, .waitingForAccount, .analyzing:
                 break
             }
@@ -595,22 +570,6 @@ struct HomeView: View {
         case .analyzing:
             "Route analysis is in progress"
         }
-    }
-
-    private var routeChecksSection: some View {
-        Button {
-            showingHowRoamWorks = true
-        } label: {
-            AppMenuRow(
-                title: "How Roam works",
-                subtitle: "Route scores, recorded drives, and your data",
-                symbol: "info.circle"
-            )
-        }
-        .buttonStyle(PressableScaleStyle())
-        .menuSurface()
-        .accessibilityIdentifier("routes.howRoamWorks")
-        .accessibilityHint("Shows route inputs, scoring, privacy, and limitations")
     }
 
     private func errorBanner(_ message: String) -> some View {
@@ -686,75 +645,13 @@ struct HomeView: View {
         locationCoordinator.useCurrentLocation()
     }
 
-    private func analyzeRoute() async {
-        guard !isLoading, !Task.isCancelled else { return }
-        let origin = form.origin
-        let destination = form.destination
-        let departureTime = form.departureTime
-        withAnimation(AppAnimation.quick) { errorMessage = nil }
-        pendingResult = nil
-        isCompletingLoading = false
-        withAnimation(loadingTransitionAnimation) {
-            isLoading = true
-        }
-        do {
-            let response = try await authSession.performAuthenticated { token in
-                try await apiClient.analyzeRoute(
-                    origin: origin,
-                    destination: destination,
-                    departureTime: departureTime,
-                    accessToken: token,
-                    includeAlternates: true
-                )
-            }
-            guard !Task.isCancelled else { return }
-            pendingResult = RouteAnalysisResult(
-                origin: origin,
-                destination: destination,
-                departureTime: departureTime,
-                primaryRoute: response.primaryRoute,
-                alternateRoutes: response.alternateRoutes
-            )
-            recentRoutes.record(
-                origin: origin,
-                destination: destination,
-                departureTime: departureTime,
-                route: response.primaryRoute
-            )
-            UINotificationFeedbackGenerator().notificationOccurred(.success)
-            withAnimation(reduceMotion ? .easeOut(duration: 0.12) : AppAnimation.quick) {
-                isCompletingLoading = true
-            }
-        } catch {
-            guard !Task.isCancelled else { return }
-            analysisTask = nil
-            UINotificationFeedbackGenerator().notificationOccurred(.error)
-            withAnimation(AppAnimation.quick) {
-                errorMessage = error.localizedDescription
-            }
-            withAnimation(loadingTransitionAnimation) {
-                isLoading = false
-            }
-        }
-    }
-
-    private func cancelAnalysis() {
-        analysisTask?.cancel()
-        analysisTask = nil
-        pendingResult = nil
-        isCompletingLoading = false
-        isLoading = false
-    }
-
     private func completeLoading() {
-        guard let pendingResult else { return }
-        analysisTask = nil
+        guard isVisible else { return }
         withAnimation(loadingTransitionAnimation) {
-            isCompletingLoading = false
-            isLoading = false
-            self.pendingResult = nil
+            if let result = analysis.takeResult() {
+                navigationPath.append(result)
+            }
         }
-        navigationPath.append(pendingResult)
     }
 
     private var loadingTransitionAnimation: Animation {
@@ -777,14 +674,7 @@ private struct RoutePlanningFieldIcon: View {
     }
 }
 
-struct RouteAnalysisResult: Hashable {
-    let origin: String
-    let destination: String
-    let departureTime: Date
-    let primaryRoute: ScoredRoute
-    let alternateRoutes: [ScoredRoute]
-}
 
 #Preview {
-    HomeView(form: RoutePlanningFormModel())
+    HomeView(form: RoutePlanningFormModel(), analysis: RoutePlanningAnalysisModel())
 }

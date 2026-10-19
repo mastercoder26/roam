@@ -47,6 +47,7 @@ sources+=(
     ios/Roam/Services/APIClient.swift
     ios/Roam/Services/ClerkBackendClient.swift
     ios/Roam/Services/AuthSessionStore.swift
+    ios/Roam/Services/RecentRouteStore.swift
     ios/Roam/Services/DriveHistorySyncService.swift
     ios/Roam/Services/SharedRouteImportCoordinator.swift
 )

@@ -1,3 +1,4 @@
+import Charts
 import SwiftUI
 import UIKit
 
@@ -37,25 +38,16 @@ struct DriverProgressView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: AppDesign.sectionSpacing) {
+                VStack(alignment: .leading, spacing: 16) {
                     ScreenHeader(title: "Progress")
                     overallScoreCard
 
-                    WeekCadenceStrip(
-                        title: "This week",
-                        days: CadenceDay.recentWeek(completedDates: session.recordedDrives.map(\.startedAt))
-                    )
-                    .animation(reduceMotion ? .easeOut(duration: 0.16) : AppAnimation.selection, value: session.recordedDrives.map(\.id))
-
-                    if summary.hasRecordedEvidence {
-                        personalizedCoachCard
-                        progressOverview
-                        if hasThinRecordedHistory {
-                            thinEvidenceState
-                        }
-                        measurementDetailsDisclosure
-                    } else {
+                    weeklyActivity
+                    if session.recordedDrives.isEmpty {
                         emptyEvidenceState
+                    } else {
+                        nextDriveCard
+                        if performance.score != nil { recentTrendCard }
                     }
 
                     if notYetQualifyingDriveCount > 0 {
@@ -75,48 +67,166 @@ struct DriverProgressView: View {
     }
 
     private var overallScoreCard: some View {
-        VStack(alignment: .leading, spacing: AppDesign.space16) {
-            Text("Overall driving score")
-                .font(.subheadline.weight(.medium))
-                .foregroundStyle(AppDesign.Ink.secondary)
-
+        VStack(alignment: .leading, spacing: 14) {
             if let score = performance.score {
-                HStack(alignment: .firstTextBaseline, spacing: AppDesign.space8) {
+                Text("Overall driving score").font(.subheadline.weight(.medium)).foregroundStyle(AppDesign.Ink.secondary)
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Text("\(score)")
                         .font(.system(size: min(scoreSize, 112), weight: .semibold))
-                        .tracking(-2)
-                        .monospacedDigit()
-                        .minimumScaleFactor(0.7)
-                    Text("/ 100")
-                        .font(.body)
-                        .foregroundStyle(AppDesign.Ink.secondary)
+                        .tracking(-2).monospacedDigit().minimumScaleFactor(0.7)
+                    Text("/ 100").font(.title3).foregroundStyle(AppDesign.Ink.secondary)
                 }
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel("Overall driving score \(score) out of 100")
-
                 if dynamicTypeSize.isAccessibilitySize {
-                    VStack(alignment: .leading, spacing: AppDesign.space8) {
-                        performanceSignals
-                    }
+                    VStack(alignment: .leading, spacing: 16) { performanceSignals }
                 } else {
-                    HStack(alignment: .top, spacing: AppDesign.space12) {
-                        performanceSignals
-                    }
+                    HStack(alignment: .top, spacing: 12) { performanceSignals }
                 }
+            } else if !session.recordedDrives.isEmpty {
+                Text("Recorded driving").font(.title2.weight(.semibold))
+                if dynamicTypeSize.isAccessibilitySize {
+                    VStack(alignment: .leading, spacing: 16) { recordedDrivingSignals }
+                } else {
+                    HStack(alignment: .top, spacing: 16) { recordedDrivingSignals }
+                }
+                Divider()
+                Text(performance.pendingAnalysisCount > 0 ? "Route analysis pending" : "No score yet").font(.headline)
+                Text(performance.detail).font(.footnote).foregroundStyle(AppDesign.Ink.secondary)
             } else {
-                Text(performance.evidence.title)
-                    .font(.title2.weight(.semibold))
-                    .fixedSize(horizontal: false, vertical: true)
+                Text("Overall driving score").font(.subheadline.weight(.medium)).foregroundStyle(AppDesign.Ink.secondary)
+                Text("No score yet").font(.headline)
+                Text("A score appears after a drive has usable sensor data and route difficulty analysis.")
+                    .font(.footnote).foregroundStyle(AppDesign.Ink.secondary)
             }
-
-            Text(performance.detail)
-                .font(.footnote)
-                .foregroundStyle(AppDesign.Ink.secondary)
-                .fixedSize(horizontal: false, vertical: true)
         }
         .foregroundStyle(AppDesign.Ink.primary)
         .heroCard()
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("progress.overallScore")
+    }
+
+    @ViewBuilder
+    private var recordedDrivingSignals: some View {
+        ProgressScoreSignal(value: String(format: "%.1f", session.recordedDrives.reduce(0) { $0 + $1.score.distanceMiles }), label: "Miles driven")
+        ProgressScoreSignal(value: String(Int(session.recordedDrives.reduce(0) { $0 + $1.score.duration } / 60)), label: "Minutes")
+        ProgressScoreSignal(value: String(Set(session.recordedDrives.map { Calendar.current.startOfDay(for: $0.startedAt) }).count), label: "Driving days")
+    }
+
+    private var weeklyActivity: some View {
+        let days = CadenceDay.recentWeek(completedDates: session.recordedDrives.map(\.startedAt))
+        let count = days.filter(\.isComplete).count
+        return VStack(alignment: .leading, spacing: 10) {
+            if dynamicTypeSize.isAccessibilitySize {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("This week").font(.title3.weight(.semibold))
+                    Text(count == 1 ? "1 driving day" : "\(count) driving days").font(.footnote).foregroundStyle(AppDesign.Ink.secondary)
+                }
+            } else {
+                HStack {
+                    Text("This week").font(.title3.weight(.semibold))
+                    Spacer()
+                    Text(count == 1 ? "1 driving day" : "\(count) driving days").font(.footnote).foregroundStyle(AppDesign.Ink.secondary)
+                }
+            }
+            WeekCadenceStrip(title: "", days: days, showsHeader: false)
+        }
+    }
+
+    private var nextDriveCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            if summary.hasRecordedEvidence {
+                Text(coaching.focus.title).font(.body)
+                Text(coaching.focus.detail).font(.subheadline).foregroundStyle(AppDesign.Ink.secondary)
+            } else { Text("Next drive").font(.title3.weight(.semibold)) }
+            Button { showDriveTab() } label: {
+                Text(summary.hasRecordedEvidence ? "Start a focus drive" : "Start a drive")
+                    .frame(maxWidth: .infinity, minHeight: 36)
+            }
+            .buttonStyle(.bordered).buttonBorderShape(.capsule).controlSize(.large)
+            .tint(AppDesign.Ink.primary)
+            .accessibilityIdentifier("progress.startFocusDrive")
+        }.premiumCard()
+    }
+
+    private var scoredHistory: [RecordedDrive] {
+        session.recordedDrives.filter { DriverPerformanceEngine.makeSummary(from: [$0]).score != nil }
+            .sorted { $0.startedAt < $1.startedAt }
+    }
+
+    private func trendChart(height: CGFloat) -> some View {
+        Chart(scoredHistory) { drive in
+            let score = DriverPerformanceEngine.makeSummary(from: [drive]).score ?? 0
+            AreaMark(x: .value("Date", drive.startedAt), yStart: .value("Base", 0), yEnd: .value("Score", score))
+                .foregroundStyle(AppDesign.accent.opacity(0.08))
+            LineMark(x: .value("Date", drive.startedAt), y: .value("Score", score))
+                .foregroundStyle(AppDesign.accent).lineStyle(StrokeStyle(lineWidth: 2.5))
+            if drive.id == scoredHistory.last?.id {
+                PointMark(x: .value("Date", drive.startedAt), y: .value("Score", score))
+                    .foregroundStyle(AppDesign.positive).symbolSize(22)
+            }
+        }
+        .chartYScale(domain: 0...100)
+        .chartXAxis(.hidden).chartYAxis(.hidden)
+        .frame(height: height)
+        .accessibilityLabel("Route-adjusted scores from \(scoredHistory.count) analyzed drives")
+    }
+
+    private var recentTrendCard: some View {
+        NavigationLink {
+            drivingInsights
+        } label: {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    Text("Recent trend").font(.headline)
+                    Spacer()
+                    Image(systemName: "chevron.right").font(.caption).foregroundStyle(AppDesign.Ink.tertiary)
+                }
+                trendChart(height: 56)
+            }.premiumCard()
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("progress.drivingInsights")
+    }
+
+    private var drivingInsights: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 24) {
+                Text("From \(performance.includedDriveCount) analyzed drives").font(.subheadline).foregroundStyle(AppDesign.Ink.secondary)
+                VStack(alignment: .leading, spacing: 20) {
+                    HStack(alignment: .firstTextBaseline, spacing: 12) {
+                        Text(performance.score.map(String.init) ?? "—").font(.system(size: 58, weight: .light))
+                        VStack(alignment: .leading) {
+                            Text("Overall driving score").font(.subheadline)
+                            Text("Route adjusted").font(.caption).foregroundStyle(AppDesign.Ink.secondary)
+                        }
+                    }
+                    trendChart(height: 120)
+                }.premiumCard()
+                Text("Experience recorded").font(.title3.weight(.semibold))
+                VStack(spacing: 22) {
+                    experienceBar("Total miles", miles: summary.validatedMiles, tint: AppDesign.accent)
+                    experienceBar("After-dark miles", miles: summary.afterDarkMiles, tint: .cyan)
+                    experienceBar("Faster-road miles", miles: summary.milesAt45Plus, tint: .cyan)
+                }.premiumCard()
+                Text("Based on recorded drives with usable GPS and motion.").font(.footnote).foregroundStyle(AppDesign.Ink.secondary)
+                measurementDetailsDisclosure
+            }.padding(20)
+        }
+        .background(AppCanvasBackground())
+        .navigationTitle("Driving insights")
+        .navigationBarTitleDisplayMode(.large)
+        .toolbar(.visible, for: .navigationBar)
+    }
+
+    private func experienceBar(_ title: String, miles: Double, tint: Color) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text(String(format: "%.1f", miles)).font(.title3.weight(.medium)).monospacedDigit()
+                Text(title).font(.footnote).foregroundStyle(AppDesign.Ink.secondary)
+            }
+            ProgressView(value: summary.validatedMiles > 0 ? min(1, max(0, miles / summary.validatedMiles)) : 0).tint(tint)
+        }
     }
 
     @ViewBuilder
@@ -139,9 +249,9 @@ struct DriverProgressView: View {
 
     private var emptyEvidenceState: some View {
         VStack(alignment: .leading, spacing: AppDesign.space12) {
-            Text("No recorded evidence yet")
+            Text("No recorded drives")
                 .font(.headline)
-            Text("Complete a drive with usable GPS and motion to start building history.")
+            Text("Record a drive to add it to your history.")
                 .font(.footnote)
                 .foregroundStyle(AppDesign.Ink.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -155,7 +265,7 @@ struct DriverProgressView: View {
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 12)
                     .foregroundStyle(AppDesign.primarySurfaceForeground)
-                    .background(AppDesign.Ink.primary, in: RoundedRectangle(cornerRadius: AppDesign.cornerRadiusSmall, style: .continuous))
+                    .background(AppDesign.Ink.primary, in: Capsule())
             }
             .buttonStyle(PressableScaleStyle())
             .accessibilityHint("Opens the Drive tab")
@@ -423,16 +533,14 @@ private struct ProgressScoreSignal: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(value)
-                .font(.caption.weight(.bold).monospacedDigit())
+                .font(.body.weight(.medium).monospacedDigit())
                 .foregroundStyle(AppDesign.Ink.primary)
             Text(label)
                 .font(.caption2)
                 .foregroundStyle(AppDesign.Ink.secondary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 10)
-        .padding(.vertical, 8)
-        .background(AppDesign.Ink.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: AppDesign.cornerRadiusTiny, style: .continuous))
+
         .accessibilityElement(children: .combine)
     }
 }
