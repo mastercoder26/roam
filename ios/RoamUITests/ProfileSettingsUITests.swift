@@ -331,6 +331,9 @@ final class RecordingDesignUITests: XCTestCase {
         app.buttons["drive.lockControls"].tap()
         let unlock = app.descendants(matching: .any)["drive.unlockControls"].firstMatch
         XCTAssertTrue(unlock.waitForExistence(timeout: 5))
+        unlock.press(forDuration: 0.25)
+        XCTAssertTrue(unlock.exists, "Releasing early must keep the controls locked")
+        XCTAssertFalse(app.buttons["drive.showControls"].exists)
         unlock.press(forDuration: 1.3)
         XCTAssertTrue(app.buttons["drive.showControls"].waitForExistence(timeout: 5))
         app.buttons["drive.showControls"].tap()

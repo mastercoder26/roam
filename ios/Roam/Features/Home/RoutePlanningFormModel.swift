@@ -260,27 +260,38 @@ final class RoutePlanningAnalysisModel: ObservableObject {
     @Published private(set) var isLoading = false
     @Published private(set) var result: RouteAnalysisResult?
     @Published private(set) var errorMessage: String?
+    @Published private(set) var progress: RouteAnalysisProgress?
     private var task: Task<Void, Never>?
     private var accountObservation: AnyCancellable?
     private var generation = 0
     private let analyze: Analyze
+    private let timingEstimator: RouteAnalysisTimingEstimator
+    private let uptime: () -> TimeInterval
 
-    init(analyze: @escaping Analyze = { origin, destination, departure, token in
-        try await APIClient().analyzeRoute(
-            origin: origin, destination: destination, departureTime: departure,
-            accessToken: token, includeAlternates: true
-        )
-    }) {
+    init(
+        timingEstimator: RouteAnalysisTimingEstimator? = nil,
+        uptime: @escaping () -> TimeInterval = { ProcessInfo.processInfo.systemUptime },
+        analyze: @escaping Analyze = { origin, destination, departure, token in
+            try await APIClient().analyzeRoute(
+                origin: origin, destination: destination, departureTime: departure,
+                accessToken: token, includeAlternates: true
+            )
+        }
+    ) {
         self.analyze = analyze
+        self.timingEstimator = timingEstimator ?? RouteAnalysisTimingEstimator()
+        self.uptime = uptime
     }
 
-    func start(form: RoutePlanningFormModel, auth: AuthSessionStore, recentRoutes: RecentRouteStore) {
+    func start(form: RoutePlanningFormModel, auth: AuthSessionStore, recentRoutes: RecentRouteStore, distanceMeters: Double? = nil) {
         guard !isLoading, auth.isSignedIn else { return }
         let origin = form.origin
         let destination = form.destination
         let departure = form.departureTime
         let accountGeneration = auth.accountDataGeneration
         let requestGeneration = generation
+        let startedAt = uptime()
+        progress = RouteAnalysisProgress(startedAt: startedAt, estimatedDuration: timingEstimator.estimate(distanceMeters: distanceMeters))
         isLoading = true
         result = nil
         errorMessage = nil
@@ -295,6 +306,9 @@ final class RoutePlanningAnalysisModel: ObservableObject {
                 }
                 guard !Task.isCancelled, self.generation == requestGeneration,
                       auth.accountDataGeneration == accountGeneration, auth.isSignedIn else { return }
+                let completedAt = self.uptime()
+                self.timingEstimator.record(duration: completedAt - startedAt, distanceMeters: distanceMeters)
+                self.progress?.complete(at: completedAt)
                 recentRoutes.record(origin: origin, destination: destination, departureTime: departure, route: response.primaryRoute)
                 self.result = RouteAnalysisResult(
                     origin: origin, destination: destination, departureTime: departure,
@@ -305,6 +319,8 @@ final class RoutePlanningAnalysisModel: ObservableObject {
                       auth.accountDataGeneration == accountGeneration, auth.isSignedIn else { return }
                 self.errorMessage = error.localizedDescription
                 self.isLoading = false
+                self.progress = nil
+                self.accountObservation = nil
             }
             self.task = nil
         }
@@ -314,6 +330,7 @@ final class RoutePlanningAnalysisModel: ObservableObject {
         guard let result else { return nil }
         self.result = nil
         isLoading = false
+        progress = nil
         accountObservation = nil
         return result
     }
@@ -326,5 +343,6 @@ final class RoutePlanningAnalysisModel: ObservableObject {
         result = nil
         errorMessage = nil
         isLoading = false
+        progress = nil
     }
 }

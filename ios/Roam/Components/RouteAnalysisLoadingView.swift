@@ -1,30 +1,52 @@
 import MapKit
 import SwiftUI
 
-/// The route being analyzed stays visible. A paced trace follows its actual
-/// geometry; reducing motion leaves the complete route in place.
+/// A single trace acts as estimated progress along the actual route geometry.
 struct RouteAnalysisLoadingView: View {
     let isFinishing: Bool
+    let progress: RouteAnalysisProgress
     var coordinates: [Coordinate] = []
     var destination: String = ""
     var routeSummary: String?
     var onCancel: (() -> Void)?
     let onDepartureComplete: () -> Void
     @ObservedObject private var theme = ThemeManager.shared
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
-        ZStack(alignment: .bottom) {
-            RouteAnalysisTraceMap(coordinates: coordinates, reduceMotion: reduceMotion)
+        TimelineView(.animation(minimumInterval: 1.0 / 30, paused: scenePhase != .active)) { _ in
+            content(at: ProcessInfo.processInfo.systemUptime)
+        }
+        .accessibilityIdentifier("routes.analysisLoading")
+        .task(id: isFinishing) {
+            guard isFinishing else { return }
+            do { try await Task.sleep(for: .seconds(progress.remainingCompletionTime(at: ProcessInfo.processInfo.systemUptime))) }
+            catch { return }
+            onDepartureComplete()
+        }
+    }
+
+    private func content(at time: TimeInterval) -> some View {
+        let fraction = progress.fraction(at: time)
+        return ZStack(alignment: .bottom) {
+            RouteAnalysisTraceMap(coordinates: coordinates, fraction: fraction)
                 .ignoresSafeArea(.container)
                 .accessibilityHidden(true)
+            RouteMapBottomFade().ignoresSafeArea(.container)
+            RouteMapHeaderShading().ignoresSafeArea(.container)
             VStack(alignment: .leading, spacing: 16) {
-                ScreenHeader(title: "Routes")
-                    .padding(.top, AppDesign.screenTopPadding)
+                CompactScreenHeader(title: "Routes")
                 Spacer()
                 VStack(alignment: .leading, spacing: 16) {
                     HStack(spacing: 12) {
-                        ProgressView().controlSize(.regular)
+                        ZStack {
+                            Circle().stroke(AppDesign.accent.opacity(0.18), lineWidth: 3)
+                            Circle().trim(from: 0, to: fraction)
+                                .stroke(AppDesign.accent, style: StrokeStyle(lineWidth: 3, lineCap: .round))
+                                .rotationEffect(.degrees(-90))
+                        }
+                        .frame(width: 24, height: 24)
+                        .accessibilityHidden(true)
                         VStack(alignment: .leading, spacing: 4) {
                             Text(isFinishing ? "Route ready" : "Analyzing route")
                                 .font(.title3.weight(.semibold))
@@ -32,7 +54,20 @@ struct RouteAnalysisLoadingView: View {
                                 .font(.footnote)
                                 .foregroundStyle(AppDesign.Ink.secondary)
                                 .lineLimit(2)
+                            if !isFinishing {
+                                Text(progress.timeDescription(at: time))
+                                    .font(.caption)
+                                    .foregroundStyle(AppDesign.Ink.secondary)
+                                    .accessibilityIdentifier("routes.analysisEstimate")
+                            }
                         }
+                        Spacer(minLength: 0)
+                        Text("\(Int(fraction * 100))%")
+                            .font(.footnote.monospacedDigit())
+                            .foregroundStyle(AppDesign.Ink.secondary)
+                            .accessibilityLabel("Estimated progress")
+                            .accessibilityValue("\(Int(fraction * 100)) percent")
+                            .accessibilityIdentifier("routes.analysisProgress")
                     }
                     if let onCancel {
                         Button("Cancel", action: onCancel)
@@ -51,19 +86,12 @@ struct RouteAnalysisLoadingView: View {
             }
             .padding(.horizontal, 20)
         }
-        .accessibilityIdentifier("routes.analysisLoading")
-        .task(id: isFinishing) {
-            guard isFinishing else { return }
-            do { try await Task.sleep(for: .milliseconds(reduceMotion ? 100 : 250)) }
-            catch { return }
-            onDepartureComplete()
-        }
     }
 }
 
 private struct RouteAnalysisTraceMap: UIViewRepresentable {
     let coordinates: [Coordinate]
-    let reduceMotion: Bool
+    let fraction: Double
     @Environment(\.colorScheme) private var colorScheme
 
     func makeCoordinator() -> Coordinator { Coordinator() }
@@ -82,7 +110,8 @@ private struct RouteAnalysisTraceMap: UIViewRepresentable {
     func updateUIView(_ map: MKMapView, context: Context) {
         map.overrideUserInterfaceStyle = colorScheme == .dark ? .dark : .light
         context.coordinator.setTint(AppDesign.UIKitColor.accent)
-        context.coordinator.update(coordinates: coordinates, reduceMotion: reduceMotion, map: map)
+        context.coordinator.update(coordinates: coordinates, map: map)
+        context.coordinator.setProgress(fraction)
     }
 
     final class Coordinator: NSObject, MKMapViewDelegate {
@@ -91,8 +120,9 @@ private struct RouteAnalysisTraceMap: UIViewRepresentable {
         private let marker = CAShapeLayer()
         private let destination = CAShapeLayer()
         private var coordinates: [CLLocationCoordinate2D] = []
-        private var reduceMotion = false
-        private var key = ""
+        private var sourceCoordinates: [Coordinate] = []
+        private var geometry = RouteTraceGeometry(points: [])
+        private var fraction = 0.0
 
         func install(in map: MKMapView) {
             for layer in [base, trace] {
@@ -104,6 +134,7 @@ private struct RouteAnalysisTraceMap: UIViewRepresentable {
             }
             base.strokeColor = UIColor.systemBlue.withAlphaComponent(0.2).cgColor
             trace.strokeColor = UIColor.systemBlue.cgColor
+            trace.strokeEnd = 0
             marker.path = UIBezierPath(ovalIn: CGRect(x: -7, y: -7, width: 14, height: 14)).cgPath
             marker.fillColor = UIColor.systemBlue.cgColor
             marker.strokeColor = UIColor.white.cgColor
@@ -124,13 +155,19 @@ private struct RouteAnalysisTraceMap: UIViewRepresentable {
             destination.strokeColor = color.cgColor
         }
 
-        func update(coordinates values: [Coordinate], reduceMotion: Bool, map: MKMapView) {
-            let newKey = values.map { "\($0.latitude),\($0.longitude)" }.joined(separator: ";") + String(reduceMotion)
-            guard newKey != key else { return }
-            key = newKey
+        func update(coordinates values: [Coordinate], map: MKMapView) {
+            guard values != sourceCoordinates else { return }
+            sourceCoordinates = values
             coordinates = values.map { CLLocationCoordinate2D(latitude: $0.latitude, longitude: $0.longitude) }
-            self.reduceMotion = reduceMotion
-            guard coordinates.count > 1 else { return }
+                .filter { CLLocationCoordinate2DIsValid($0) }
+            guard coordinates.count > 1 else {
+                base.path = nil
+                trace.path = nil
+                geometry = RouteTraceGeometry(points: [])
+                marker.isHidden = true
+                destination.isHidden = true
+                return
+            }
             let polyline = MKPolyline(coordinates: coordinates, count: coordinates.count)
             map.setVisibleMapRect(polyline.boundingMapRect,
                 edgePadding: UIEdgeInsets(top: 160, left: 42, bottom: 260, right: 42), animated: false)
@@ -138,42 +175,33 @@ private struct RouteAnalysisTraceMap: UIViewRepresentable {
         }
 
         func mapView(_ mapView: MKMapView, regionDidChangeAnimated animated: Bool) { redraw(in: mapView) }
+        func mapViewDidFinishRenderingMap(_ mapView: MKMapView, fullyRendered: Bool) { redraw(in: mapView) }
+
+        func setProgress(_ value: Double) {
+            fraction = min(1, max(0, value))
+            CATransaction.begin()
+            CATransaction.setDisableActions(true)
+            trace.strokeEnd = fraction
+            marker.isHidden = geometry.points.count < 2
+            if let point = geometry.position(at: fraction) { marker.position = point }
+            CATransaction.commit()
+        }
 
         private func redraw(in map: MKMapView) {
             guard coordinates.count > 1 else { return }
             let path = UIBezierPath()
             let points = coordinates.map { map.convert($0, toPointTo: map) }
+            geometry = RouteTraceGeometry(points: points)
             path.move(to: points[0])
             for point in points.dropFirst() { path.addLine(to: point) }
             CATransaction.begin()
             CATransaction.setDisableActions(true)
             base.path = path.cgPath
             trace.path = path.cgPath
-            trace.removeAllAnimations()
-            marker.removeAllAnimations()
-            marker.isHidden = reduceMotion
-            marker.position = points[0]
             destination.position = points[points.count - 1]
             destination.isHidden = false
             CATransaction.commit()
-            guard !reduceMotion else { return }
-            let draw = CAKeyframeAnimation(keyPath: "strokeEnd")
-            draw.values = [0, 0, 1, 1]
-            draw.keyTimes = [0, 0.08, 0.8, 1]
-            draw.duration = 1.8
-            draw.repeatCount = .infinity
-            trace.add(draw, forKey: "routeTrace")
-            let travel = CAKeyframeAnimation(keyPath: "position")
-            travel.path = path.cgPath
-            travel.calculationMode = .paced
-            travel.beginTime = 0.144
-            travel.duration = 1.296
-            travel.fillMode = .both
-            let loop = CAAnimationGroup()
-            loop.animations = [travel]
-            loop.duration = 1.8
-            loop.repeatCount = .infinity
-            marker.add(loop, forKey: "routeHead")
+            setProgress(fraction)
         }
     }
 }

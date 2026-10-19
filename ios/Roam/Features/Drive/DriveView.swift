@@ -69,7 +69,6 @@ struct DriveView: View {
                         // the viewport exactly. That keeps the End Drive path vertical
                         // and prevents the control from sliding under the tab bar.
                         .padding(.horizontal, isFocusedCanvas ? 0 : AppDesign.contentPadding)
-                        .padding(.top, isFocusedCanvas ? 0 : AppDesign.screenTopPadding)
                         .padding(.bottom, isFocusedCanvas ? 0 : AppDesign.space24)
                         .frame(maxWidth: isFocusedCanvas ? .infinity : AppDesign.maximumContentWidth, alignment: .leading)
                         .frame(maxWidth: .infinity)
@@ -218,16 +217,8 @@ struct DriveView: View {
     }
 
     private var driveToolbar: some View {
-        HStack(alignment: .center, spacing: AppDesign.space12) {
-            VStack(alignment: .leading, spacing: AppDesign.space4) {
-                Text(showsSavedSummary ? "Drive saved" : "Drive")
-                    .font(AppDesign.Typography.display)
-                    .tracking(-0.7)
-                    .foregroundStyle(AppDesign.Ink.primary)
-            }
-
-            Spacer(minLength: AppDesign.space8)
-
+        CompactScreenHeader(title: showsSavedSummary ? "Drive saved" : "Drive")
+        .overlay(alignment: .trailing) {
             Button {
                 showingHelp = true
             } label: {
@@ -242,7 +233,6 @@ struct DriveView: View {
             .accessibilityLabel("Get help")
             .accessibilityHint("Shows safety and emergency options")
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .contain)
     }
 
@@ -856,14 +846,8 @@ private struct LiveDriveRecordingView: View {
     private var dock: some View {
         VStack(spacing: 14) {
             if controlsLocked {
-                Label("Hold to unlock controls", systemImage: "lock.fill")
-                    .font(.headline)
-                    .frame(maxWidth: .infinity, minHeight: 62)
-                    .contentShape(Capsule())
-                    .onLongPressGesture(minimumDuration: 1) { unlock() }
-                    .accessibilityAddTraits(.isButton)
-                    .accessibilityAction { unlock() }
-                    .accessibilityIdentifier("drive.unlockControls")
+                HoldToUnlockControl(onUnlock: unlock)
+                    .transition(.opacity.combined(with: .scale(scale: 0.94)))
             } else {
                 Button { showsControls = true } label: {
                     Capsule().fill(AppDesign.Ink.tertiary).frame(width: 38, height: 5)
@@ -906,8 +890,116 @@ private struct LiveDriveRecordingView: View {
     }
 
     private func unlock() {
-        controlsLocked = false
-        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        withAnimation(.spring(response: 0.38, dampingFraction: 0.8)) {
+            controlsLocked = false
+        }
+    }
+}
+
+private struct HoldToUnlockControl: View {
+    private static let holdDuration = 1.1
+    @ObservedObject private var theme = ThemeManager.shared
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var isHolding = false
+    @State private var isUnlocked = false
+    @State private var progress = 0.0
+    @State private var feedbackTask: Task<Void, Never>?
+    let onUnlock: () -> Void
+
+    var body: some View {
+        HStack(spacing: 12) {
+            ZStack {
+                Circle().stroke(AppDesign.Ink.primary.opacity(0.12), lineWidth: 2.5)
+                Circle().trim(from: 0, to: progress)
+                    .stroke(AppDesign.Ink.primary, style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
+                    .rotationEffect(.degrees(-90))
+                Image(systemName: isUnlocked ? "lock.open.fill" : "lock.fill")
+                    .font(.system(size: 16, weight: .semibold))
+                    .contentTransition(.symbolEffect(.replace))
+                    .rotationEffect(.degrees(isUnlocked ? -12 : 0))
+                    .scaleEffect(isUnlocked ? 1.12 : 1)
+            }
+            .frame(width: 38, height: 38)
+            Text(isUnlocked ? "Unlocked" : isHolding ? "Keep holding…" : "Hold to unlock controls")
+                .font(.headline)
+                .contentTransition(.opacity)
+        }
+        .foregroundStyle(AppDesign.Ink.primary)
+        .frame(maxWidth: .infinity, minHeight: 62)
+        .background {
+            GeometryReader { geometry in
+                Capsule().fill(AppDesign.Ink.primary.opacity(0.09))
+                    .frame(width: geometry.size.width * progress)
+            }
+            .clipShape(Capsule())
+        }
+        .overlay {
+            Capsule().strokeBorder(AppDesign.Ink.primary.opacity(isHolding ? 0.3 : 0.12), lineWidth: 0.75)
+        }
+        .shadow(color: AppDesign.Ink.primary.opacity(isHolding ? 0.1 : 0), radius: 14)
+        .scaleEffect(isHolding ? 0.97 : 1)
+        .contentShape(Capsule())
+        .onLongPressGesture(minimumDuration: Self.holdDuration, maximumDistance: 28, pressing: { pressed in
+            if pressed { beginHold() } else if !isUnlocked { cancelHold() }
+        }, perform: finishHold)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Hold to unlock controls")
+        .accessibilityValue(isUnlocked ? "Unlocked" : "Locked")
+        .accessibilityHint("Hold for one second to unlock. Release to cancel.")
+        .accessibilityAddTraits(.isButton)
+        .accessibilityAction { finishHold() }
+        .accessibilityIdentifier("drive.unlockControls")
+        .onChange(of: scenePhase) { _, phase in
+            if phase != .active { cancelHold() }
+        }
+        .onDisappear { feedbackTask?.cancel() }
+    }
+
+    private func beginHold() {
+        guard !isHolding, !isUnlocked else { return }
+        feedbackTask?.cancel()
+        UIImpactFeedbackGenerator(style: .soft).impactOccurred(intensity: 0.65)
+        withAnimation(.spring(response: 0.22, dampingFraction: 0.85)) { isHolding = true }
+        withAnimation(.linear(duration: Self.holdDuration)) { progress = 1 }
+        feedbackTask = Task { @MainActor in
+            do {
+                let tick = UIImpactFeedbackGenerator(style: .light)
+                tick.prepare()
+                try await Task.sleep(for: .milliseconds(400))
+                try Task.checkCancellation()
+                tick.impactOccurred(intensity: 0.55)
+                let next = UIImpactFeedbackGenerator(style: .medium)
+                next.prepare()
+                try await Task.sleep(for: .milliseconds(400))
+                try Task.checkCancellation()
+                next.impactOccurred(intensity: 0.8)
+            } catch { return }
+        }
+    }
+
+    private func cancelHold() {
+        feedbackTask?.cancel()
+        guard !isUnlocked else { return }
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+            isHolding = false
+            progress = 0
+        }
+    }
+
+    private func finishHold() {
+        guard !isUnlocked, scenePhase == .active else { return }
+        feedbackTask?.cancel()
+        UINotificationFeedbackGenerator().notificationOccurred(.success)
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+            isUnlocked = true
+            isHolding = false
+            progress = 1
+        }
+        feedbackTask = Task { @MainActor in
+            do { try await Task.sleep(for: .milliseconds(180)) }
+            catch { return }
+            onUnlock()
+        }
     }
 }
 

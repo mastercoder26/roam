@@ -237,6 +237,7 @@ struct ReadinessInsightRow: View {
 struct RouteDemandRow: View {
     @ObservedObject private var theme = ThemeManager.shared
     let demand: RouteDemand
+    @State private var showsEvidence = false
 
     private var color: Color {
         switch demand.level {
@@ -269,17 +270,25 @@ struct RouteDemandRow: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: AppDesign.space8) {
-            HStack(alignment: .top, spacing: AppDesign.space12) {
-                Image(systemName: symbol).font(.subheadline.weight(.semibold)).foregroundStyle(color).frame(width: 36, height: 36).background(color.opacity(0.12), in: RoundedRectangle(cornerRadius: AppDesign.cornerRadiusTiny, style: .continuous))
-                VStack(alignment: .leading, spacing: 3) {
-                    HStack(spacing: AppDesign.space8) {
-                        Text(demand.title).font(.subheadline.weight(.semibold))
-                        Text(levelLabel).font(.caption2.weight(.bold)).foregroundStyle(color).padding(.horizontal, 7).padding(.vertical, 3).background(color.opacity(0.12), in: Capsule())
+            DisclosureGroup(isExpanded: $showsEvidence) {
+                Text(demand.evidence)
+                    .font(.footnote)
+                    .foregroundStyle(AppDesign.Ink.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, 6)
+            } label: {
+                HStack(alignment: .center, spacing: AppDesign.space12) {
+                    Image(systemName: symbol).font(.subheadline.weight(.semibold)).foregroundStyle(color).frame(width: 36, height: 36).background(color.opacity(0.12), in: RoundedRectangle(cornerRadius: AppDesign.cornerRadiusTiny, style: .continuous))
+                    VStack(alignment: .leading, spacing: 3) {
+                        HStack(spacing: AppDesign.space8) {
+                            Text(demand.title).font(.subheadline.weight(.semibold))
+                            Text(levelLabel).font(.caption2.weight(.bold)).foregroundStyle(color).padding(.horizontal, 7).padding(.vertical, 3).background(color.opacity(0.12), in: Capsule())
+                        }
                     }
-                    Text(demand.evidence).font(.footnote).foregroundStyle(AppDesign.Ink.secondary).fixedSize(horizontal: false, vertical: true)
+                    Spacer(minLength: 0)
                 }
-                Spacer(minLength: 0)
             }
+            .tint(AppDesign.Ink.secondary)
             GeometryReader { proxy in
                 ZStack(alignment: .leading) {
                     Capsule().fill(AppDesign.cardStrokeStrong)
@@ -290,7 +299,7 @@ struct RouteDemandRow: View {
             .accessibilityHidden(true)
         }
         .padding(.vertical, 10)
-        .accessibilityElement(children: .combine)
+        .accessibilityElement(children: .contain)
     }
 }
 

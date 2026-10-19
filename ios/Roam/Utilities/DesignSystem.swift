@@ -745,9 +745,57 @@ struct MetricTile: View {
     }
 }
 
-/// Number-first dashboard data, inspired by fitness summaries: the value does
-/// the talking and the label stays quiet. Used across Drive, Progress and
-/// Profile so those screens scan as one product.
+/// The same compact title size and centered placement as the Profile tab.
+struct CompactScreenHeader: View {
+    @ObservedObject private var theme = ThemeManager.shared
+    let title: String
+
+    var body: some View {
+        Text(title)
+            .font(.system(size: 17, weight: .semibold))
+            .foregroundStyle(AppDesign.Ink.primary)
+            .frame(maxWidth: .infinity, minHeight: 44)
+            .accessibilityAddTraits(.isHeader)
+    }
+}
+
+/// The map stays behind the form, then dissolves into the app canvas before
+/// the bottom edge and tab bar. Never intercepts map or form interaction.
+struct RouteMapBottomFade: View {
+    @ObservedObject private var theme = ThemeManager.shared
+    var startLocation = 0.54
+    var endLocation = 0.82
+    var strength = 1.0
+
+    var body: some View {
+        LinearGradient(stops: [
+            .init(color: .clear, location: 0),
+            .init(color: .clear, location: startLocation),
+            .init(color: AppDesign.canvas.opacity(strength), location: endLocation),
+            .init(color: AppDesign.canvas, location: 1)
+        ], startPoint: .top, endPoint: .bottom)
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+}
+
+struct RouteMapHeaderShading: View {
+    @ObservedObject private var theme = ThemeManager.shared
+
+    var body: some View {
+        LinearGradient(stops: [
+            .init(color: AppDesign.canvas.opacity(0.98), location: 0),
+            .init(color: AppDesign.canvas.opacity(0.98), location: 0.55),
+            .init(color: .clear, location: 1)
+        ], startPoint: .top, endPoint: .bottom)
+        .frame(height: 200)
+        .frame(maxHeight: .infinity, alignment: .top)
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+}
+
+/// Number-first dashboard data shared across Drive, Progress and Profile.
 struct DashboardMetric: Identifiable {
     let id: String
     let value: String

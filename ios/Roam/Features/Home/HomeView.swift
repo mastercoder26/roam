@@ -96,36 +96,34 @@ struct HomeView: View {
                 )
                 .ignoresSafeArea(.container)
                 .accessibilityIdentifier("routes.backgroundMap")
+                RouteMapBottomFade(startLocation: 0.64, endLocation: 0.94, strength: 0.9)
+                    .ignoresSafeArea(.container)
+                    .accessibilityIdentifier("routes.mapBottomFade")
 
                 VStack(alignment: .leading, spacing: 16) {
-                    HStack {
-                        ScreenHeader(title: "Routes")
-                        Spacer()
-                        if !recentRoutes.entries.isEmpty {
-                            Button { showingRecentRoutes = true } label: {
-                                Image(systemName: "clock.arrow.circlepath")
+                    CompactScreenHeader(title: "Routes")
+                    .overlay(alignment: .trailing) {
+                        HStack(spacing: 8) {
+                            if !recentRoutes.entries.isEmpty {
+                                Button { showingRecentRoutes = true } label: {
+                                    Image(systemName: "clock.arrow.circlepath")
+                                }
+                                .accessibilityLabel("Recent routes")
+                                .buttonStyle(.glass)
+                                .buttonBorderShape(.circle)
+                                .controlSize(.large)
                             }
-                            .accessibilityLabel("Recent routes")
+                            Button { showingHowRoamWorks = true } label: {
+                                Image(systemName: "info.circle")
+                            }
+                            .accessibilityIdentifier("routes.howRoamWorks")
+                            .accessibilityLabel("How Roam works")
                             .buttonStyle(.glass)
                             .buttonBorderShape(.circle)
                             .controlSize(.large)
                         }
-                        Button { showingHowRoamWorks = true } label: {
-                            Image(systemName: "info.circle")
-                        }
-                        .accessibilityIdentifier("routes.howRoamWorks")
-                        .accessibilityLabel("How Roam works")
-                        .buttonStyle(.glass)
-                        .buttonBorderShape(.circle)
-                        .controlSize(.large)
                     }
                     .padding(.horizontal, AppDesign.contentPadding)
-                    .padding(.top, AppDesign.screenTopPadding)
-                    .background(alignment: .top) {
-                        LinearGradient(colors: [AppDesign.canvas.opacity(0.9), .clear], startPoint: .top, endPoint: .bottom)
-                            .ignoresSafeArea(edges: .top)
-                            .padding(.bottom, -36)
-                    }
                     Spacer(minLength: 16)
                     ScrollView {
                         VStack(alignment: .leading, spacing: 12) {
@@ -156,9 +154,10 @@ struct HomeView: View {
                     .accessibilityIdentifier("routes.planningSheet")
                     .disabled(isLoading)
                 }
-                if isLoading {
+                if isLoading, let progress = analysis.progress {
                     RouteAnalysisLoadingView(
                         isFinishing: isCompletingLoading,
+                        progress: progress,
                         coordinates: mapPreview?.coordinates ?? [],
                         destination: form.destination,
                         routeSummary: mapPreview?.displayText,
@@ -500,7 +499,7 @@ struct HomeView: View {
                 authIsPresented = true
             case .analyze:
                 withAnimation(loadingTransitionAnimation) {
-                    analysis.start(form: form, auth: authSession, recentRoutes: recentRoutes)
+                    analysis.start(form: form, auth: authSession, recentRoutes: recentRoutes, distanceMeters: mapPreview?.distanceMeters)
                 }
             case .chooseOrigin, .chooseDestination, .waitingForAccount, .analyzing:
                 break

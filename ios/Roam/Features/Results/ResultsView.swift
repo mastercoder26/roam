@@ -36,6 +36,7 @@ struct ResultsView: View {
     @State private var isComparingDepartures = false
     @State private var isReanalyzingDeparture = false
     @State private var showsAllReadinessEvidence = false
+    @State private var showsReadinessDetails = false
     @State private var selectedPage: ResultsPage = .overview
 
     private let apiClient = APIClient()
@@ -135,9 +136,16 @@ struct ResultsView: View {
             } else {
                 ScrollView {
                     VStack(alignment: .leading, spacing: AppDesign.sectionSpacing) {
-                        readinessSection
-                        departureComparisonSection
+                        scoreSection
                         selectedPageContent
+                        readinessSection
+                        DisclosureGroup("Departure times") {
+                            departureComparisonSection.padding(.top, 12)
+                        }
+                        .font(.subheadline.weight(.medium))
+                        .tint(AppDesign.Ink.primary)
+                        .accessibilityIdentifier("routes.departureDetails")
+                        routeDataDisclosure
                         navigationSection
                     }.padding(20)
                 }
@@ -196,16 +204,18 @@ struct ResultsView: View {
                 Text(selectedRoute.reasons.first ?? selectedRoute.label.rawValue)
                     .font(.footnote).foregroundStyle(AppDesign.Ink.secondary).lineLimit(2)
                 Spacer(minLength: 8)
-                Button("Details") { selectedPage = .details }.font(.footnote.weight(.semibold))
+                Button("Practice this route") { queuePracticeRoute() }
+                    .font(.footnote.weight(.semibold))
+                    .disabled(driveSession.isRecording)
+                    .accessibilityIdentifier("routes.practiceSelected")
             }
-            Button { queuePracticeRoute() } label: {
-                Text("Practice this route").font(.headline).frame(maxWidth: .infinity, minHeight: 50)
+            Button { selectedPage = .details } label: {
+                Text("View details").font(.headline).frame(maxWidth: .infinity, minHeight: 50)
                     .foregroundStyle(AppDesign.primarySurfaceForeground)
                     .background(AppDesign.Ink.primary, in: Capsule())
             }
             .buttonStyle(PressableScaleStyle())
-            .disabled(driveSession.isRecording)
-            .accessibilityIdentifier("routes.practiceSelected")
+            .accessibilityIdentifier("routes.viewDetails")
         }
         .padding(24)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 28))
@@ -249,11 +259,18 @@ struct ResultsView: View {
                 if selectedRoute.routeDemands == nil {
                     // Keep older backend deployments useful instead of hiding
                     // the prior score explanation while they catch up.
-                    breakdownSection
-                    if let contributions = selectedRoute.contributions, !contributions.isEmpty {
-                        contributionsSection(contributions)
+                    DisclosureGroup("Score breakdown") {
+                        VStack(spacing: AppDesign.space12) {
+                            breakdownSection
+                            if let contributions = selectedRoute.contributions, !contributions.isEmpty {
+                                contributionsSection(contributions)
+                            }
+                            reasonsSection
+                        }
+                        .padding(.top, 12)
                     }
-                    reasonsSection
+                    .font(.subheadline.weight(.medium))
+                    .tint(AppDesign.Ink.primary)
                 }
             }
             .transition(resultsPageTransition)
@@ -314,7 +331,11 @@ struct ResultsView: View {
 
     private var scoreSection: some View {
         VStack(spacing: AppDesign.space12) {
+            Text("Route difficulty")
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(AppDesign.Ink.secondary)
             ScoreGaugeView(score: selectedRoute.score, label: selectedRoute.label)
+                .accessibilityIdentifier("routes.detailScore")
 
             Text(selectedRoute.label.rawValue)
                 .font(.subheadline.weight(.semibold))
@@ -324,22 +345,31 @@ struct ResultsView: View {
                 .background(labelColor.opacity(0.12))
                 .clipShape(Capsule())
                 .animation(reduceMotion ? .easeOut(duration: 0.16) : AppAnimation.selection, value: selectedRoute.label)
-
-            RouteEvidenceCard(evidence: selectedRoute.uncertainty?.evidence)
-                .padding(.top, 2)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 8)
         .animation(reduceMotion ? .easeOut(duration: 0.16) : AppAnimation.selection, value: selectedRoute.label)
     }
 
+    private var routeDataDisclosure: some View {
+        DisclosureGroup {
+            RouteEvidenceCard(evidence: selectedRoute.uncertainty?.evidence)
+                .padding(.top, 12)
+        } label: {
+            HStack(spacing: 12) {
+                Text("Route data")
+                Spacer(minLength: 0)
+                Text(selectedRoute.uncertainty?.evidence?.level.title ?? "Coverage unavailable")
+                    .font(.caption)
+                    .foregroundStyle(AppDesign.Ink.secondary)
+            }
+        }
+        .font(.subheadline.weight(.medium))
+        .tint(AppDesign.Ink.primary)
+    }
+
     private var readinessSection: some View {
         VStack(alignment: .leading, spacing: 14) {
-            SectionHeader(
-                title: "Ready for this route?",
-                subtitle: "Compared with your recorded drives."
-            )
-
             HStack(alignment: .top, spacing: AppDesign.space12) {
                 Image(systemName: readinessSymbol)
                     .font(.title3.weight(.semibold))
@@ -351,79 +381,86 @@ struct ResultsView: View {
                     Text(readiness.headline)
                         .font(.headline)
                         .foregroundStyle(AppDesign.Ink.primary)
+                }
+            }
+
+            DisclosureGroup("Compare with your drives", isExpanded: $showsReadinessDetails) {
+                VStack(alignment: .leading, spacing: 14) {
                     Text(readiness.summary)
                         .font(.footnote)
                         .foregroundStyle(AppDesign.Ink.secondary)
                         .fixedSize(horizontal: false, vertical: true)
-                }
-            }
+                    ReadinessHistorySummary(profile: readiness.profile)
 
-            ReadinessHistorySummary(profile: readiness.profile)
-
-            if !featuredReadinessInsights.isEmpty {
-                Divider()
-                VStack(spacing: 10) {
-                    ForEach(featuredReadinessInsights) { insight in
-                        ReadinessInsightRow(insight: insight)
+                    if !featuredReadinessInsights.isEmpty {
+                        Divider()
+                        VStack(spacing: 10) {
+                            ForEach(featuredReadinessInsights) { insight in
+                                ReadinessInsightRow(insight: insight)
+                            }
+                        }
                     }
-                }
-            }
 
-            if hiddenReadinessInsightCount > 0 || showsAllReadinessEvidence {
-                Button {
-                    withAnimation(AppAnimation.quick) {
-                        showsAllReadinessEvidence.toggle()
+                    if hiddenReadinessInsightCount > 0 || showsAllReadinessEvidence {
+                        Button {
+                            withAnimation(AppAnimation.quick) {
+                                showsAllReadinessEvidence.toggle()
+                            }
+                        } label: {
+                            Label(
+                                showsAllReadinessEvidence
+                                    ? "Show fewer comparisons"
+                                    : "See all \(orderedReadinessInsights.count) comparisons",
+                                systemImage: showsAllReadinessEvidence
+                                    ? "chevron.up"
+                                    : "chevron.down"
+                            )
+                            .font(.footnote.weight(.semibold))
+                            .foregroundStyle(AppDesign.accent)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityHint(
+                            showsAllReadinessEvidence
+                                ? "Collapses the recorded evidence used in this route comparison."
+                                : "Expands the recorded evidence used in this route comparison."
+                        )
                     }
-                } label: {
+
+                    if let practicePlan, !practicePlan.goals.isEmpty {
+                        Divider()
+                        PracticePlanPreview(plan: practicePlan)
+                    }
+
+                    if !(selectedRoute.routeDemands ?? []).isEmpty {
+                        Divider()
+                        Button {
+                            queuePracticeRoute()
+                        } label: {
+                            Label("Practice this route", systemImage: "steeringwheel")
+                                .font(.subheadline.weight(.semibold))
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 12)
+                                .foregroundStyle(AppDesign.accentForeground)
+                                .background(AppDesign.accent, in: RoundedRectangle(cornerRadius: AppDesign.cornerRadiusSmall, style: .continuous))
+                        }
+                        .buttonStyle(PressableScaleStyle())
+                        .disabled(driveSession.isRecording)
+                        .opacity(driveSession.isRecording ? 0.55 : 1)
+                        .accessibilityHint("Prepares this route for your next drive.")
+                    }
+
                     Label(
-                        showsAllReadinessEvidence
-                            ? "Show fewer comparisons"
-                            : "See all \(orderedReadinessInsights.count) comparisons",
-                        systemImage: showsAllReadinessEvidence
-                            ? "chevron.up"
-                            : "chevron.down"
+                        "This is coaching, not a safety guarantee.",
+                        systemImage: "checkmark.shield"
                     )
-                    .font(.footnote.weight(.semibold))
-                    .foregroundStyle(AppDesign.accent)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .font(.caption)
+                    .foregroundStyle(AppDesign.Ink.secondary)
                 }
-                .buttonStyle(.plain)
-                .accessibilityHint(
-                    showsAllReadinessEvidence
-                        ? "Collapses the recorded evidence used in this route comparison."
-                        : "Expands the recorded evidence used in this route comparison."
-                )
+                .padding(.top, 12)
             }
-
-            if let practicePlan, !practicePlan.goals.isEmpty {
-                Divider()
-                PracticePlanPreview(plan: practicePlan)
-            }
-
-            if !(selectedRoute.routeDemands ?? []).isEmpty {
-                Divider()
-                Button {
-                    queuePracticeRoute()
-                } label: {
-                    Label("Practice this route", systemImage: "steeringwheel")
-                        .font(.subheadline.weight(.semibold))
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 12)
-                        .foregroundStyle(AppDesign.accentForeground)
-                        .background(AppDesign.accent, in: RoundedRectangle(cornerRadius: AppDesign.cornerRadiusSmall, style: .continuous))
-                }
-                .buttonStyle(PressableScaleStyle())
-                .disabled(driveSession.isRecording)
-                .opacity(driveSession.isRecording ? 0.55 : 1)
-                .accessibilityHint("Prepares this route for your next drive.")
-            }
-
-            Label(
-                "This is coaching, not a safety guarantee.",
-                systemImage: "checkmark.shield"
-            )
-            .font(.caption)
-            .foregroundStyle(AppDesign.Ink.secondary)
+            .font(.subheadline.weight(.medium))
+            .tint(AppDesign.Ink.primary)
         }
         .premiumCard()
         .animation(reduceMotion ? .easeOut(duration: 0.16) : AppAnimation.content, value: selectedRoute.polyline)

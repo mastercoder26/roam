@@ -39,7 +39,7 @@ struct DriverProgressView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
-                    ScreenHeader(title: "Progress")
+                    CompactScreenHeader(title: "Progress")
                     overallScoreCard
 
                     weeklyActivity
@@ -55,7 +55,6 @@ struct DriverProgressView: View {
                     }
                 }
                 .padding(.horizontal, AppDesign.contentPadding)
-                .padding(.top, AppDesign.screenTopPadding)
                 .padding(.bottom, AppDesign.space24)
                 .frame(maxWidth: AppDesign.maximumContentWidth)
                 .frame(maxWidth: .infinity)
@@ -215,7 +214,7 @@ struct DriverProgressView: View {
         }
         .background(AppCanvasBackground())
         .navigationTitle("Driving insights")
-        .navigationBarTitleDisplayMode(.large)
+        .navigationBarTitleDisplayMode(.inline)
         .toolbar(.visible, for: .navigationBar)
     }
 

@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		E11000000000000000000001 /* RouteAnalysisProgress.swift in Sources */ = {isa = PBXBuildFile; fileRef = E21000000000000000000001 /* RouteAnalysisProgress.swift */; };
 		1EBFCB6E4464444BB2936C89 /* AppIconManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D5BFA4B25844B26BFE25E88 /* AppIconManager.swift */; };
 		40A6EEF1D2F24291A3621A0C /* AppIconAlt-40x40@3x.png in Resources */ = {isa = PBXBuildFile; fileRef = 0E9EAF96588049B0852628E9 /* AppIconAlt-40x40@3x.png */; };
 		506AEF7FDE8E4C71BBB23780 /* AppIconAlt-20x20@3x.png in Resources */ = {isa = PBXBuildFile; fileRef = CDA55DDA2E744AFAACA46532 /* AppIconAlt-20x20@3x.png */; };
@@ -145,6 +146,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		E21000000000000000000001 /* RouteAnalysisProgress.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RouteAnalysisProgress.swift; sourceTree = "<group>"; };
 		0E9EAF96588049B0852628E9 /* AppIconAlt-40x40@3x.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "AppIconAlt-40x40@3x.png"; sourceTree = "<group>"; };
 		25396EAAE4294CDAACC5E8D4 /* AppIconPickerSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppIconPickerSheet.swift; sourceTree = "<group>"; };
 		2D17157632DC46C1A30100A6 /* AppIconAlt-60x60@3x.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "AppIconAlt-60x60@3x.png"; sourceTree = "<group>"; };
@@ -386,6 +388,7 @@
 				A20000000000000000000018 /* RoutePlanningLocationCoordinator.swift */,
 				A20000000000000000000021 /* DriveActivityAttributes.swift */,
 				A20000000000000000000026 /* DrivePresentationEngine.swift */,
+				E21000000000000000000001 /* RouteAnalysisProgress.swift */,
 				A2000000000000000000002E /* DriveHistoryPolicy.swift */,
 				A2000000000000000000002F /* Theme.swift */,
 				A20000000000000000000043 /* LaunchIntroChoreography.swift */,
@@ -780,6 +783,7 @@
 				A10000000000000000000022 /* DriveLiveActivityManager.swift in Sources */,
 				A10000000000000000000023 /* CarPlaySceneDelegate.swift in Sources */,
 				A10000000000000000000027 /* DrivePresentationEngine.swift in Sources */,
+				E11000000000000000000001 /* RouteAnalysisProgress.swift in Sources */,
 				A1000000000000000000002E /* DriveHistoryPolicy.swift in Sources */,
 				A100000000000000000000F1 /* DriverProfile.swift in Sources */,
 				A100000000000000000000F2 /* ProfileView.swift in Sources */,

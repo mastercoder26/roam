@@ -12,6 +12,9 @@ private final class HeldAnalysis {
     func fail() { continuation?.resume(throwing: URLError(.notConnectedToInternet)); continuation = nil }
 }
 
+@MainActor
+private final class AnalysisClock { var time: TimeInterval = 100 }
+
 @main
 struct RoutePlanningAnalysisChecks {
     @MainActor
@@ -24,21 +27,29 @@ struct RoutePlanningAnalysisChecks {
         let recent = RecentRouteStore(userDefaults: defaults)
         auth.configureAccountDataReset { recent.clear() }
         let held = HeldAnalysis()
-        let model = RoutePlanningAnalysisModel { _, _, _, _ in try await held.analyze() }
+        let timing = RouteAnalysisTimingEstimator(defaults: defaults)
+        let clock = AnalysisClock()
+        let model = RoutePlanningAnalysisModel(timingEstimator: timing, uptime: { clock.time }) { _, _, _, _ in try await held.analyze() }
         let form = RoutePlanningFormModel(initialState: .init(origin: "Start", destination: "Finish"))
         let response = try JSONDecoder().decode(RouteDifficultyResponse.self, from: Data(fixture.utf8))
         model.start(form: form, auth: auth, recentRoutes: recent)
         await waitUntil { held.continuation != nil }
+        expect(model.progress?.startedAt == 100, "the progress clock must begin with the request, not when its view mounts")
         // No view owns this task: leaving the tab has no cancellation callback.
         model.start(form: form, auth: auth, recentRoutes: recent)
         expect(held.requests == 1, "a tab returning while loading must not duplicate the request")
         form.destination = "Later edit"
+        clock.time = 106
         held.finish(response)
         await waitUntil { model.result != nil }
         expect(model.result?.destination == "Finish", "the result must preserve submitted endpoints")
         expect(recent.entries.count == 1, "offscreen completion must record exactly one recent route")
+        expect(model.progress?.completedAt == 106, "the trace completes only after a real response")
+        let timingHistory = defaults.data(forKey: "roam.route-analysis-timing-v1")
+        expect(timingHistory != nil, "successful latency must train future estimates")
         expect(model.takeResult() != nil && model.takeResult() == nil, "returning to the tab consumes the result once")
         expect(!model.isLoading, "completion must clear loading")
+        expect(model.progress == nil, "consuming the result must clear the progress clock")
 
         model.start(form: form, auth: auth, recentRoutes: recent)
         await waitUntil { held.continuation != nil }
@@ -47,6 +58,7 @@ struct RoutePlanningAnalysisChecks {
         held.finish(response)
         for _ in 0..<20 { await Task.yield() }
         expect(model.result == nil && !model.isLoading, "even signing back into the same account must reject an old response")
+        expect(model.progress == nil, "account changes must clear progress")
         expect(recent.entries.isEmpty, "late responses must not repopulate cleared history")
 
         model.start(form: form, auth: auth, recentRoutes: recent)
@@ -54,12 +66,14 @@ struct RoutePlanningAnalysisChecks {
         held.fail()
         await waitUntil { !model.isLoading }
         expect(model.errorMessage != nil, "offscreen failure must remain available when the tab returns")
+        expect(model.progress == nil, "failure must dismiss progress without reporting success")
         model.start(form: form, auth: auth, recentRoutes: recent)
         await waitUntil { held.continuation != nil }
         model.cancel()
         held.finish(response)
         for _ in 0..<20 { await Task.yield() }
         expect(model.result == nil && recent.entries.isEmpty, "import replacement must invalidate the previous route request")
+        expect(defaults.data(forKey: "roam.route-analysis-timing-v1") == timingHistory, "failed, canceled and stale requests must never train the estimator")
         print("Route planning analysis checks passed")
     }
     @MainActor
