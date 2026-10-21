@@ -1,4 +1,5 @@
 import OSLog
+import MapKit
 import SwiftUI
 import UIKit
 import UniformTypeIdentifiers
@@ -28,10 +29,11 @@ final class ShareViewController: UIViewController {
         ])
         controller.didMove(toParent: self)
 
-        let attachments = (extensionContext?.inputItems as? [NSExtensionItem])?
-            .flatMap { $0.attachments ?? [] } ?? []
+        let items = extensionContext?.inputItems as? [NSExtensionItem] ?? []
+        let attachments = items.flatMap { $0.attachments ?? [] }
+        let fallbackText = items.compactMap { $0.attributedContentText?.string }.joined(separator: "\n")
         Task { [model] in
-            let outcome = await SharedRouteShareItemReader.read(from: attachments)
+            let outcome = await SharedRouteShareItemReader.read(from: attachments, fallbackText: fallbackText)
             model.importRoute(from: outcome)
         }
     }
@@ -43,6 +45,7 @@ private final class ShareRouteImportViewModel: ObservableObject {
         case loading
         case saved(SharedRouteDraft?)
         case savedGoogleShortLink
+        case savedAppleShortLink
         case unsupported(String)
     }
 
@@ -88,6 +91,13 @@ private final class ShareRouteImportViewModel: ObservableObject {
             }
             state = .savedGoogleShortLink
 
+        case let .needsAppleShortLinkResolution(url):
+            guard inbox.enqueueAppleShortLink(url) else {
+                state = .unsupported("Roam could not save this Apple Maps link.")
+                return
+            }
+            state = .savedAppleShortLink
+
         case let .unsupportedTravelMode(mode):
             state = .unsupported("This link is for \(mode.displayName). Roam can only analyze driving routes.")
 
@@ -112,7 +122,9 @@ private struct RouteShareImportView: View {
                 case let .saved(route):
                     savedContent(route: route)
                 case .savedGoogleShortLink:
-                    savedGoogleShortLinkContent
+                    savedShortLinkContent(provider: .googleMaps)
+                case .savedAppleShortLink:
+                    savedShortLinkContent(provider: .appleMaps)
                 case let .unsupported(message):
                     unsupportedContent(message: message)
                 }
@@ -136,6 +148,7 @@ private struct RouteShareImportView: View {
         case .loading: "loading"
         case .saved: "saved"
         case .savedGoogleShortLink: "short-link"
+        case .savedAppleShortLink: "apple-short-link"
         case .unsupported: "unsupported"
         }
     }
@@ -193,16 +206,16 @@ private struct RouteShareImportView: View {
         }
     }
 
-    private var savedGoogleShortLinkContent: some View {
+    private func savedShortLinkContent(provider: SharedRouteProvider) -> some View {
         VStack(alignment: .leading, spacing: 18) {
             statusHeader(
-                title: "Google Maps link saved",
+                title: "\(provider.displayName) link saved",
                 detail: "Open Roam to finish preparing the route, then review and analyze it.",
                 symbol: "link.circle.fill",
                 color: .accentColor
             )
 
-            Text("Roam only follows the shared Google Maps link after you return to the app. It will not start a route analysis by itself.")
+            Text("Roam only follows the shared \(provider.displayName) link after you return to the app. It will not start a route analysis by itself.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
                 .padding(16)
@@ -305,13 +318,19 @@ private enum SharedRouteShareItemReader {
         case failed(Error?)
     }
 
-    static func read(from attachments: [NSItemProvider]) async -> Outcome {
+    static func read(from attachments: [NSItemProvider], fallbackText: String) async -> Outcome {
         var sawLoadFailure = false
+        var unsupportedItem: SharedRouteShareItem?
 
         for provider in attachments {
             switch await loadURL(from: provider) {
             case let .loaded(url):
-                return .item(SharedRouteShareItem(url: url, text: nil))
+                let item = SharedRouteShareItem(url: url, text: fallbackText)
+                if case .unsupported = SharedRouteImportParser.parse(url: url, text: fallbackText) {
+                    unsupportedItem = unsupportedItem ?? item
+                } else {
+                    return .item(item)
+                }
             case let .failed(error):
                 log(error, forType: "URL")
                 sawLoadFailure = true
@@ -323,7 +342,12 @@ private enum SharedRouteShareItemReader {
         for provider in attachments {
             switch await loadText(from: provider) {
             case let .loaded(text):
-                return .item(SharedRouteShareItem(url: nil, text: text))
+                let item = SharedRouteShareItem(url: nil, text: text)
+                if case .unsupported = SharedRouteImportParser.parse(url: nil, text: text) {
+                    unsupportedItem = unsupportedItem ?? item
+                } else {
+                    return .item(item)
+                }
             case let .failed(error):
                 log(error, forType: "plain text")
                 sawLoadFailure = true
@@ -332,7 +356,44 @@ private enum SharedRouteShareItemReader {
             }
         }
 
+        // Apple Maps can supply a native map item in addition to (or instead
+        // of) a URL. Use its coordinate when no readable link was supplied.
+        for provider in attachments where provider.canLoadObject(ofClass: MKMapItem.self) {
+            if let url = await loadMapItemURL(from: provider) {
+                return .item(SharedRouteShareItem(url: url, text: nil))
+            }
+            sawLoadFailure = true
+        }
+
+        if !fallbackText.isEmpty {
+            switch SharedRouteImportParser.parse(url: nil, text: fallbackText) {
+            case .unsupported:
+                break
+            default:
+                return .item(SharedRouteShareItem(url: nil, text: fallbackText))
+            }
+        }
+        if let unsupportedItem { return .item(unsupportedItem) }
         return sawLoadFailure ? .attachmentFailedToLoad : .noSupportedAttachment
+    }
+
+    private static func loadMapItemURL(from provider: NSItemProvider) async -> URL? {
+        await withCheckedContinuation { continuation in
+            provider.loadObject(ofClass: MKMapItem.self) { item, _ in
+                guard let mapItem = item as? MKMapItem, !mapItem.isCurrentLocation else {
+                    continuation.resume(returning: nil)
+                    return
+                }
+                let coordinate = mapItem.placemark.coordinate
+                guard CLLocationCoordinate2DIsValid(coordinate) else {
+                    continuation.resume(returning: nil)
+                    return
+                }
+                var components = URLComponents(string: "https://maps.apple.com/place")!
+                components.queryItems = [URLQueryItem(name: "coordinate", value: "\(coordinate.latitude),\(coordinate.longitude)")]
+                continuation.resume(returning: components.url)
+            }
+        }
     }
 
     private static func log(_ error: Error?, forType type: String) {

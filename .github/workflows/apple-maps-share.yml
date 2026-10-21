@@ -1,0 +1,35 @@
+name: Apple Maps share import
+
+on:
+  pull_request:
+    paths:
+      - 'ios/Roam/Models/SharedRouteImport.swift'
+      - 'ios/Roam/Services/SharedRouteImportCoordinator.swift'
+      - 'ios/RoamRouteShareExtension/**'
+      - 'ios/tests/AppleMapsShareChecks.swift'
+      - '.github/workflows/apple-maps-share.yml'
+  push:
+    branches: [fix/apple-maps-share-import]
+
+permissions:
+  contents: read
+
+jobs:
+  share-import:
+    runs-on: macos-26
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run Apple Maps share regression checks
+        run: |
+          swiftc ios/Roam/Models/SharedRouteImport.swift \
+            ios/Roam/Services/SharedRouteImportCoordinator.swift \
+            ios/tests/AppleMapsShareChecks.swift \
+            -o "$RUNNER_TEMP/apple-maps-share-checks"
+          "$RUNNER_TEMP/apple-maps-share-checks"
+      - name: Build the app and share extension for Simulator
+        run: |
+          xcodebuild -project ios/Roam.xcodeproj -scheme Roam \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath "$RUNNER_TEMP/roam-build" \
+            CODE_SIGNING_ALLOWED=NO build

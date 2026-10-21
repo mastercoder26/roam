@@ -9,6 +9,7 @@ final class SharedRouteImportCoordinator: ObservableObject {
     enum State: Equatable {
         case idle
         case resolvingGoogleMapsLink
+        case resolvingAppleMapsLink
         case ready(SharedRouteDraft)
         case failed(String)
     }
@@ -16,15 +17,18 @@ final class SharedRouteImportCoordinator: ObservableObject {
     @Published private(set) var state: State = .idle
 
     private let inbox: SharedRouteInbox
-    private let shortLinkResolver: any GoogleMapsShortLinkResolving
+    private let shortLinkResolver: any MapsShortLinkResolving
+    private let appleShortLinkResolver: any MapsShortLinkResolving
     private var isRefreshing = false
 
     init(
         inbox: SharedRouteInbox = SharedRouteInbox(),
-        shortLinkResolver: any GoogleMapsShortLinkResolving = GoogleMapsShortLinkResolver()
+        shortLinkResolver: any MapsShortLinkResolving = GoogleMapsShortLinkResolver(),
+        appleShortLinkResolver: any MapsShortLinkResolving = AppleMapsShortLinkResolver()
     ) {
         self.inbox = inbox
         self.shortLinkResolver = shortLinkResolver
+        self.appleShortLinkResolver = appleShortLinkResolver
     }
 
     func refresh() async {
@@ -48,33 +52,42 @@ final class SharedRouteImportCoordinator: ObservableObject {
 
         case let .unresolvedGoogleShortLink(link):
             state = .resolvingGoogleMapsLink
-            do {
-                let finalURL = try await shortLinkResolver.resolve(link.url)
-                // Failing to read the resolved page is not the same as the
-                // page being unsupported: a consent interstitial resolves
-                // differently on the next attempt. Keep it retriable.
-                guard case let .ready(candidate) = SharedRouteImportParser.parse(url: finalURL, text: nil) else {
-                    throw GoogleMapsShortLinkResolverError.unreadableRedirectTarget
-                }
-                let route = SharedRouteDraft(
-                    id: link.id,
-                    provider: candidate.provider,
-                    origin: candidate.origin,
-                    destination: candidate.destination,
-                    importedAt: link.receivedAt,
-                    waypointCount: candidate.waypointCount
-                )
-                guard inbox.replaceGoogleShortLink(id: link.id, with: route) else {
-                    throw GoogleMapsShortLinkResolverError.invalidLink
-                }
-                state = .ready(route)
-            } catch {
-                if Self.isPermanentResolutionFailure(error) {
-                    inbox.acknowledge(id: link.id)
-                    state = .failed(error.localizedDescription)
-                } else {
-                    state = .failed(Self.retryableFailureMessage)
-                }
+            await resolve(link, using: shortLinkResolver, provider: .googleMaps)
+
+        case let .unresolvedAppleShortLink(link):
+            state = .resolvingAppleMapsLink
+            await resolve(link, using: appleShortLinkResolver, provider: .appleMaps)
+        }
+    }
+
+    private func resolve(_ link: SharedRouteShortLink, using resolver: any MapsShortLinkResolving, provider: SharedRouteProvider) async {
+        do {
+            let finalURL = try await resolver.resolve(link.url)
+            // Failing to read the resolved page is not the same as the
+            // page being unsupported: a consent interstitial resolves
+            // differently on the next attempt. Keep it retriable.
+            guard case let .ready(candidate) = SharedRouteImportParser.parse(url: finalURL, text: nil),
+                  candidate.provider == provider else {
+                throw MapsShortLinkResolverError.unreadableRedirectTarget
+            }
+            let route = SharedRouteDraft(
+                id: link.id,
+                provider: candidate.provider,
+                origin: candidate.origin,
+                destination: candidate.destination,
+                importedAt: link.receivedAt,
+                waypointCount: candidate.waypointCount
+            )
+            guard inbox.replaceShortLink(id: link.id, with: route) else {
+                throw MapsShortLinkResolverError.invalidLink
+            }
+            state = .ready(route)
+        } catch {
+            if Self.isPermanentResolutionFailure(error) {
+                inbox.acknowledge(id: link.id)
+                state = .failed(error.localizedDescription)
+            } else {
+                state = .failed(Self.retryableFailureMessage)
             }
         }
     }
@@ -90,7 +103,7 @@ final class SharedRouteImportCoordinator: ObservableObject {
         state = .idle
     }
 
-    static let retryableFailureMessage = "Roam could not finish reading this Google Maps link right now. The route is saved and will be tried again when Roam is next active."
+    static let retryableFailureMessage = "Roam could not finish reading this Maps link right now. The route is saved and will be tried again when Roam is next active."
 
     static let unreadableInboxMessage = "A route shared with Roam could not be opened in this version. It is still saved on the device and is not being deleted."
 
@@ -99,7 +112,7 @@ final class SharedRouteImportCoordinator: ObservableObject {
     /// could not read this time — keeps the link so the retry Roam promises
     /// actually happens.
     nonisolated static func isPermanentResolutionFailure(_ error: Error) -> Bool {
-        guard let resolverError = error as? GoogleMapsShortLinkResolverError else {
+        guard let resolverError = error as? MapsShortLinkResolverError else {
             return false
         }
         return resolverError.isPermanent
