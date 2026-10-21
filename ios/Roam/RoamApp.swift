@@ -45,7 +45,14 @@ struct RoamApp: App {
     var body: some Scene {
         WindowGroup {
             #if DEBUG
-            if ProcessInfo.processInfo.arguments.contains("--preview-profile-signed-in") {
+            if ProcessInfo.processInfo.arguments.contains("--preview-results") {
+                NavigationStack { ResultsView(result: ResultsView.previewResult) }
+                    .environmentObject(themeManager)
+                    .environmentObject(DriveSessionManager.shared)
+                    .environmentObject(AuthSessionStore.shared)
+                    .environment(Clerk.shared)
+                    .preferredColorScheme(themeManager.preferredColorScheme)
+            } else if ProcessInfo.processInfo.arguments.contains("--preview-profile-signed-in") {
                 ProfileSignedInPreview()
                     .environmentObject(themeManager)
                     .environment(Clerk.shared)
@@ -123,6 +130,7 @@ struct RoamApp: App {
         authSession.configureAccountDataReset {
             driveSession.clearAccountData()
             RecentRouteStore.shared.clear()
+            DrivingLicensePreferencesStore.shared.reset()
         }
 
         authSession.configureDriveHistorySync {

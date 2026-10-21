@@ -86,6 +86,48 @@ final class ProfileSettingsUITests: XCTestCase {
         XCTAssertTrue(help.waitForExistence(timeout: 5))
     }
 
+    func testDrivingRestrictionsSetupAndExceptions() {
+        let entry = app.buttons["profile.drivingRestrictions"]
+        if !entry.isHittable { app.swipeUp() }
+        XCTAssertTrue(entry.waitForExistence(timeout: 5))
+        entry.tap()
+        XCTAssertTrue(app.navigationBars["Driving restrictions"].waitForExistence(timeout: 5))
+        let state = app.buttons["profile.restrictions.state"]
+        XCTAssertTrue(state.waitForExistence(timeout: 5))
+        state.tap()
+        let california = app.buttons["California"]
+        XCTAssertTrue(california.waitForExistence(timeout: 5))
+        california.tap()
+        let stage = app.buttons["profile.restrictions.stage"]
+        if !stage.exists { app.navigationBars.buttons.firstMatch.tap() }
+        stage.tap()
+        app.buttons["Provisional license"].tap()
+        attachScreenshot("California license restrictions")
+        let passengers = app.buttons["profile.restrictions.passengers"]
+        XCTAssertTrue(passengers.waitForExistence(timeout: 5))
+        passengers.tap()
+        XCTAssertTrue(app.navigationBars["Passengers"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "not automatically exempt")).firstMatch.exists)
+        attachScreenshot("Family passenger exception")
+        app.navigationBars.buttons.firstMatch.tap()
+        app.buttons["profile.restrictions.dates"].tap()
+        XCTAssertTrue(app.navigationBars["Age & issue date"].waitForExistence(timeout: 5))
+        func enable(_ toggle: XCUIElement) {
+            let isOn = (toggle.value as? NSNumber)?.boolValue ?? (toggle.value as? String == "1")
+            guard !isOn else { return }
+            let control = toggle.switches.firstMatch
+            if control.exists { control.tap() } else { toggle.tap() }
+        }
+        let birthday = app.switches["Add birthday"]
+        enable(birthday)
+        attachScreenshot("Birthday entry")
+        XCTAssertTrue(app.staticTexts["Birthday"].waitForExistence(timeout: 5))
+        let issued = app.switches["Add original issue date"]
+        enable(issued)
+        XCTAssertTrue(app.staticTexts["Issued"].waitForExistence(timeout: 5))
+        attachScreenshot("License dates")
+    }
+
     func testPullReturnsToRestAndPreservesNavigation() {
         let greeting = app.staticTexts["Welcome"]
         let restingY = greeting.frame.minY
@@ -116,6 +158,26 @@ final class ProfileSettingsUITests: XCTestCase {
 
 @MainActor
 final class NavigationChromeUITests: XCTestCase {
+    func testRouteScoreDetailsKeepDialAndUseGroupedMenus() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = ["--preview-results", "-roam.theme-id-v1", "dark"]
+        app.launch()
+        let details = app.buttons["View details"]
+        if !details.waitForExistence(timeout: 10) { print(app.debugDescription) }
+        XCTAssertTrue(details.waitForExistence(timeout: 30))
+        details.tap()
+        XCTAssertTrue(app.navigationBars["Route details"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.descendants(matching: .any)["routes.detailScore"].firstMatch.exists)
+        XCTAssertFalse(app.staticTexts["Most of the drive falls in the 8 PM to 6 AM window."].exists)
+        attach(app, "Route score with grouped menus")
+        app.buttons["Route breakdown"].tap()
+        XCTAssertTrue(app.navigationBars["Route breakdown"].waitForExistence(timeout: 5))
+        attach(app, "Route breakdown")
+        app.navigationBars.buttons.firstMatch.tap()
+        XCTAssertTrue(app.navigationBars["Route details"].waitForExistence(timeout: 5))
+    }
+
     func testTabsRemainReachableAfterScrolling() {
         continueAfterFailure = false
         let app = XCUIApplication()

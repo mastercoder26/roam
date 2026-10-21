@@ -305,6 +305,14 @@ struct ProfileView: View {
                             .padding(.leading, AppDesign.Menu.dividerInset)
                     }
                 }
+                if section == .explore {
+                    Divider().padding(.leading, AppDesign.Menu.dividerInset)
+                    NavigationLink { DrivingRestrictionsView() } label: {
+                        ProfileSettingsRow(title: "Driving restrictions", symbol: "person.text.rectangle")
+                    }
+                    .buttonStyle(PressableScaleStyle())
+                    .accessibilityIdentifier("profile.drivingRestrictions")
+                }
             }
             .profileSettingsSurface()
         }

@@ -137,16 +137,8 @@ struct ResultsView: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: AppDesign.sectionSpacing) {
                         scoreSection
-                        selectedPageContent
-                        readinessSection
-                        DisclosureGroup("Departure times") {
-                            departureComparisonSection.padding(.top, 12)
-                        }
-                        .font(.subheadline.weight(.medium))
-                        .tint(AppDesign.Ink.primary)
-                        .accessibilityIdentifier("routes.departureDetails")
-                        routeDataDisclosure
-                        navigationSection
+                        tripDetailsSection
+                        detailMenu
                     }.padding(20)
                 }
                 .background(AppCanvasBackground())
@@ -176,6 +168,53 @@ struct ResultsView: View {
         .onChange(of: selectedPage) { _, _ in
             UISelectionFeedbackGenerator().selectionChanged()
         }
+    }
+
+    private var detailMenu: some View {
+        VStack(spacing: 0) {
+            NavigationLink {
+                AppDetailPage(title: "Route breakdown") {
+                    routeDemandsSection
+                    if let hotspots = selectedRoute.hotspots, !hotspots.isEmpty { hotspotsSection(hotspots) }
+                    if selectedRoute.routeDemands == nil {
+                        breakdownSection
+                        if let contributions = selectedRoute.contributions, !contributions.isEmpty {
+                            contributionsSection(contributions)
+                        }
+                        reasonsSection
+                    }
+                }
+            } label: { ProfileSettingsRow(title: "Route breakdown", symbol: "point.topleft.down.to.point.bottomright.curvepath") }
+            menuDivider
+            NavigationLink {
+                AppDetailPage(title: "Your experience") { readinessSection }
+            } label: { ProfileSettingsRow(title: "Your experience", symbol: "steeringwheel") }
+            if let conditions = selectedRoute.conditions, !conditions.sources.isEmpty {
+                menuDivider
+                NavigationLink {
+                    AppDetailPage(title: "Live conditions") { RouteConditionsCard(conditions: conditions) }
+                } label: { ProfileSettingsRow(title: "Live conditions", symbol: "cloud.sun") }
+            }
+            menuDivider
+            NavigationLink {
+                AppDetailPage(title: "Departure times") { departureComparisonSection }
+            } label: { ProfileSettingsRow(title: "Departure times", symbol: "clock") }
+            .accessibilityIdentifier("routes.departureDetails")
+            menuDivider
+            NavigationLink {
+                AppDetailPage(title: "Route data") { RouteEvidenceCard(evidence: selectedRoute.uncertainty?.evidence) }
+            } label: { ProfileSettingsRow(title: "Route data", symbol: "checkmark.shield") }
+            menuDivider
+            NavigationLink {
+                AppDetailPage(title: "Navigation") { navigationSection }
+            } label: { ProfileSettingsRow(title: "Open in Maps", symbol: "arrow.triangle.turn.up.right.diamond") }
+        }
+        .buttonStyle(.plain)
+        .profileSettingsSurface()
+    }
+
+    private var menuDivider: some View {
+        Divider().padding(.leading, AppDesign.Menu.dividerInset)
     }
 
     private var comparisonSheet: some View {
@@ -219,6 +258,7 @@ struct ResultsView: View {
         }
         .padding(24)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 28))
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("routes.comparisonSheet")
     }
 
@@ -886,10 +926,10 @@ struct ResultsView: View {
 
 }
 
-#Preview {
-    NavigationStack {
-        ResultsView(
-            result: RouteAnalysisResult(
+#if DEBUG
+extension ResultsView {
+    static var previewResult: RouteAnalysisResult {
+        RouteAnalysisResult(
                 origin: "Miami, FL",
                 destination: "Orlando, FL",
                 departureTime: Date().addingTimeInterval(15 * 60),
@@ -978,7 +1018,12 @@ struct ResultsView: View {
                 ),
                 alternateRoutes: []
             )
-        )
     }
-    .environmentObject(DriveSessionManager())
 }
+
+#Preview {
+    NavigationStack { ResultsView(result: ResultsView.previewResult) }
+        .environmentObject(DriveSessionManager())
+        .environmentObject(AuthSessionStore.shared)
+}
+#endif

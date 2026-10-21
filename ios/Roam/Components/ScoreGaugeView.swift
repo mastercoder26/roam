@@ -31,12 +31,11 @@ struct ScoreGaugeView: View {
                 .rotationEffect(.degrees(-90))
 
             VStack(spacing: 2) {
-                KineticMetricText(
-                    value: String(format: "%.1f", score),
-                    fontSize: 64,
-                    foreground: AppDesign.Ink.primary,
-                    context: .routeResult
-                )
+                Text(String(format: "%.1f", score))
+                    .font(.system(size: 64, weight: .semibold))
+                    .monospacedDigit()
+                    .foregroundStyle(AppDesign.Ink.primary)
+                    .contentTransition(.numericText())
 
                 Text("OUT OF 10")
                     .font(.caption2.weight(.bold))

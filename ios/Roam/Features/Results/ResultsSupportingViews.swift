@@ -411,8 +411,6 @@ struct TripDetailsCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: AppDesign.space12) {
-            SectionHeader(title: "Trip at a glance")
-
             HStack(spacing: AppDesign.space16) {
                 DetailTile(
                     title: "ETA",
@@ -436,13 +434,6 @@ struct TripDetailsCard: View {
                 )
             }
 
-            HStack(spacing: 6) {
-                Image(systemName: "gauge.with.dots.needle.33percent")
-                    .foregroundStyle(AppDesign.Ink.secondary)
-                Text("Normal drive: \(route.formattedStaticDuration)")
-                    .font(.subheadline)
-                    .foregroundStyle(AppDesign.Ink.secondary)
-            }
         }
         .premiumCard()
     }

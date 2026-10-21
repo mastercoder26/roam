@@ -42,53 +42,37 @@ struct DriveDetailView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: AppDesign.sectionSpacing) {
-                VStack(alignment: .leading, spacing: AppDesign.space4) {
-                    Text("Drive details").font(AppDesign.Typography.heroTitle)
-                    Text(drive.startedAt.formatted(date: .complete, time: .shortened))
-                        .font(.subheadline)
-                        .foregroundStyle(AppDesign.Ink.secondary)
-                }
-
-                if hasUsableRoute {
-                    RecordedDriveMapView(
-                        route: drive.route,
-                        moments: replayMoments,
-                        selectedEventID: selectedMomentID,
-                        onSelectMoment: select
-                    )
-                    .frame(height: 300)
-                    .clipShape(RoundedRectangle(cornerRadius: AppDesign.cornerRadius, style: .continuous))
-                } else {
-                    ContentUnavailableView(
-                        "Route unavailable",
-                        systemImage: "location.slash",
-                        description: Text("GPS coverage was too limited to draw this route.")
-                    )
+                Text(drive.startedAt.formatted(date: .abbreviated, time: .shortened))
+                    .font(.subheadline)
+                    .foregroundStyle(AppDesign.Ink.secondary)
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 36)
-                    .background(
-                        PastelBackdrop(
-                            imageName: "PastelRouteUnavailable",
-                            fullBleed: false,
-                            cardOutset: AppDesign.cardPadding
-                        )
-                    )
-                    .premiumCard()
-                }
-
-                if let debrief = drive.plannedRouteContext?.debrief {
-                    DriveDebriefSummary(debrief: debrief)
-                }
-                DriveRouteDifficultyCard(analysis: drive.routeAnalysis)
                 DriveScoreCard(score: drive.score, title: "Drive score")
-                replaySection
+
+                VStack(spacing: 0) {
+                    NavigationLink {
+                        AppDetailPage(title: "Route difficulty") { DriveRouteDifficultyCard(analysis: drive.routeAnalysis) }
+                    } label: { ProfileSettingsRow(title: "Route difficulty", symbol: "map") }
+                    Divider().padding(.leading, AppDesign.Menu.dividerInset)
+                    NavigationLink {
+                        AppDetailPage(title: "Drive replay") { replayContent }
+                    } label: { ProfileSettingsRow(title: "Drive replay", symbol: "play.circle", value: "\(replayMoments.count) moments") }
+                    if let debrief = drive.plannedRouteContext?.debrief {
+                        Divider().padding(.leading, AppDesign.Menu.dividerInset)
+                        NavigationLink {
+                            AppDetailPage(title: "Practice review") { DriveDebriefSummary(debrief: debrief) }
+                        } label: { ProfileSettingsRow(title: "Practice review", symbol: "steeringwheel") }
+                    }
+                }
+                .buttonStyle(.plain)
+                .profileSettingsSurface()
             }
             .padding(.horizontal, AppDesign.contentPadding)
             .padding(.vertical, 12)
         }
         .background(AppDesign.canvas)
-        .navigationTitle("Past drive")
+        .navigationTitle("Drive details")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar(.visible, for: .navigationBar)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button(role: .destructive) { confirmingDelete = true } label: {
@@ -97,11 +81,7 @@ struct DriveDetailView: View {
                 .accessibilityLabel("Delete drive")
             }
         }
-        .confirmationDialog(
-            "Delete this drive?",
-            isPresented: $confirmingDelete,
-            titleVisibility: .visible
-        ) {
+        .confirmationDialog("Delete this drive?", isPresented: $confirmingDelete, titleVisibility: .visible) {
             Button("Delete drive", role: .destructive) {
                 session.deleteDrive(id: drive.id)
                 dismiss()
@@ -109,6 +89,39 @@ struct DriveDetailView: View {
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("This removes the drive from this device. It cannot be undone.")
+        }
+    }
+
+    private var replayContent: some View {
+        VStack(alignment: .leading, spacing: AppDesign.sectionSpacing) {
+            if hasUsableRoute {
+                RecordedDriveMapView(
+                    route: drive.route,
+                    moments: replayMoments,
+                    selectedEventID: selectedMomentID,
+                    onSelectMoment: select
+                )
+                .frame(height: 300)
+                .clipShape(RoundedRectangle(cornerRadius: AppDesign.cornerRadius, style: .continuous))
+            } else {
+                ContentUnavailableView(
+                    "Route unavailable",
+                    systemImage: "location.slash",
+                    description: Text("GPS coverage was too limited to draw this route.")
+                )
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 36)
+                .background(
+                    PastelBackdrop(
+                        imageName: "PastelRouteUnavailable",
+                        fullBleed: false,
+                        cardOutset: AppDesign.cardPadding
+                    )
+                )
+                .premiumCard()
+            }
+
+            replaySection
         }
     }
 
@@ -365,7 +378,58 @@ struct DriveScoreCard: View {
         self.title = title
     }
 
+    private var hasScore: Bool { score.dataQuality.confidence != .low }
+
     var body: some View {
+        VStack(spacing: 22) {
+            Text(title).font(.subheadline).foregroundStyle(AppDesign.Ink.secondary)
+            ZStack {
+                Circle().stroke(AppDesign.cardStrokeStrong, lineWidth: 12)
+                if hasScore {
+                    Circle().trim(from: 0, to: min(1, max(0, Double(score.score) / 100)))
+                        .stroke(score.score >= 78 ? AppDesign.positive : AppDesign.safety,
+                                style: StrokeStyle(lineWidth: 12, lineCap: .round))
+                        .rotationEffect(.degrees(-90))
+                }
+                VStack(spacing: 4) {
+                    Text(hasScore ? "\(score.score)" : "—")
+                        .font(.system(size: 64, weight: .light)).monospacedDigit()
+                    Text(hasScore ? "OUT OF 100" : "LIMITED DATA")
+                        .font(.caption2.weight(.semibold)).foregroundStyle(AppDesign.Ink.secondary)
+                }
+            }
+            .frame(width: 196, height: 196)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(hasScore ? "Drive score \(score.score) out of 100" : "Drive score unavailable, limited data")
+            Text(score.grade).font(.subheadline.weight(.medium))
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 24) { driveMetrics }
+                VStack(spacing: 16) { driveMetrics }
+            }
+            NavigationLink {
+                AppDetailPage(title: "Score evidence") { evidenceReport }
+            } label: { ProfileSettingsRow(title: "Score evidence", symbol: "checkmark.shield") }
+                .buttonStyle(.plain)
+                .profileSettingsSurface()
+        }
+        .frame(maxWidth: .infinity)
+        .foregroundStyle(AppDesign.Ink.primary)
+    }
+
+    @ViewBuilder private var driveMetrics: some View {
+        metric(String(format: "%.1f", score.distanceMiles), "Miles")
+        metric(score.formattedDuration, "Drive time")
+        metric("\(score.events.count)", "Events")
+    }
+
+    private func metric(_ value: String, _ label: String) -> some View {
+        VStack(spacing: 4) {
+            Text(value).font(.title3.weight(.semibold)).monospacedDigit()
+            Text(label).font(.caption).foregroundStyle(AppDesign.Ink.secondary)
+        }.frame(maxWidth: .infinity)
+    }
+
+    private var evidenceReport: some View {
         VStack(alignment: .leading, spacing: AppDesign.space16) {
             HStack(alignment: .firstTextBaseline) {
                 VStack(alignment: .leading, spacing: 2) {

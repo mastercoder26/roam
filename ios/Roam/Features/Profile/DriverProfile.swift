@@ -15,6 +15,31 @@ enum ProfileLandscape: String, CaseIterable {
     }
 }
 
+@MainActor
+final class DrivingLicensePreferencesStore: ObservableObject {
+    static let shared = DrivingLicensePreferencesStore()
+    static let storageKey = "roam.driving-license-preferences-v1"
+    private let defaults: UserDefaults
+    @Published var preferences: DrivingLicensePreferences {
+        didSet {
+            if let data = try? JSONEncoder().encode(preferences) {
+                defaults.set(data, forKey: Self.storageKey)
+            }
+        }
+    }
+
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+        preferences = defaults.data(forKey: Self.storageKey)
+            .flatMap { try? JSONDecoder().decode(DrivingLicensePreferences.self, from: $0) } ?? .init()
+    }
+
+    func reset() {
+        preferences = .init()
+        defaults.removeObject(forKey: Self.storageKey)
+    }
+}
+
 /// The scroll view supplies the rubber band and settling physics. These
 /// values only stretch and soften the artwork during positive overscroll.
 struct ProfileHeaderPull: Equatable {

@@ -387,7 +387,8 @@ final class AccountLocalDataBoundary {
     static let contentKeys = [
         "recorded-drives-v1", "recorded-drives-v1-quarantined",
         "in-progress-drive-v1", "in-progress-drive-v1-quarantined",
-        "recentRoutes.v1", "roam.driver-profile-v1", "roam.driver-profile-updated-at-v1"
+        "recentRoutes.v1", "roam.driver-profile-v1", "roam.driver-profile-updated-at-v1",
+        "roam.driving-license-preferences-v1"
     ]
 
     init(defaults: UserDefaults) { self.defaults = defaults }

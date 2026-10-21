@@ -1,5 +1,26 @@
 import SwiftUI
 
+/// The same title, margins, and canvas for every pushed report and settings page.
+struct AppDetailPage<Content: View>: View {
+    let title: String
+    @ViewBuilder let content: () -> Content
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: AppDesign.sectionSpacing, content: content)
+                .padding(.horizontal, AppDesign.contentPadding)
+                .padding(.vertical, 16)
+                .frame(maxWidth: AppDesign.maximumContentWidth)
+                .frame(maxWidth: .infinity)
+        }
+        .background(AppDesign.canvas)
+        .navigationTitle(title)
+        .navigationBarTitleDisplayMode(.inline)
+        .navigationBarBackButtonHidden(false)
+        .toolbar(.visible, for: .navigationBar)
+    }
+}
+
 /// Uses the same qualifying drives as Goals & progress so all three totals
 /// describe the same locally recorded evidence, including a new driver's zeros.
 struct ProfileDrivingSummary: View {

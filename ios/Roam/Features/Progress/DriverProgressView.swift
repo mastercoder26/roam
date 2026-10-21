@@ -10,7 +10,6 @@ struct DriverProgressView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.showDriveTab) private var showDriveTab
-    @State private var showsMeasurementDetails = false
     @ScaledMetric(relativeTo: .largeTitle) private var scoreSize: CGFloat = 64
 
     private var summary: DriverProgressSummary {
@@ -410,56 +409,16 @@ struct DriverProgressView: View {
     }
 
     private var measurementDetailsDisclosure: some View {
-        VStack(alignment: .leading, spacing: showsMeasurementDetails ? AppDesign.space12 : 0) {
-            Button {
-                withAnimation(reduceMotion ? .easeOut(duration: 0.16) : AppAnimation.content) {
-                    showsMeasurementDetails.toggle()
-                }
-            } label: {
-                HStack(spacing: AppDesign.space12) {
-                    Image(systemName: "scope")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(AppDesign.Ink.secondary)
-                        .frame(width: 34, height: 34)
-                        .background(AppDesign.trackSurface, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Measurement details")
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(AppDesign.Ink.primary)
-                        Text("Night, speed, continuity, and privacy")
-                            .font(.caption)
-                            .foregroundStyle(AppDesign.Ink.secondary)
-                    }
-
-                    Spacer(minLength: AppDesign.space8)
-
-                    Image(systemName: "chevron.down")
-                        .font(.caption.weight(.bold))
-                        .foregroundStyle(AppDesign.Ink.tertiary)
-                        .rotationEffect(.degrees(showsMeasurementDetails ? 180 : 0))
-                }
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(PressableScaleStyle())
-            .accessibilityLabel("Measurement details")
-            .accessibilityValue(showsMeasurementDetails ? "Expanded" : "Collapsed")
-            .accessibilityHint(showsMeasurementDetails ? "Hides measurement coverage" : "Shows measurement coverage")
-
-            if showsMeasurementDetails {
-                Divider()
+        NavigationLink {
+            AppDetailPage(title: "Measurement details") {
                 coverageSection
-                    .transition(reduceMotion ? .opacity : .opacity.combined(with: .move(edge: .top)))
                 measurementNote
-                    .transition(.opacity)
             }
+        } label: {
+            ProfileSettingsRow(title: "Measurement details", symbol: "scope")
         }
-        .padding(14)
-        .background(AppDesign.cardSurface, in: RoundedRectangle(cornerRadius: AppDesign.cornerRadius, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: AppDesign.cornerRadius, style: .continuous)
-                .stroke(AppDesign.cardStroke, lineWidth: 0.75)
-        }
+        .buttonStyle(.plain)
+        .profileSettingsSurface()
     }
 
     private var measurementNote: some View {
