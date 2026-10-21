@@ -37,6 +37,7 @@ struct SharedRouteCandidate: Equatable {
 
 enum SharedRouteImportParseResult: Equatable {
     case ready(SharedRouteCandidate)
+    case needsAppleShortLinkResolution(URL)
     case needsGoogleShortLinkResolution(URL)
     case unsupportedTravelMode(SharedRouteTravelMode)
     case unsupported(String)
@@ -59,11 +60,7 @@ enum SharedRouteImportParser {
     static let maximumEndpointLength = 512
 
     static func parse(url: URL?, text: String?) -> SharedRouteImportParseResult {
-        if let url {
-            return parse(url: url)
-        }
-
-        let candidates = urls(in: text ?? "")
+        let candidates = (url.map { [$0] } ?? []) + urls(in: text ?? "")
         guard !candidates.isEmpty else {
             return .unsupported("Roam could not find a map link in this share.")
         }
@@ -82,8 +79,10 @@ enum SharedRouteImportParser {
             return destinationOnly
         }
         if let shortLink = results.first(where: { result in
-            guard case .needsGoogleShortLinkResolution = result else { return false }
-            return true
+            switch result {
+            case .needsAppleShortLinkResolution, .needsGoogleShortLinkResolution: true
+            default: false
+            }
         }) {
             return shortLink
         }
@@ -115,6 +114,9 @@ enum SharedRouteImportParser {
         if host == "maps.apple.com" {
             return parseApple(url: url)
         }
+        if isAppleShortLink(url) {
+            return .needsAppleShortLinkResolution(url)
+        }
         if isGoogleShortLink(url) {
             return .needsGoogleShortLinkResolution(url)
         }
@@ -128,16 +130,19 @@ enum SharedRouteImportParser {
         guard case let .success(query) = queryValues(in: url) else {
             return .unsupported("The Apple Maps link has invalid query values.")
         }
-        guard !hasConflictingValues(named: ["saddr", "source", "daddr", "destination", "address", "q", "query"], in: query) else {
+        guard !hasConflictingValues(named: ["saddr", "source", "daddr", "destination", "address", "q", "query", "coordinate", "ll", "mode", "dirflg"], in: query) else {
             return .unsupported("The Apple Maps link contains conflicting route details.")
         }
         let origin = singleEndpoint(named: ["saddr", "source"], in: query)
-        guard let destination = singleEndpoint(named: ["daddr", "destination", "address", "q", "query"], in: query)
-            ?? coordinateEndpoint(from: query) else {
+        // A place card's name is a label, not an address. Prefer its exact
+        // coordinate over a name such as "Home" or "Dropped Pin".
+        guard let destination = singleEndpoint(named: ["daddr", "destination", "address"], in: query)
+            ?? coordinateEndpoint(from: query)
+            ?? singleEndpoint(named: ["q", "query"], in: query) else {
             return .unsupported("Roam could not find a destination in this Apple Maps link.")
         }
 
-        let mode = travelMode(from: singleValue(named: ["dirflg"], in: query))
+        let mode = travelMode(from: singleValue(named: ["mode", "dirflg"], in: query))
         guard mode == .driving || mode == .unknown else {
             return .unsupportedTravelMode(mode)
         }
@@ -148,7 +153,7 @@ enum SharedRouteImportParser {
                 origin: origin,
                 destination: destination,
                 travelMode: mode,
-                waypointCount: 0
+                waypointCount: min(20, (query["waypoint"] ?? []).filter { cleanEndpoint($0) != nil }.count)
             )
         )
     }
@@ -232,7 +237,7 @@ enum SharedRouteImportParser {
     }
 
     private static func coordinateEndpoint(from query: [String: [String]]) -> String? {
-        guard let raw = singleValue(named: ["ll"], in: query) else { return nil }
+        guard let raw = singleValue(named: ["coordinate", "ll"], in: query) else { return nil }
         let parts = raw.split(separator: ",", omittingEmptySubsequences: false)
         guard parts.count == 2,
               let latitude = Double(parts[0]),
@@ -379,6 +384,17 @@ enum SharedRouteImportParser {
             !url.path.trimmingCharacters(in: CharacterSet(charactersIn: "/")).isEmpty
     }
 
+    static func isAppleShortLink(_ url: URL) -> Bool {
+        isTrustedAppleRedirectURL(url) && url.host?.lowercased() == "maps.apple" &&
+            !url.path.trimmingCharacters(in: CharacterSet(charactersIn: "/")).isEmpty
+    }
+
+    static func isTrustedAppleRedirectURL(_ url: URL) -> Bool {
+        url.scheme?.lowercased() == "https" && url.user == nil && url.password == nil &&
+            (url.port == nil || url.port == 443) && isSafeLength(url) &&
+            ["maps.apple", "maps.apple.com"].contains(url.host?.lowercased() ?? "")
+    }
+
     static func isTrustedGoogleMapsHost(_ host: String?) -> Bool {
         guard let host else { return false }
         let normalizedHost = host.lowercased()
@@ -456,6 +472,21 @@ struct SharedRouteInbox {
 
     @discardableResult
     func enqueueGoogleShortLink(_ url: URL, id: UUID = UUID(), now: Date = Date()) -> Bool {
+        enqueueShortLink(url, provider: .googleMaps, id: id, now: now)
+    }
+
+    @discardableResult
+    func enqueueAppleShortLink(_ url: URL, id: UUID = UUID(), now: Date = Date()) -> Bool {
+        enqueueShortLink(url, provider: .appleMaps, id: id, now: now)
+    }
+
+    private func enqueueShortLink(_ url: URL, provider: SharedRouteProvider, id: UUID, now: Date) -> Bool {
+        switch (provider, SharedRouteImportParser.parse(url: url)) {
+        case (.appleMaps, .needsAppleShortLinkResolution), (.googleMaps, .needsGoogleShortLinkResolution):
+            break
+        default:
+            return false
+        }
         guard url.scheme?.lowercased() == "https",
               url.absoluteString.count <= SharedRouteImportParser.maximumURLLength else {
             return false
@@ -468,7 +499,8 @@ struct SharedRouteInbox {
                     receivedAt: now,
                     expiresAt: now.addingTimeInterval(Self.unresolvedLinkLifetime),
                     route: nil,
-                    unresolvedGoogleURL: url.absoluteString
+                    unresolvedGoogleURL: provider == .googleMaps ? url.absoluteString : nil,
+                    unresolvedAppleURL: provider == .appleMaps ? url.absoluteString : nil
                 )
             )
             return true
@@ -522,9 +554,14 @@ struct SharedRouteInbox {
 
     @discardableResult
     func replaceGoogleShortLink(id: UUID, with route: SharedRouteDraft, now: Date = Date()) -> Bool {
+        replaceShortLink(id: id, with: route, now: now)
+    }
+
+    @discardableResult
+    func replaceShortLink(id: UUID, with route: SharedRouteDraft, now: Date = Date()) -> Bool {
         mutate(now: now) { entries in
             guard let index = entries.firstIndex(where: { entry in
-                entry.id == id && entry.unresolvedGoogleURL != nil
+                entry.id == id && (entry.unresolvedGoogleURL != nil || entry.unresolvedAppleURL != nil)
             }) else {
                 return false
             }
@@ -684,15 +721,19 @@ struct SharedRouteInbox {
         let expiresAt: Date
         let route: SharedRouteDraft?
         let unresolvedGoogleURL: String?
+        var unresolvedAppleURL: String? = nil
 
         var item: SharedRouteInboxItem? {
             if let route { return .route(route) }
+            if let unresolvedAppleURL, let url = URL(string: unresolvedAppleURL) {
+                return .unresolvedAppleShortLink(SharedRouteShortLink(id: id, url: url, receivedAt: receivedAt))
+            }
             guard let unresolvedGoogleURL,
                   let url = URL(string: unresolvedGoogleURL) else {
                 return nil
             }
             return .unresolvedGoogleShortLink(
-                SharedRouteGoogleShortLink(
+                SharedRouteShortLink(
                     id: id,
                     url: url,
                     receivedAt: receivedAt
@@ -704,34 +745,35 @@ struct SharedRouteInbox {
 
 enum SharedRouteInboxItem: Equatable, Identifiable {
     case route(SharedRouteDraft)
-    case unresolvedGoogleShortLink(SharedRouteGoogleShortLink)
+    case unresolvedGoogleShortLink(SharedRouteShortLink)
+    case unresolvedAppleShortLink(SharedRouteShortLink)
 
     var id: UUID {
         switch self {
         case let .route(route):
             route.id
-        case let .unresolvedGoogleShortLink(link):
+        case let .unresolvedGoogleShortLink(link), let .unresolvedAppleShortLink(link):
             link.id
         }
     }
 }
 
-struct SharedRouteGoogleShortLink: Equatable, Identifiable {
+struct SharedRouteShortLink: Equatable, Identifiable {
     let id: UUID
     let url: URL
     let receivedAt: Date
 }
 
-protocol GoogleMapsShortLinkResolving {
+protocol MapsShortLinkResolving {
     func resolve(_ url: URL) async throws -> URL
 }
 
-enum GoogleMapsShortLinkResolverError: LocalizedError {
+enum MapsShortLinkResolverError: LocalizedError {
     case invalidLink
-    /// The redirect chain left the trusted Google allowlist, or ran past the
+    /// The redirect chain left the provider allowlist, or ran past the
     /// redirect limit. Following the same link again cannot change that.
     case unsupportedRedirect
-    /// The chain stayed on Google but the page it landed on was not readable
+    /// The chain stayed on its provider but the page it landed on was not readable
     /// as a route — a consent interstitial, a regional variant, or a response
     /// that never arrived. The same link may well work on the next attempt.
     case unreadableRedirectTarget
@@ -751,33 +793,40 @@ enum GoogleMapsShortLinkResolverError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .invalidLink:
-            "That Google Maps link could not be resolved."
+            "That Maps link could not be resolved."
         case .unsupportedRedirect:
-            "That Google Maps link did not lead to a supported directions route."
+            "That Maps link did not lead to a supported directions route."
         case .unreadableRedirectTarget:
-            "Roam could not read a route from that Google Maps link this time."
+            "Roam could not read a route from that Maps link this time."
         case .responseTooLarge:
-            "That Google Maps link returned more data than Roam can safely read."
+            "That Maps link returned more data than Roam can safely read."
         }
     }
 }
 
-struct GoogleMapsShortLinkResolver: GoogleMapsShortLinkResolving {
+struct GoogleMapsShortLinkResolver: MapsShortLinkResolving {
     func resolve(_ url: URL) async throws -> URL {
         guard url.scheme?.lowercased() == "https",
               url.host?.lowercased() == "maps.app.goo.gl",
               SharedRouteImportParser.isTrustedGoogleRedirectURL(url) else {
-            throw GoogleMapsShortLinkResolverError.invalidLink
+            throw MapsShortLinkResolverError.invalidLink
         }
-        return try await GoogleMapsRedirectWalker().resolve(url)
+        return try await MapsRedirectWalker(provider: .googleMaps).resolve(url)
     }
 }
 
-/// Resolves a Google Maps short link without allowing the network request to
-/// become a general-purpose URL fetcher. Every redirect must remain HTTPS on a
-/// small Google allowlist. The final response is accepted from its headers and
-/// cancelled before its body is read.
-private final class GoogleMapsRedirectWalker: NSObject, URLSessionDataDelegate, URLSessionTaskDelegate {
+struct AppleMapsShortLinkResolver: MapsShortLinkResolving {
+    func resolve(_ url: URL) async throws -> URL {
+        guard SharedRouteImportParser.isAppleShortLink(url) else {
+            throw MapsShortLinkResolverError.invalidLink
+        }
+        return try await MapsRedirectWalker(provider: .appleMaps).resolve(url)
+    }
+}
+
+/// Follows HTTPS redirects only within the originating Maps provider. The
+/// expanded URL contains the endpoints; no HTML response body is needed.
+private final class MapsRedirectWalker: NSObject, URLSessionDataDelegate, URLSessionTaskDelegate {
     private static let maximumRedirects = 5
     private static let maximumResponseBytes = 32 * 1_024
 
@@ -787,6 +836,19 @@ private final class GoogleMapsRedirectWalker: NSObject, URLSessionDataDelegate, 
     private var continuation: CheckedContinuation<URL, Error>?
     private var session: URLSession?
     private var didFinish = false
+    private let provider: SharedRouteProvider
+
+    init(provider: SharedRouteProvider) {
+        self.provider = provider
+        super.init()
+    }
+
+    private func isTrusted(_ url: URL) -> Bool {
+        switch provider {
+        case .appleMaps: SharedRouteImportParser.isTrustedAppleRedirectURL(url)
+        case .googleMaps: SharedRouteImportParser.isTrustedGoogleRedirectURL(url)
+        }
+    }
 
     func resolve(_ url: URL) async throws -> URL {
         try await withCheckedThrowingContinuation { continuation in
@@ -822,11 +884,19 @@ private final class GoogleMapsRedirectWalker: NSObject, URLSessionDataDelegate, 
     ) {
         guard let currentURL = response.url,
               let redirectURL = request.url,
-              SharedRouteImportParser.isTrustedGoogleRedirectURL(currentURL),
-              SharedRouteImportParser.isTrustedGoogleRedirectURL(redirectURL),
+              isTrusted(currentURL),
+              isTrusted(redirectURL),
               incrementRedirectCountIfAllowed() else {
             completionHandler(nil)
-            finish(.failure(GoogleMapsShortLinkResolverError.unsupportedRedirect))
+            finish(.failure(MapsShortLinkResolverError.unsupportedRedirect))
+            return
+        }
+        // Apple exposes the expanded Maps URL in the 301 Location header.
+        // Accept it before requesting a potentially large place-card page.
+        if provider == .appleMaps,
+           case .ready = SharedRouteImportParser.parse(url: redirectURL) {
+            completionHandler(nil)
+            finish(.success(redirectURL))
             return
         }
         completionHandler(request)
@@ -841,9 +911,9 @@ private final class GoogleMapsRedirectWalker: NSObject, URLSessionDataDelegate, 
         guard let httpResponse = response as? HTTPURLResponse,
               (200 ... 299).contains(httpResponse.statusCode),
               let finalURL = response.url,
-              SharedRouteImportParser.isTrustedGoogleRedirectURL(finalURL) else {
+              isTrusted(finalURL) else {
             completionHandler(.cancel)
-            finish(.failure(GoogleMapsShortLinkResolverError.unsupportedRedirect))
+            finish(.failure(MapsShortLinkResolverError.unsupportedRedirect))
             return
         }
 
@@ -852,7 +922,7 @@ private final class GoogleMapsRedirectWalker: NSObject, URLSessionDataDelegate, 
         // it is transient, not a reason to throw the share away.
         guard case .ready = SharedRouteImportParser.parse(url: finalURL, text: nil) else {
             completionHandler(.cancel)
-            finish(.failure(GoogleMapsShortLinkResolverError.unreadableRedirectTarget))
+            finish(.failure(MapsShortLinkResolverError.unreadableRedirectTarget))
             return
         }
 
@@ -868,7 +938,7 @@ private final class GoogleMapsRedirectWalker: NSObject, URLSessionDataDelegate, 
 
         guard exceededLimit else { return }
         dataTask.cancel()
-        finish(.failure(GoogleMapsShortLinkResolverError.responseTooLarge))
+        finish(.failure(MapsShortLinkResolverError.responseTooLarge))
     }
 
     func urlSession(
@@ -881,7 +951,7 @@ private final class GoogleMapsRedirectWalker: NSObject, URLSessionDataDelegate, 
         } else {
             // The task completed without ever producing a usable response.
             // Nothing here proves the link is bad, so it stays retriable.
-            finish(.failure(GoogleMapsShortLinkResolverError.unreadableRedirectTarget))
+            finish(.failure(MapsShortLinkResolverError.unreadableRedirectTarget))
         }
     }
 

@@ -142,6 +142,10 @@ struct RoamRootView: View {
         // A route import must never pull someone out of a manually started
         // drive. The inbox remains local and will be read after the drive ends.
         guard !driveSession.isRecording else { return }
+        if case .ready = sharedRouteImport.state {
+            applySharedRouteStateIfSafe(sharedRouteImport.state)
+            return
+        }
         Task {
             await sharedRouteImport.refresh()
         }
@@ -162,7 +166,7 @@ struct RoamRootView: View {
             sharedRouteImport.dismissFailure()
             selectedTab = .routes
 
-        case .idle, .resolvingGoogleMapsLink:
+        case .idle, .resolvingGoogleMapsLink, .resolvingAppleMapsLink:
             break
         }
     }

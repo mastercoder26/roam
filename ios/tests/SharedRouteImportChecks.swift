@@ -385,7 +385,7 @@ struct SharedRouteImportChecks {
     }
 
     private static func onlyUnchangeableFailuresAreTreatedAsPermanent() {
-        typealias ResolverError = GoogleMapsShortLinkResolverError
+        typealias ResolverError = MapsShortLinkResolverError
 
         expect(ResolverError.invalidLink.isPermanent, "a link that is not a Google short link cannot become one")
         expect(
@@ -455,7 +455,7 @@ struct SharedRouteImportChecks {
         let coordinator = SharedRouteImportCoordinator(
             inbox: inbox,
             shortLinkResolver: StubGoogleShortLinkResolver(
-                error: GoogleMapsShortLinkResolverError.unsupportedRedirect
+                error: MapsShortLinkResolverError.unsupportedRedirect
             )
         )
         await coordinator.refresh()
@@ -510,7 +510,7 @@ struct SharedRouteImportChecks {
     }
 }
 
-private struct StubGoogleShortLinkResolver: GoogleMapsShortLinkResolving {
+private struct StubGoogleShortLinkResolver: MapsShortLinkResolving {
     private let url: URL?
     private let error: Error?
 
