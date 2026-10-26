@@ -201,18 +201,25 @@ struct APIClient {
         includeAlternates: Bool,
         continuousDriveMinutes: Double?
     ) async throws -> RouteDifficultyResponse {
+        let now = Date()
+        // "Leave now" and expired form selections must use Google's current
+        // conditions default. Also leave enough time for a scheduled timestamp
+        // to remain in the future throughout the request's network budget.
+        let scheduledDeparture = departureTime.flatMap {
+            $0.timeIntervalSince(now) > Self.totalRequestBudget ? $0 : nil
+        }
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         let localTime = Calendar.autoupdatingCurrent.dateComponents(
             [.hour, .minute],
-            from: departureTime ?? Date()
+            from: scheduledDeparture ?? now
         )
         let departureLocalMinutes = (localTime.hour ?? 0) * 60 + (localTime.minute ?? 0)
 
         let body = RouteDifficultyRequest(
             origin: origin,
             destination: destination,
-            departureTime: departureTime.map(formatter.string(from:)),
+            departureTime: scheduledDeparture.map(formatter.string(from:)),
             departureLocalMinutes: departureLocalMinutes,
             includeAlternates: includeAlternates,
             continuousDriveMinutes: continuousDriveMinutes

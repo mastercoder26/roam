@@ -15,6 +15,7 @@ struct RouteAnalysisChecks {
         endpointsComeFromTheOuterEdgesOfTheTrace()
         aTooShortTraceIsRejectedBeforeAnyNetworkCall()
         await theAutomaticRequestOmitsDepartureTime()
+        await immediateAndExpiredDeparturesUseCurrentConditions()
         await aManuallyPlannedRouteStillSendsItsDepartureTime()
         await aRealBackendResponseBecomesAnAvailableAnalysis()
         await aProviderFailureIsRetryEligibleAndKeepsTheDrive()
@@ -94,13 +95,35 @@ struct RouteAnalysisChecks {
         expect(stub.capturedPath?.hasSuffix("/api/route/difficulty") == true, "it should call the difficulty endpoint")
     }
 
-    /// The planning screens analyze a *future* departure the driver picked, so
-    /// they must keep sending it. Only the after-the-fact path drops it.
+    /// "Leave now" and a form left open past its selected time must not send
+    /// timestamps Google will reject by the time the request reaches it.
+    @MainActor
+    private static func immediateAndExpiredDeparturesUseCurrentConditions() async {
+        for offset: TimeInterval in [-3_600, 0, 30] {
+            let stub = StubTransport(responseBody: Data(realBackendResponseJSON.utf8))
+            let client = makeClient(stub: stub)
+
+            _ = try? await client.analyzeRoute(
+                origin: "1 Market St, San Francisco",
+                destination: "San Jose, CA",
+                departureTime: Date().addingTimeInterval(offset),
+                accessToken: "test-token"
+            )
+
+            guard let body = stub.capturedBody, let json = jsonObject(body) else {
+                fail("the immediate planning call should have sent a JSON body")
+            }
+            expect(json["departureTime"] == nil, "departure offset \(offset) should use current conditions")
+            expect(json["departureLocalMinutes"] != nil, "current conditions still need a local clock hint")
+        }
+    }
+
+    /// A genuinely future departure must keep its exact scheduled timestamp.
     @MainActor
     private static func aManuallyPlannedRouteStillSendsItsDepartureTime() async {
         let stub = StubTransport(responseBody: Data(realBackendResponseJSON.utf8))
         let client = makeClient(stub: stub)
-        let departure = Date(timeIntervalSince1970: 1_800_000_000)
+        let departure = Date().addingTimeInterval(3_600)
 
         _ = try? await client.analyzeRoute(
             origin: "1 Market St, San Francisco",
@@ -113,10 +136,10 @@ struct RouteAnalysisChecks {
         guard let body = stub.capturedBody, let json = jsonObject(body) else {
             fail("the planning call should have sent a JSON body")
         }
-        expect(
-            json["departureTime"] as? String != nil,
-            "a driver-selected future departure must still be sent"
-        )
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        expect(json["departureTime"] as? String == formatter.string(from: departure),
+               "a driver-selected future departure must retain its exact scheduled time")
     }
 
     // MARK: - Response decoding
