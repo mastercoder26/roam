@@ -1,6 +1,12 @@
 <div align="center">
 
-<img src="web/public/brand/roam-wordmark.png" alt="Roam" width="224" />
+<p>
+  <img src="docs/assets/readme/roam-app-icon.png" alt="Roam primary app logo" width="48" />
+  &nbsp;
+  <img src="web/public/brand/roam-wordmark.png" alt="Roam wordmark" width="200" />
+  &nbsp;
+  <img src="docs/assets/readme/roam-alternate-icon.png" alt="Roam alternate app logo" width="48" />
+</p>
 
 <h1>Know what you're driving into.</h1>
 
@@ -9,7 +15,7 @@
 <p><strong>2026 Congressional App Challenge</strong><br />California's 9th Congressional District</p>
 
 <p>
-  <a href="https://youtu.be/b0pFSwxqZD0"><strong>Watch the walkthrough ↗</strong></a>
+  <a href="#walkthrough"><strong>Watch the app in use</strong></a>
   &nbsp; · &nbsp;
   <a href="#the-app">Explore the app</a>
   &nbsp; · &nbsp;
@@ -17,12 +23,22 @@
   &nbsp; · &nbsp;
   <a href="#how-the-algorithms-work">The algorithms</a>
   &nbsp; · &nbsp;
-  <a href="#under-the-hood">Under the hood</a>
+  <a href="#tech-stack">Tech stack</a>
   &nbsp; · &nbsp;
   <a href="#run-it-locally">Run it locally</a>
 </p>
 
 </div>
+
+## Walkthrough
+
+<p align="center">
+  <a href="docs/assets/readme/roam-walkthrough.mp4"><img src="docs/assets/readme/walkthrough-preview.gif" alt="Preview of the recorded Roam walkthrough showing native app interactions in dark mode" width="800" /></a>
+</p>
+
+[Watch the full app walkthrough](docs/assets/readme/roam-walkthrough.mp4)
+
+Recorded from the native iPhone app in dark mode. The walkthrough opens route details, expands the explanations, checks conditions, edits a local profile, and uses the drive controls. Route analysis uses the app's sample data; the simulator recording demonstrates the controls and does not represent a real drive.
 
 ## The app
 
@@ -42,8 +58,8 @@ From choosing a route to building experience. Select any screen for the original
     </td>
     <td width="33%" valign="top" align="center">
       <strong>03 &nbsp; Practice with purpose</strong><br /><br />
-      <a href="docs/assets/readme/raw/drive.png"><img src="docs/assets/readme/drive.png" alt="Roam Drive tab for starting and reviewing manually recorded practice drives" width="260" /></a><br /><br />
-      Start a recording, then review the drive and its coaching events.
+      <a href="docs/assets/readme/raw/drive.png"><img src="docs/assets/readme/drive.png" alt="Roam actively recording simulated GPS input, showing 28 mph, elapsed time, distance, and the pause control" width="260" /></a><br /><br />
+      Record speed, time, and distance, with pause and lock controls close by.
     </td>
   </tr>
   <tr>
@@ -59,26 +75,52 @@ From choosing a route to building experience. Select any screen for the original
     </td>
     <td width="33%" valign="top" align="center">
       <strong>06 &nbsp; Look a little closer</strong><br /><br />
-      <a href="docs/assets/readme/raw/route-breakdown.png"><img src="docs/assets/readme/route-breakdown.png" alt="Roam Route breakdown in dark mode showing sample demands for after-dark driving, fast roads, and merges" width="260" /></a><br /><br />
-      Open the route breakdown to explore the demands behind the score.
+      <a href="docs/assets/readme/raw/route-breakdown.png"><img src="docs/assets/readme/route-breakdown.png" alt="Roam Route breakdown in dark mode with the after-dark, fast-road, and merge explanations expanded" width="260" /></a><br /><br />
+      Read the expanded evidence behind each route demand.
     </td>
   </tr>
 </table>
 
-<sub>Captured in dark mode from the native SwiftUI app in the iPhone simulator. Route analysis uses sample preview data. Guest screens show the starting experience before drives are recorded.</sub>
+<sub>Captured in dark mode from the native SwiftUI app in the iPhone simulator. Route analysis uses sample preview data; the active drive uses simulated GPS. Profile and Progress show guest or first-use states.</sub>
 
-<details>
-<summary><strong>See the interface in motion</strong></summary>
+## Tech stack
 
-<p align="center">
-  <img src="docs/assets/readme/profile-interaction.gif" alt="A recording of the Roam Profile screen responding to a pull-down gesture, with the landscape header expanding and settling back" width="300" />
-</p>
+The native app, route analysis, and account storage work together through two APIs.
 
-The Profile header responds to a pull-down gesture. This loop comes from an app recording.
+| Part | Built with | Responsibility |
+| :--- | :--- | :--- |
+| **iPhone app** | SwiftUI, MapKit, CoreLocation, CoreMotion | Planning, manual drive recording, on-device coaching, and progress. |
+| **Route analysis** | TypeScript, Express, Google Cloud Run | Route difficulty, departure comparisons, and road and weather context. |
+| **Account sync** | Clerk, Express, Render, PostgreSQL | Authenticated profiles, saved routes, and drive history. |
+| **Web companion** | Next.js, React, Leaflet | A browser interface to the route analysis engine, available to run locally. |
 
-[Watch the full walkthrough with sound](https://youtu.be/b0pFSwxqZD0) · [Open the original recording](docs/assets/profile-pull-down.mp4)
+```mermaid
+flowchart TD
+    IOS["iPhone app · SwiftUI"]
+    SENSORS["GPS + phone motion"]
+    LOCAL["On-device drive processing<br/>Local history + readiness"]
+    WEB["Web companion · Next.js"]
+    ROUTES["Route analysis API<br/>Google Cloud Run"]
+    CONTEXT["Google Routes + Roads<br/>Open-Meteo + OpenStreetMap"]
+    AUTH["Clerk authentication"]
+    DATA["Account data API<br/>Render"]
+    DB[("PostgreSQL")]
 
-</details>
+    SENSORS --> IOS
+    IOS --> LOCAL
+    IOS <-->|"Route analysis"| ROUTES
+    WEB <-->|"Route analysis"| ROUTES
+    ROUTES <-->|"Routing + conditions"| CONTEXT
+    AUTH -->|"Token verification"| ROUTES
+    AUTH -->|"Token verification"| DATA
+    IOS <-->|"Profile, routes + drives"| DATA
+    DATA <--> DB
+```
+
+The same backend code serves two deployments. Cloud Run handles route requests without a database; Render handles persistent account data. The iPhone app processes recorded drives and matches practice routes locally.
+
+See the [deployment guide](docs/deployment.md) for service configuration.
+
 
 ## Why Roam
 
@@ -210,47 +252,6 @@ Read the [readiness engine](ios/Roam/Models/DriverReadinessEngine.swift), [confi
 
 </details>
 
-## Under the hood
-
-| Part | Built with | Responsibility |
-| :--- | :--- | :--- |
-| **iPhone app** | SwiftUI, MapKit, CoreLocation, CoreMotion | Planning, manual drive recording, on-device coaching, and progress. |
-| **Route analysis** | TypeScript, Express, Google Cloud Run | Route difficulty, departure comparisons, and road and weather context. |
-| **Account sync** | Clerk, Express, Render, PostgreSQL | Authenticated profiles, saved routes, and drive history. |
-| **Web companion** | Next.js, React, Leaflet | A browser interface to the route analysis engine, available to run locally. |
-
-<details>
-<summary><strong>Explore the architecture</strong></summary>
-
-```mermaid
-flowchart TD
-    IOS["iPhone app · SwiftUI"]
-    SENSORS["GPS + phone motion"]
-    LOCAL["On-device drive processing<br/>Local history + readiness"]
-    WEB["Web companion · Next.js"]
-    ROUTES["Route analysis API<br/>Google Cloud Run"]
-    CONTEXT["Google Routes + Roads<br/>Open-Meteo + OpenStreetMap"]
-    AUTH["Clerk authentication"]
-    DATA["Account data API<br/>Render"]
-    DB[("PostgreSQL")]
-
-    SENSORS --> IOS
-    IOS --> LOCAL
-    IOS <-->|"Route analysis"| ROUTES
-    WEB <-->|"Route analysis"| ROUTES
-    ROUTES <-->|"Routing + conditions"| CONTEXT
-    AUTH -->|"Token verification"| ROUTES
-    AUTH -->|"Token verification"| DATA
-    IOS <-->|"Profile, routes + drives"| DATA
-    DATA <--> DB
-```
-
-The same backend code serves two deployments. Cloud Run handles route requests without a database; Render handles persistent account data. The iPhone app processes recorded drives and matches practice routes locally.
-
-See the [deployment guide](docs/deployment.md) for service configuration.
-
-</details>
-
 <details>
 <summary><strong>Recording and personal data</strong></summary>
 
@@ -354,5 +355,5 @@ The Swift checks cover scoring, readiness, route matching, recording policies, a
 <p align="center">
   <strong>Roam</strong><br />
   Built for the first miles, and the practice that comes after.<br /><br />
-  <a href="https://youtu.be/b0pFSwxqZD0">Watch the walkthrough</a> · <a href="docs/driving-restrictions.md">Driving restriction sources</a> · <a href="LICENSE">MIT License</a>
+  <a href="#walkthrough">Watch the app in use</a> · <a href="docs/driving-restrictions.md">Driving restriction sources</a> · <a href="LICENSE">MIT License</a>
 </p>

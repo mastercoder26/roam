@@ -36,3 +36,13 @@ for (const file of (await readdir(join(directory, 'raw'))).sort()) {
     .toFile(join(directory, file));
   console.log(`Framed ${file}: ${frameWidth} × ${frameHeight}`);
 }
+
+for (const [source, output] of [
+  ['AppIconPrimaryPreview', 'roam-app-icon.png'],
+  ['AppIconWordmarkPreview', 'roam-alternate-icon.png'],
+]) {
+  await sharp(join(directory, '../../../ios/Roam/Assets.xcassets', `${source}.imageset`, `${source}.png`))
+    .resize(144, 144)
+    .png()
+    .toFile(join(directory, output));
+}
