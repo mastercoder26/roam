@@ -333,9 +333,12 @@ describe("route demands", () => {
     expect(fastRoads.coverageRanges).toEqual([
       { startFraction: 0.33333, endFraction: 0.66667 },
     ]);
-    expect(merges.coverageRanges?.[0]?.startFraction).toBeCloseTo(0.59, 2);
-    expect(merges.coverageRanges?.[0]?.endFraction).toBeCloseTo(0.74, 2);
-    expect(intersections.coverageRanges?.[0]?.startFraction).toBeCloseTo(0.955, 2);
+    // Maneuvers are performed where their step begins (1/3 and 2/3 of the
+    // overview geometry), so the highlighted windows are centred there.
+    expect(merges.coverageRanges?.[0]?.startFraction).toBeCloseTo(0.258, 2);
+    expect(merges.coverageRanges?.[0]?.endFraction).toBeCloseTo(0.408, 2);
+    expect(intersections.coverageRanges?.[0]?.startFraction).toBeCloseTo(0.622, 2);
+    expect(intersections.coverageRanges?.[0]?.endFraction).toBeCloseTo(0.712, 2);
     expect(afterDark.coverageRanges).toEqual([
       { startFraction: 0.66667, endFraction: 1 },
     ]);

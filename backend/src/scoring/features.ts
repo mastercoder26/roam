@@ -435,10 +435,15 @@ function computeMonotony(
   longestHighwaySegmentMiles: number,
   durationHours: number
 ): number {
-  if (highwayShare < 0.5) return 0;
-  return Math.min(
-    1,
-    (longestHighwaySegmentMiles / 40) * 0.5 + (durationHours / 4) * 0.5
+  // Ramped in between 35% and 65% highway; a hard gate at 50% made two
+  // near-identical routes differ by the whole monotony term.
+  const highwayGate = smoothstep((highwayShare - 0.35) / 0.3);
+  return (
+    highwayGate *
+    Math.min(
+      1,
+      (longestHighwaySegmentMiles / 40) * 0.5 + (durationHours / 4) * 0.5
+    )
   );
 }
 
@@ -471,9 +476,12 @@ function computeTrafficVariance(
     speedRatios.reduce((sum, ratio) => sum + Math.abs(ratio - meanRatio), 0) /
     speedRatios.length;
 
+  // Pace differences between a freeway and a side street exist with no
+  // traffic at all; only the part that coincides with real delay is traffic.
+  const congestion = smoothstep(delayRatio / 0.1);
   return Math.max(
     0,
-    Math.min(1, finiteOr(meanAbsoluteDeviation) * (1 + delayRatio))
+    Math.min(1, finiteOr(meanAbsoluteDeviation) * (1 + delayRatio) * congestion)
   );
 }
 

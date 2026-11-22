@@ -58,8 +58,14 @@ export async function handleDeleteAccount(req: Request, res: Response): Promise<
   try {
     const user = req.user as AuthenticatedUser;
     if (!user.clerkUserId) throw new AuthConfigurationError("The Clerk user id is missing.");
-    await deleteClerkUser(user.clerkUserId);
+    // Personal data goes first. If the database fails, nothing was removed and
+    // the still-valid Clerk session can retry. If Clerk fails afterwards, the
+    // data is already gone and a retry with the same session finishes the
+    // identity removal (the middleware re-creates an empty local row, which
+    // the retry deletes again). The old order could strand personal data
+    // behind an identity that no longer existed to request its deletion.
     await deleteUser(user.id);
+    await deleteClerkUser(user.clerkUserId);
     res.status(204).end();
   } catch (error) {
     sendError(res, requestId, error, "account-delete");

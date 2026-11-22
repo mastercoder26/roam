@@ -158,7 +158,7 @@ describe("score calibration", () => {
     const calibrator = getCalibrator();
     expect(calibrator.transform(8.7)).toBeLessThan(8);
     expect(calibrator.transform(10)).toBe(9);
-    expect(calibrator.modelVersion).toBe("hybrid-v6");
+    expect(calibrator.modelVersion).toBe("hybrid-v7");
   });
 });
 

@@ -1,11 +1,12 @@
 import type { FactorContribution, ScoringBreakdown, ScoringContext, SegmentHotspot } from "../types.js";
 import { BASE_SCORE_WEIGHTS, type BaseScoreComponents } from "./baseScore.js";
 import type { FatigueResult } from "./fatigue.js";
-import { durationBurden, fatigueSubscore } from "./fatigue.js";
+import { durationBurden, fatigueSubscore, type RawScoreParts } from "./fatigue.js";
 import type { RouteFeatures } from "./features.js";
 import {
   METERS_PER_MILE,
   computeSustainedEffortFromHours,
+  finiteOr,
   smoothstep,
 } from "./helpers.js";
 import type { RouteSegment } from "./segments.js";
@@ -24,6 +25,7 @@ const FACTOR_LABELS: Record<string, string> = {
   sustained: "Sustained attention",
   laneChange: "Lane change urgency",
   unprotectedLefts: "Unprotected left turns",
+  night: "Driving after dark",
 };
 
 /**
@@ -85,100 +87,53 @@ export function buildBreakdown(
   };
 }
 
+/**
+ * Factor contributions are the points each factor actually added in
+ * `computeRawScoreParts` (expressed as a 0–1 fraction of the 10-point scale),
+ * not a second, presentation-only weighting. The top contribution is therefore
+ * always the term that moved the score most.
+ */
 export function explainPrediction(
   breakdown: ScoringBreakdown,
-  features: RouteFeatures
+  features: RouteFeatures,
+  parts: RawScoreParts
 ): FactorContribution[] {
-  const keys = Object.keys(FACTOR_WEIGHTS) as Array<keyof typeof FACTOR_WEIGHTS>;
+  const values: Record<keyof RawScoreParts, number> = {
+    speed: breakdown.speed,
+    merges: breakdown.merges,
+    turns: breakdown.turns,
+    traffic: breakdown.traffic,
+    length: breakdown.length,
+    fatigue: breakdown.fatigue,
+    weather: breakdown.weather ?? 0,
+    road: breakdown.road ?? 0,
+    unprotectedLefts: smoothstep(features.unprotectedLeftTurns / 4),
+    night: features.nighttimeShare,
+  };
+  const optional = new Set<keyof RawScoreParts>([
+    "weather",
+    "road",
+    "unprotectedLefts",
+    "night",
+  ]);
 
-  const entries: FactorContribution[] = keys
-    .filter((key) => {
-      // Hide condition factors entirely when no live data contributed.
-      if (key === "weather" || key === "road") return (breakdown[key] ?? 0) > 0.02;
-      return true;
-    })
+  const entries: FactorContribution[] = (
+    Object.keys(parts) as Array<keyof RawScoreParts>
+  )
+    // Hide overlay factors entirely when they added nothing.
+    .filter((key) => !optional.has(key) || parts[key] > 0.02)
     .map((key) => {
-      const value = breakdown[key] ?? 0;
-      const weight = FACTOR_WEIGHTS[key];
-      const contribution = weight * value;
+      const value = finiteOr(values[key]);
+      const contribution = Math.max(0, finiteOr(parts[key])) / 10;
       return {
         factor: key,
         label: FACTOR_LABELS[key] ?? key,
         value,
-        weight,
+        weight: value > 0 ? contribution / value : 0,
         contribution,
         share: 0,
       };
     });
-
-  if (features.unprotectedLeftTurns >= 1) {
-    const norm = smoothstep(features.unprotectedLeftTurns / 5);
-    entries.push({
-      factor: "unprotectedLefts",
-      label: FACTOR_LABELS.unprotectedLefts,
-      value: norm,
-      weight: 0.1,
-      contribution: 0.1 * norm,
-      share: 0,
-    });
-  }
-
-  const sustained = computeSustainedEffortFromHours(features.durationHours).subscore;
-  if (sustained > 0.2) {
-    entries.push({
-      factor: "sustained",
-      label: FACTOR_LABELS.sustained,
-      value: sustained,
-      weight: 0.24,
-      contribution: 0.24 * sustained,
-      share: 0,
-    });
-  }
-
-  if (features.turnClusterSubscore > 0.15) {
-    entries.push({
-      factor: "turnCluster",
-      label: FACTOR_LABELS.turnCluster,
-      value: features.turnClusterSubscore,
-      weight: 0.12,
-      contribution: 0.12 * features.turnClusterSubscore,
-      share: 0,
-    });
-  }
-
-  if (features.decisionPointDensity > 1) {
-    const densityNorm = smoothstep(features.decisionPointDensity / 5);
-    entries.push({
-      factor: "decisionDensity",
-      label: FACTOR_LABELS.decisionDensity,
-      value: densityNorm,
-      weight: 0.08,
-      contribution: 0.08 * densityNorm,
-      share: 0,
-    });
-  }
-
-  if (features.laneChangeUrgency > 0.2) {
-    entries.push({
-      factor: "laneChange",
-      label: FACTOR_LABELS.laneChange,
-      value: features.laneChangeUrgency,
-      weight: 0.06,
-      contribution: 0.06 * features.laneChangeUrgency,
-      share: 0,
-    });
-  }
-
-  if (features.segmentMaxDifficulty > 0.5) {
-    entries.push({
-      factor: "hotspot",
-      label: `Hardest segment (${(features.segmentMaxDifficulty * 100).toFixed(0)}%)`,
-      value: features.segmentMaxDifficulty,
-      weight: 0,
-      contribution: features.segmentMaxDifficulty * 0.15,
-      share: 0,
-    });
-  }
 
   const total = entries.reduce((sum, e) => sum + e.contribution, 0) || 1;
   for (const entry of entries) {
@@ -275,6 +230,12 @@ export function generateReasons(
 
   for (const rule of FACTOR_REASONS) {
     const value = ctx.breakdown[rule.key] ?? 0;
+    // The speed component also carries local-road burden, so it can be high
+    // on a route with no fast roads at all. Only call it high-speed when the
+    // route really is.
+    if (rule.key === "speed" && features && features.fractionAbove45Mph < 0.5) {
+      continue;
+    }
     if (value >= rule.threshold) {
       reasons.push({ text: rule.message, weight: (REASON_WEIGHTS[rule.key] ?? 0.1) * value });
     }
