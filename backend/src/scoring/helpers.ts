@@ -168,5 +168,5 @@ export function getCalibrator(): {
   transform: (score: number) => number;
   modelVersion: string;
 } {
-  return { transform: calibrateScore, modelVersion: "hybrid-v6" };
+  return { transform: calibrateScore, modelVersion: "hybrid-v7" };
 }

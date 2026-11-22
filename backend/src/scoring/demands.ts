@@ -292,9 +292,9 @@ function rangesForSpans(
 
 /**
  * A maneuver belongs near its routing-instruction boundary, not across an
- * entire (sometimes multi-mile) step. `collectMergeEvents` and turn-cluster
- * scoring both place the instruction at the end of its step, so use the same
- * convention here and retain only a small distance window around it.
+ * entire (sometimes multi-mile) step. The maneuver is performed where its
+ * step begins; `collectMergeEvents` and turn-cluster scoring use the same
+ * convention, so retain only a small distance window around the step start.
  */
 function rangesNearInstructionBoundaries(
   spans: RouteStepSpan[],
@@ -308,8 +308,8 @@ function rangesNearInstructionBoundaries(
     spans
       .filter(predicate)
       .map((span) => ({
-        startFraction: span.coverageRange!.endFraction - radiusFraction,
-        endFraction: span.coverageRange!.endFraction + radiusFraction,
+        startFraction: span.coverageRange!.startFraction - radiusFraction,
+        endFraction: span.coverageRange!.startFraction + radiusFraction,
       }))
   );
 }
