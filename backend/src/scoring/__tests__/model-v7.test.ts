@@ -21,6 +21,12 @@ function route(steps: RouteStep[], trafficRatio = 1): ParsedRoute {
   };
 }
 
+const clustering = (steps: RouteStep[]) =>
+  computeTurnClustering(
+    steps,
+    steps.reduce((sum, s) => sum + s.distanceMeters, 0)
+  );
+
 const step = (
   distanceMeters: number,
   mph: number,
@@ -35,16 +41,16 @@ describe("hybrid-v7 model behaviour", () => {
   it("places a maneuver where its step begins", () => {
     // Two turns 100 m apart, the second followed by a long straight step.
     // Measured at step ends they looked 5 km apart and were not a close pair.
-    const clustering = computeTurnClustering([
+    const result = clustering([
       step(500, 25, "DEPART"),
       step(100, 25, "TURN_LEFT"),
       step(5000, 25, "TURN_RIGHT"),
     ]);
-    expect(clustering.closeTurnPairs).toBe(1);
+    expect(result.closeTurnPairs).toBe(1);
   });
 
   it("gives a lone turn no spacing pressure, so adding a turn never lowers it", () => {
-    const one = computeTurnClustering([step(500, 25, "DEPART"), step(3000, 25, "TURN_LEFT")]);
+    const one = clustering([step(500, 25, "DEPART"), step(3000, 25, "TURN_LEFT")]);
     const two = computeTurnClustering([
       step(500, 25, "DEPART"),
       step(3000, 25, "TURN_LEFT"),
