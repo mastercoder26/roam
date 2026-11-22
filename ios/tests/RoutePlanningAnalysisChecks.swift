@@ -19,6 +19,7 @@ private final class AnalysisClock { var time: TimeInterval = 100 }
 struct RoutePlanningAnalysisChecks {
     @MainActor
     static func main() async throws {
+        recentRoutesSurviveOneUnreadableEntry()
         let suite = "RoutePlanningAnalysisChecks.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suite)!
         defer { defaults.removePersistentDomain(forName: suite) }
@@ -76,6 +77,27 @@ struct RoutePlanningAnalysisChecks {
         expect(defaults.data(forKey: "roam.route-analysis-timing-v1") == timingHistory, "failed, canceled and stale requests must never train the estimator")
         print("Route planning analysis checks passed")
     }
+    /// One recent route written by another build used to blank the whole list.
+    @MainActor
+    private static func recentRoutesSurviveOneUnreadableEntry() {
+        let suite = "RoutePlanningAnalysisChecks.recent.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let good = RecentRouteEntry(
+            origin: "Home", destination: "School", departureTime: Date(timeIntervalSince1970: 1_800_000_000),
+            score: 4.2, label: .moderate, distanceMeters: 5_000, durationSeconds: 600
+        )
+        var rows = (try! JSONSerialization.jsonObject(with: JSONEncoder().encode([good]))) as! [Any]
+        rows.insert(["id": UUID().uuidString, "origin": "A", "destination": "B", "label": "Label From A Newer Build"], at: 0)
+        defaults.set(try! JSONSerialization.data(withJSONObject: rows), forKey: "recentRoutes.v1")
+
+        let store = RecentRouteStore(userDefaults: defaults)
+        expect(store.entries.map(\.id) == [good.id], "readable recent routes must survive one unreadable entry")
+
+        defaults.set(Data("not json".utf8), forKey: "recentRoutes.v1")
+        expect(RecentRouteStore(userDefaults: defaults).entries.isEmpty, "corrupt recent routes must load as empty, not crash")
+    }
+
     @MainActor
     private static func waitUntil(_ condition: () -> Bool) async {
         for _ in 0..<1000 {

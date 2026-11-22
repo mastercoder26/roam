@@ -23,6 +23,8 @@ struct DriveHistorySyncChecks {
         await duplicateRemoteDriveUsesLatestRevision()
         await offlineDeletionSurvivesBackendIdentityTransition()
         await backendKeyedDeletionMigratesToClerkAccount()
+        oneUnreadableServerRowDoesNotFailTheWholePage()
+        await analysisResolvedDuringUploadIsUploadedAgain()
 
         print("Drive history sync checks passed")
     }
@@ -571,6 +573,63 @@ struct DriveHistorySyncChecks {
         expect(applied.isEmpty, "migration must not resurrect a drive pending deletion")
     }
 
+    /// The page decode used to be all-or-nothing, so one row in a shape this
+    /// build cannot read stopped every other drive from syncing.
+    private static func oneUnreadableServerRowDoesNotFailTheWholePage() {
+        let good = UUID().uuidString
+        let json = """
+        {"drives":[
+          {"id":"\(good)","startedAt":"2026-01-02T03:04:05Z","durationSeconds":60,"distanceMeters":100,
+           "score":80,"topSpeedMetersPerSecond":10,"eventCount":0,"recordingTimeZoneIdentifier":null,
+           "payload":{},"createdAt":"2026-01-02T03:04:05Z","updatedAt":"2026-01-02T03:04:05Z"},
+          {"id":"broken","startedAt":"not a date","score":"high"},
+          null
+        ],"nextCursor":null}
+        """
+        do {
+            let page = try APIClient.makeDateDecoder().decode(DriveHistoryPage.self, from: Data(json.utf8))
+            expect(page.drives.map(\.id) == [good], "readable rows must survive an unreadable neighbour")
+        } catch {
+            fail("one unreadable row must not fail the whole history page: \(error)")
+        }
+    }
+
+    /// A route analysis that resolved while the pending-state upload was in
+    /// flight used to be recorded as already synced, so the server kept the
+    /// pending copy forever.
+    @MainActor
+    private static func analysisResolvedDuringUploadIsUploadedAgain() async {
+        let user = AuthUser(id: "analysis-race-user", email: "race@example.com", displayName: nil)
+        let session = AuthSessionStore(automaticallyRestore: false)
+        session.setSignedInForTesting(user: user, accessToken: "access-token")
+        let transport = FakeDriveHistoryTransport()
+        let service = DriveHistorySyncService(
+            transport: transport,
+            authSession: session,
+            userDefaults: isolatedDefaults(),
+            retryDelaysNanoseconds: [0]
+        )
+        let pending = makeDrive(score: 75).replacingRouteAnalysis(with: .pending)
+        let resolved = pending.replacingRouteAnalysis(with: .unavailable("No route match."))
+
+        transport.holdNextUpload = true
+        service.sync(localDrives: [pending], applyLocalDrives: { _ in })
+        await waitUntil { transport.hasHeldUpload }
+        service.sync(localDrives: [resolved], applyLocalDrives: { _ in })
+        transport.releaseHeldUpload()
+        await waitUntil { service.state == .synced && transport.uploadCount >= 2 }
+
+        let statuses = transport.uploadedPayloads.map { payload -> String? in
+            guard case .object(let analysis)? = payload["routeAnalysis"],
+                  case .string(let status)? = analysis["status"] else { return nil }
+            return status
+        }
+        expect(
+            statuses.last == DriveRouteAnalysisStatus.unavailable.rawValue,
+            "the resolved analysis must reach the server after a racing pending upload, got \(statuses)"
+        )
+    }
+
     private static func makeDrive(
         id: UUID = UUID(),
         score: Int,
@@ -668,9 +727,25 @@ private final class FakeDriveHistoryTransport: DriveHistorySyncTransport {
         heldPage = nil
     }
 
+    var holdNextUpload = false
+    private(set) var hasHeldUpload = false
+    private var heldUpload: CheckedContinuation<Void, Never>?
+    private(set) var uploadedPayloads: [[String: JSONValue]] = []
+
+    func releaseHeldUpload() {
+        heldUpload?.resume()
+        heldUpload = nil
+    }
+
     func uploadDrives(_ drives: [DriveHistoryInput], accessToken: String) async throws -> [DriveHistoryDTO] {
         uploadCount += 1
         if shouldFail { throw AuthError.offline }
+        uploadedPayloads.append(contentsOf: drives.map(\.payload))
+        if holdNextUpload {
+            holdNextUpload = false
+            hasHeldUpload = true
+            await withCheckedContinuation { heldUpload = $0 }
+        }
         return drives.map {
             DriveHistoryDTO(
                 id: $0.id,
