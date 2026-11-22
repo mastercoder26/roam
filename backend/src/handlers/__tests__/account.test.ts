@@ -4,6 +4,7 @@ import type { Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { app } from "../../../server.js";
 import { ClerkAccountDeletionError } from "../../auth/errors.js";
+import { DatabaseOperationError } from "../../errors.js";
 
 const { deleteClerkUserMock, deleteUserMock, findByIdMock, toPublicUserMock } = vi.hoisted(() => ({
   deleteClerkUserMock: vi.fn(),
@@ -49,7 +50,24 @@ const request = {
 } as unknown as Request;
 
 describe("Clerk-backed account handlers", () => {
-  it("does not delete locally when Clerk deletion fails", async () => {
+  beforeEach(() => {
+    deleteClerkUserMock.mockReset();
+    deleteUserMock.mockReset();
+  });
+
+  it("keeps the Clerk identity when the local deletion fails so the user can retry", async () => {
+    deleteUserMock.mockRejectedValueOnce(new DatabaseOperationError(new Error("db down")));
+    const response = responseDouble();
+
+    await handleDeleteAccount(request, response);
+
+    expect(response.statusCode).toBe(503);
+    expect(response.body).toMatchObject({ code: "SERVICE_UNAVAILABLE" });
+    expect(deleteClerkUserMock).not.toHaveBeenCalled();
+  });
+
+  it("reports a retryable failure when Clerk deletion fails after local data is gone", async () => {
+    deleteUserMock.mockResolvedValueOnce(undefined);
     deleteClerkUserMock.mockRejectedValueOnce(new ClerkAccountDeletionError(new Error("Clerk unavailable")));
     const response = responseDouble();
 
@@ -57,10 +75,10 @@ describe("Clerk-backed account handlers", () => {
 
     expect(response.statusCode).toBe(503);
     expect(response.body).toMatchObject({ code: "SERVICE_UNAVAILABLE" });
-    expect(deleteUserMock).not.toHaveBeenCalled();
+    expect(deleteUserMock).toHaveBeenCalledWith(request.user?.id);
   });
 
-  it("deletes Clerk first, then cascades the local user", async () => {
+  it("deletes local personal data first, then the Clerk identity", async () => {
     deleteClerkUserMock.mockResolvedValueOnce(undefined);
     deleteUserMock.mockResolvedValueOnce(undefined);
     const response = responseDouble();
@@ -70,7 +88,7 @@ describe("Clerk-backed account handlers", () => {
     expect(response.statusCode).toBe(204);
     expect(deleteClerkUserMock).toHaveBeenCalledWith("user_clerk_123");
     expect(deleteUserMock).toHaveBeenCalledWith(request.user?.id);
-    expect(deleteClerkUserMock.mock.invocationCallOrder[0]).toBeLessThan(deleteUserMock.mock.invocationCallOrder[0]);
+    expect(deleteUserMock.mock.invocationCallOrder[0]).toBeLessThan(deleteClerkUserMock.mock.invocationCallOrder[0]);
   });
 
   it("returns the local user for /api/auth/me", async () => {
