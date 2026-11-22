@@ -127,7 +127,8 @@ struct DriveSnapshotPersistence {
             acceptedLocationSamples: snapshot.acceptedLocationSamples,
             rejectedLocationSamples: snapshot.rejectedLocationSamples,
             motionSamples: snapshot.motionSamples,
-            usableTraceDuration: usableTraceDuration
+            usableTraceDuration: usableTraceDuration,
+            movingDuration: DriveScoringEngine.movingDuration(for: snapshot.route)
         )
         let dataQuality = DriveDataQuality(
             acceptedLocationSamples: result.quality.acceptedLocationSamples,
