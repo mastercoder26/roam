@@ -182,11 +182,13 @@ struct ProfileView: View {
                 Text("Profile")
                     .font(.system(size: 17, weight: .semibold))
                     .foregroundStyle(.white)
+                    .shadow(color: .black.opacity(0.45), radius: 3, y: 1)
                 Spacer(minLength: 8)
                 Button(action: refreshLandscape) {
                     Image(systemName: "arrow.triangle.2.circlepath")
                         .font(.system(size: 17, weight: .medium))
                         .foregroundStyle(.white)
+                        .shadow(color: .black.opacity(0.45), radius: 3, y: 1)
                         .frame(width: 44, height: 44)
                         .profileGlassSurface(cornerRadius: 22)
                         .environment(\.colorScheme, .dark)
