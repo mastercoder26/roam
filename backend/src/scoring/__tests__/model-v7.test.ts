@@ -51,7 +51,7 @@ describe("hybrid-v7 model behaviour", () => {
 
   it("gives a lone turn no spacing pressure, so adding a turn never lowers it", () => {
     const one = clustering([step(500, 25, "DEPART"), step(3000, 25, "TURN_LEFT")]);
-    const two = computeTurnClustering([
+    const two = clustering([
       step(500, 25, "DEPART"),
       step(3000, 25, "TURN_LEFT"),
       step(3000, 25, "TURN_RIGHT"),
