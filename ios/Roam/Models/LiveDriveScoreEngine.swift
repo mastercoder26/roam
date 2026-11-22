@@ -259,7 +259,8 @@ enum LiveDriveScoreEngine {
     static func provisionalScore(
         duration: TimeInterval,
         distanceMeters: Double,
-        events: [DrivingEvent]
+        events: [DrivingEvent],
+        movingDuration: TimeInterval? = nil
     ) -> Int? {
         guard duration.isFinite, distanceMeters.isFinite,
               duration >= minimumScoringDuration,
@@ -275,7 +276,8 @@ enum LiveDriveScoreEngine {
             events: events,
             acceptedLocationSamples: 0,
             rejectedLocationSamples: 0,
-            motionSamples: 0
+            motionSamples: 0,
+            movingDuration: movingDuration
         ).score
     }
 
@@ -287,12 +289,14 @@ enum LiveDriveScoreEngine {
         events: [DrivingEvent],
         motionSamples: [DriveMotionSample],
         previousScore: Int?,
-        currentSmoothness: SmoothnessState?
+        currentSmoothness: SmoothnessState?,
+        movingDuration: TimeInterval? = nil
     ) -> LiveDriveScore {
         let score = provisionalScore(
             duration: duration,
             distanceMeters: distanceMeters,
-            events: events
+            events: events,
+            movingDuration: movingDuration
         )
         let streak = cleanStreakSeconds(
             now: now,

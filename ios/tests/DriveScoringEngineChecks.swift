@@ -218,12 +218,143 @@ struct DriveScoringEngineChecks {
         expect(sustainedTrip.quality.confidence == .high, "sustained high-quality trips should earn high confidence")
         expect(sustainedTrip.score > shortTrip.score, "short-trip distance floor should avoid over-penalizing sparse data")
 
-        let manyEvents = Array(repeating: DrivingEvent(kind: .hardBrake, timestamp: Date(), source: .gpsSpeed), count: 100)
-        let boundedScore = DriveScoringEngine.score(
-            duration: 900, distanceMeters: 1_609.344, events: manyEvents,
-            acceptedLocationSamples: 100, rejectedLocationSamples: 0, motionSamples: 2_000
+        let scoringBase = Date(timeIntervalSince1970: 1_800_000_000)
+        func scoredEvent(
+            _ kind: DrivingEventKind,
+            at offset: TimeInterval,
+            source: DrivingEventSource = .fused,
+            intensity: Double? = nil,
+            speed: Double? = nil
+        ) -> DrivingEvent {
+            DrivingEvent(
+                kind: kind, timestamp: scoringBase.addingTimeInterval(offset), source: source,
+                intensity: intensity, speedMetersPerSecond: speed
+            )
+        }
+        func tripScore(_ events: [DrivingEvent], miles: Double = 5, movingDuration: TimeInterval? = nil) -> Int {
+            DriveScoringEngine.score(
+                duration: 900, distanceMeters: miles * 1_609.344, events: events,
+                acceptedLocationSamples: 100, rejectedLocationSamples: 0, motionSamples: 2_000,
+                movingDuration: movingDuration
+            ).score
+        }
+
+        let manyEvents = (0..<100).map { scoredEvent(.hardBrake, at: Double($0) * 30, source: .gpsSpeed) }
+        let boundedScore = tripScore(manyEvents, miles: 1)
+        expect(
+            boundedScore >= Int(DriveScoringEngine.scoreFloor) && boundedScore < 40,
+            "an extreme drive must stay at or above the floor without being rounded up to a usable score"
         )
-        expect(boundedScore.score == 45, "penalties must remain capped instead of producing unusable scores")
+        let fewerEvents = Array(manyEvents.prefix(12))
+        expect(
+            tripScore(fewerEvents, miles: 1) > boundedScore,
+            "the score must keep separating bad drives from worse ones instead of flattening at a cap"
+        )
+        expect(tripScore([]) == 100, "a drive with no detected events scores 100")
+
+        expect(
+            tripScore([scoredEvent(.hardBrake, at: 0, intensity: 1.05)]) >
+                tripScore([scoredEvent(.hardBrake, at: 0, intensity: 1.8)]),
+            "a barely-over-threshold brake must cost less than a severe one"
+        )
+        expect(
+            tripScore([scoredEvent(.hardBrake, at: 0, speed: 6)]) >
+                tripScore([scoredEvent(.hardBrake, at: 0, speed: 30)]),
+            "the same maneuver must cost more at highway speed than in a parking lot"
+        )
+        expect(
+            DriveScoringEngine.penaltyPoints(for: scoredEvent(.hardBrake, at: 0, source: .gpsSpeed)) <
+                DriveScoringEngine.penaltyPoints(for: scoredEvent(.hardBrake, at: 0, source: .fused)),
+            "an event device motion did not confirm must count less than a corroborated one"
+        )
+        expect(
+            DriveScoringEngine.penaltyPoints(for: scoredEvent(.hardBrake, at: 0, intensity: .infinity, speed: .nan)) ==
+                DriveScoringEngine.penaltyPoints(for: scoredEvent(.hardBrake, at: 0)),
+            "corrupt severity or speed must fall back to a typical event"
+        )
+        expect(
+            DriveScoringEngine.penaltyPoints(for: scoredEvent(.phoneMovement, at: 0, intensity: 2, speed: 30)) ==
+                DriveScoringEngine.penaltyPoints(for: scoredEvent(.phoneMovement, at: 0)),
+            "phone movement is not a driving maneuver and must not scale with speed or severity"
+        )
+
+        let oneManeuver = [scoredEvent(.hardBrake, at: 0), scoredEvent(.sharpCorner, at: 2), scoredEvent(.hardBrake, at: 5)]
+        let separateManeuvers = [scoredEvent(.hardBrake, at: 0), scoredEvent(.sharpCorner, at: 120), scoredEvent(.hardBrake, at: 240)]
+        expect(DriveScoringEngine.maneuvers(from: oneManeuver).count == 1, "events seconds apart are one maneuver")
+        expect(DriveScoringEngine.maneuvers(from: separateManeuvers).count == 3, "events minutes apart are separate maneuvers")
+        expect(
+            tripScore(oneManeuver) > tripScore(separateManeuvers),
+            "one maneuver that trips several detectors must not be charged as several maneuvers"
+        )
+        expect(
+            tripScore(oneManeuver) <= tripScore([scoredEvent(.hardBrake, at: 0)]),
+            "extra events in a maneuver must never make it cheaper"
+        )
+        expect(
+            tripScore(oneManeuver.reversed()) == tripScore(oneManeuver),
+            "the score must not depend on the order events are stored in"
+        )
+        let chained = (0..<20).map { scoredEvent(.hardBrake, at: Double($0) * 5) }
+        expect(
+            DriveScoringEngine.maneuvers(from: chained).count > 1,
+            "a long run of events must not chain into a single cheap maneuver"
+        )
+        expect(
+            DriveScoringEngine.maneuvers(from: [scoredEvent(.phoneMovement, at: 0), scoredEvent(.phoneMovement, at: 1)]).count == 2,
+            "phone movement is never folded into a driving maneuver"
+        )
+
+        let cityEvents = [scoredEvent(.hardBrake, at: 0), scoredEvent(.hardBrake, at: 200), scoredEvent(.hardBrake, at: 400)]
+        expect(
+            tripScore(cityEvents, miles: 2, movingDuration: 30 * 60) > tripScore(cityEvents, miles: 2),
+            "slow city driving is exposure too: time moving must count, not only miles"
+        )
+        expect(
+            tripScore(cityEvents, miles: 2, movingDuration: .nan) == tripScore(cityEvents, miles: 2) &&
+                tripScore(cityEvents, miles: 2, movingDuration: -50) == tripScore(cityEvents, miles: 2),
+            "an invalid moving duration must be ignored"
+        )
+        expect(
+            DriveScoringEngine.scoreValue(forPenaltyPoints: .infinity) == Int(DriveScoringEngine.scoreFloor) &&
+                DriveScoringEngine.scoreValue(forPenaltyPoints: .nan) == Int(DriveScoringEngine.scoreFloor) &&
+                DriveScoringEngine.scoreValue(forPenaltyPoints: -5) == 100,
+            "non-finite penalties must never produce a perfect or out-of-range score"
+        )
+
+        let legacyEventJSON = Data("""
+        {"id":"7C0B7C8E-4B8E-4C56-9B7B-0C1D2E3F4A5B","kind":"hardBrake","timestamp":700000000,"source":"GPS speed"}
+        """.utf8)
+        let legacyEvent = try? JSONDecoder().decode(DrivingEvent.self, from: legacyEventJSON)
+        expect(
+            legacyEvent != nil && legacyEvent?.intensity == nil && legacyEvent?.speedMetersPerSecond == nil,
+            "events saved before severity was recorded must still decode"
+        )
+        let detailedEvent = scoredEvent(.sharpCorner, at: 0, intensity: 1.4, speed: 18)
+        let detailedRoundTrip = try? JSONDecoder().decode(DrivingEvent.self, from: JSONEncoder().encode(detailedEvent))
+        expect(detailedRoundTrip == detailedEvent, "severity and speed must round-trip")
+        expect(
+            detailedEvent.replacingCoordinate(with: nil).intensity == 1.4,
+            "redacting an event's location must keep its severity"
+        )
+
+        let slowTightTurn = DriveScoringEngine.detectEvents(
+            previous: DriveLocationSample(timestamp: scoringBase, speedMetersPerSecond: 6.5, courseDegrees: 0, courseAccuracyDegrees: 5, horizontalAccuracyMeters: 5),
+            current: DriveLocationSample(timestamp: scoringBase.addingTimeInterval(1), speedMetersPerSecond: 6.5, courseDegrees: 30, courseAccuracyDegrees: 5, horizontalAccuracyMeters: 5),
+            nearbyMotionG: nil
+        )
+        expect(
+            !slowTightTurn.contains { $0.kind == .sharpCorner },
+            "an ordinary slow intersection turn is not a sharp corner"
+        )
+        let fastSweep = DriveScoringEngine.detectEvents(
+            previous: DriveLocationSample(timestamp: scoringBase, speedMetersPerSecond: 25, courseDegrees: 0, courseAccuracyDegrees: 5, horizontalAccuracyMeters: 5),
+            current: DriveLocationSample(timestamp: scoringBase.addingTimeInterval(1), speedMetersPerSecond: 25, courseDegrees: 15, courseAccuracyDegrees: 5, horizontalAccuracyMeters: 5),
+            nearbyMotionG: nil
+        )
+        expect(
+            fastSweep.contains { $0.kind == .sharpCorner && ($0.intensity ?? 0) > 1 },
+            "a fast curve with high lateral force is a sharp corner even at a modest turn rate"
+        )
 
         // A 45-minute drive whose GPS was almost entirely unusable must not be
         // presented as a strong sample just because the clock kept running.

@@ -206,13 +206,7 @@ enum DriveHistoryPayloadCodec {
 
     static func payload(for drive: RecordedDrive) -> [String: JSONValue] {
         let redactedEvents = drive.score.events.map { event in
-            DrivingEvent(
-                id: event.id,
-                kind: event.kind,
-                timestamp: event.timestamp,
-                source: event.source,
-                coordinate: nil
-            )
+            event.replacingCoordinate(with: nil)
         }
         let redactedScore = DrivingScore(
             score: drive.score.score,
@@ -328,13 +322,7 @@ enum DriveHistorySyncEngine {
             distanceMeters: remote.score.distanceMeters,
             topSpeedMetersPerSecond: remote.score.topSpeedMetersPerSecond,
             events: remote.score.events.map { event in
-                DrivingEvent(
-                    id: event.id,
-                    kind: event.kind,
-                    timestamp: event.timestamp,
-                    source: event.source,
-                    coordinate: localEventCoordinates[event.id]
-                )
+                event.replacingCoordinate(with: localEventCoordinates[event.id])
             },
             motionSamples: remote.score.motionSamples,
             dataQuality: remote.score.dataQuality
