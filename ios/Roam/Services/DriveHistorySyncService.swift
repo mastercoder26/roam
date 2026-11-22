@@ -104,10 +104,21 @@ struct DriveHistoryPage: Decodable {
     init(from decoder: Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
         self.init(
-            drives: try values.decode([DriveHistoryDTO].self, forKey: .drives),
+            drives: try values.decode([LossyDriveHistoryDTO].self, forKey: .drives).compactMap(\.value),
             nextCursor: try values.decodeIfPresent(String.self, forKey: .nextCursor),
             nextCursorId: try values.decodeIfPresent(String.self, forKey: .nextCursorId)
         )
+    }
+}
+
+/// One record the server returns in a shape this build cannot read must not
+/// fail the whole page: the page is all-or-nothing otherwise, so a single bad
+/// row would stop every other drive from ever syncing on this device.
+struct LossyDriveHistoryDTO: Decodable {
+    let value: DriveHistoryDTO?
+
+    init(from decoder: Decoder) throws {
+        value = try? DriveHistoryDTO(from: decoder)
     }
 }
 
@@ -166,8 +177,8 @@ struct APIClientDriveHistoryTransport: DriveHistorySyncTransport {
         )
         try validate(response)
         do {
-            struct Response: Decodable { let drives: [DriveHistoryDTO] }
-            return try APIClient.makeDateDecoder().decode(Response.self, from: response.data).drives
+            struct Response: Decodable { let drives: [LossyDriveHistoryDTO] }
+            return try APIClient.makeDateDecoder().decode(Response.self, from: response.data).drives.compactMap(\.value)
         } catch {
             throw APIError.decodingError(error)
         }
@@ -735,9 +746,15 @@ final class DriveHistorySyncService: ObservableObject {
         }
 
         let pendingIDs = Set(pendingDrives.keys)
-        let inputs = merged
-            .filter { pendingIDs.contains($0.id) }
-            .map(Self.input(for:))
+        let drivesToUpload = merged.filter { pendingIDs.contains($0.id) }
+        let inputs = drivesToUpload.map(Self.input(for:))
+        // What the server is about to hold. A route analysis can resolve while
+        // an upload is in flight, so the confirmation must be recorded against
+        // the status that was sent, not whatever is pending by the time the
+        // response arrives.
+        let uploadedStatusByID = drivesToUpload.reduce(into: [String: String?]()) { statuses, drive in
+            statuses[drive.id.uuidString] = .some(drive.routeAnalysis?.status.rawValue)
+        }
 
         for batchStart in stride(from: 0, to: inputs.count, by: 100) {
             let batch = Array(inputs[batchStart..<min(batchStart + 100, inputs.count)])
@@ -749,10 +766,19 @@ final class DriveHistorySyncService: ObservableObject {
             metadata.syncedDriveIDs.formUnion(confirmedIDs)
             for idString in confirmedIDs {
                 guard let uuid = UUID(uuidString: idString) else { continue }
-                metadata.syncedRouteAnalysisStatus[idString] = pendingDrives[uuid]?.routeAnalysis?.status.rawValue
+                let uploadedStatus = uploadedStatusByID[idString] ?? pendingDrives[uuid]?.routeAnalysis?.status.rawValue
+                metadata.syncedRouteAnalysisStatus[idString] = uploadedStatus
                 metadata.syncedPayloadVersions[idString] = DriveHistoryPayloadCodec.currentVersion
             }
-            pendingDrives = pendingDrives.filter { !confirmedIDs.contains($0.key.uuidString) }
+            pendingDrives = pendingDrives.filter { id, drive in
+                let idString = id.uuidString
+                guard confirmedIDs.contains(idString) else { return true }
+                // Still pending when the local drive moved on during the upload.
+                return metadata.syncedRouteAnalysisStatus[idString] != drive.routeAnalysis?.status.rawValue
+            }
+            if pendingDrives.keys.contains(where: { confirmedIDs.contains($0.uuidString) }) {
+                needsSync = true
+            }
             persistMetadata()
         }
 
