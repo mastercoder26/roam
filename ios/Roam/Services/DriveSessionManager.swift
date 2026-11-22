@@ -57,6 +57,9 @@ final class DriveSessionManager: NSObject, ObservableObject {
     private var topSpeed: CLLocationSpeed = 0
     private var events: [DrivingEvent] = []
     private var lastEventAt: [DrivingEventKind: Date] = [:]
+    /// Time the saved trace shows the car moving, kept in step with
+    /// `routePoints` so the live score uses the same exposure as the saved one.
+    private var movingDuration: TimeInterval = 0
     private var recentMotionSamples: [DriveMotionSample] = []
     private var phoneMovementDetector = PhoneMovementDetector()
     /// The score the trend arrow compares against, plus when it was taken.
@@ -363,7 +366,8 @@ final class DriveSessionManager: NSObject, ObservableObject {
             acceptedLocationSamples: acceptedLocationSamples,
             rejectedLocationSamples: rejectedLocationSamples,
             motionSamples: motionSamples,
-            usableTraceDuration: usableTraceDuration(for: routePoints)
+            usableTraceDuration: usableTraceDuration(for: routePoints),
+            movingDuration: DriveScoringEngine.movingDuration(for: routePoints)
         )
         let finalPlacementQuality = phonePlacementAnalyzer.finish(at: driveEndedAt)
         phonePlacementAssessment = finalPlacementQuality
@@ -640,6 +644,7 @@ final class DriveSessionManager: NSObject, ObservableObject {
         topSpeed = 0
         events = []
         lastEventAt = [:]
+        movingDuration = 0
         recentMotionSamples = []
         phoneMovementDetector.reset()
         liveScore = .idle
@@ -769,15 +774,26 @@ final class DriveSessionManager: NSObject, ObservableObject {
             return
         }
 
-        acceptedLocationSamples += 1
         let speed = max(location.speed, 0)
-        currentSpeedMetersPerSecond = speed
-        topSpeed = max(topSpeed, speed)
         let routePoint = DriveRoutePoint(timestamp: location.timestamp, coordinate: DriveCoordinate(location.coordinate), speedMetersPerSecond: speed, startsNewSegment: beginsNewRouteSegment ? true : nil)
+        var detectedEvents: [DetectedDrivingEvent] = []
 
         if let previousLocation {
             let time = location.timestamp.timeIntervalSince(previousLocation.timestamp)
-            if time >= DriveScoringEngine.minimumSampleGap, time <= DriveScoringEngine.maximumSampleGap {
+            if time < DriveScoringEngine.minimumSampleGap {
+                // A burst, duplicate, or out-of-order fix. It is a good reading
+                // of the current speed, but it must not become the anchor: the
+                // distance back to the real previous fix would then never be
+                // counted, and an older fix would move the anchor back in time.
+                acceptedLocationSamples += 1
+                if time > 0 {
+                    currentSpeedMetersPerSecond = speed
+                    topSpeed = max(topSpeed, speed)
+                    latestAcceptedLocationAt = location.timestamp
+                }
+                return
+            }
+            if time <= DriveScoringEngine.maximumSampleGap {
                 let previousSample = DriveLocationSample(
                     timestamp: previousLocation.timestamp,
                     speedMetersPerSecond: previousLocation.speed,
@@ -786,6 +802,9 @@ final class DriveSessionManager: NSObject, ObservableObject {
                     horizontalAccuracyMeters: previousLocation.horizontalAccuracy
                 )
                 let distance = location.distance(from: previousLocation)
+                // Checked before anything is counted: a position jump is one
+                // rejected fix, not an accepted one, and its speed reading
+                // must not set the drive's top speed.
                 guard DriveScoringEngine.isPlausibleTransition(
                     previous: previousSample,
                     current: sample,
@@ -796,19 +815,15 @@ final class DriveSessionManager: NSObject, ObservableObject {
                 }
                 distanceMeters += distance
                 appendRoutePoint(routePoint)
-                let nearbyMotion = DriveScoringEngine.corroboratingMotionG(
-                    from: recentMotionSamples,
-                    near: location.timestamp
-                )
-                for event in DriveScoringEngine.detectEvents(
+                detectedEvents = DriveScoringEngine.detectEvents(
                     previous: previousSample,
                     current: sample,
-                    nearbyMotionG: nearbyMotion
-                ) {
-                    let cooldown: TimeInterval = event.kind == .sharpCorner ? 5 : 4
-                    addEvent(event.kind, timestamp: location.timestamp, coordinate: routePoint.coordinate, source: event.source, cooldown: cooldown)
-                }
-            } else if time > DriveScoringEngine.maximumSampleGap {
+                    nearbyMotionG: DriveScoringEngine.corroboratingMotionG(
+                        from: recentMotionSamples,
+                        near: location.timestamp
+                    )
+                )
+            } else {
                 // Resume the route after a long background gap without drawing
                 // a synthetic straight line or deriving a false acceleration.
                 noteLocationGap(seconds: time)
@@ -816,6 +831,22 @@ final class DriveSessionManager: NSObject, ObservableObject {
             }
         } else {
             appendRoutePoint(routePoint)
+        }
+
+        acceptedLocationSamples += 1
+        currentSpeedMetersPerSecond = speed
+        topSpeed = max(topSpeed, speed)
+        for event in detectedEvents {
+            let cooldown: TimeInterval = event.kind == .sharpCorner ? 5 : 4
+            addEvent(
+                event.kind,
+                timestamp: location.timestamp,
+                coordinate: routePoint.coordinate,
+                source: event.source,
+                cooldown: cooldown,
+                intensity: event.intensity,
+                speedMetersPerSecond: event.speedMetersPerSecond
+            )
         }
 
         beginsNewRouteSegment = false
@@ -862,13 +893,37 @@ final class DriveSessionManager: NSObject, ObservableObject {
                 .distance(from: CLLocation(latitude: point.coordinate.latitude, longitude: point.coordinate.longitude)) < 5 {
             return
         }
+        if let last = routePoints.last {
+            movingDuration += DriveScoringEngine.movingDuration(for: [last, point])
+        }
         routePoints.append(point)
     }
 
-    private func addEvent(_ kind: DrivingEventKind, timestamp: Date, coordinate: DriveCoordinate?, source: DrivingEventSource, cooldown: TimeInterval) {
-        if let lastEvent = lastEventAt[kind], timestamp.timeIntervalSince(lastEvent) < cooldown { return }
+    private func addEvent(
+        _ kind: DrivingEventKind,
+        timestamp: Date,
+        coordinate: DriveCoordinate?,
+        source: DrivingEventSource,
+        cooldown: TimeInterval,
+        intensity: Double? = nil,
+        speedMetersPerSecond: Double? = nil
+    ) {
+        let event = DrivingEvent(
+            kind: kind,
+            timestamp: timestamp,
+            source: source,
+            coordinate: coordinate,
+            intensity: intensity,
+            speedMetersPerSecond: speedMetersPerSecond
+        )
+        if let lastEvent = lastEventAt[kind], timestamp.timeIntervalSince(lastEvent) < cooldown {
+            // Still the same maneuver. It does not become a second event, but
+            // if this reading is the harder one, the saved event should carry
+            // the peak rather than whichever sample happened to come first.
+            upgradeLatestEvent(of: kind, toMatch: event)
+            return
+        }
         lastEventAt[kind] = timestamp
-        let event = DrivingEvent(kind: kind, timestamp: timestamp, source: source, coordinate: coordinate)
         events.append(event)
         liveEvents.append(event)
         // A new event both restarts the streak and moves the score, so the
@@ -878,6 +933,29 @@ final class DriveSessionManager: NSObject, ObservableObject {
         publishLiveDriveSnapshot(force: true)
         // Force past the normal throttle so a coaching event is never the
         // thing lost if the app is killed a moment later.
+        persistInProgressSnapshot(force: true)
+    }
+
+    private func upgradeLatestEvent(of kind: DrivingEventKind, toMatch candidate: DrivingEvent) {
+        guard let index = events.lastIndex(where: { $0.kind == kind }) else { return }
+        let existing = events[index]
+        guard DriveScoringEngine.penaltyPoints(for: candidate) > DriveScoringEngine.penaltyPoints(for: existing) else {
+            return
+        }
+        let upgraded = DrivingEvent(
+            id: existing.id,
+            kind: kind,
+            timestamp: existing.timestamp,
+            source: candidate.source,
+            coordinate: existing.coordinate,
+            intensity: candidate.intensity,
+            speedMetersPerSecond: candidate.speedMetersPerSecond
+        )
+        events[index] = upgraded
+        if let liveIndex = liveEvents.lastIndex(where: { $0.id == existing.id }) {
+            liveEvents[liveIndex] = upgraded
+        }
+        refreshLiveScore(force: true)
         persistInProgressSnapshot(force: true)
     }
 
@@ -903,7 +981,8 @@ final class DriveSessionManager: NSObject, ObservableObject {
             events: events,
             motionSamples: recentMotionSamples,
             previousScore: liveTrendBaseline?.score,
-            currentSmoothness: liveScore.smoothness
+            currentSmoothness: liveScore.smoothness,
+            movingDuration: movingDuration
         )
         // Re-anchor the trend baseline only once the window has elapsed, and
         // only on a real score — carrying a settling `nil` forward would reset

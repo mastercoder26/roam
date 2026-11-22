@@ -10,7 +10,7 @@ import { aggregateSegmentScores } from "./segments.js";
 import { buildFeaturesFromRoute } from "./features.js";
 import { buildRouteDemands } from "./demands.js";
 import { computeBaseScore } from "./baseScore.js";
-import { computeFatigue, computeRawScore } from "./fatigue.js";
+import { computeFatigue, computeRawScoreParts } from "./fatigue.js";
 import {
   buildBreakdown,
   buildHotspots,
@@ -78,7 +78,8 @@ export function scoreRoute(
     departureLocalMinutes: options.departureLocalMinutes,
     continuousDriveMinutes,
   });
-  const rawScore = computeRawScore(D_route, base.D_base, fatigue, features);
+  const raw = computeRawScoreParts(D_route, base, fatigue, features);
+  const rawScore = raw.total;
 
   const uncalibrated = clampScore(rawScore);
 
@@ -86,7 +87,7 @@ export function scoreRoute(
   const score = Math.round(clampScore(calibrator.transform(uncalibrated)) * 10) / 10;
 
   const breakdown = buildBreakdown(base, fatigue, features.durationHours);
-  const contributions = explainPrediction(breakdown, features);
+  const contributions = explainPrediction(breakdown, features, raw.parts);
   const hotspots = buildHotspots(segments, segmentScores);
 
   const ctx: ScoringContext = {

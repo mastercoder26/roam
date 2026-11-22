@@ -19,6 +19,8 @@ export interface HighwayResult {
   subscore: number;
 }
 
+const LONG_STRAIGHT_HIGHWAY_MIN_MPH = 40;
+
 export function isHighwayStep(
   step: RouteStep,
   stepSpeedMph?: number
@@ -32,8 +34,15 @@ export function isHighwayStep(
     return true;
   }
 
+  // A long uninterrupted stretch suggests a highway only when it is also
+  // fast. A 2-mile straight through town at 25 mph is not one.
   if (STRAIGHT_MANEUVERS.has(maneuver) && step.distanceMeters >= 2000) {
-    return true;
+    const implied =
+      Number.isFinite(step.staticDurationSeconds) && step.staticDurationSeconds > 0
+        ? (step.distanceMeters / step.staticDurationSeconds) * 2.237
+        : undefined;
+    const speed = stepSpeedMph ?? implied;
+    if (speed === undefined || speed >= LONG_STRAIGHT_HIGHWAY_MIN_MPH) return true;
   }
 
   if (stepSpeedMph !== undefined && stepSpeedMph >= 55) {
@@ -170,6 +179,11 @@ export const MERGE_COEFFICIENTS = {
 const MERGE_MANEUVERS = new Set(["MERGE", "RAMP_LEFT", "RAMP_RIGHT"]);
 const WEAVE_WINDOW_METERS = 500;
 
+/** A malformed step distance must not poison every later event position. */
+function positiveMeters(value: number): number {
+  return Number.isFinite(value) && value > 0 ? value : 0;
+}
+
 interface MergeEvent {
   distanceMeters: number;
   maneuver: string;
@@ -179,12 +193,16 @@ function collectMergeEvents(steps: RouteStep[]): MergeEvent[] {
   const events: MergeEvent[] = [];
   let cumulative = 0;
 
+  // A routing step's maneuver is performed where the step *begins*: "merge
+  // onto I-90" and then drive the step's distance. Placing it at the end of
+  // the step shifted every gap by one step, so two back-to-back ramps followed
+  // by a long cruise read as far apart.
   for (const step of steps) {
-    cumulative += step.distanceMeters;
     const maneuver = step.maneuver ?? "";
     if (MERGE_MANEUVERS.has(maneuver)) {
       events.push({ distanceMeters: cumulative, maneuver });
     }
+    cumulative += positiveMeters(step.distanceMeters);
   }
 
   return events;
@@ -332,7 +350,6 @@ function collectTurnEvents(steps: RouteStep[]): TurnEvent[] {
   let cumulative = 0;
 
   for (const step of steps) {
-    cumulative += step.distanceMeters;
     const maneuver = step.maneuver ?? "";
     if (isTurnManeuver(maneuver)) {
       events.push({
@@ -341,6 +358,7 @@ function collectTurnEvents(steps: RouteStep[]): TurnEvent[] {
         isSharp: isSharpManeuver(maneuver),
       });
     }
+    cumulative += positiveMeters(step.distanceMeters);
   }
 
   return events;
@@ -376,7 +394,9 @@ function countTurnClusters(events: TurnEvent[]): number {
 }
 
 function turnExponentialSpacingSum(events: TurnEvent[], tau: number): number {
-  if (events.length <= 1) return events.length > 0 ? 0.5 : 0;
+  // One turn has no neighbour to be close to. This used to return 0.5, so a
+  // second, distant turn *lowered* the spacing pressure.
+  if (events.length <= 1) return 0;
 
   let sum = 0;
   for (let i = 1; i < events.length; i++) {
@@ -392,11 +412,11 @@ function computePeakDecisionsPerMile(steps: RouteStep[]): number {
   let cumulative = 0;
 
   for (const step of steps) {
-    cumulative += step.distanceMeters;
     const maneuver = step.maneuver ?? "";
     if (maneuver && !TURN_EXCLUDED.has(maneuver)) {
       events.push({ distanceMeters: cumulative });
     }
+    cumulative += positiveMeters(step.distanceMeters);
   }
 
   if (events.length === 0) return 0;

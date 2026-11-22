@@ -217,6 +217,18 @@ struct ResultsView: View {
         Divider().padding(.leading, AppDesign.Menu.dividerInset)
     }
 
+    private var comparisonChoices: some View {
+        VStack(spacing: 6) {
+            if let ranking = routeChoiceRanking {
+                ForEach(ranking.choices) { choice in
+                    AlternateRouteCard(route: choice.route, isSelected: choice.route.id == selectedRoute.id,
+                        readinessHeadline: choice.assessment.headline, badges: choice.badges,
+                        comparisonLimitedByHistory: ranking.comparisonLimitedByHistory) { selectRouteChoice(choice) }
+                }
+            } else { ProgressView("Preparing routes") }
+        }
+    }
+
     private var comparisonSheet: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack {
@@ -226,25 +238,21 @@ struct ResultsView: View {
                     .foregroundStyle(labelColor).padding(.horizontal, 12).padding(.vertical, 7)
                     .background(labelColor.opacity(0.1), in: Capsule())
             }
-            ScrollView {
-                VStack(spacing: 6) {
-                    if let ranking = routeChoiceRanking {
-                        ForEach(ranking.choices) { choice in
-                            AlternateRouteCard(route: choice.route, isSelected: choice.route.id == selectedRoute.id,
-                                readinessHeadline: choice.assessment.headline, badges: choice.badges,
-                                comparisonLimitedByHistory: ranking.comparisonLimitedByHistory) { selectRouteChoice(choice) }
-                        }
-                    } else { ProgressView("Preparing routes") }
-                }
-            }
-            .scrollBounceBehavior(.basedOnSize)
-            .frame(maxHeight: 190)
+            // The list hugs its content up to the cap, so one or two routes
+            // leave no empty band and a longer list scrolls.
+            ScrollView { comparisonChoices }
+                .scrollBounceBehavior(.basedOnSize)
+                .frame(maxHeight: 190)
+                .fixedSize(horizontal: false, vertical: true)
             HStack {
                 Text(selectedRoute.reasons.first ?? selectedRoute.label.rawValue)
                     .font(.footnote).foregroundStyle(AppDesign.Ink.secondary).lineLimit(2)
                 Spacer(minLength: 8)
                 Button("Practice this route") { queuePracticeRoute() }
                     .font(.footnote.weight(.semibold))
+                    .frame(minHeight: 44)
+                    .contentShape(Rectangle())
+                    .padding(.vertical, -13)
                     .disabled(driveSession.isRecording)
                     .accessibilityIdentifier("routes.practiceSelected")
             }

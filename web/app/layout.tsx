@@ -59,6 +59,7 @@ export default function RootLayout({
                 <span className="hidden h-5 w-px bg-card-strong sm:block" />
                 <p className="text-xs text-ink-secondary">Route planning and coaching, not a safety guarantee.</p>
               </div>
+              <a href="/privacy" className="text-xs font-semibold text-ink-secondary underline-offset-4 hover:text-ink-primary hover:underline">Privacy Policy</a>
             </div>
           </footer>
         </body>

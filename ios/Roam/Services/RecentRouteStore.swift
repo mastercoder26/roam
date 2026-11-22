@@ -71,7 +71,9 @@ final class RecentRouteStore: ObservableObject {
     func record(origin: String, destination: String, departureTime: Date, route: ScoredRoute) {
         let trimmedOrigin = origin.trimmingCharacters(in: .whitespacesAndNewlines)
         let trimmedDestination = destination.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmedOrigin.isEmpty, !trimmedDestination.isEmpty else { return }
+        // A non-finite score cannot be JSON-encoded, so persisting it would
+        // fail for the entire list and silently drop every later entry too.
+        guard !trimmedOrigin.isEmpty, !trimmedDestination.isEmpty, route.score.isFinite else { return }
 
         var updated = entries.filter {
             !($0.origin == trimmedOrigin && $0.destination == trimmedDestination)
@@ -102,11 +104,23 @@ final class RecentRouteStore: ObservableObject {
 
     private func load() {
         guard let data = userDefaults.data(forKey: storageKey) else { return }
-        entries = (try? JSONDecoder().decode([RecentRouteEntry].self, from: data)) ?? []
+        // Decoded entry by entry: one row written by another build (an unknown
+        // difficulty label, a missing field) must not blank the whole list,
+        // which the next `record` would then overwrite for good.
+        let decoded = (try? JSONDecoder().decode([LossyRecentRouteEntry].self, from: data)) ?? []
+        entries = Array(decoded.compactMap(\.value).filter { $0.score.isFinite }.prefix(maxEntries))
     }
 
     private func persist() {
         guard let data = try? JSONEncoder().encode(entries) else { return }
         userDefaults.set(data, forKey: storageKey)
+    }
+}
+
+private struct LossyRecentRouteEntry: Decodable {
+    let value: RecentRouteEntry?
+
+    init(from decoder: Decoder) throws {
+        value = try? RecentRouteEntry(from: decoder)
     }
 }

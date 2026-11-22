@@ -7,12 +7,22 @@ function clerkSecretKey(): string {
   return secretKey;
 }
 
+function isNotFound(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    (error as { status?: unknown }).status === 404
+  );
+}
+
 export async function deleteClerkUser(clerkUserId: string): Promise<void> {
   try {
     const clerk = createClerkClient({ secretKey: clerkSecretKey() });
     await clerk.users.deleteUser(clerkUserId);
   } catch (error) {
     if (error instanceof AuthConfigurationError) throw error;
+    // Already gone (e.g. a retry after a response was lost): deletion is done.
+    if (isNotFound(error)) return;
     throw new ClerkAccountDeletionError(error);
   }
 }

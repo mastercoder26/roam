@@ -59,13 +59,43 @@ struct DrivingEvent: Identifiable, Codable, Hashable {
     let source: DrivingEventSource
     /// Present for GPS/fused events and for motion events after a GPS fix.
     let coordinate: DriveCoordinate?
+    /// How far past its detection threshold the maneuver measured, as a ratio
+    /// (1.0 is exactly at the threshold). Optional so events saved before
+    /// severity was recorded still decode; those are scored as typical.
+    let intensity: Double?
+    /// Vehicle speed at the maneuver. Optional for the same reason.
+    let speedMetersPerSecond: Double?
 
-    init(id: UUID = UUID(), kind: DrivingEventKind, timestamp: Date, source: DrivingEventSource, coordinate: DriveCoordinate? = nil) {
+    init(
+        id: UUID = UUID(),
+        kind: DrivingEventKind,
+        timestamp: Date,
+        source: DrivingEventSource,
+        coordinate: DriveCoordinate? = nil,
+        intensity: Double? = nil,
+        speedMetersPerSecond: Double? = nil
+    ) {
         self.id = id
         self.kind = kind
         self.timestamp = timestamp
         self.source = source
         self.coordinate = coordinate
+        self.intensity = intensity.flatMap { $0.isFinite && $0 > 0 ? $0 : nil }
+        self.speedMetersPerSecond = speedMetersPerSecond.flatMap { $0.isFinite && $0 >= 0 ? $0 : nil }
+    }
+
+    /// The same event with a different (or no) location. Used when a copy
+    /// leaves the device without coordinates and when one comes back.
+    func replacingCoordinate(with coordinate: DriveCoordinate?) -> DrivingEvent {
+        DrivingEvent(
+            id: id,
+            kind: kind,
+            timestamp: timestamp,
+            source: source,
+            coordinate: coordinate,
+            intensity: intensity,
+            speedMetersPerSecond: speedMetersPerSecond
+        )
     }
 }
 
@@ -78,9 +108,56 @@ struct DrivingScore: Codable {
     let motionSamples: Int
     let dataQuality: DriveDataQuality
 
-    var distanceMiles: Double { distanceMeters / 1_609.344 }
-    var topSpeedMPH: Int { Int((topSpeedMetersPerSecond * 2.23694).rounded()) }
+    init(
+        score: Int,
+        duration: TimeInterval,
+        distanceMeters: CLLocationDistance,
+        topSpeedMetersPerSecond: CLLocationSpeed,
+        events: [DrivingEvent],
+        motionSamples: Int,
+        dataQuality: DriveDataQuality
+    ) {
+        self.score = min(100, max(0, score))
+        self.duration = duration
+        self.distanceMeters = distanceMeters
+        self.topSpeedMetersPerSecond = topSpeedMetersPerSecond
+        self.events = events
+        self.motionSamples = motionSamples
+        self.dataQuality = dataQuality
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case score, duration, distanceMeters, topSpeedMetersPerSecond, events, motionSamples, dataQuality
+    }
+
+    /// Saved and synced history is the untrusted path, so it goes through the
+    /// same clamping as the designated initializer. Key names are unchanged.
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(
+            score: try values.decode(Int.self, forKey: .score),
+            duration: try values.decode(TimeInterval.self, forKey: .duration),
+            distanceMeters: try values.decode(CLLocationDistance.self, forKey: .distanceMeters),
+            topSpeedMetersPerSecond: try values.decode(CLLocationSpeed.self, forKey: .topSpeedMetersPerSecond),
+            events: try values.decode([DrivingEvent].self, forKey: .events),
+            motionSamples: try values.decode(Int.self, forKey: .motionSamples),
+            dataQuality: try values.decode(DriveDataQuality.self, forKey: .dataQuality)
+        )
+    }
+
+    var distanceMiles: Double {
+        distanceMeters.isFinite ? max(0, distanceMeters) / 1_609.344 : 0
+    }
+
+    /// Converting a non-finite or absurd Double to Int traps, so a corrupt
+    /// saved speed must not be able to crash the history screen.
+    var topSpeedMPH: Int {
+        guard topSpeedMetersPerSecond.isFinite else { return 0 }
+        return Int((min(max(topSpeedMetersPerSecond, 0), 500) * 2.23694).rounded())
+    }
+
     var formattedDuration: String {
+        guard duration.isFinite, duration >= 0 else { return "0s" }
         let formatter = DateComponentsFormatter()
         formatter.allowedUnits = duration >= 3_600 ? [.hour, .minute] : [.minute, .second]
         formatter.unitsStyle = .abbreviated
@@ -101,17 +178,36 @@ struct DrivingScore: Codable {
         }
     }
 
+    /// The kind of event that cost this drive the most, after severity, speed
+    /// and maneuver grouping. Ties resolve in declaration order so the answer
+    /// is the same every time it is asked.
+    var primaryFocus: DrivingEventKind? {
+        let shares = DriveScoringEngine.penaltyShare(from: events)
+        var best: (kind: DrivingEventKind, points: Double)?
+        for kind in DrivingEventKind.allCases {
+            guard let points = shares[kind], points > 0 else { continue }
+            if best == nil || points > best!.points { best = (kind, points) }
+        }
+        return best?.kind
+    }
+
     var summary: String {
         guard dataQuality.confidence != .low else {
             return dataQuality.summary
         }
-        guard !events.isEmpty else {
-            return "Smooth trip. Keep leaving room to brake and taking turns calmly."
+        guard let focus = primaryFocus else {
+            return "No hard braking, rapid acceleration, or sharp cornering was detected. Keep leaving room to brake and taking turns calmly."
         }
-        let mostCommon = Dictionary(grouping: events, by: \.kind)
-            .max { $0.value.count < $1.value.count }?.key
-        return mostCommon.map { "Focus on fewer \($0.title.lowercased()) events next drive." }
-            ?? "Review this trip before the next drive."
+        switch focus {
+        case .hardBrake:
+            return "Hard braking cost the most on this drive. Look further ahead and leave more room so you can slow down earlier."
+        case .rapidAcceleration:
+            return "Rapid acceleration cost the most on this drive. Build speed more gradually next time."
+        case .sharpCorner:
+            return "Sharp cornering cost the most on this drive. Slow down before the turn rather than in it."
+        case .phoneMovement:
+            return "Abrupt phone movement was the main thing detected. Secure the phone in a mount before your next drive."
+        }
     }
 
     func count(for kind: DrivingEventKind) -> Int {
